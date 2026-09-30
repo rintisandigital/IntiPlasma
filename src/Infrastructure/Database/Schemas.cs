@@ -11,4 +11,6 @@ internal static class Schemas
     public const string MasterData = "master";
     public const string Partnership = "partnership";
     public const string Finance = "finance";
+    public const string Procurement = "procurement";
+    public const string Inventory = "inventory";
 }

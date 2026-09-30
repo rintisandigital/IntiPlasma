@@ -6,6 +6,9 @@ using Domain.Finance.FiscalPeriods;
 using Domain.Finance.JournalMappings;
 using Domain.Finance.Journals;
 using Domain.Finance.JournalTemplates;
+using Domain.Inventory.GoodsReceipts;
+using Domain.Inventory.Stock;
+using Domain.Inventory.StockTransfers;
 using Domain.MasterData.Branches;
 using Domain.MasterData.Coops;
 using Domain.MasterData.Customers;
@@ -17,6 +20,7 @@ using Domain.MasterData.Vendors;
 using Domain.MasterData.Warehouses;
 using Domain.Partnership.Contracts;
 using Domain.Partnership.Cycles;
+using Domain.Procurement.PurchaseOrders;
 using Domain.Roles;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
@@ -71,6 +75,16 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
     public DbSet<JournalTemplate> JournalTemplates { get; set; }
 
     public DbSet<JournalMapping> JournalMappings { get; set; }
+
+    public DbSet<PurchaseOrder> PurchaseOrders { get; set; }
+
+    public DbSet<GoodsReceipt> GoodsReceipts { get; set; }
+
+    public DbSet<StockTransfer> StockTransfers { get; set; }
+
+    public DbSet<StockBalance> StockBalances { get; set; }
+
+    public DbSet<StockLedgerEntry> StockLedgerEntries { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -131,5 +145,33 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
 
         modelBuilder.Entity<JournalMapping>().Navigation(m => m.Lines).HasField("_lines");
         modelBuilder.Entity<JournalMappingLine>().HasKey(l => new { l.JournalMappingId, l.Component });
+
+        modelBuilder.Entity<PurchaseOrder>().Navigation(o => o.Lines).HasField("_lines");
+        modelBuilder.Entity<PurchaseOrderLine>(b =>
+        {
+            b.HasKey(l => new { l.PurchaseOrderId, l.LineNumber });
+            b.OwnsOne(l => l.UnitPrice);
+        });
+
+        modelBuilder.Entity<GoodsReceipt>().Navigation(r => r.Lines).HasField("_lines");
+        modelBuilder.Entity<GoodsReceiptLine>(b =>
+        {
+            b.HasKey(l => new { l.GoodsReceiptId, l.LineNumber });
+            b.OwnsOne(l => l.Value);
+        });
+
+        modelBuilder.Entity<StockTransfer>().Navigation(t => t.Lines).HasField("_lines");
+        modelBuilder.Entity<StockTransferLine>(b =>
+        {
+            b.HasKey(l => new { l.StockTransferId, l.LineNumber });
+            b.OwnsOne(l => l.Value);
+        });
+
+        modelBuilder.Entity<StockBalance>().OwnsOne(b => b.Value);
+        modelBuilder.Entity<StockLedgerEntry>(b =>
+        {
+            b.OwnsOne(e => e.Value);
+            b.OwnsOne(e => e.BalanceValue);
+        });
     }
 }

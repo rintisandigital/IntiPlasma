@@ -22,4 +22,8 @@ public static class Tags
     public const string JournalMappings = "Finance - Auto Journal Mappings";
     public const string Journals = "Finance - Journals";
     public const string FinanceReports = "Finance - Reports";
+    public const string PurchaseOrders = "Purchasing - Purchase Orders";
+    public const string GoodsReceipts = "Inventory - Goods Receipts";
+    public const string StockTransfers = "Inventory - Stock Transfers";
+    public const string Stock = "Inventory - Stock";
 }

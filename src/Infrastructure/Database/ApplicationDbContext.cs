@@ -6,6 +6,9 @@ using Domain.Finance.FiscalPeriods;
 using Domain.Finance.JournalMappings;
 using Domain.Finance.Journals;
 using Domain.Finance.JournalTemplates;
+using Domain.Inventory.GoodsReceipts;
+using Domain.Inventory.Stock;
+using Domain.Inventory.StockTransfers;
 using Domain.MasterData.Branches;
 using Domain.MasterData.Coops;
 using Domain.MasterData.Customers;
@@ -17,6 +20,7 @@ using Domain.MasterData.Vendors;
 using Domain.MasterData.Warehouses;
 using Domain.Partnership.Contracts;
 using Domain.Partnership.Cycles;
+using Domain.Procurement.PurchaseOrders;
 using Domain.Roles;
 using Domain.Users;
 using Infrastructure.Numbering;
@@ -75,6 +79,16 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<JournalTemplate> JournalTemplates { get; set; }
 
     public DbSet<JournalMapping> JournalMappings { get; set; }
+
+    public DbSet<PurchaseOrder> PurchaseOrders { get; set; }
+
+    public DbSet<GoodsReceipt> GoodsReceipts { get; set; }
+
+    public DbSet<StockTransfer> StockTransfers { get; set; }
+
+    public DbSet<StockBalance> StockBalances { get; set; }
+
+    public DbSet<StockLedgerEntry> StockLedgerEntries { get; set; }
 
     internal DbSet<OutboxMessage> OutboxMessages { get; set; }
 

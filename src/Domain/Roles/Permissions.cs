@@ -71,6 +71,30 @@ public static class Permissions
     /// </summary>
     public const string FinanceReportsRead = "finance-reports:read";
 
+    public const string PurchasingRead = "purchasing:read";
+
+    /// <summary>
+    /// Create, edit, cancel and close purchase orders.
+    /// </summary>
+    public const string PurchasingManage = "purchasing:manage";
+
+    public const string PurchasingApprove = "purchasing:approve";
+
+    /// <summary>
+    /// Stock balances, stock cards, goods receipts and transfers (read only).
+    /// </summary>
+    public const string InventoryRead = "inventory:read";
+
+    /// <summary>
+    /// Post goods receipts (bukti penerimaan barang).
+    /// </summary>
+    public const string InventoryReceive = "inventory:receive";
+
+    /// <summary>
+    /// Post stock transfers, including sapronak deliveries to coops.
+    /// </summary>
+    public const string InventoryTransfer = "inventory:transfer";
+
     public static readonly IReadOnlyList<string> All =
     [
         UsersRead,
@@ -97,7 +121,13 @@ public static class Permissions
         JournalsCreate,
         JournalsApprove,
         JournalsPost,
-        FinanceReportsRead
+        FinanceReportsRead,
+        PurchasingRead,
+        PurchasingManage,
+        PurchasingApprove,
+        InventoryRead,
+        InventoryReceive,
+        InventoryTransfer
     ];
 
     public static bool Exists(string permission) => All.Contains(permission);

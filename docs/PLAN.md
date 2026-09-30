@@ -146,13 +146,13 @@ tests/
 - Journal Mapping (Auto Journal Engine) + handler integration event.
 - Query: Buku Besar, Ledger Mutation, Trial Balance.
 
-### Fase 3 — Pengadaan & Gudang
+### Fase 3 — Pengadaan & Gudang ✅ (selesai 2026-09-30, lihat §9)
 - Purchase Order (DOC/Pakan/OVK) → Goods Receipt (ke gudang induk **atau** langsung ke siklus untuk DOC).
 - Stock Transfer gudang induk → kandang/siklus; kartu stok; saldo stok; valuasi (moving average).
 - Event → auto journal persediaan.
 
 ### Fase 4 — Produksi
-- Chick-in (dari penerimaan DOC), Daily Recording (mati, culling, bobot rata-rata, pakan terpakai, OVK terpakai).
+- Chick-in (dari penerimaan DOC), Daily Recording (mati, culling, bobot rata-rata, pakan terpakai, OVK terpakai), Revisi Daily Recording, Mutasi Pakan.
 - Kalkulasi otomatis: populasi, deplesi, FCR, ADG, IP (query read model per siklus/hari).
 - Tutup siklus (CycleClosing) + ringkasan performa.
 
@@ -296,3 +296,36 @@ Migration: `Phase2_FinanceCore` (schema `finance`). Semua endpoint di bawah `/ap
 - Belum ada penutupan tahun (laba/rugi → laba ditahan); dikerjakan di Fase 8. Sampai itu, saldo akun pendapatan/beban terakumulasi lintas tahun di neraca saldo.
 - Use case Finance ditulis satu file per use case (command + validator + handler) agar ringkas.
 - Diverifikasi end-to-end ke PostgreSQL lokal (database sementara): seed COA & mapping, jurnal tidak seimbang/akun header ditolak, self-approval ditolak, approve & post oleh checker, reverse, buku besar & neraca saldo seimbang, preview mapping, override mapping per cabang, aturan tutup/buka periode, posting ke periode tertutup ditolak.
+
+---
+
+## 9. Realisasi Fase 3 — Pengadaan & Gudang
+
+Migration: `Phase3_ProcurementInventory` (schema `procurement` & `inventory`).
+
+**Purchase Order** (`/api/v1/purchase-orders`)
+- `Draft → Approved → PartiallyReceived → Received`, bisa `Closed` (sisa tidak dikirim) atau `Cancelled` (sebelum ada penerimaan).
+- Hanya item sapronak aktif (DOC/Pakan/OVK), satuan = satuan dasar atau konversi item (mis. pakan dipesan per SAK), harga per satuan pesan **exclude PPN**, kode PPN opsional (dipakai di invoice vendor, Fase 6).
+- Nomor `PO/{cabang}/{yyyy}/{bulan romawi}/{nnnn}`; tidak bisa diterima sebelum di-approve; tidak boleh over-receipt.
+
+**Penerimaan Barang / BPB** (`/api/v1/inventory/goods-receipts`)
+- Terhadap PO; jumlah per baris PO (satuan PO) dikonversi ke satuan dasar; nilai = harga PO × qty.
+- Pakan & OVK → **gudang induk**. **DOC boleh langsung ke gudang kandang** → otomatis masuk ke siklus terbuka kandang tsb.
+- Jurnal otomatis (outbox): `PurchaseReceipt` (Dr Persediaan DOC/Pakan/OVK, Cr GRNI). DOC langsung ke kandang juga `StockTransferToCycle` (Dr Ayam Dalam Proses, Cr Persediaan DOC).
+
+**Transfer Stok / Kirim Sapronak** (`/api/v1/inventory/stock-transfers`)
+- Dari gudang induk ke gudang induk lain (satu cabang, tanpa jurnal) atau ke **gudang kandang** → dibebankan ke **siklus terbuka** kandang (ditentukan otomatis; ditolak bila kandang tidak punya siklus terbuka).
+- Keluar dengan harga rata-rata (moving average) saat itu; nilai masuk di tujuan = nilai keluar (tanpa selisih pembulatan).
+- Jurnal otomatis ke kandang: `StockTransferToCycle` (Dr Ayam Dalam Proses, Cr Persediaan).
+
+**Stok** (`/api/v1/inventory/stock-balances`, `/api/v1/inventory/stock-card`)
+- Saldo per (gudang, item): qty satuan dasar, nilai, **harga rata-rata bergerak**; stok tidak bisa minus.
+- Kartu stok: saldo awal, mutasi (termasuk nomor siklus untuk gudang kandang), saldo berjalan & akhir.
+
+**Permission baru**: `purchasing:read/manage/approve`, `inventory:read/receive/transfer`.
+
+**Catatan teknis**
+- Konflik konkurensi (dua transaksi mengubah saldo stok yang sama bersamaan) dan pelanggaran unique index kini dikembalikan sebagai **409** (bukan 500) → aman untuk di-*retry* klien.
+- Stok di gudang kandang sudah menjadi biaya siklus (WIP); pemakaian harian (Fase 4) hanya mengurangi kuantitas untuk FCR, **retur/mutasi pakan antar kandang** dikerjakan di Fase 4 bersama "Mutasi Pakan".
+- Kegagalan jurnal otomatis (mis. periode tutup, mapping belum ada) tercatat di `infrastructure.outbox_messages.error` setelah retry; perlu layar monitoring di WebApp nanti.
+- Diverifikasi end-to-end ke PostgreSQL lokal (database sementara): moving average (60 SAK @430rb + 40 SAK @440rb = Rp 8.680/kg), transfer 30 SAK = Rp 13.020.000, DOC langsung ke kandang, 5 jurnal otomatis, neraca saldo seimbang (Persediaan Pakan 30,38 jt; Ayam Dalam Proses 50,52 jt; GRNI 80,9 jt), serta penolakan: PO draft, satuan salah, pakan ke kandang, over-receipt, stok kurang, kandang tanpa siklus.
