@@ -2,6 +2,7 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Inventory;
+using Application.Sales;
 using Domain.MasterData.Items;
 using Domain.MasterData.Warehouses;
 using Domain.Partnership.Cycles;
@@ -17,8 +18,9 @@ namespace Application.Production;
 public sealed record RecordHarvestCommand(Guid CycleId, DateOnly Date, int Birds, decimal WeightKg, string? Notes) : ICommand<Guid>;
 
 /// <summary>
-/// Tutup siklus: requires the whole population to be harvested (or recorded as dead/culled) and the coop warehouse
-/// to be empty (leftover feed/OVK returned to the central warehouse). Freezes the performance summary used by the
+/// Tutup siklus: requires the whole population to be harvested (or recorded as dead/culled), the coop warehouse
+/// to be empty (leftover feed/OVK returned to the central warehouse) and every harvest to be sold (on a delivery order
+/// billed by a posted sales invoice). Freezes the performance summary used by the
 /// plasma settlement.
 /// </summary>
 public sealed record CloseCycleCommand(Guid CycleId) : ICommand<CyclePerformance>;
@@ -90,6 +92,14 @@ internal sealed class CloseCycleCommandHandler(IApplicationDbContext context, IB
         if (leftovers.Count > 0)
         {
             return Result.Failure<CyclePerformance>(CycleErrors.LeftoverStock(string.Join(", ", leftovers)));
+        }
+
+        int unsold = await SalesSupport.UnsoldHarvestCountAsync(
+            context, [.. cycle.Value.Harvests.Select(h => h.Id)], cancellationToken);
+
+        if (unsold > 0)
+        {
+            return Result.Failure<CyclePerformance>(CycleErrors.UnsoldHarvest(unsold));
         }
 
         decimal feedKg = await ProductionSupport.FeedUsedKgAsync(context, cycle.Value.Id, null, cancellationToken);

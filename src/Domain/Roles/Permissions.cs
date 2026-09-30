@@ -117,6 +117,46 @@ public static class Permissions
     /// </summary>
     public const string InventoryReturn = "inventory:return";
 
+    /// <summary>
+    /// Sales orders, delivery orders and sales invoices (read only).
+    /// </summary>
+    public const string SalesRead = "sales:read";
+
+    /// <summary>
+    /// Create, edit, cancel and close sales orders.
+    /// </summary>
+    public const string SalesManage = "sales:manage";
+
+    /// <summary>
+    /// Approve sales orders within the customer's credit limit.
+    /// </summary>
+    public const string SalesApprove = "sales:approve";
+
+    /// <summary>
+    /// Approve sales orders above the customer's credit limit (with a reason).
+    /// </summary>
+    public const string SalesCreditOverride = "sales:credit-override";
+
+    /// <summary>
+    /// Create and cancel delivery orders (surat jalan) of harvested birds.
+    /// </summary>
+    public const string SalesDeliver = "sales:deliver";
+
+    /// <summary>
+    /// Create, post and cancel (draft) sales invoices.
+    /// </summary>
+    public const string SalesInvoice = "sales:invoice";
+
+    /// <summary>
+    /// Customer receipts, receivable ledger and aging (read only).
+    /// </summary>
+    public const string ReceivablesRead = "receivables:read";
+
+    /// <summary>
+    /// Record customer receipts (penerimaan pembayaran).
+    /// </summary>
+    public const string ReceivablesManage = "receivables:manage";
+
     public static readonly IReadOnlyList<string> All =
     [
         UsersRead,
@@ -154,7 +194,15 @@ public static class Permissions
         ProductionRead,
         ProductionRecord,
         ProductionRevise,
-        ProductionClose
+        ProductionClose,
+        SalesRead,
+        SalesManage,
+        SalesApprove,
+        SalesCreditOverride,
+        SalesDeliver,
+        SalesInvoice,
+        ReceivablesRead,
+        ReceivablesManage
     ];
 
     public static bool Exists(string permission) => All.Contains(permission);

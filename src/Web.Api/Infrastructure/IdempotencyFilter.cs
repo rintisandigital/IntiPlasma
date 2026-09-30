@@ -1,5 +1,7 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Options;
 
 namespace Web.Api.Infrastructure;
 
@@ -12,7 +14,7 @@ namespace Web.Api.Infrastructure;
 /// Responses are kept in HybridCache. Without a distributed cache backend this is per instance;
 /// add a Redis L2 cache before scaling out to multiple instances.
 /// </remarks>
-internal sealed class IdempotencyFilter(HybridCache cache) : IEndpointFilter
+internal sealed class IdempotencyFilter(HybridCache cache, IOptions<JsonOptions> jsonOptions) : IEndpointFilter
 {
     public const string HeaderName = "Idempotency-Key";
 
@@ -47,9 +49,12 @@ internal sealed class IdempotencyFilter(HybridCache cache) : IEndpointFilter
         {
             object? value = (result as IValueHttpResult)?.Value;
 
+            // Same serializer options as the API (camelCase, enums by name), so a replay looks exactly like the original.
+            string body = JsonSerializer.Serialize(value, jsonOptions.Value.SerializerOptions);
+
             await cache.SetAsync(
                 cacheKey,
-                new IdempotentResponse(statusResult.StatusCode.Value, JsonSerializer.Serialize(value)),
+                new IdempotentResponse(statusResult.StatusCode.Value, body),
                 CacheOptions,
                 cancellationToken: httpContext.RequestAborted);
         }

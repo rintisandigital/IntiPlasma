@@ -4,6 +4,7 @@ using Domain.Finance.FiscalPeriods;
 using Domain.Finance.JournalMappings;
 using Domain.Finance.Journals;
 using Domain.Finance.JournalTemplates;
+using Domain.Finance.Receivables;
 using Domain.Inventory.GoodsReceipts;
 using Domain.Inventory.Stock;
 using Domain.Inventory.StockReturns;
@@ -22,6 +23,9 @@ using Domain.Partnership.Cycles;
 using Domain.Procurement.PurchaseOrders;
 using Domain.Production.DailyRecordings;
 using Domain.Roles;
+using Domain.Sales.DeliveryOrders;
+using Domain.Sales.SalesInvoices;
+using Domain.Sales.SalesOrders;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
 
@@ -65,6 +69,11 @@ public interface IApplicationDbContext
     DbSet<StockReturn> StockReturns { get; }
 
     DbSet<DailyRecording> DailyRecordings { get; }
+
+    DbSet<SalesOrder> SalesOrders { get; }
+    DbSet<DeliveryOrder> DeliveryOrders { get; }
+    DbSet<SalesInvoice> SalesInvoices { get; }
+    DbSet<CustomerReceipt> CustomerReceipts { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

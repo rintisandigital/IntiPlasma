@@ -156,7 +156,7 @@ tests/
 - Kalkulasi otomatis: populasi, deplesi, FCR, ADG, IP (query read model per siklus/hari).
 - Tutup siklus (CycleClosing) + ringkasan performa.
 
-### Fase 5 — Penjualan & AR
+### Fase 5 — Penjualan & AR ✅ (selesai 2026-10-01, lihat §11)
 - Sales Order/Kontrak customer → Delivery Order (panen, timbangan ekor & kg, per truk) → Sales Invoice.
 - Customer Receipt (bank/kas), partial payment, AR ledger & AR aging.
 
@@ -374,3 +374,52 @@ Migration: `Phase4_Production` (schema `production`, tabel retur di `inventory`,
 **Catatan**
 - Respons siklus kini menyertakan `totalMortality`, `totalCulling`, `harvestedBirds`, `harvestedWeightKg`, `currentPopulation`, `closedDate`.
 - Diverifikasi end-to-end ke PostgreSQL lokal (database sementara): chick-in dari stok DOC kandang, recording + retry offline (id sama) + tolak tanggal ganda/masa depan/DOC sebagai pakai, revisi (alasan wajib, riwayat tersimpan, stok terkoreksi), retur kandang→kandang ditolak, mutasi A→induk→B, kartu stok induk, performa harian, panen melebihi populasi ditolak, tutup ditolak selama masih ada sisa pakan lalu berhasil setelah retur, recording setelah tutup ditolak; 8 jurnal otomatis tanpa error; neraca saldo seimbang (Ayam Dalam Proses 14,45 jt = siklus A 8,45 jt [DOC 7,5 jt + pakan 90 kg + 1 vial OVK] + siklus B 6 jt).
+
+---
+
+## 11. Realisasi Fase 5 — Penjualan & AR
+
+Migration: `Phase5_SalesReceivables` (schema `sales`; tabel penerimaan di `finance`).
+
+**Keputusan (2026-10-01)**
+- **HPP ditunda**: invoice penjualan hanya menjurnal piutang, penjualan, dan PPN keluaran. Pengakuan HPP (Dr HPP / Cr Ayam Dalam Proses) dikerjakan di Fase 7 dari biaya siklus. Komponen `CostOfGoodsSold` di katalog `SalesInvoice` tetap ada tetapi belum dikirim.
+- **Sales Order wajib sebelum DO.**
+
+**Sales Order** (`/api/v1/sales/orders`)
+- `Draft → Approved → PartiallyDelivered → Delivered`, bisa `Closed` (sisa tidak dikirim) atau `Cancelled` (sebelum ada pengiriman). Nomor `SO/{cabang}/{yyyy}/{bulan romawi}/{nnnn}`.
+- Baris: item **ayam hidup** aktif, jumlah **ekor** (kuantitas yang mengikat), estimasi kg, harga per kg (exclude PPN), kode PPN opsional.
+- **Credit limit dicek saat approve**. Exposure customer mencakup seluruh cabang: outstanding invoice terposting, draft invoice, DO yang belum ditagih, dan sisa estimasi SO lain yang masih terbuka (tanpa PPN). Exposure + nilai SO ini tidak boleh melebihi limit. Limit 0 berarti tidak ada kredit.
+- Jika melebihi limit, SO hanya bisa di-approve lewat `POST {id}/approve-over-limit` dengan alasan dan permission `sales:credit-override`. Alasan disimpan di `creditOverrideReason`.
+
+**Delivery Order / Surat Jalan** (`/api/v1/sales/delivery-orders`)
+- Setiap baris adalah **satu data panen** (`cycle_harvests`, biasanya satu truk) dan dikirim utuh: ekor & kg hasil timbang panen yang dijual. Harga/kg & kode PPN di-*snapshot* dari baris SO.
+- Satu panen hanya boleh ada di **satu DO aktif** (dicek aplikasi + partial unique index `ix_delivery_order_lines_harvest_id_active`). Ekor tidak boleh melebihi sisa SO. Panen harus dari cabang SO. Tanggal DO ≥ tanggal SO & tanggal panen.
+- Status `Delivered → Invoiced`. `cancel` hanya untuk DO yang belum ditagih: ekor kembali ke sisa SO dan panen bisa di-DO ulang.
+- `GET /api/v1/sales/undelivered-harvests?branchId=&cycleId=` menampilkan panen yang belum masuk DO.
+
+**Sales Invoice** (`/api/v1/sales/invoices`)
+- Dibuat sebagai **Draft** dari satu atau lebih DO (customer & cabang sama). Draft **belum bernomor**. Jatuh tempo = tanggal invoice + termin customer.
+- PPN per baris mengikuti kode PPN & tarif yang berlaku pada tanggal invoice: `Taxable` → DPP = nilai × rasio DPP, PPN = DPP × tarif. `Exempt`/`NotCollected`/tanpa kode → tanpa PPN. Invoice ditolak jika kode Taxable tidak punya tarif pada tanggal tersebut.
+- `post` memberi nomor `INV/...` (posting tanpa celah nomor) dan memicu jurnal `SalesInvoice`: Dr Piutang Usaha / Cr Penjualan Ayam Hidup (DPP) dan Dr Piutang / Cr PPN Keluaran. Invoice terposting final (koreksi lewat nota kredit, belum ada).
+- `cancel` hanya untuk draft; DO-nya bisa ditagih lagi.
+
+**Penerimaan Pembayaran Customer** (`/api/v1/finance/customer-receipts`)
+- Per cabang & customer, diterima ke **akun kas/bank** yang dipilih (akun aset postable & aktif), dialokasikan ke satu atau lebih invoice terposting. Pembayaran parsial boleh, tetapi tidak boleh melebihi outstanding. Tanggal ≥ tanggal invoice. Nomor `RCV/...`.
+- Invoice menjadi `PartiallyPaid` / `Paid`. Jurnal `CustomerReceipt`: Dr akun kas/bank penerimaan (override per transaksi) / Cr Piutang Usaha.
+
+**Laporan piutang** (`/api/v1/finance/receivables`)
+- `ledger?customerId=&from=&to=[&branchId=]` (kartu piutang): saldo awal, invoice (debit) & penerimaan (kredit) dengan saldo berjalan, saldo akhir.
+- `aging?asOf=[&branchId=&customerId=]`: outstanding per invoice pada tanggal tersebut (hanya memperhitungkan penerimaan s.d. tanggal itu), dikelompokkan *belum jatuh tempo* / 1–30 / 31–60 / 61–90 / >90 hari lewat jatuh tempo, per customer & total.
+
+**Tutup siklus** — syarat baru: setiap panen siklus harus ada di DO yang ditagih oleh invoice **terposting** (`Cycles.UnsoldHarvest`). Draft invoice belum dihitung terjual.
+
+**Permission baru**: `sales:read/manage/approve/credit-override/deliver/invoice`, `receivables:read/manage`.
+
+**Perbaikan lain**
+- `IdempotencyFilter` kini menyimpan respons dengan opsi JSON API (camelCase, enum sebagai nama). Sebelumnya respons *replay* memakai PascalCase sehingga berbeda dari respons pertama (bug Fase 0).
+
+**Catatan**
+- `TaxRate.TaxBaseRatio` disimpan dengan presisi (10,8), sehingga 11/12 tersimpan sebagai 0,91666667. Contoh hasil verifikasi: DPP 40.400.000 → PPN 4.444.000,02 (seharusnya 4.444.000). Perlu keputusan: simpan rasio sebagai pecahan (pembilang/penyebut) atau pakai tarif efektif 11% dengan rasio 1. Konfirmasi ke konsultan pajak.
+- Penerimaan belum bisa dibatalkan/di-*void*. Koreksi saat ini hanya lewat jurnal manual (status invoice tidak ikut terkoreksi). Kandidat Fase 6 bersama Cash & Bank.
+- Belum ada uang muka penjualan (deposit) maupun nota kredit/retur penjualan.
+- Diverifikasi end-to-end ke PostgreSQL lokal (database sementara), **43 skenario lulus**: penolakan item non-ayam, credit limit (ditolak lalu override dengan alasan), batal SO, DO + replay idempotency, panen ganda (409), DO ke SO batal / sebelum tanggal panen, panen belum terkirim, batal DO mengembalikan sisa SO, draft invoice (tanpa nomor, DO terkunci, batal draft melepas DO), PPN dengan rasio DPP, jatuh tempo, posting bernomor & final, penerimaan parsial (tolak lebih bayar & akun non-aset), kartu piutang, aging (1–30 hari & per tanggal lampau), 2 jurnal otomatis tanpa error, neraca saldo seimbang (Piutang 14.844.000,02; Penjualan 40.400.000; PPN Keluaran 4.444.000,02; Bank 30.000.000), tutup siklus ditolak selama panen belum terjual/invoice masih draft lalu berhasil setelah posting.

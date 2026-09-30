@@ -6,6 +6,7 @@ using Domain.Finance.FiscalPeriods;
 using Domain.Finance.JournalMappings;
 using Domain.Finance.Journals;
 using Domain.Finance.JournalTemplates;
+using Domain.Finance.Receivables;
 using Domain.Inventory.GoodsReceipts;
 using Domain.Inventory.Stock;
 using Domain.Inventory.StockReturns;
@@ -24,6 +25,9 @@ using Domain.Partnership.Cycles;
 using Domain.Procurement.PurchaseOrders;
 using Domain.Production.DailyRecordings;
 using Domain.Roles;
+using Domain.Sales.DeliveryOrders;
+using Domain.Sales.SalesInvoices;
+using Domain.Sales.SalesOrders;
 using Domain.Users;
 using Infrastructure.Numbering;
 using Infrastructure.Outbox;
@@ -95,6 +99,14 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<StockReturn> StockReturns { get; set; }
 
     public DbSet<DailyRecording> DailyRecordings { get; set; }
+
+    public DbSet<SalesOrder> SalesOrders { get; set; }
+
+    public DbSet<DeliveryOrder> DeliveryOrders { get; set; }
+
+    public DbSet<SalesInvoice> SalesInvoices { get; set; }
+
+    public DbSet<CustomerReceipt> CustomerReceipts { get; set; }
 
     internal DbSet<OutboxMessage> OutboxMessages { get; set; }
 

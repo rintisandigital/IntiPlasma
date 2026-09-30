@@ -145,12 +145,11 @@ public sealed class ProductionHandlersTests : BaseHandlerTest
                 [new StockTransferLineRequest(s.Feed.Id, s.Kg.Id, 500m)]),
             CancellationToken.None);
 
+        // With the stock returned, the harvest still has to be sold (see SalesHandlersTests for a successful close).
         Result<CyclePerformance> closed = await close.Handle(new CloseCycleCommand(s.CycleA.Id), CancellationToken.None);
 
-        closed.IsSuccess.ShouldBeTrue();
-        closed.Value.HarvestedBirds.ShouldBe(1_000);
-        closed.Value.AverageWeightKg.ShouldBe(2m);
-        (await context.ProductionCycles.SingleAsync(c => c.Id == s.CycleA.Id)).Status.ShouldBe(CycleStatus.Closed);
+        closed.Error.ShouldBe(CycleErrors.UnsoldHarvest(1));
+        (await context.ProductionCycles.SingleAsync(c => c.Id == s.CycleA.Id)).Status.ShouldBe(CycleStatus.Harvesting);
     }
 
     private static async Task StartAsync(TestDbContext context, Setup s) =>

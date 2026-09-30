@@ -50,6 +50,10 @@ public static class CycleErrors
         "Cycles.LeftoverStock",
         $"The coop warehouse still holds {itemCodes}; return the leftover sapronak to the central warehouse before closing");
 
+    public static Error UnsoldHarvest(int harvests) => Error.Problem(
+        "Cycles.UnsoldHarvest",
+        $"{harvests} harvest(s) of the cycle are not yet on a delivery order with a posted sales invoice");
+
     public static Error InsufficientDoc(int requested, decimal available) => Error.Problem(
         "Cycles.InsufficientDoc",
         $"Chick-in of {requested} birds needs that much DOC in the coop warehouse, but only {available:0} is there");

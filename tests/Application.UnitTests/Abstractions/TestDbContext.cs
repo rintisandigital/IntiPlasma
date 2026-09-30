@@ -6,6 +6,7 @@ using Domain.Finance.FiscalPeriods;
 using Domain.Finance.JournalMappings;
 using Domain.Finance.Journals;
 using Domain.Finance.JournalTemplates;
+using Domain.Finance.Receivables;
 using Domain.Inventory.GoodsReceipts;
 using Domain.Inventory.Stock;
 using Domain.Inventory.StockReturns;
@@ -24,6 +25,9 @@ using Domain.Partnership.Cycles;
 using Domain.Procurement.PurchaseOrders;
 using Domain.Production.DailyRecordings;
 using Domain.Roles;
+using Domain.Sales.DeliveryOrders;
+using Domain.Sales.SalesInvoices;
+using Domain.Sales.SalesOrders;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
 
@@ -91,6 +95,14 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
     public DbSet<StockReturn> StockReturns { get; set; }
 
     public DbSet<DailyRecording> DailyRecordings { get; set; }
+
+    public DbSet<SalesOrder> SalesOrders { get; set; }
+
+    public DbSet<DeliveryOrder> DeliveryOrders { get; set; }
+
+    public DbSet<SalesInvoice> SalesInvoices { get; set; }
+
+    public DbSet<CustomerReceipt> CustomerReceipts { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -208,5 +220,48 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
         });
         modelBuilder.Entity<DailyRecordingRevision>().HasKey(v => new { v.DailyRecordingId, v.RevisionNumber });
         modelBuilder.Entity<CycleHarvest>().Property(h => h.Id).ValueGeneratedNever();
+
+        modelBuilder.Entity<SalesOrder>().Navigation(o => o.Lines).HasField("_lines");
+        modelBuilder.Entity<SalesOrderLine>(b =>
+        {
+            b.HasKey(l => new { l.SalesOrderId, l.LineNumber });
+            b.OwnsOne(l => l.PricePerKg);
+        });
+
+        modelBuilder.Entity<DeliveryOrder>().Navigation(d => d.Lines).HasField("_lines");
+        modelBuilder.Entity<DeliveryOrderLine>(b =>
+        {
+            b.HasKey(l => new { l.DeliveryOrderId, l.LineNumber });
+            b.OwnsOne(l => l.PricePerKg);
+            b.OwnsOne(l => l.Amount);
+        });
+
+        modelBuilder.Entity<SalesInvoice>(b =>
+        {
+            b.Navigation(i => i.Lines).HasField("_lines");
+            b.OwnsOne(i => i.Subtotal);
+            b.OwnsOne(i => i.VatAmount);
+            b.OwnsOne(i => i.Total);
+            b.OwnsOne(i => i.PaidAmount);
+        });
+        modelBuilder.Entity<SalesInvoiceLine>(b =>
+        {
+            b.HasKey(l => new { l.SalesInvoiceId, l.LineNumber });
+            b.OwnsOne(l => l.PricePerKg);
+            b.OwnsOne(l => l.Amount);
+            b.OwnsOne(l => l.VatTaxBase);
+            b.OwnsOne(l => l.VatAmount);
+        });
+
+        modelBuilder.Entity<CustomerReceipt>(b =>
+        {
+            b.Navigation(r => r.Allocations).HasField("_allocations");
+            b.OwnsOne(r => r.Amount);
+        });
+        modelBuilder.Entity<CustomerReceiptAllocation>(b =>
+        {
+            b.HasKey(a => new { a.CustomerReceiptId, a.SalesInvoiceId });
+            b.OwnsOne(a => a.Amount);
+        });
     }
 }

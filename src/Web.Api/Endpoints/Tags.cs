@@ -28,4 +28,9 @@ public static class Tags
     public const string Stock = "Inventory - Stock";
     public const string StockReturns = "Inventory - Returns & Feed Mutations";
     public const string DailyRecordings = "Production - Daily Recordings";
+    public const string SalesOrders = "Sales - Sales Orders";
+    public const string DeliveryOrders = "Sales - Delivery Orders";
+    public const string SalesInvoices = "Sales - Invoices";
+    public const string CustomerReceipts = "Finance - Customer Receipts";
+    public const string Receivables = "Finance - Receivables";
 }
