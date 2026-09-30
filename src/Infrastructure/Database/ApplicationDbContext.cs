@@ -8,6 +8,7 @@ using Domain.Finance.Journals;
 using Domain.Finance.JournalTemplates;
 using Domain.Inventory.GoodsReceipts;
 using Domain.Inventory.Stock;
+using Domain.Inventory.StockReturns;
 using Domain.Inventory.StockTransfers;
 using Domain.MasterData.Branches;
 using Domain.MasterData.Coops;
@@ -21,6 +22,7 @@ using Domain.MasterData.Warehouses;
 using Domain.Partnership.Contracts;
 using Domain.Partnership.Cycles;
 using Domain.Procurement.PurchaseOrders;
+using Domain.Production.DailyRecordings;
 using Domain.Roles;
 using Domain.Users;
 using Infrastructure.Numbering;
@@ -89,6 +91,10 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<StockBalance> StockBalances { get; set; }
 
     public DbSet<StockLedgerEntry> StockLedgerEntries { get; set; }
+
+    public DbSet<StockReturn> StockReturns { get; set; }
+
+    public DbSet<DailyRecording> DailyRecordings { get; set; }
 
     internal DbSet<OutboxMessage> OutboxMessages { get; set; }
 

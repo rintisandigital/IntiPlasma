@@ -12,7 +12,11 @@ public sealed record CycleResponse
                pc.contract_id AS ContractId, ct.code AS ContractCode,
                pc.planned_chick_in_date AS PlannedChickInDate, pc.planned_population AS PlannedPopulation,
                pc.chick_in_date AS ChickInDate, pc.initial_population AS InitialPopulation,
-               pc.notes AS Notes, pc.cancellation_reason AS CancellationReason
+               pc.notes AS Notes, pc.cancellation_reason AS CancellationReason,
+               pc.total_mortality AS TotalMortality, pc.total_culling AS TotalCulling, pc.harvested_birds AS HarvestedBirds,
+               pc.harvested_weight_kg AS HarvestedWeightKg,
+               COALESCE(pc.initial_population, 0) - pc.total_mortality - pc.total_culling - pc.harvested_birds AS CurrentPopulation,
+               pc.closed_date AS ClosedDate
         FROM partnership.production_cycles pc
         JOIN master.branches b ON b.id = pc.branch_id
         JOIN master.farmers f ON f.id = pc.farmer_id
@@ -59,6 +63,18 @@ public sealed record CycleResponse
     public string? Notes { get; init; }
 
     public string? CancellationReason { get; init; }
+
+    public int TotalMortality { get; init; }
+
+    public int TotalCulling { get; init; }
+
+    public int HarvestedBirds { get; init; }
+
+    public decimal HarvestedWeightKg { get; init; }
+
+    public int CurrentPopulation { get; init; }
+
+    public DateOnly? ClosedDate { get; init; }
 
     /// <summary>
     /// Contract terms frozen when the cycle was planned (detail endpoint only).

@@ -2,6 +2,7 @@ using Application.Abstractions.Data;
 using Application.Finance.AutoJournal;
 using Domain.Finance.JournalMappings;
 using Domain.Inventory.GoodsReceipts;
+using Domain.Inventory.StockReturns;
 using Domain.Inventory.StockTransfers;
 using Domain.MasterData.Items;
 using Microsoft.EntityFrameworkCore;
@@ -87,8 +88,41 @@ internal sealed class StockTransferPostedDomainEventHandler(IApplicationDbContex
     }
 }
 
+/// <summary>
+/// Journals leftover sapronak returned from a coop: Dr persediaan / Cr ayam dalam proses.
+/// </summary>
+internal sealed class StockReturnPostedDomainEventHandler(IApplicationDbContext context, IAutoJournalService autoJournal)
+    : IDomainEventHandler<StockReturnPostedDomainEvent>
+{
+    public async Task Handle(StockReturnPostedDomainEvent domainEvent, CancellationToken cancellationToken)
+    {
+        StockReturn stockReturn = await context.StockReturns.AsNoTracking()
+            .Include(r => r.Lines)
+            .SingleAsync(r => r.Id == domainEvent.StockReturnId, cancellationToken);
+
+        IReadOnlyList<(ItemCategory Category, Money Value)> values = await InventoryAccounting.ValuesByCategoryAsync(
+            context, stockReturn.Lines.Select(l => (l.ItemId, l.Value)), cancellationToken);
+
+        await InventoryAccounting.PostAsync(autoJournal, new AccountingEntry(
+            AccountingEvents.StockReturnFromCycle,
+            stockReturn.Id,
+            stockReturn.BranchId,
+            stockReturn.ReturnDate,
+            $"Retur sapronak {stockReturn.Number}: {stockReturn.Reason}",
+            [.. values.Select(v => new AccountingAmount(InventoryAccounting.ReturnedComponent(v.Category), v.Value))]),
+            cancellationToken);
+    }
+}
+
 internal static class InventoryAccounting
 {
+    public static string ReturnedComponent(ItemCategory category) => category switch
+    {
+        ItemCategory.Feed => "FeedReturned",
+        ItemCategory.Ovk => "OvkReturned",
+        _ => throw new InvalidOperationException($"Items of category {category} cannot be returned.")
+    };
+
     public static string ReceivedComponent(ItemCategory category) => category switch
     {
         ItemCategory.Doc => "DocReceived",

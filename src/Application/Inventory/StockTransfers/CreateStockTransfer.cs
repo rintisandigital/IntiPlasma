@@ -2,7 +2,6 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Numbering;
-using Domain.Inventory.Stock;
 using Domain.Inventory.StockTransfers;
 using Domain.MasterData.Items;
 using Domain.MasterData.Warehouses;
@@ -28,6 +27,16 @@ public sealed record CreateStockTransferCommand(
 
 public sealed record CreateStockTransferResponse(Guid Id, string Number, Guid? CycleId);
 
+internal sealed class StockTransferLineRequestValidator : AbstractValidator<StockTransferLineRequest>
+{
+    public StockTransferLineRequestValidator()
+    {
+        RuleFor(x => x.ItemId).NotEmpty();
+        RuleFor(x => x.UomId).NotEmpty();
+        RuleFor(x => x.Quantity).GreaterThan(0);
+    }
+}
+
 internal sealed class CreateStockTransferCommandValidator : AbstractValidator<CreateStockTransferCommand>
 {
     public CreateStockTransferCommandValidator()
@@ -36,12 +45,7 @@ internal sealed class CreateStockTransferCommandValidator : AbstractValidator<Cr
         RuleFor(c => c.ToWarehouseId).NotEmpty();
         RuleFor(c => c.Notes).MaximumLength(1000);
         RuleFor(c => c.Lines).NotEmpty();
-        RuleForEach(c => c.Lines).ChildRules(l =>
-        {
-            l.RuleFor(x => x.ItemId).NotEmpty();
-            l.RuleFor(x => x.UomId).NotEmpty();
-            l.RuleFor(x => x.Quantity).GreaterThan(0);
-        });
+        RuleForEach(c => c.Lines).SetValidator(new StockTransferLineRequestValidator());
     }
 }
 
@@ -54,52 +58,18 @@ internal sealed class CreateStockTransferCommandHandler(
 
     public async Task<Result<CreateStockTransferResponse>> Handle(CreateStockTransferCommand command, CancellationToken cancellationToken)
     {
-        List<Warehouse> warehouses = await context.Warehouses.AsNoTracking()
-            .Where(w => w.Id == command.FromWarehouseId || w.Id == command.ToWarehouseId)
-            .ToListAsync(cancellationToken);
+        Result<StockTransferDraft> draft = await PrepareAsync(
+            context, branchAccess, command.FromWarehouseId, command.ToWarehouseId, command.TransferDate, command.Notes,
+            command.Lines, cancellationToken);
 
-        Warehouse? from = warehouses.Find(w => w.Id == command.FromWarehouseId);
-        Warehouse? to = warehouses.Find(w => w.Id == command.ToWarehouseId);
-
-        if (from is null || to is null)
+        if (draft.IsFailure)
         {
-            return Result.Failure<CreateStockTransferResponse>(
-                WarehouseErrors.NotFound(from is null ? command.FromWarehouseId : command.ToWarehouseId));
+            return Result.Failure<CreateStockTransferResponse>(draft.Error);
         }
 
-        Result access = await branchAccess.EnsureAccessAsync(from.BranchId, cancellationToken);
-        if (access.IsFailure)
-        {
-            return Result.Failure<CreateStockTransferResponse>(access.Error);
-        }
+        StockTransfer transfer = await draft.Value.CreateAsync(context, numberGenerator, cancellationToken);
 
-        Result<Guid?> cycleId = await InventorySupport.ResolveCoopCycleAsync(context, to, cancellationToken);
-        if (cycleId.IsFailure)
-        {
-            return Result.Failure<CreateStockTransferResponse>(cycleId.Error);
-        }
-
-        Result<List<StockTransferLineInput>> lines = await ToBaseQuantitiesAsync(command.Lines, cycleId.Value is not null, cancellationToken);
-        if (lines.IsFailure)
-        {
-            return Result.Failure<CreateStockTransferResponse>(lines.Error);
-        }
-
-        Result<StockTransfer> validation = StockTransfer.Create(
-            string.Empty, from, to, cycleId.Value, command.TransferDate, command.Notes, lines.Value);
-
-        if (validation.IsFailure)
-        {
-            return Result.Failure<CreateStockTransferResponse>(validation.Error);
-        }
-
-        string number = await numberGenerator.NextForBranchAsync(
-            context, DocumentPrefix, from.BranchId, command.TransferDate, cancellationToken);
-
-        StockTransfer transfer = StockTransfer.Create(
-            number, from, to, cycleId.Value, command.TransferDate, command.Notes, lines.Value).Value;
-
-        Result moved = await MoveStockAsync(transfer, cancellationToken);
+        Result moved = await StockPosting.PostTransferAsync(context, new StockBalances(context), transfer, cancellationToken);
         if (moved.IsFailure)
         {
             return Result.Failure<CreateStockTransferResponse>(moved.Error);
@@ -112,71 +82,87 @@ internal sealed class CreateStockTransferCommandHandler(
         return new CreateStockTransferResponse(transfer.Id, transfer.Number, transfer.CycleId);
     }
 
-    private async Task<Result> MoveStockAsync(StockTransfer transfer, CancellationToken cancellationToken)
-    {
-        var balances = new StockBalances(context);
-        var outMovement = new StockMovement(
-            transfer.TransferDate, StockMovementType.TransferOut, nameof(StockTransfer), transfer.Id, transfer.Number, transfer.CycleId);
-        StockMovement inMovement = outMovement with { Type = StockMovementType.TransferIn };
-
-        foreach (StockTransferLine line in transfer.Lines)
-        {
-            StockBalance source = await balances.GetAsync(transfer.FromWarehouseId, line.ItemId, cancellationToken);
-
-            Result<StockLedgerEntry> issued = source.Issue(outMovement, line.BaseQuantity);
-            if (issued.IsFailure)
-            {
-                return issued;
-            }
-
-            Money value = -issued.Value.Value;
-            transfer.RecordCost(line.LineNumber, issued.Value.UnitCost, value);
-
-            StockBalance destination = await balances.GetAsync(transfer.ToWarehouseId, line.ItemId, cancellationToken);
-
-            Result<StockLedgerEntry> received = destination.Receive(inMovement, line.BaseQuantity, value);
-            if (received.IsFailure)
-            {
-                return received;
-            }
-
-            context.StockLedgerEntries.AddRange(issued.Value, received.Value);
-        }
-
-        return Result.Success();
-    }
-
-    private async Task<Result<List<StockTransferLineInput>>> ToBaseQuantitiesAsync(
+    /// <summary>
+    /// Validates a transfer completely (without consuming a document number) so it can also be combined with a
+    /// return into a feed mutation.
+    /// </summary>
+    internal static async Task<Result<StockTransferDraft>> PrepareAsync(
+        IApplicationDbContext context,
+        IBranchAccess branchAccess,
+        Guid fromWarehouseId,
+        Guid toWarehouseId,
+        DateOnly transferDate,
+        string? notes,
         IReadOnlyList<StockTransferLineRequest> requests,
-        bool toCycle,
         CancellationToken cancellationToken)
     {
-        Dictionary<Guid, Item> items = await InventorySupport.LoadItemsAsync(context, requests.Select(r => r.ItemId), cancellationToken);
+        List<Warehouse> warehouses = await context.Warehouses.AsNoTracking()
+            .Where(w => w.Id == fromWarehouseId || w.Id == toWarehouseId)
+            .ToListAsync(cancellationToken);
 
-        var lines = new List<StockTransferLineInput>();
+        Warehouse? from = warehouses.Find(w => w.Id == fromWarehouseId);
+        Warehouse? to = warehouses.Find(w => w.Id == toWarehouseId);
 
-        foreach (StockTransferLineRequest request in requests)
+        if (from is null || to is null)
         {
-            if (!items.TryGetValue(request.ItemId, out Item? item))
-            {
-                return Result.Failure<List<StockTransferLineInput>>(ItemErrors.NotFound(request.ItemId));
-            }
-
-            // Only sapronak can be charged to a production cycle; the auto journal has no account for other items.
-            if (toCycle && !InventorySupport.SapronakCategories.Contains(item.Category))
-            {
-                return Result.Failure<List<StockTransferLineInput>>(StockTransferErrors.OnlySapronakToCoop);
-            }
-
-            Result<decimal> baseQuantity = item.ConvertToBase(request.UomId, request.Quantity);
-            if (baseQuantity.IsFailure)
-            {
-                return Result.Failure<List<StockTransferLineInput>>(baseQuantity.Error);
-            }
-
-            lines.Add(new StockTransferLineInput(request.ItemId, request.UomId, request.Quantity, baseQuantity.Value));
+            return Result.Failure<StockTransferDraft>(WarehouseErrors.NotFound(from is null ? fromWarehouseId : toWarehouseId));
         }
 
-        return lines;
+        Result access = await branchAccess.EnsureAccessAsync(from.BranchId, cancellationToken);
+        if (access.IsFailure)
+        {
+            return Result.Failure<StockTransferDraft>(access.Error);
+        }
+
+        Result<Guid?> cycleId = await InventorySupport.ResolveCoopCycleAsync(context, to, cancellationToken);
+        if (cycleId.IsFailure)
+        {
+            return Result.Failure<StockTransferDraft>(cycleId.Error);
+        }
+
+        Dictionary<Guid, Item> items = await InventorySupport.LoadItemsAsync(context, requests.Select(r => r.ItemId), cancellationToken);
+
+        // Only sapronak can be charged to a production cycle; the auto journal has no account for other items.
+        Result<List<BaseQuantityLine>> converted = StockPosting.ToBaseQuantities(
+            items,
+            requests.Select(r => (r.ItemId, r.UomId, r.Quantity)),
+            cycleId.Value is null ? null : InventorySupport.SapronakCategories,
+            StockTransferErrors.OnlySapronakToCoop);
+
+        if (converted.IsFailure)
+        {
+            return Result.Failure<StockTransferDraft>(converted.Error);
+        }
+
+        List<StockTransferLineInput> lines =
+            [.. converted.Value.Select(l => new StockTransferLineInput(l.ItemId, l.UomId, l.Quantity, l.BaseQuantity))];
+
+        Result<StockTransfer> validation = StockTransfer.Create(string.Empty, from, to, cycleId.Value, transferDate, notes, lines);
+        if (validation.IsFailure)
+        {
+            return Result.Failure<StockTransferDraft>(validation.Error);
+        }
+
+        return new StockTransferDraft(from, to, cycleId.Value, transferDate, notes, lines);
+    }
+}
+
+internal sealed record StockTransferDraft(
+    Warehouse From,
+    Warehouse To,
+    Guid? CycleId,
+    DateOnly TransferDate,
+    string? Notes,
+    List<StockTransferLineInput> Lines)
+{
+    public async Task<StockTransfer> CreateAsync(
+        IApplicationDbContext context,
+        IDocumentNumberGenerator numberGenerator,
+        CancellationToken cancellationToken)
+    {
+        string number = await numberGenerator.NextForBranchAsync(
+            context, CreateStockTransferCommandHandler.DocumentPrefix, From.BranchId, TransferDate, cancellationToken);
+
+        return StockTransfer.Create(number, From, To, CycleId, TransferDate, Notes, Lines).Value;
     }
 }

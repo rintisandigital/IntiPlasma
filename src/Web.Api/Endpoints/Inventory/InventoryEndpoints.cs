@@ -2,6 +2,7 @@ using Application.Abstractions.Messaging;
 using Application.Abstractions.Paging;
 using Application.Inventory;
 using Application.Inventory.GoodsReceipts;
+using Application.Inventory.StockReturns;
 using Application.Inventory.StockTransfers;
 using Domain.MasterData.Items;
 using Domain.Roles;
@@ -18,6 +19,67 @@ internal sealed class InventoryEndpoints : IEndpoint
         MapGoodsReceipts(app.MapGroup("inventory/goods-receipts").WithTags(Tags.GoodsReceipts));
         MapStockTransfers(app.MapGroup("inventory/stock-transfers").WithTags(Tags.StockTransfers));
         MapStock(app.MapGroup("inventory").WithTags(Tags.Stock));
+        MapStockReturns(app.MapGroup("inventory").WithTags(Tags.StockReturns));
+    }
+
+    private static void MapStockReturns(RouteGroupBuilder group)
+    {
+        group.MapGet("stock-returns", async (
+            string? search,
+            int? page,
+            int? pageSize,
+            Guid? branchId,
+            Guid? warehouseId,
+            Guid? cycleId,
+            DateOnly? from,
+            DateOnly? to,
+            IQueryHandler<GetStockReturnsQuery, PagedList<InventoryDocumentResponse>> handler,
+            CancellationToken cancellationToken) =>
+        {
+            var query = new GetStockReturnsQuery(
+                new PageRequest(page, pageSize, search), branchId, warehouseId, cycleId, from, to);
+
+            Result<PagedList<InventoryDocumentResponse>> result = await handler.Handle(query, cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.InventoryRead);
+
+        group.MapGet("stock-returns/{stockReturnId:guid}", async (
+            Guid stockReturnId,
+            IQueryHandler<GetStockReturnByIdQuery, InventoryDocumentResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<InventoryDocumentResponse> result = await handler.Handle(
+                new GetStockReturnByIdQuery(stockReturnId), cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.InventoryRead);
+
+        group.MapPost("stock-returns", async (
+            CreateStockReturnCommand command,
+            ICommandHandler<CreateStockReturnCommand, CreateStockReturnResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<CreateStockReturnResponse> result = await handler.Handle(command, cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.InventoryReturn)
+        .WithIdempotency();
+
+        group.MapPost("feed-mutations", async (
+            CreateFeedMutationCommand command,
+            ICommandHandler<CreateFeedMutationCommand, CreateFeedMutationResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<CreateFeedMutationResponse> result = await handler.Handle(command, cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.InventoryReturn)
+        .WithIdempotency();
     }
 
     private static void MapGoodsReceipts(RouteGroupBuilder group)

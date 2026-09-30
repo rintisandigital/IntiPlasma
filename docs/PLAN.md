@@ -151,7 +151,7 @@ tests/
 - Stock Transfer gudang induk → kandang/siklus; kartu stok; saldo stok; valuasi (moving average).
 - Event → auto journal persediaan.
 
-### Fase 4 — Produksi
+### Fase 4 — Produksi ✅ (selesai 2026-09-30, lihat §10)
 - Chick-in (dari penerimaan DOC), Daily Recording (mati, culling, bobot rata-rata, pakan terpakai, OVK terpakai), Revisi Daily Recording, Mutasi Pakan.
 - Kalkulasi otomatis: populasi, deplesi, FCR, ADG, IP (query read model per siklus/hari).
 - Tutup siklus (CycleClosing) + ringkasan performa.
@@ -329,3 +329,48 @@ Migration: `Phase3_ProcurementInventory` (schema `procurement` & `inventory`).
 - Stok di gudang kandang sudah menjadi biaya siklus (WIP); pemakaian harian (Fase 4) hanya mengurangi kuantitas untuk FCR, **retur/mutasi pakan antar kandang** dikerjakan di Fase 4 bersama "Mutasi Pakan".
 - Kegagalan jurnal otomatis (mis. periode tutup, mapping belum ada) tercatat di `infrastructure.outbox_messages.error` setelah retry; perlu layar monitoring di WebApp nanti.
 - Diverifikasi end-to-end ke PostgreSQL lokal (database sementara): moving average (60 SAK @430rb + 40 SAK @440rb = Rp 8.680/kg), transfer 30 SAK = Rp 13.020.000, DOC langsung ke kandang, 5 jurnal otomatis, neraca saldo seimbang (Persediaan Pakan 30,38 jt; Ayam Dalam Proses 50,52 jt; GRNI 80,9 jt), serta penolakan: PO draft, satuan salah, pakan ke kandang, over-receipt, stok kurang, kandang tanpa siklus.
+
+---
+
+## 10. Realisasi Fase 4 — Produksi
+
+Migration: `Phase4_Production` (schema `production`, tabel retur di `inventory`, panen di `partnership`).
+
+**Aturan retur & mutasi pakan (keputusan 2026-09-30)**: retur dan mutasi pakan antar kandang **harus melalui gudang induk**. Tidak ada transfer kandang → kandang langsung; gudang induk selalu tercatat di kartu stok.
+
+**Chick-in** (`POST /api/v1/cycles/{id}/start`) — ⚠️ *breaking change* dari Fase 1
+- Body sekarang `{ chickInDate, lines: [{ itemId (DOC), quantity }] }`; DOC diambil dari **stok gudang kandang** (diterima langsung atau ditransfer), populasi awal = total DOC yang ditebar. Ditolak bila DOC kurang.
+- Permission: `production:record` (PPL).
+
+**Daily Recording** (`/api/v1/production/daily-recordings`)
+- Per siklus per hari: mati, culling, BW rata-rata (gram, opsional — tidak ditimbang tiap hari), pemakaian pakan & OVK (satuan bebas: KG/SAK/VIAL…), catatan. Umur dihitung otomatis dari tanggal chick-in.
+- Pemakaian mengurangi stok **gudang kandang** (kartu stok tipe `Usage`); tidak ada jurnal (biaya sudah di Ayam Dalam Proses saat transfer).
+- Aturan: siklus Active/Harvesting, tanggal ≥ chick-in dan tidak di masa depan (toleransi +1 hari untuk zona waktu), satu recording per hari, populasi tidak boleh minus, hanya item Pakan/OVK.
+- **Offline-ready**: klien boleh mengirim `id` (Guid v7) sendiri; kirim ulang dengan id yang sama → mengembalikan recording yang sudah ada (tidak dobel). Plus `Idempotency-Key`.
+
+**Revisi Daily Recording** (`PUT /api/v1/production/daily-recordings/{id}`, permission `production:revise`)
+- Wajib alasan; nilai sebelumnya disimpan (JSON) di riwayat revisi + siapa & kapan. Detail recording menampilkan riwayatnya.
+- Stok dikoreksi: pemakaian lama dikembalikan (`UsageReversal`, dengan nilai aslinya) lalu pemakaian baru dikeluarkan; populasi siklus disesuaikan dengan selisih mati/culling.
+
+**Retur Sapronak** (`/api/v1/inventory/stock-returns`, permission `inventory:return`)
+- Gudang kandang → gudang induk (satu cabang), hanya Pakan/OVK, dari siklus terbuka kandang, dengan harga rata-rata gudang kandang.
+- Jurnal otomatis baru `StockReturnFromCycle`: Dr Persediaan Pakan/OVK, Cr Ayam Dalam Proses. **Mapping default ditambahkan otomatis** saat startup Development meskipun COA sudah ada (seeder kini melengkapi mapping yang belum ada tanpa mengubah yang sudah ada).
+
+**Mutasi Pakan antar kandang** (`POST /api/v1/inventory/feed-mutations`)
+- `{ fromCoopWarehouseId, viaCentralWarehouseId, toCoopWarehouseId, mutationDate, reason, lines }` → dalam **satu transaksi** membuat Retur (kandang A → induk) + Transfer (induk → kandang B). Keduanya bernomor, terjurnal, dan terlihat di kartu stok gudang induk (`ReturnIn` lalu `TransferOut`). Transfer keluar dengan harga rata-rata gudang induk.
+
+**Panen** (`POST /api/v1/cycles/{id}/harvests`)
+- Tanggal, jumlah ekor, total bobot (kg), catatan (mis. per truk); umur dicatat otomatis; tidak boleh melebihi populasi; panen pertama → status `Harvesting`. Fase 5 (DO/Invoice) akan merujuk data panen ini.
+
+**Performa** (`GET /api/v1/cycles/{id}/performance`)
+- Per hari: populasi, deplesi %, pakan kumulatif, BW (dibawa dari penimbangan terakhir), bobot hidup, **FCR, ADG, IP**; plus daftar panen, angka terkini, dan performa penutupan.
+- Rumus (satu sumber: `CyclePerformance.Calculate`): Deplesi = (mati+culling)/populasi awal; FCR = pakan kg / (populasi × BW + kg dipanen); ADG = BW g / umur; IP = (100 − deplesi%) × BW kg / (FCR × umur) × 100. Saat tutup: BW = rata-rata bobot panen, umur = rata-rata umur panen tertimbang ekor.
+
+**Tutup Siklus** (`POST /api/v1/cycles/{id}/close`, permission `production:close`)
+- Syarat: status Harvesting, populasi = 0, **gudang kandang kosong** (sisa pakan/OVK sudah diretur). Performa penutupan disimpan permanen (dasar settlement Fase 7). Setelah tutup, recording/panen ditolak.
+
+**Permission baru**: `production:read/record/revise/close`, `inventory:return`.
+
+**Catatan**
+- Respons siklus kini menyertakan `totalMortality`, `totalCulling`, `harvestedBirds`, `harvestedWeightKg`, `currentPopulation`, `closedDate`.
+- Diverifikasi end-to-end ke PostgreSQL lokal (database sementara): chick-in dari stok DOC kandang, recording + retry offline (id sama) + tolak tanggal ganda/masa depan/DOC sebagai pakai, revisi (alasan wajib, riwayat tersimpan, stok terkoreksi), retur kandang→kandang ditolak, mutasi A→induk→B, kartu stok induk, performa harian, panen melebihi populasi ditolak, tutup ditolak selama masih ada sisa pakan lalu berhasil setelah retur, recording setelah tutup ditolak; 8 jurnal otomatis tanpa error; neraca saldo seimbang (Ayam Dalam Proses 14,45 jt = siklus A 8,45 jt [DOC 7,5 jt + pakan 90 kg + 1 vial OVK] + siklus B 6 jt).

@@ -16,7 +16,7 @@ namespace Web.Api.Endpoints.Partnership;
 
 internal sealed class CycleEndpoints : IEndpoint
 {
-    public sealed record StartRequest(DateOnly ChickInDate, int InitialPopulation);
+    public sealed record StartRequest(DateOnly ChickInDate, IReadOnlyList<ChickInLine> Lines);
 
     public sealed record CancelRequest(string Reason);
 
@@ -69,16 +69,16 @@ internal sealed class CycleEndpoints : IEndpoint
         group.MapPost("{cycleId:guid}/start", async (
             Guid cycleId,
             StartRequest request,
-            ICommandHandler<StartCycleCommand> handler,
+            ICommandHandler<StartCycleCommand, int> handler,
             CancellationToken cancellationToken) =>
         {
-            var command = new StartCycleCommand(cycleId, request.ChickInDate, request.InitialPopulation);
+            var command = new StartCycleCommand(cycleId, request.ChickInDate, request.Lines);
 
-            Result result = await handler.Handle(command, cancellationToken);
+            Result<int> result = await handler.Handle(command, cancellationToken);
 
-            return result.Match(Results.NoContent, CustomResults.Problem);
+            return result.Match(population => Results.Ok(new { initialPopulation = population }), CustomResults.Problem);
         })
-        .HasPermission(Permissions.CyclesManage);
+        .HasPermission(Permissions.ProductionRecord);
 
         group.MapPost("{cycleId:guid}/cancel", async (
             Guid cycleId,

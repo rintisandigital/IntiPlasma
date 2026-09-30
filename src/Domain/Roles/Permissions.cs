@@ -95,6 +95,28 @@ public static class Permissions
     /// </summary>
     public const string InventoryTransfer = "inventory:transfer";
 
+    /// <summary>
+    /// Daily recordings, harvests and cycle performance (read only).
+    /// </summary>
+    public const string ProductionRead = "production:read";
+
+    /// <summary>
+    /// Chick-in, daily recording and harvest entry (typically the PPL).
+    /// </summary>
+    public const string ProductionRecord = "production:record";
+
+    /// <summary>
+    /// Revise an existing daily recording (with a reason, kept in the revision history).
+    /// </summary>
+    public const string ProductionRevise = "production:revise";
+
+    public const string ProductionClose = "production:close";
+
+    /// <summary>
+    /// Return leftover sapronak from a coop and move feed between coops via a central warehouse.
+    /// </summary>
+    public const string InventoryReturn = "inventory:return";
+
     public static readonly IReadOnlyList<string> All =
     [
         UsersRead,
@@ -127,7 +149,12 @@ public static class Permissions
         PurchasingApprove,
         InventoryRead,
         InventoryReceive,
-        InventoryTransfer
+        InventoryTransfer,
+        InventoryReturn,
+        ProductionRead,
+        ProductionRecord,
+        ProductionRevise,
+        ProductionClose
     ];
 
     public static bool Exists(string permission) => All.Contains(permission);

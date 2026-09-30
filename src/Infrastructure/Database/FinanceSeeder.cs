@@ -116,36 +116,65 @@ internal static class FinanceSeeder
         (AccountingEvents.PlasmaSettlement, "PlasmaIncome", "5-1201", "2-1201"),
         (AccountingEvents.PlasmaSettlement, "IncomeTaxWithheld", "2-1201", "2-1303"),
         (AccountingEvents.PlasmaSettlement, "Deduction", "2-1201", "1-1302"),
-        (AccountingEvents.PlasmaPayment, "Paid", "2-1201", "1-1201")
+        (AccountingEvents.PlasmaPayment, "Paid", "2-1201", "1-1201"),
+        (AccountingEvents.StockReturnFromCycle, "FeedReturned", "1-1402", "1-1501"),
+        (AccountingEvents.StockReturnFromCycle, "OvkReturned", "1-1403", "1-1501")
     ];
 
     public static async Task SeedAsync(ApplicationDbContext dbContext, CancellationToken cancellationToken)
     {
+        Dictionary<string, Guid> accountIds;
+
         if (await dbContext.Accounts.AnyAsync(cancellationToken))
         {
-            return;
+            accountIds = await dbContext.Accounts.ToDictionaryAsync(a => a.Code, a => a.Id, cancellationToken);
         }
-
-        var accounts = new Dictionary<string, Account>(StringComparer.Ordinal);
-
-        foreach ((string code, string name, AccountType type, string? parent, bool postable, BalanceSide? normal) in ChartOfAccounts)
+        else
         {
-            Account account = Account.Create(
-                code, name, type, parent is null ? null : accounts[parent], postable, normal).Value;
+            var accounts = new Dictionary<string, Account>(StringComparer.Ordinal);
 
-            accounts.Add(code, account);
+            foreach ((string code, string name, AccountType type, string? parent, bool postable, BalanceSide? normal) in ChartOfAccounts)
+            {
+                Account account = Account.Create(
+                    code, name, type, parent is null ? null : accounts[parent], postable, normal).Value;
+
+                accounts.Add(code, account);
+            }
+
+            dbContext.Accounts.AddRange(accounts.Values);
+            accountIds = accounts.ToDictionary(a => a.Key, a => a.Value.Id);
         }
 
-        dbContext.Accounts.AddRange(accounts.Values);
+        await SeedMissingMappingsAsync(dbContext, accountIds, cancellationToken);
+    }
+
+    /// <summary>
+    /// Adds the default mapping of an accounting event that has no default mapping yet (e.g. an event introduced by a
+    /// later release), provided every account it needs still exists under its seeded code. Existing mappings are never touched.
+    /// </summary>
+    private static async Task SeedMissingMappingsAsync(
+        ApplicationDbContext dbContext,
+        Dictionary<string, Guid> accountIds,
+        CancellationToken cancellationToken)
+    {
+        List<string> mappedEvents = await dbContext.JournalMappings
+            .Where(m => m.BranchId == null)
+            .Select(m => m.EventType)
+            .ToListAsync(cancellationToken);
 
         foreach (IGrouping<string, (string Event, string Component, string Debit, string Credit)> group in
-                 Mappings.GroupBy(m => m.Event))
+                 Mappings.Where(m => !mappedEvents.Contains(m.Event)).GroupBy(m => m.Event))
         {
+            if (!group.All(m => accountIds.ContainsKey(m.Debit) && accountIds.ContainsKey(m.Credit)))
+            {
+                continue;
+            }
+
             JournalMapping mapping = JournalMapping.Create(
                 group.Key,
                 branchId: null,
                 "Mapping default (seed)",
-                [.. group.Select(m => (m.Component, accounts[m.Debit].Id, accounts[m.Credit].Id, (Guid?)null))]).Value;
+                [.. group.Select(m => (m.Component, accountIds[m.Debit], accountIds[m.Credit], (Guid?)null))]).Value;
 
             dbContext.JournalMappings.Add(mapping);
         }

@@ -13,4 +13,5 @@ internal static class Schemas
     public const string Finance = "finance";
     public const string Procurement = "procurement";
     public const string Inventory = "inventory";
+    public const string Production = "production";
 }

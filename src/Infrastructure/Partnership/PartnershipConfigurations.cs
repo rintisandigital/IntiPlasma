@@ -104,6 +104,17 @@ internal sealed class ProductionCycleConfiguration : IEntityTypeConfiguration<Pr
                 snapshot => JsonSerializer.Serialize(snapshot, SnapshotSerializerOptions),
                 json => JsonSerializer.Deserialize<ContractSnapshot>(json, SnapshotSerializerOptions));
 
+        builder.Property(c => c.HarvestedWeightKg).HasPrecision(14, 3);
+
+        builder.Property(c => c.ClosingPerformance)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                performance => JsonSerializer.Serialize(performance, SnapshotSerializerOptions),
+                json => JsonSerializer.Deserialize<CyclePerformance>(json, SnapshotSerializerOptions));
+
+        builder.HasMany(c => c.Harvests).WithOne().HasForeignKey(h => h.CycleId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(c => c.Harvests).HasField("_harvests").UsePropertyAccessMode(PropertyAccessMode.Field);
+
         builder.HasOne<Branch>().WithMany().HasForeignKey(c => c.BranchId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Farmer>().WithMany().HasForeignKey(c => c.FarmerId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Coop>().WithMany().HasForeignKey(c => c.CoopId).OnDelete(DeleteBehavior.Restrict);

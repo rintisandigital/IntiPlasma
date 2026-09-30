@@ -30,6 +30,34 @@ public static class CycleErrors
         "Cycles.ContractRequired",
         "A plasma cycle needs an active partnership contract");
 
+    public static Error NotRecordable(Guid cycleId, CycleStatus status) => Error.Problem(
+        "Cycles.NotRecordable",
+        $"The production cycle with the Id = '{cycleId}' is {status}; recordings and harvests need an active or harvesting cycle");
+
+    public static Error BeforeChickIn(DateOnly chickInDate) => Error.Problem(
+        "Cycles.BeforeChickIn",
+        $"The date cannot be before the chick-in date {chickInDate:yyyy-MM-dd}");
+
+    public static Error PopulationExceeded(int population) => Error.Problem(
+        "Cycles.PopulationExceeded",
+        $"The number of birds exceeds the current population of {population}");
+
+    public static Error PopulationRemaining(int population) => Error.Problem(
+        "Cycles.PopulationRemaining",
+        $"The cycle still has {population} birds; harvest or record them before closing");
+
+    public static Error LeftoverStock(string itemCodes) => Error.Problem(
+        "Cycles.LeftoverStock",
+        $"The coop warehouse still holds {itemCodes}; return the leftover sapronak to the central warehouse before closing");
+
+    public static Error InsufficientDoc(int requested, decimal available) => Error.Problem(
+        "Cycles.InsufficientDoc",
+        $"Chick-in of {requested} birds needs that much DOC in the coop warehouse, but only {available:0} is there");
+
+    public static readonly Error InvalidHarvest = Error.Problem(
+        "Cycles.InvalidHarvest",
+        "A harvest needs a positive number of birds and a positive weight");
+
     public static readonly Error IntiCannotHaveContract = Error.Problem(
         "Cycles.IntiCannotHaveContract",
         "A cycle on an inti farm cannot have a partnership contract");

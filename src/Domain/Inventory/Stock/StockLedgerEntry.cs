@@ -95,5 +95,30 @@ public enum StockMovementType
     /// <summary>
     /// Masuk dari transfer gudang lain.
     /// </summary>
-    TransferIn = 3
+    TransferIn = 3,
+
+    /// <summary>
+    /// DOC ditebar ke kandang (chick-in).
+    /// </summary>
+    ChickIn = 4,
+
+    /// <summary>
+    /// Pemakaian pakan/OVK harian (recording).
+    /// </summary>
+    Usage = 5,
+
+    /// <summary>
+    /// Pembatalan pemakaian karena revisi recording.
+    /// </summary>
+    UsageReversal = 6,
+
+    /// <summary>
+    /// Keluar dari gudang kandang karena retur.
+    /// </summary>
+    ReturnOut = 7,
+
+    /// <summary>
+    /// Masuk ke gudang induk dari retur kandang.
+    /// </summary>
+    ReturnIn = 8
 }

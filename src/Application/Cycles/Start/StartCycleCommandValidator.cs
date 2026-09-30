@@ -7,6 +7,11 @@ internal sealed class StartCycleCommandValidator : AbstractValidator<StartCycleC
     public StartCycleCommandValidator()
     {
         RuleFor(c => c.CycleId).NotEmpty();
-        RuleFor(c => c.InitialPopulation).GreaterThan(0);
+        RuleFor(c => c.Lines).NotEmpty();
+        RuleForEach(c => c.Lines).ChildRules(l =>
+        {
+            l.RuleFor(x => x.ItemId).NotEmpty();
+            l.RuleFor(x => x.Quantity).GreaterThan(0);
+        });
     }
 }

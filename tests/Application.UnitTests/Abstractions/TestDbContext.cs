@@ -8,6 +8,7 @@ using Domain.Finance.Journals;
 using Domain.Finance.JournalTemplates;
 using Domain.Inventory.GoodsReceipts;
 using Domain.Inventory.Stock;
+using Domain.Inventory.StockReturns;
 using Domain.Inventory.StockTransfers;
 using Domain.MasterData.Branches;
 using Domain.MasterData.Coops;
@@ -21,6 +22,7 @@ using Domain.MasterData.Warehouses;
 using Domain.Partnership.Contracts;
 using Domain.Partnership.Cycles;
 using Domain.Procurement.PurchaseOrders;
+using Domain.Production.DailyRecordings;
 using Domain.Roles;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
@@ -85,6 +87,10 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
     public DbSet<StockBalance> StockBalances { get; set; }
 
     public DbSet<StockLedgerEntry> StockLedgerEntries { get; set; }
+
+    public DbSet<StockReturn> StockReturns { get; set; }
+
+    public DbSet<DailyRecording> DailyRecordings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -173,5 +179,34 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
             b.OwnsOne(e => e.Value);
             b.OwnsOne(e => e.BalanceValue);
         });
+
+        modelBuilder.Entity<StockReturn>().Navigation(r => r.Lines).HasField("_lines");
+        modelBuilder.Entity<StockReturnLine>(b =>
+        {
+            b.HasKey(l => new { l.StockReturnId, l.LineNumber });
+            b.OwnsOne(l => l.Value);
+        });
+
+        modelBuilder.Entity<ProductionCycle>(b =>
+        {
+            b.Navigation(c => c.Harvests).HasField("_harvests");
+            b.HasMany(c => c.Harvests).WithOne().HasForeignKey(h => h.CycleId);
+            b.Property(c => c.ClosingPerformance).HasConversion(
+                performance => JsonSerializer.Serialize(performance, JsonSerializerOptions.Web),
+                json => JsonSerializer.Deserialize<CyclePerformance>(json, JsonSerializerOptions.Web));
+        });
+
+        modelBuilder.Entity<DailyRecording>(b =>
+        {
+            b.Navigation(r => r.Usages).HasField("_usages");
+            b.Navigation(r => r.Revisions).HasField("_revisions");
+        });
+        modelBuilder.Entity<DailyRecordingUsage>(b =>
+        {
+            b.HasKey(u => new { u.DailyRecordingId, u.ItemId });
+            b.OwnsOne(u => u.Value);
+        });
+        modelBuilder.Entity<DailyRecordingRevision>().HasKey(v => new { v.DailyRecordingId, v.RevisionNumber });
+        modelBuilder.Entity<CycleHarvest>().Property(h => h.Id).ValueGeneratedNever();
     }
 }

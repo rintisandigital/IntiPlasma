@@ -5,6 +5,7 @@ using Application.Abstractions.Messaging;
 using Application.Abstractions.Paging;
 using Dapper;
 using Domain.Inventory.GoodsReceipts;
+using Domain.Inventory.StockReturns;
 using Domain.Inventory.StockTransfers;
 using SharedKernel;
 
@@ -279,5 +280,96 @@ internal static class InventoryDocumentReader
         }
 
         return document with { Lines = [.. await multi.ReadAsync<InventoryDocumentLineResponse>()] };
+    }
+}
+
+public sealed record GetStockReturnsQuery(
+    PageRequest Paging,
+    Guid? BranchId,
+    Guid? WarehouseId,
+    Guid? CycleId,
+    DateOnly? From,
+    DateOnly? To) : IQuery<PagedList<InventoryDocumentResponse>>;
+
+public sealed record GetStockReturnByIdQuery(Guid StockReturnId) : IQuery<InventoryDocumentResponse>;
+
+internal static class StockReturnSql
+{
+    /// <summary>
+    /// Reference = source coop warehouse, Party = reason, WarehouseCode = receiving central warehouse.
+    /// </summary>
+    public const string Select =
+        """
+        SELECT t.id AS Id, t.number AS Number, t.branch_id AS BranchId, b.code AS BranchCode, t.return_date AS Date,
+               wf.code AS Reference, t.reason AS Party, wt.code AS WarehouseCode, t.cycle_id AS CycleId, c.number AS CycleNumber,
+               t.notes AS Notes,
+               (SELECT COALESCE(SUM(l.value), 0) FROM inventory.stock_return_lines l WHERE l.stock_return_id = t.id) AS TotalValue
+        FROM inventory.stock_returns t
+        JOIN master.branches b ON b.id = t.branch_id
+        JOIN master.warehouses wf ON wf.id = t.from_warehouse_id
+        JOIN master.warehouses wt ON wt.id = t.to_warehouse_id
+        LEFT JOIN partnership.production_cycles c ON c.id = t.cycle_id
+        """;
+}
+
+internal sealed class GetStockReturnsQueryHandler(IDbConnectionFactory dbConnectionFactory, IBranchAccess branchAccess)
+    : IQueryHandler<GetStockReturnsQuery, PagedList<InventoryDocumentResponse>>
+{
+    private const string Filter =
+        """
+        WHERE (@AllBranches OR t.branch_id = ANY(@BranchIds))
+          AND (@BranchId::uuid IS NULL OR t.branch_id = @BranchId)
+          AND (@WarehouseId::uuid IS NULL OR t.from_warehouse_id = @WarehouseId OR t.to_warehouse_id = @WarehouseId)
+          AND (@CycleId::uuid IS NULL OR t.cycle_id = @CycleId)
+          AND (@From::date IS NULL OR t.return_date >= @From)
+          AND (@To::date IS NULL OR t.return_date <= @To)
+          AND (@Search IS NULL OR t.number ILIKE @Search)
+        """;
+
+    public async Task<Result<PagedList<InventoryDocumentResponse>>> Handle(GetStockReturnsQuery query, CancellationToken cancellationToken)
+    {
+        BranchScope scope = await branchAccess.GetScopeAsync(cancellationToken);
+
+        await using DbConnection connection = await dbConnectionFactory.OpenConnectionAsync(cancellationToken);
+
+        return await connection.QueryPagedAsync<InventoryDocumentResponse>(
+            $"SELECT COUNT(*) FROM inventory.stock_returns t {Filter}",
+            $"{StockReturnSql.Select} {Filter} ORDER BY t.return_date DESC, t.number DESC LIMIT @PageSize OFFSET @Offset",
+            query.Paging,
+            new
+            {
+                scope.AllBranches,
+                scope.BranchIds,
+                query.BranchId,
+                query.WarehouseId,
+                query.CycleId,
+                query.From,
+                query.To
+            },
+            cancellationToken);
+    }
+}
+
+internal sealed class GetStockReturnByIdQueryHandler(IDbConnectionFactory dbConnectionFactory, IBranchAccess branchAccess)
+    : IQueryHandler<GetStockReturnByIdQuery, InventoryDocumentResponse>
+{
+    public async Task<Result<InventoryDocumentResponse>> Handle(GetStockReturnByIdQuery query, CancellationToken cancellationToken)
+    {
+        await using DbConnection connection = await dbConnectionFactory.OpenConnectionAsync(cancellationToken);
+
+        string sql =
+            $"""
+            {StockReturnSql.Select}
+            WHERE t.id = @Id;
+
+            SELECT {InventoryDocumentSql.LineColumns}
+            FROM inventory.stock_return_lines l
+            {InventoryDocumentSql.LineJoins}
+            WHERE l.stock_return_id = @Id
+            ORDER BY l.line_number;
+            """;
+
+        return await InventoryDocumentReader.ReadAsync(
+            connection, branchAccess, sql, query.StockReturnId, StockReturnErrors.NotFound(query.StockReturnId), cancellationToken);
     }
 }

@@ -15,6 +15,7 @@ public static class AccountingEvents
     public const string CustomerReceipt = "CustomerReceipt";
     public const string PlasmaSettlement = "PlasmaSettlement";
     public const string PlasmaPayment = "PlasmaPayment";
+    public const string StockReturnFromCycle = "StockReturnFromCycle";
 
     public static readonly IReadOnlyList<AccountingEventDefinition> All =
     [
@@ -49,6 +50,11 @@ public static class AccountingEvents
         new(CustomerReceipt, "Penerimaan pembayaran customer",
         [
             new("Received", "Jumlah diterima (akun kas/bank bisa ditentukan per transaksi)")
+        ]),
+        new(StockReturnFromCycle, "Retur sisa sapronak dari kandang ke gudang induk",
+        [
+            new("FeedReturned", "Nilai pakan diretur"),
+            new("OvkReturned", "Nilai OVK diretur")
         ]),
         new(PlasmaSettlement, "Settlement plasma (rugi/laba kemitraan)",
         [

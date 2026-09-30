@@ -30,6 +30,19 @@ internal static class InventorySupport
             .ToDictionaryAsync(i => i.Id, cancellationToken);
     }
 
+    public static readonly ItemCategory[] UsableCategories = [ItemCategory.Feed, ItemCategory.Ovk];
+
+    public static async Task<Result<Warehouse>> FindCoopWarehouseAsync(
+        IApplicationDbContext context,
+        Guid coopId,
+        CancellationToken cancellationToken)
+    {
+        Warehouse? warehouse = await context.Warehouses.AsNoTracking()
+            .SingleOrDefaultAsync(w => w.CoopId == coopId, cancellationToken);
+
+        return warehouse is null ? Result.Failure<Warehouse>(InventoryErrors.CoopWarehouseMissing(coopId)) : warehouse;
+    }
+
     /// <summary>
     /// For a coop warehouse: the coop's single open (planned, running or harvesting) cycle; null for central warehouses.
     /// </summary>

@@ -26,4 +26,6 @@ public static class Tags
     public const string GoodsReceipts = "Inventory - Goods Receipts";
     public const string StockTransfers = "Inventory - Stock Transfers";
     public const string Stock = "Inventory - Stock";
+    public const string StockReturns = "Inventory - Returns & Feed Mutations";
+    public const string DailyRecordings = "Production - Daily Recordings";
 }

@@ -3,7 +3,11 @@ using Application.Abstractions.Messaging;
 namespace Application.Cycles.Start;
 
 /// <summary>
-/// Chick-in: records the actual placement date and DOC population. In phase 4 this is triggered
-/// by the DOC receipt at the coop instead of being entered manually.
+/// Chick-in: places DOC from the coop warehouse into the coop. The initial population is the number of DOC placed,
+/// so the DOC must first be received in (or transferred to) the coop warehouse.
 /// </summary>
-public sealed record StartCycleCommand(Guid CycleId, DateOnly ChickInDate, int InitialPopulation) : ICommand;
+public sealed record StartCycleCommand(Guid CycleId, DateOnly ChickInDate, IReadOnlyList<ChickInLine> Lines) : ICommand<int>;
+
+/// <param name="ItemId">A DOC item in the coop warehouse.</param>
+/// <param name="Quantity">Number of birds placed (ekor).</param>
+public sealed record ChickInLine(Guid ItemId, int Quantity);

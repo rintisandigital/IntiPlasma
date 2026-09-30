@@ -6,6 +6,7 @@ using Domain.Finance.Journals;
 using Domain.Finance.JournalTemplates;
 using Domain.Inventory.GoodsReceipts;
 using Domain.Inventory.Stock;
+using Domain.Inventory.StockReturns;
 using Domain.Inventory.StockTransfers;
 using Domain.MasterData.Branches;
 using Domain.MasterData.Coops;
@@ -19,6 +20,7 @@ using Domain.MasterData.Warehouses;
 using Domain.Partnership.Contracts;
 using Domain.Partnership.Cycles;
 using Domain.Procurement.PurchaseOrders;
+using Domain.Production.DailyRecordings;
 using Domain.Roles;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
@@ -60,6 +62,9 @@ public interface IApplicationDbContext
     DbSet<StockTransfer> StockTransfers { get; }
     DbSet<StockBalance> StockBalances { get; }
     DbSet<StockLedgerEntry> StockLedgerEntries { get; }
+    DbSet<StockReturn> StockReturns { get; }
+
+    DbSet<DailyRecording> DailyRecordings { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
