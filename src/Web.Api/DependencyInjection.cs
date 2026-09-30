@@ -1,4 +1,5 @@
-﻿using Web.Api.Infrastructure;
+﻿using System.Text.Json.Serialization;
+using Web.Api.Infrastructure;
 
 namespace Web.Api;
 
@@ -11,6 +12,10 @@ public static class DependencyInjection
 
         // REMARK: If you want to use Controllers, you'll need this.
         services.AddControllers();
+
+        // Enums travel as names ("Plasma", "Feed"), which is readable and robust for API clients.
+        services.ConfigureHttpJsonOptions(options =>
+            options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();

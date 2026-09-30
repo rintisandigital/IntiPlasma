@@ -135,7 +135,7 @@ tests/
 - Document numbering, multi-cabang (BranchId di tiap transaksi).
 - Pagination/filter standar untuk query.
 
-### Fase 1 — Master Data & Kemitraan
+### Fase 1 — Master Data & Kemitraan ✅ (selesai 2026-09-30, lihat §7)
 - CRUD Branch, Farmer (tipe Inti/Plasma, NIK, rekening), Coop (kapasitas, tipe open/closed house), Item & UoM, Warehouse (Induk/Kandang), Vendor, Customer.
 - PartnershipContract: harga kontrak DOC/pakan/OVK, harga jaminan ayam per range bobot, skema bonus (FCR, IP, mortalitas).
 - ProductionCycle: buka siklus (kandang, kontrak, tanggal chick-in rencana), ubah status.
@@ -223,3 +223,36 @@ Per fase, definisi selesai: domain + unit test invariant → command/query + val
 **Catatan**
 - Integration test butuh Docker (Testcontainers); belum dijalankan di mesin dev tanpa Docker. Alur yang sama sudah diverifikasi manual ke PostgreSQL lokal.
 - `IdempotencyFilter` memakai HybridCache in-memory; tambahkan Redis (L2) sebelum API dijalankan multi-instance.
+
+---
+
+## 7. Realisasi Fase 1 — Master Data & Kemitraan
+
+Migration: `Phase1_MasterData_Partnership` (schema `master` & `partnership`).
+
+**Master data (schema `master`)**
+| Aggregate | Endpoint (`/api/v1`) | Aturan utama |
+|---|---|---|
+| Branch (Cabang) | `branches` | Kode ≤10 alfanumerik, *immutable* (dipakai di nomor dokumen). |
+| Uom (Satuan) | `uoms` | Seed otomatis: EKOR, KG, GR, SAK, BTL, VIAL, LTR, ML, PCS. |
+| TaxCode | `tax-codes` | PPN (`Taxable`/`Exempt`/`NotCollected`) atau PPh (21/22/23/4(2)); tarif ber-tanggal-efektif + rasio DPP (mis. 11/12 untuk PPN 12% DPP nilai lain). **Tidak di-seed** — isi sesuai arahan konsultan pajak. |
+| Item | `items` | Kategori DOC/Feed/OVK/LiveBird/Other; satuan dasar + konversi (1 SAK = 50 KG); default kode PPN. |
+| Warehouse | `warehouses` | Gudang induk dibuat manual; **gudang kandang dibuat otomatis** (`GK-{kode kandang}`) lewat event `CoopCreated` + outbox. |
+| Vendor / Customer | `vendors`, `customers` | Identitas pajak (NPWP 15/16 digit, NITKU 22 digit, PKP wajib NPWP), rekening bank, termin, credit limit. |
+| Farmer (Peternak) | `farmers` | Inti/Plasma; Plasma wajib NIK 16 digit; cabang & tipe *immutable*. |
+| Coop (Kandang) | `coops` | Milik satu peternak, cabang mengikuti peternak, kapasitas, open/closed house, koordinat. |
+
+**Kemitraan (schema `partnership`)**
+- `contracts`: skema `PriceContract` (harga kontrak sapronak per satuan dasar + harga jaminan ayam per rentang bobot, tidak boleh tumpang tindih) atau `ProfitSharing` (% bagi hasil plasma). Komponen bonus/potongan berbasis metrik FCR/IP/Deplesi/Bobot rata-rata (per kg, per ekor, atau lump sum). PPh atas settlement per kontrak. Siklus: `Draft → Active → Inactive`; hanya draft yang bisa diubah.
+- `cycles`: rencana siklus → nomor `SKL/{cabang}/{yyyy}/{bulan romawi}/{nnnn}`; *snapshot* kontrak (jsonb) disimpan saat rencana dibuat. Aturan: plasma wajib kontrak aktif & berlaku di tanggal chick-in dan satu cabang; inti tidak boleh berkontrak; populasi ≤ kapasitas; **satu siklus terbuka per kandang** (dicek di aplikasi + partial unique index). Aksi: `start` (chick-in) dan `cancel` (hanya saat Planned). Transisi Harvesting/Closed/Settled menyusul di Fase 4 & 7.
+
+**Otorisasi per cabang**
+- `PUT users/{id}/branches` menetapkan cabang user; permission `branches:access-all` untuk kantor pusat (Administrator otomatis punya).
+- Warehouse, Farmer, Coop, Contract, Cycle difilter per cabang di semua query; akses ke cabang lain → **403** `Branches.AccessDenied`.
+- Permission baru: `branches:*`, `master-data:*`, `warehouses:*`, `farmers:*`, `contracts:*`, `cycles:*` (read/manage).
+
+**Catatan teknis**
+- Enum disimpan & dikirim sebagai **nama** (mis. `"Plasma"`, `"Feed"`), bukan angka.
+- Endpoint per resource dikelompokkan dalam satu file (`XxxEndpoints.cs`, `MapGroup`) agar tag & permission konsisten.
+- List endpoint mendukung `?search=&page=&pageSize=` (maks 100) + filter spesifik (`branchId`, `type`, `category`, `status`, `farmerId`, `coopId`).
+- Diverifikasi end-to-end ke PostgreSQL lokal (database sementara): semua skenario di atas, termasuk 409 siklus ganda, 403 lintas cabang, dan event outbox tanpa error.

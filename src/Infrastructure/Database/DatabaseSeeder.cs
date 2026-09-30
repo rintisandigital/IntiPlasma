@@ -1,4 +1,5 @@
 using Application.Abstractions.Authentication;
+using Domain.MasterData.Uoms;
 using Domain.Roles;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
@@ -48,6 +49,34 @@ public static class DatabaseSeeder
             dbContext.Users.Add(admin);
         }
 
+        await SeedUomsAsync(dbContext, cancellationToken);
+
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Standard units used by broiler farming. Tax codes are deliberately not seeded: tariffs and
+    /// facilities must be confirmed by the tax consultant and entered as data.
+    /// </summary>
+    private static async Task SeedUomsAsync(ApplicationDbContext dbContext, CancellationToken cancellationToken)
+    {
+        (string Code, string Name)[] defaults =
+        [
+            ("EKOR", "Ekor"),
+            ("KG", "Kilogram"),
+            ("GR", "Gram"),
+            ("SAK", "Sak"),
+            ("BTL", "Botol"),
+            ("VIAL", "Vial"),
+            ("LTR", "Liter"),
+            ("ML", "Mililiter"),
+            ("PCS", "Pcs")
+        ];
+
+        List<string> existing = await dbContext.Uoms.Select(u => u.Code).ToListAsync(cancellationToken);
+
+        dbContext.Uoms.AddRange(defaults
+            .Where(d => !existing.Contains(d.Code))
+            .Select(d => Uom.Create(d.Code, d.Name)));
     }
 }

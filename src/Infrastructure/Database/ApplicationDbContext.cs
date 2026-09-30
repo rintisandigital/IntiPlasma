@@ -1,10 +1,22 @@
 using System.Linq.Expressions;
 using Application.Abstractions.Data;
+using Domain.MasterData.Branches;
+using Domain.MasterData.Coops;
+using Domain.MasterData.Customers;
+using Domain.MasterData.Farmers;
+using Domain.MasterData.Items;
+using Domain.MasterData.TaxCodes;
+using Domain.MasterData.Uoms;
+using Domain.MasterData.Vendors;
+using Domain.MasterData.Warehouses;
+using Domain.Partnership.Contracts;
+using Domain.Partnership.Cycles;
 using Domain.Roles;
 using Domain.Users;
 using Infrastructure.Numbering;
 using Infrastructure.Outbox;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using SharedKernel;
 
 namespace Infrastructure.Database;
@@ -16,11 +28,35 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
 {
     internal const string ConcurrencyTokenProperty = "Version";
 
+    private const int EnumMaxLength = 30;
+
     public DbSet<User> Users { get; set; }
 
     public DbSet<RefreshToken> RefreshTokens { get; set; }
 
     public DbSet<Role> Roles { get; set; }
+
+    public DbSet<Branch> Branches { get; set; }
+
+    public DbSet<Uom> Uoms { get; set; }
+
+    public DbSet<TaxCode> TaxCodes { get; set; }
+
+    public DbSet<Item> Items { get; set; }
+
+    public DbSet<Warehouse> Warehouses { get; set; }
+
+    public DbSet<Vendor> Vendors { get; set; }
+
+    public DbSet<Customer> Customers { get; set; }
+
+    public DbSet<Farmer> Farmers { get; set; }
+
+    public DbSet<Coop> Coops { get; set; }
+
+    public DbSet<PartnershipContract> Contracts { get; set; }
+
+    public DbSet<ProductionCycle> ProductionCycles { get; set; }
 
     internal DbSet<OutboxMessage> OutboxMessages { get; set; }
 
@@ -32,8 +68,10 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
 
         modelBuilder.HasDefaultSchema(Schemas.Default);
 
-        foreach (Type clrType in modelBuilder.Model.GetEntityTypes().Select(e => e.ClrType).ToList())
+        foreach (IMutableEntityType entityType in modelBuilder.Model.GetEntityTypes().ToList())
         {
+            Type clrType = entityType.ClrType;
+
             // Optimistic concurrency on every aggregate, mapped to PostgreSQL's xmin system column.
             if (clrType.IsAssignableTo(typeof(AggregateRoot)))
             {
@@ -43,6 +81,14 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
             if (clrType.IsAssignableTo(typeof(ISoftDeletable)))
             {
                 modelBuilder.Entity(clrType).HasQueryFilter(CreateSoftDeleteFilter(clrType));
+            }
+
+            // Enums are stored by name: readable in SQL reports and safe against reordering.
+            foreach (IMutableProperty property in entityType.GetProperties()
+                         .Where(p => (Nullable.GetUnderlyingType(p.ClrType) ?? p.ClrType).IsEnum))
+            {
+                property.SetProviderClrType(typeof(string));
+                property.SetMaxLength(EnumMaxLength);
             }
         }
     }

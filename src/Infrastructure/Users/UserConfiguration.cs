@@ -1,3 +1,4 @@
+using Domain.MasterData.Branches;
 using Domain.Roles;
 using Domain.Users;
 using Infrastructure.Database;
@@ -28,6 +29,30 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Navigation(u => u.Roles)
             .HasField("_roles")
             .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.HasMany(u => u.Branches)
+            .WithOne()
+            .HasForeignKey(ub => ub.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(u => u.Branches)
+            .HasField("_branches")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class UserBranchConfiguration : IEntityTypeConfiguration<UserBranch>
+{
+    public void Configure(EntityTypeBuilder<UserBranch> builder)
+    {
+        builder.ToTable("user_branches", Schemas.Identity);
+
+        builder.HasKey(ub => new { ub.UserId, ub.BranchId });
+
+        builder.HasOne<Branch>()
+            .WithMany()
+            .HasForeignKey(ub => ub.BranchId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 

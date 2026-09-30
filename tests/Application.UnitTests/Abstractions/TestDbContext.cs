@@ -1,4 +1,16 @@
+using System.Text.Json;
 using Application.Abstractions.Data;
+using Domain.MasterData.Branches;
+using Domain.MasterData.Coops;
+using Domain.MasterData.Customers;
+using Domain.MasterData.Farmers;
+using Domain.MasterData.Items;
+using Domain.MasterData.TaxCodes;
+using Domain.MasterData.Uoms;
+using Domain.MasterData.Vendors;
+using Domain.MasterData.Warehouses;
+using Domain.Partnership.Contracts;
+using Domain.Partnership.Cycles;
 using Domain.Roles;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +20,8 @@ namespace Application.UnitTests.Abstractions;
 /// <summary>
 /// A lightweight in-memory <see cref="DbContext"/> that implements <see cref="IApplicationDbContext"/>
 /// so Application handlers can be unit tested without referencing the Infrastructure layer.
+/// It mirrors only the parts of the real model that the in-memory provider cannot infer by convention.
+/// Value objects are mapped as owned types here because the in-memory provider cannot query complex types.
 /// </summary>
 public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
     : DbContext(options), IApplicationDbContext
@@ -18,12 +32,72 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
 
     public DbSet<Role> Roles { get; set; }
 
+    public DbSet<Branch> Branches { get; set; }
+
+    public DbSet<Uom> Uoms { get; set; }
+
+    public DbSet<TaxCode> TaxCodes { get; set; }
+
+    public DbSet<Item> Items { get; set; }
+
+    public DbSet<Warehouse> Warehouses { get; set; }
+
+    public DbSet<Vendor> Vendors { get; set; }
+
+    public DbSet<Customer> Customers { get; set; }
+
+    public DbSet<Farmer> Farmers { get; set; }
+
+    public DbSet<Coop> Coops { get; set; }
+
+    public DbSet<PartnershipContract> Contracts { get; set; }
+
+    public DbSet<ProductionCycle> ProductionCycles { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>().Navigation(u => u.Roles).HasField("_roles");
+        modelBuilder.Entity<User>().Navigation(u => u.Branches).HasField("_branches");
         modelBuilder.Entity<UserRole>().HasKey(ur => new { ur.UserId, ur.RoleId });
+        modelBuilder.Entity<UserBranch>().HasKey(ub => new { ub.UserId, ub.BranchId });
 
         modelBuilder.Entity<Role>().Navigation(r => r.Permissions).HasField("_permissions");
         modelBuilder.Entity<RolePermission>().HasKey(rp => new { rp.RoleId, rp.Permission });
+
+        modelBuilder.Entity<TaxCode>().Navigation(t => t.Rates).HasField("_rates");
+        modelBuilder.Entity<TaxRate>().HasKey(r => new { r.TaxCodeId, r.EffectiveFrom });
+
+        modelBuilder.Entity<Item>().Navigation(i => i.Conversions).HasField("_conversions");
+        modelBuilder.Entity<ItemUomConversion>().HasKey(c => new { c.ItemId, c.UomId });
+
+        modelBuilder.Entity<Vendor>().OwnsOne(v => v.TaxIdentity);
+        modelBuilder.Entity<Vendor>().OwnsOne(v => v.BankAccount);
+        modelBuilder.Entity<Customer>().OwnsOne(c => c.TaxIdentity);
+        modelBuilder.Entity<Customer>().OwnsOne(c => c.CreditLimit);
+        modelBuilder.Entity<Farmer>().OwnsOne(f => f.TaxIdentity);
+        modelBuilder.Entity<Farmer>().OwnsOne(f => f.BankAccount);
+
+        modelBuilder.Entity<PartnershipContract>().Navigation(c => c.InputPrices).HasField("_inputPrices");
+        modelBuilder.Entity<PartnershipContract>().Navigation(c => c.LiveBirdPrices).HasField("_liveBirdPrices");
+        modelBuilder.Entity<PartnershipContract>().Navigation(c => c.Incentives).HasField("_incentives");
+        modelBuilder.Entity<ContractInputPrice>(b =>
+        {
+            b.HasKey(p => new { p.ContractId, p.ItemId });
+            b.OwnsOne(p => p.Price);
+        });
+        modelBuilder.Entity<ContractLiveBirdPrice>(b =>
+        {
+            b.HasKey(p => new { p.ContractId, p.MinWeightKg });
+            b.OwnsOne(p => p.PricePerKg);
+        });
+        modelBuilder.Entity<ContractIncentive>(b =>
+        {
+            b.HasKey(i => new { i.ContractId, i.LineNumber });
+            b.OwnsOne(i => i.Amount);
+        });
+
+        modelBuilder.Entity<ProductionCycle>().Property(c => c.ContractSnapshot).HasConversion(
+            snapshot => JsonSerializer.Serialize(snapshot, JsonSerializerOptions.Web),
+            json => JsonSerializer.Deserialize<ContractSnapshot>(json, JsonSerializerOptions.Web));
     }
 }

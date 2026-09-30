@@ -15,10 +15,12 @@ public sealed record Money : IComparable<Money>
         Amount = decimal.Round(amount, Decimals, MidpointRounding.AwayFromZero);
     }
 
-    public decimal Amount { get; }
+    public decimal Amount { get; private init; }
 
+    [System.Text.Json.Serialization.JsonIgnore]
     public bool IsZero => Amount == 0m;
 
+    [System.Text.Json.Serialization.JsonIgnore]
     public bool IsNegative => Amount < 0m;
 
     public static Money operator +(Money left, Money right) => Add(left, right);

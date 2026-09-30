@@ -8,4 +8,6 @@ internal static class Schemas
     public const string Default = "public";
     public const string Identity = "identity";
     public const string Infrastructure = "infrastructure";
+    public const string MasterData = "master";
+    public const string Partnership = "partnership";
 }

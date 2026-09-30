@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using Application.Abstractions.Authentication;
+using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Numbering;
 using Dapper;
@@ -59,6 +60,7 @@ public static class DependencyInjection
         services.AddSingleton<IDbConnectionFactory, DbConnectionFactory>();
 
         DefaultTypeMap.MatchNamesWithUnderscores = true;
+        SqlMapper.AddTypeHandler(new DateOnlyTypeHandler());
 
         services.AddScoped<AuditableEntitiesInterceptor>();
         services.AddSingleton<InsertOutboxMessagesInterceptor>();
@@ -66,7 +68,9 @@ public static class DependencyInjection
         services.AddDbContext<ApplicationDbContext>(
             (sp, options) => options
                 .UseNpgsql(sp.GetRequiredService<NpgsqlDataSource>(), npgsqlOptions =>
-                    npgsqlOptions.MigrationsHistoryTable(HistoryRepository.DefaultTableName, Schemas.Default))
+                    npgsqlOptions
+                        .MigrationsHistoryTable(HistoryRepository.DefaultTableName, Schemas.Default)
+                        .UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
                 .UseSnakeCaseNamingConvention()
                 .AddInterceptors(
                     sp.GetRequiredService<AuditableEntitiesInterceptor>(),
@@ -119,6 +123,8 @@ public static class DependencyInjection
         services.AddAuthorization();
 
         services.AddScoped<PermissionProvider>();
+
+        services.AddScoped<IBranchAccess, BranchAccess>();
 
         services.AddTransient<IAuthorizationHandler, PermissionAuthorizationHandler>();
 

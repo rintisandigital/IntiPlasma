@@ -5,6 +5,7 @@ namespace Domain.Users;
 public sealed class User : AggregateRoot
 {
     private readonly List<UserRole> _roles = [];
+    private readonly List<UserBranch> _branches = [];
 
     private User(Guid id, string email, string firstName, string lastName, string passwordHash)
         : base(id)
@@ -24,6 +25,7 @@ public sealed class User : AggregateRoot
     public string LastName { get; private set; }
     public string PasswordHash { get; private set; }
     public IReadOnlyCollection<UserRole> Roles => [.. _roles];
+    public IReadOnlyCollection<UserBranch> Branches => [.. _branches];
 
     public static User Create(string email, string firstName, string lastName, string passwordHash)
     {
@@ -49,5 +51,20 @@ public sealed class User : AggregateRoot
         }
 
         Raise(new UserRolesChangedDomainEvent(Id));
+    }
+
+    /// <summary>
+    /// Replaces the branches the user may access. The caller is responsible for rejecting unknown branch ids.
+    /// </summary>
+    public void SetBranches(IEnumerable<Guid> branchIds)
+    {
+        var desired = branchIds.ToHashSet();
+
+        _branches.RemoveAll(b => !desired.Contains(b.BranchId));
+
+        foreach (Guid branchId in desired.Where(id => _branches.TrueForAll(b => b.BranchId != id)))
+        {
+            _branches.Add(new UserBranch(Id, branchId));
+        }
     }
 }
