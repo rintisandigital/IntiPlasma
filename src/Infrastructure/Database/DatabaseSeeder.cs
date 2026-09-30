@@ -51,6 +51,8 @@ public static class DatabaseSeeder
 
         await SeedUomsAsync(dbContext, cancellationToken);
 
+        await FinanceSeeder.SeedAsync(dbContext, cancellationToken);
+
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 

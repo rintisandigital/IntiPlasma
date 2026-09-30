@@ -41,6 +41,36 @@ public static class Permissions
     public const string CyclesRead = "cycles:read";
     public const string CyclesManage = "cycles:manage";
 
+    /// <summary>
+    /// Finance setup: chart of accounts, cost centers, fiscal periods, journal templates and auto journal mappings.
+    /// </summary>
+    public const string FinanceSetupRead = "finance-setup:read";
+    public const string FinanceSetupManage = "finance-setup:manage";
+
+    public const string FiscalPeriodsClose = "fiscal-periods:close";
+
+    public const string JournalsRead = "journals:read";
+
+    /// <summary>
+    /// Create, edit and delete draft manual journals (maker).
+    /// </summary>
+    public const string JournalsCreate = "journals:create";
+
+    /// <summary>
+    /// Approve draft journals created by someone else (checker).
+    /// </summary>
+    public const string JournalsApprove = "journals:approve";
+
+    /// <summary>
+    /// Post approved journals to the ledger and reverse posted journals.
+    /// </summary>
+    public const string JournalsPost = "journals:post";
+
+    /// <summary>
+    /// General ledger (buku besar) and trial balance (neraca saldo).
+    /// </summary>
+    public const string FinanceReportsRead = "finance-reports:read";
+
     public static readonly IReadOnlyList<string> All =
     [
         UsersRead,
@@ -59,7 +89,15 @@ public static class Permissions
         ContractsRead,
         ContractsManage,
         CyclesRead,
-        CyclesManage
+        CyclesManage,
+        FinanceSetupRead,
+        FinanceSetupManage,
+        FiscalPeriodsClose,
+        JournalsRead,
+        JournalsCreate,
+        JournalsApprove,
+        JournalsPost,
+        FinanceReportsRead
     ];
 
     public static bool Exists(string permission) => All.Contains(permission);

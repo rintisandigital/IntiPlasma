@@ -1,5 +1,11 @@
 using System.Text.Json;
 using Application.Abstractions.Data;
+using Domain.Finance.Accounts;
+using Domain.Finance.CostCenters;
+using Domain.Finance.FiscalPeriods;
+using Domain.Finance.JournalMappings;
+using Domain.Finance.Journals;
+using Domain.Finance.JournalTemplates;
 using Domain.MasterData.Branches;
 using Domain.MasterData.Coops;
 using Domain.MasterData.Customers;
@@ -54,6 +60,18 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
 
     public DbSet<ProductionCycle> ProductionCycles { get; set; }
 
+    public DbSet<Account> Accounts { get; set; }
+
+    public DbSet<CostCenter> CostCenters { get; set; }
+
+    public DbSet<FiscalPeriod> FiscalPeriods { get; set; }
+
+    public DbSet<JournalEntry> JournalEntries { get; set; }
+
+    public DbSet<JournalTemplate> JournalTemplates { get; set; }
+
+    public DbSet<JournalMapping> JournalMappings { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>().Navigation(u => u.Roles).HasField("_roles");
@@ -99,5 +117,19 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
         modelBuilder.Entity<ProductionCycle>().Property(c => c.ContractSnapshot).HasConversion(
             snapshot => JsonSerializer.Serialize(snapshot, JsonSerializerOptions.Web),
             json => JsonSerializer.Deserialize<ContractSnapshot>(json, JsonSerializerOptions.Web));
+
+        modelBuilder.Entity<JournalEntry>().Navigation(j => j.Lines).HasField("_lines");
+        modelBuilder.Entity<JournalLine>(b =>
+        {
+            b.HasKey(l => new { l.JournalEntryId, l.LineNumber });
+            b.OwnsOne(l => l.Debit);
+            b.OwnsOne(l => l.Credit);
+        });
+
+        modelBuilder.Entity<JournalTemplate>().Navigation(t => t.Lines).HasField("_lines");
+        modelBuilder.Entity<JournalTemplateLine>().HasKey(l => new { l.JournalTemplateId, l.LineNumber });
+
+        modelBuilder.Entity<JournalMapping>().Navigation(m => m.Lines).HasField("_lines");
+        modelBuilder.Entity<JournalMappingLine>().HasKey(l => new { l.JournalMappingId, l.Component });
     }
 }

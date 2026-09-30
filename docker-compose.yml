@@ -13,7 +13,7 @@ services:
     image: postgres:17
     container_name: postgres
     environment:
-      - POSTGRES_DB=clean-architecture
+      - POSTGRES_DB=intiplasma
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
     volumes:

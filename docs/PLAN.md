@@ -140,7 +140,7 @@ tests/
 - PartnershipContract: harga kontrak DOC/pakan/OVK, harga jaminan ayam per range bobot, skema bonus (FCR, IP, mortalitas).
 - ProductionCycle: buka siklus (kandang, kontrak, tanggal chick-in rencana), ubah status.
 
-### Fase 2 — Finance Core (dibuat awal karena semua modul posting ke sini)
+### Fase 2 — Finance Core (dibuat awal karena semua modul posting ke sini) ✅ (selesai 2026-09-30, lihat §8)
 - COA (hierarki, group account, tipe: Asset/Liability/Equity/Revenue/Expense), Cost Center, Fiscal Period (open/close).
 - JournalEntry: draft → approve → post → reverse; template jurnal; jurnal manual.
 - Journal Mapping (Auto Journal Engine) + handler integration event.
@@ -256,3 +256,43 @@ Migration: `Phase1_MasterData_Partnership` (schema `master` & `partnership`).
 - Endpoint per resource dikelompokkan dalam satu file (`XxxEndpoints.cs`, `MapGroup`) agar tag & permission konsisten.
 - List endpoint mendukung `?search=&page=&pageSize=` (maks 100) + filter spesifik (`branchId`, `type`, `category`, `status`, `farmerId`, `coopId`).
 - Diverifikasi end-to-end ke PostgreSQL lokal (database sementara): semua skenario di atas, termasuk 409 siklus ganda, 403 lintas cabang, dan event outbox tanpa error.
+
+---
+
+## 8. Realisasi Fase 2 — Finance Core
+
+Migration: `Phase2_FinanceCore` (schema `finance`). Semua endpoint di bawah `/api/v1/finance/...`.
+
+**Setup**
+| Fitur | Endpoint | Aturan utama |
+|---|---|---|
+| Chart of Accounts | `accounts` | Tipe Asset/Liability/Equity/Revenue/Expense; akun header (pengelompok) vs akun postable; induk harus header & bertipe sama; saldo normal default dari tipe, bisa di-*override* untuk akun kontra (akumulasi penyusutan, retur penjualan). Kode, tipe, induk & sifat postable *immutable*. |
+| COA default | (seed) | **67 akun** standar peternakan inti-plasma (kas/bank, piutang, persediaan DOC/pakan/OVK, ayam dalam proses, PPN masukan/keluaran, hutang PPh, hutang plasma, GRNI, HPP, beban kemitraan, dst). Hanya di-seed bila COA masih kosong — silakan disesuaikan tim finance. |
+| Cost Center | `cost-centers` | Dimensi analisis opsional per baris jurnal. |
+| Periode Fiskal | `fiscal-periods` | `POST years/{tahun}` membuat 12 periode bulanan. **Tutup** berurutan (periode sebelumnya harus tutup, tidak boleh ada jurnal Draft/Approved). **Buka kembali** hanya periode tertutup terakhir. |
+| Template Jurnal | `journal-templates` | Susunan akun & sisi (tanpa nominal) untuk jurnal berulang. |
+
+**Jurnal** (`journals`)
+- Jurnal manual: `Draft → Approved → Posted`; **maker-checker** — penyetuju tidak boleh pembuatnya (`Journals.SelfApprovalNotAllowed`). Draft bisa diubah/dihapus.
+- Wajib seimbang, minimal 2 baris, tiap baris hanya debit **atau** kredit, akun harus postable & aktif, periode harus terbuka.
+- **Nomor diberikan saat posting** → nomor jurnal terposting tanpa celah: `JU/{cabang}/{yyyy}/{bulan romawi}/{nnnn}` (manual), `JO/...` (otomatis).
+- Jurnal terposting *immutable*; koreksi via `reverse` (jurnal pembalik terposting, asli berstatus `Reversed`, keduanya tetap di buku besar).
+- Branch-scoped seperti modul lain.
+
+**Mesin Jurnal Otomatis (Auto Journal Engine)**
+- Katalog event akuntansi (`journal-mappings/events`): PurchaseReceipt, VendorInvoice, VendorPayment, StockTransferToCycle, SalesInvoice, CustomerReceipt, PlasmaSettlement, PlasmaPayment — masing-masing dengan komponen nominal (mis. `FeedReceived`, `InputVat`, `IncomeTaxWithheld`).
+- `journal-mappings`: tiap komponen → akun debit & kredit. Mapping default (tanpa cabang) + *override* per cabang. Default untuk semua event sudah di-seed.
+- `IAutoJournalService.PostAsync(AccountingEntry)` dipanggil modul operasional (Fase 3+) dari domain event handler (outbox). **Idempotent** per (event, dokumen sumber) — dijamin unique index. Akun bisa di-*override* per transaksi (mis. rekening bank yang dipakai). Nominal negatif membalik sisi.
+- `journal-mappings/preview`: *dry-run* untuk mengecek mapping tanpa menyimpan.
+
+**Laporan** (`reports`)
+- `general-ledger?accountId=&from=&to=[&branchId=&costCenterId=]` — saldo awal, mutasi dengan saldo berjalan (arah saldo normal), saldo akhir.
+- `trial-balance?from=&to=[&branchId=&includeZeroBalances=]` — per akun postable: saldo awal, mutasi, saldo akhir (kolom debit/kredit) + `isBalanced`.
+
+**Permission baru**: `finance-setup:read/manage`, `fiscal-periods:close`, `journals:read/create/approve/post`, `finance-reports:read`.
+
+**Catatan & penyesuaian**
+- Dimensi cabang disimpan di header jurnal (satu jurnal = satu cabang); transaksi antar-cabang nanti dibuat sebagai dua jurnal dengan akun antar-cabang.
+- Belum ada penutupan tahun (laba/rugi → laba ditahan); dikerjakan di Fase 8. Sampai itu, saldo akun pendapatan/beban terakumulasi lintas tahun di neraca saldo.
+- Use case Finance ditulis satu file per use case (command + validator + handler) agar ringkas.
+- Diverifikasi end-to-end ke PostgreSQL lokal (database sementara): seed COA & mapping, jurnal tidak seimbang/akun header ditolak, self-approval ditolak, approve & post oleh checker, reverse, buku besar & neraca saldo seimbang, preview mapping, override mapping per cabang, aturan tutup/buka periode, posting ke periode tertutup ditolak.

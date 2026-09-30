@@ -1,3 +1,9 @@
+using Domain.Finance.Accounts;
+using Domain.Finance.CostCenters;
+using Domain.Finance.FiscalPeriods;
+using Domain.Finance.JournalMappings;
+using Domain.Finance.Journals;
+using Domain.Finance.JournalTemplates;
 using Domain.MasterData.Branches;
 using Domain.MasterData.Coops;
 using Domain.MasterData.Customers;
@@ -37,6 +43,13 @@ public interface IApplicationDbContext
 
     DbSet<PartnershipContract> Contracts { get; }
     DbSet<ProductionCycle> ProductionCycles { get; }
+
+    DbSet<Account> Accounts { get; }
+    DbSet<CostCenter> CostCenters { get; }
+    DbSet<FiscalPeriod> FiscalPeriods { get; }
+    DbSet<JournalEntry> JournalEntries { get; }
+    DbSet<JournalTemplate> JournalTemplates { get; }
+    DbSet<JournalMapping> JournalMappings { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

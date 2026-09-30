@@ -15,4 +15,11 @@ public static class Tags
     public const string Coops = "Coops";
     public const string Contracts = "Partnership Contracts";
     public const string Cycles = "Production Cycles";
+    public const string Accounts = "Finance - Chart of Accounts";
+    public const string CostCenters = "Finance - Cost Centers";
+    public const string FiscalPeriods = "Finance - Fiscal Periods";
+    public const string JournalTemplates = "Finance - Journal Templates";
+    public const string JournalMappings = "Finance - Auto Journal Mappings";
+    public const string Journals = "Finance - Journals";
+    public const string FinanceReports = "Finance - Reports";
 }

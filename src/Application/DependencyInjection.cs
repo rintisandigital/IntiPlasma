@@ -1,5 +1,6 @@
 ﻿using Application.Abstractions.Behaviors;
 using Application.Abstractions.Messaging;
+using Application.Finance.AutoJournal;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using SharedKernel;
@@ -34,6 +35,8 @@ public static class DependencyInjection
             .WithScopedLifetime());
 
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly, includeInternalTypes: true);
+
+        services.AddScoped<IAutoJournalService, AutoJournalService>();
 
         return services;
     }

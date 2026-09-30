@@ -1,5 +1,11 @@
 using System.Linq.Expressions;
 using Application.Abstractions.Data;
+using Domain.Finance.Accounts;
+using Domain.Finance.CostCenters;
+using Domain.Finance.FiscalPeriods;
+using Domain.Finance.JournalMappings;
+using Domain.Finance.Journals;
+using Domain.Finance.JournalTemplates;
 using Domain.MasterData.Branches;
 using Domain.MasterData.Coops;
 using Domain.MasterData.Customers;
@@ -57,6 +63,18 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<PartnershipContract> Contracts { get; set; }
 
     public DbSet<ProductionCycle> ProductionCycles { get; set; }
+
+    public DbSet<Account> Accounts { get; set; }
+
+    public DbSet<CostCenter> CostCenters { get; set; }
+
+    public DbSet<FiscalPeriod> FiscalPeriods { get; set; }
+
+    public DbSet<JournalEntry> JournalEntries { get; set; }
+
+    public DbSet<JournalTemplate> JournalTemplates { get; set; }
+
+    public DbSet<JournalMapping> JournalMappings { get; set; }
 
     internal DbSet<OutboxMessage> OutboxMessages { get; set; }
 
