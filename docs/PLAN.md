@@ -163,6 +163,7 @@ tests/
 ### Fase 6 — AP & Cash/Bank
 - Vendor Invoice (3-way match PO–GR–Invoice), Payment Voucher, multi/partial payment, AP ledger & aging.
 - Cash In/Out, Petty Cash, Bank Transfer, Bank Reconciliation, Cash & Bank Ledger.
+- Sisa AR dari Fase 5 (keputusan 2026-10-01): *void* penerimaan customer (jurnal pembalik), uang muka penjualan, nota kredit/retur penjualan.
 
 ### Fase 7 — HPP & Settlement Plasma
 - CycleCost: akumulasi biaya per siklus (DOC, pakan, OVK, biaya lain, alokasi overhead) → HPP per kg & per ekor; HPP harian (estimasi berjalan).
@@ -419,7 +420,6 @@ Migration: `Phase5_SalesReceivables` (schema `sales`; tabel penerimaan di `finan
 - `IdempotencyFilter` kini menyimpan respons dengan opsi JSON API (camelCase, enum sebagai nama). Sebelumnya respons *replay* memakai PascalCase sehingga berbeda dari respons pertama (bug Fase 0).
 
 **Catatan**
-- `TaxRate.TaxBaseRatio` disimpan dengan presisi (10,8), sehingga 11/12 tersimpan sebagai 0,91666667. Contoh hasil verifikasi: DPP 40.400.000 → PPN 4.444.000,02 (seharusnya 4.444.000). Perlu keputusan: simpan rasio sebagai pecahan (pembilang/penyebut) atau pakai tarif efektif 11% dengan rasio 1. Konfirmasi ke konsultan pajak.
-- Penerimaan belum bisa dibatalkan/di-*void*. Koreksi saat ini hanya lewat jurnal manual (status invoice tidak ikut terkoreksi). Kandidat Fase 6 bersama Cash & Bank.
-- Belum ada uang muka penjualan (deposit) maupun nota kredit/retur penjualan.
+- `TaxRate.TaxBaseRatio` disimpan dengan presisi (10,8), sehingga 11/12 tersimpan sebagai 0,91666667. Contoh hasil verifikasi: DPP 40.400.000 → PPN 4.444.000,02 (seharusnya 4.444.000). **Keputusan 2026-10-01**: PPN 12% DPP nilai lain diinput sebagai **tarif efektif 11% dengan rasio DPP 1**.
+- Penerimaan belum bisa dibatalkan/di-*void*, dan belum ada uang muka penjualan maupun nota kredit/retur penjualan. **Diputuskan masuk Fase 6.**
 - Diverifikasi end-to-end ke PostgreSQL lokal (database sementara), **43 skenario lulus**: penolakan item non-ayam, credit limit (ditolak lalu override dengan alasan), batal SO, DO + replay idempotency, panen ganda (409), DO ke SO batal / sebelum tanggal panen, panen belum terkirim, batal DO mengembalikan sisa SO, draft invoice (tanpa nomor, DO terkunci, batal draft melepas DO), PPN dengan rasio DPP, jatuh tempo, posting bernomor & final, penerimaan parsial (tolak lebih bayar & akun non-aset), kartu piutang, aging (1–30 hari & per tanggal lampau), 2 jurnal otomatis tanpa error, neraca saldo seimbang (Piutang 14.844.000,02; Penjualan 40.400.000; PPN Keluaran 4.444.000,02; Bank 30.000.000), tutup siklus ditolak selama panen belum terjual/invoice masih draft lalu berhasil setelah posting.

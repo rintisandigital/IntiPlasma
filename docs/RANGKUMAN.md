@@ -26,6 +26,8 @@
 | 8 | Format nomor dokumen | `PREFIX/CABANG/YYYY/BULAN-ROMAWI/NNNN`, mis. `PO/BDG/2026/IX/0001` |
 | 9 | Pengakuan HPP penjualan | **Ditunda ke Fase 7** (dari biaya siklus); invoice hanya menjurnal piutang, penjualan, dan PPN keluaran |
 | 10 | Sales Order | **Wajib sebelum DO** |
+| 11 | PPN "DPP nilai lain" (12% × 11/12) | Diinput sebagai **tarif efektif 11% dengan rasio DPP 1** (menghindari selisih sen akibat presisi rasio) |
+| 12 | Void penerimaan customer, uang muka penjualan, nota kredit/retur penjualan | **Masuk Fase 6** |
 
 ## 3. Arsitektur & Konvensi Kode
 
@@ -140,8 +142,8 @@ Sudah ada di katalog tetapi belum dipakai (untuk fase berikut): `VendorInvoice`,
 - `IdempotencyFilter` masih in-memory → tambah Redis sebelum scale-out.
 - Belum ada penutupan tahun buku (laba/rugi → laba ditahan) → Fase 8.
 - Satu admin tunggal tidak bisa menyelesaikan jurnal manual (maker-checker) → perlu user kedua.
-- **Presisi rasio DPP**: `TaxBaseRatio` (10,8) menyimpan 11/12 sebagai 0,91666667 → PPN meleset beberapa sen (DPP 40,4 jt → PPN 4.444.000,02, seharusnya 4.444.000). Perlu diputuskan: simpan sebagai pecahan, atau pakai tarif efektif 11% dengan rasio 1 (konfirmasi konsultan pajak).
-- Penerimaan customer belum bisa di-*void*; belum ada uang muka penjualan, nota kredit/retur penjualan.
+- Presisi rasio DPP: `TaxBaseRatio` (10,8) menyimpan 11/12 sebagai 0,91666667 sehingga PPN bisa meleset beberapa sen. **Diputuskan**: PPN 12% DPP nilai lain diinput sebagai tarif 11% dengan rasio 1. Rasio ≠ 1 tetap didukung, tetapi hindari pecahan berulang.
+- Void penerimaan customer, uang muka penjualan, nota kredit/retur penjualan → **Fase 6**.
 
 ## 9. Langkah Berikutnya — Fase 6: AP & Cash/Bank
 
@@ -149,5 +151,8 @@ Rencana (lihat PLAN.md §4 & §5):
 - Vendor Invoice dengan **3-way match** PO–BPB–Invoice, PPN Masukan & PPh dipotong → jurnal `VendorInvoice` (GRNI / Hutang Usaha / PPN Masukan / Hutang PPh).
 - Payment Voucher (multi/parsial) → jurnal `VendorPayment`; AP ledger & aging (pola sama dengan AR Fase 5).
 - Cash In/Out, Petty Cash, Bank Transfer, Bank Reconciliation, Cash & Bank Ledger.
-- Pertimbangkan: *void* penerimaan customer (dengan jurnal pembalik) dan uang muka penjualan.
+- **Sisa AR dari Fase 5 (disepakati masuk Fase 6)**:
+  - *Void* penerimaan customer: alokasi invoice dikembalikan + jurnal pembalik (`JournalEntry.Reverse` atas jurnal otomatis `CustomerReceipt`).
+  - Uang muka penjualan (deposit ke akun 2-1501), dialokasikan ke invoice kemudian. Customer dengan limit 0 bisa membayar di muka.
+  - Nota kredit / retur penjualan atas invoice terposting (koreksi harga/berat, PPN ikut dikoreksi; akun 4-1901).
 - Setelah itu: Fase 7 (HPP & Settlement Plasma — termasuk pengakuan HPP penjualan), Fase 8 (Laporan Keuangan & pajak).
