@@ -1,3 +1,4 @@
+using Domain.MasterData.TaxCodes;
 using Domain.Sales.DeliveryOrders;
 using SharedKernel;
 
@@ -5,7 +6,7 @@ namespace Domain.Sales.SalesInvoices;
 
 public sealed class SalesInvoiceLine
 {
-    internal SalesInvoiceLine(Guid salesInvoiceId, int lineNumber, DeliveryOrderLine deliveryLine, VatCalculation vat)
+    internal SalesInvoiceLine(Guid salesInvoiceId, int lineNumber, DeliveryOrderLine deliveryLine, TaxCalculation vat)
     {
         SalesInvoiceId = salesInvoiceId;
         LineNumber = lineNumber;
@@ -22,7 +23,7 @@ public sealed class SalesInvoiceLine
         TaxCodeId = vat.TaxCodeId ?? deliveryLine.TaxCodeId;
         VatRatePercent = vat.RatePercent;
         VatTaxBase = vat.TaxBase with { };
-        VatAmount = vat.VatAmount with { };
+        VatAmount = vat.TaxAmount with { };
     }
 
     private SalesInvoiceLine()
@@ -62,4 +63,16 @@ public sealed class SalesInvoiceLine
     public Money VatTaxBase { get; private set; }
 
     public Money VatAmount { get; private set; }
+
+    /// <summary>
+    /// Amount (excluding VAT) reduced by credit notes.
+    /// </summary>
+    public Money CreditedAmount { get; private set; } = new(0m);
+
+    public Money CreditableAmount => Amount - CreditedAmount;
+
+    internal void AddCredit(Money amount)
+    {
+        CreditedAmount += amount;
+    }
 }

@@ -102,6 +102,475 @@ namespace Infrastructure.Database.Migrations
                     b.ToTable("accounts", "finance");
                 });
 
+            modelBuilder.Entity("Domain.Finance.CashBank.BankReconciliation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<Guid>("CashBankAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cash_bank_account_id");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at_utc");
+
+                    b.Property<Guid?>("CompletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("completed_by");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<DateOnly>("StatementDate")
+                        .HasColumnType("date")
+                        .HasColumnName("statement_date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("status");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "StatementBalance", "Domain.Finance.CashBank.BankReconciliation.StatementBalance#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("statement_balance");
+                        });
+
+                    b.HasKey("Id")
+                        .HasName("pk_bank_reconciliations");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_bank_reconciliations_branch_id");
+
+                    b.HasIndex("CashBankAccountId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_bank_reconciliations_cash_bank_account_id_in_progress")
+                        .HasFilter("status = 'InProgress'");
+
+                    b.HasIndex("CashBankAccountId", "StatementDate")
+                        .HasDatabaseName("ix_bank_reconciliations_cash_bank_account_id_statement_date");
+
+                    b.ToTable("bank_reconciliations", "finance");
+                });
+
+            modelBuilder.Entity("Domain.Finance.CashBank.BankStatementLine", b =>
+                {
+                    b.Property<Guid>("BankReconciliationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bank_reconciliation_id");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("line_number");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("description");
+
+                    b.Property<Guid?>("MatchedJournalEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("matched_journal_entry_id");
+
+                    b.Property<int?>("MatchedJournalLineNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("matched_journal_line_number");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Amount", "Domain.Finance.CashBank.BankStatementLine.Amount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("amount");
+                        });
+
+                    b.HasKey("BankReconciliationId", "LineNumber")
+                        .HasName("pk_bank_statement_lines");
+
+                    b.HasIndex("MatchedJournalEntryId", "MatchedJournalLineNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_bank_statement_lines_matched_journal_entry_id_matched_journ")
+                        .HasFilter("matched_journal_entry_id IS NOT NULL");
+
+                    b.ToTable("bank_statement_lines", "finance");
+                });
+
+            modelBuilder.Entity("Domain.Finance.CashBank.BankTransfer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<Guid>("FromCashBankAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("from_cash_bank_account_id");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("number");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reference");
+
+                    b.Property<Guid>("ToCashBankAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("to_cash_bank_account_id");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Amount", "Domain.Finance.CashBank.BankTransfer.Amount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("amount");
+                        });
+
+                    b.HasKey("Id")
+                        .HasName("pk_bank_transfers");
+
+                    b.HasIndex("FromCashBankAccountId")
+                        .HasDatabaseName("ix_bank_transfers_from_cash_bank_account_id");
+
+                    b.HasIndex("Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_bank_transfers_number");
+
+                    b.HasIndex("ToCashBankAccountId")
+                        .HasDatabaseName("ix_bank_transfers_to_cash_bank_account_id");
+
+                    b.HasIndex("BranchId", "Date")
+                        .HasDatabaseName("ix_bank_transfers_branch_id_date");
+
+                    b.ToTable("bank_transfers", "finance");
+                });
+
+            modelBuilder.Entity("Domain.Finance.CashBank.CashBankAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("AccountNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("account_number");
+
+                    b.Property<string>("BankName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("bank_name");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("type");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cash_bank_accounts");
+
+                    b.HasIndex("AccountId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_cash_bank_accounts_account_id");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_cash_bank_accounts_branch_id");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_cash_bank_accounts_code");
+
+                    b.ToTable("cash_bank_accounts", "finance");
+                });
+
+            modelBuilder.Entity("Domain.Finance.CashBank.CashTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("ApprovedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_at_utc");
+
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_by");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("cancellation_reason");
+
+                    b.Property<Guid>("CashBankAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cash_bank_account_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("direction");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Number")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("number");
+
+                    b.Property<DateTime?>("PostedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("posted_at_utc");
+
+                    b.Property<Guid?>("PostedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("posted_by");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reference");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("status");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Amount", "Domain.Finance.CashBank.CashTransaction.Amount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("amount");
+                        });
+
+                    b.HasKey("Id")
+                        .HasName("pk_cash_transactions");
+
+                    b.HasIndex("Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_cash_transactions_number")
+                        .HasFilter("number IS NOT NULL");
+
+                    b.HasIndex("BranchId", "Date")
+                        .HasDatabaseName("ix_cash_transactions_branch_id_date");
+
+                    b.HasIndex("CashBankAccountId", "Date")
+                        .HasDatabaseName("ix_cash_transactions_cash_bank_account_id_date");
+
+                    b.ToTable("cash_transactions", "finance");
+                });
+
+            modelBuilder.Entity("Domain.Finance.CashBank.CashTransactionLine", b =>
+                {
+                    b.Property<Guid>("CashTransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cash_transaction_id");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("line_number");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<Guid?>("CostCenterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cost_center_id");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("description");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Amount", "Domain.Finance.CashBank.CashTransactionLine.Amount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("amount");
+                        });
+
+                    b.HasKey("CashTransactionId", "LineNumber")
+                        .HasName("pk_cash_transaction_lines");
+
+                    b.HasIndex("AccountId")
+                        .HasDatabaseName("ix_cash_transaction_lines_account_id");
+
+                    b.HasIndex("CostCenterId")
+                        .HasDatabaseName("ix_cash_transaction_lines_cost_center_id");
+
+                    b.ToTable("cash_transaction_lines", "finance");
+                });
+
             modelBuilder.Entity("Domain.Finance.CostCenters.CostCenter", b =>
                 {
                     b.Property<Guid>("Id")
@@ -602,6 +1071,515 @@ namespace Infrastructure.Database.Migrations
                     b.ToTable("journal_lines", "finance");
                 });
 
+            modelBuilder.Entity("Domain.Finance.Payables.PaymentVoucher", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("ApprovedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_at_utc");
+
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_by");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("cancellation_reason");
+
+                    b.Property<Guid>("CashBankAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cash_bank_account_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("number");
+
+                    b.Property<DateTime?>("PaidAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_at_utc");
+
+                    b.Property<Guid?>("PaidBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("paid_by");
+
+                    b.Property<DateOnly>("PaymentDate")
+                        .HasColumnType("date")
+                        .HasColumnName("payment_date");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reference");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("VendorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("vendor_id");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Amount", "Domain.Finance.Payables.PaymentVoucher.Amount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("amount");
+                        });
+
+                    b.HasKey("Id")
+                        .HasName("pk_payment_vouchers");
+
+                    b.HasIndex("CashBankAccountId")
+                        .HasDatabaseName("ix_payment_vouchers_cash_bank_account_id");
+
+                    b.HasIndex("Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_payment_vouchers_number");
+
+                    b.HasIndex("BranchId", "PaymentDate")
+                        .HasDatabaseName("ix_payment_vouchers_branch_id_payment_date");
+
+                    b.HasIndex("VendorId", "Status")
+                        .HasDatabaseName("ix_payment_vouchers_vendor_id_status");
+
+                    b.ToTable("payment_vouchers", "finance");
+                });
+
+            modelBuilder.Entity("Domain.Finance.Payables.PaymentVoucherAllocation", b =>
+                {
+                    b.Property<Guid>("PaymentVoucherId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payment_voucher_id");
+
+                    b.Property<Guid>("VendorInvoiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("vendor_invoice_id");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Amount", "Domain.Finance.Payables.PaymentVoucherAllocation.Amount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("amount");
+                        });
+
+                    b.HasKey("PaymentVoucherId", "VendorInvoiceId")
+                        .HasName("pk_payment_voucher_allocations");
+
+                    b.HasIndex("VendorInvoiceId")
+                        .HasDatabaseName("ix_payment_voucher_allocations_vendor_invoice_id");
+
+                    b.ToTable("payment_voucher_allocations", "finance");
+                });
+
+            modelBuilder.Entity("Domain.Finance.Payables.VendorInvoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("cancellation_reason");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("due_date");
+
+                    b.Property<Guid?>("IncomeTaxCodeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("income_tax_code_id");
+
+                    b.Property<decimal>("IncomeTaxRatePercent")
+                        .HasPrecision(7, 4)
+                        .HasColumnType("numeric(7,4)")
+                        .HasColumnName("income_tax_rate_percent");
+
+                    b.Property<DateOnly>("InvoiceDate")
+                        .HasColumnType("date")
+                        .HasColumnName("invoice_date");
+
+                    b.Property<decimal>("MaxPriceDeviationPercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("max_price_deviation_percent");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("Number")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("number");
+
+                    b.Property<DateTime?>("PostedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("posted_at_utc");
+
+                    b.Property<Guid?>("PostedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("posted_by");
+
+                    b.Property<string>("PriceVarianceApprovalReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("price_variance_approval_reason");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TaxInvoiceNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("tax_invoice_number");
+
+                    b.Property<Guid>("VendorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("vendor_id");
+
+                    b.Property<string>("VendorInvoiceNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("vendor_invoice_number");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "GoodsValue", "Domain.Finance.Payables.VendorInvoice.GoodsValue#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("goods_value");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "IncomeTaxAmount", "Domain.Finance.Payables.VendorInvoice.IncomeTaxAmount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("income_tax_amount");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "PaidAmount", "Domain.Finance.Payables.VendorInvoice.PaidAmount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("paid_amount");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Subtotal", "Domain.Finance.Payables.VendorInvoice.Subtotal#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("subtotal");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Total", "Domain.Finance.Payables.VendorInvoice.Total#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("total");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "VatAmount", "Domain.Finance.Payables.VendorInvoice.VatAmount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("vat_amount");
+                        });
+
+                    b.HasKey("Id")
+                        .HasName("pk_vendor_invoices");
+
+                    b.HasIndex("IncomeTaxCodeId")
+                        .HasDatabaseName("ix_vendor_invoices_income_tax_code_id");
+
+                    b.HasIndex("Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_vendor_invoices_number")
+                        .HasFilter("number IS NOT NULL");
+
+                    b.HasIndex("BranchId", "InvoiceDate")
+                        .HasDatabaseName("ix_vendor_invoices_branch_id_invoice_date");
+
+                    b.HasIndex("VendorId", "Status")
+                        .HasDatabaseName("ix_vendor_invoices_vendor_id_status");
+
+                    b.HasIndex("VendorId", "VendorInvoiceNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_vendor_invoices_vendor_id_vendor_invoice_number_active")
+                        .HasFilter("status <> 'Cancelled'");
+
+                    b.ToTable("vendor_invoices", "finance");
+                });
+
+            modelBuilder.Entity("Domain.Finance.Payables.VendorInvoiceLine", b =>
+                {
+                    b.Property<Guid>("VendorInvoiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("vendor_invoice_id");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("line_number");
+
+                    b.Property<Guid>("GoodsReceiptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("goods_receipt_id");
+
+                    b.Property<int>("GoodsReceiptLineNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("goods_receipt_line_number");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("item_id");
+
+                    b.Property<decimal>("PriceDeviationPercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("price_deviation_percent");
+
+                    b.Property<Guid>("PurchaseOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("purchase_order_id");
+
+                    b.Property<int>("PurchaseOrderLineNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("purchase_order_line_number");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<Guid?>("TaxCodeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tax_code_id");
+
+                    b.Property<Guid>("UomId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("uom_id");
+
+                    b.Property<decimal>("VatRatePercent")
+                        .HasPrecision(7, 4)
+                        .HasColumnType("numeric(7,4)")
+                        .HasColumnName("vat_rate_percent");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Amount", "Domain.Finance.Payables.VendorInvoiceLine.Amount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("amount");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "GoodsValue", "Domain.Finance.Payables.VendorInvoiceLine.GoodsValue#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("goods_value");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "OrderUnitPrice", "Domain.Finance.Payables.VendorInvoiceLine.OrderUnitPrice#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("order_unit_price");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "UnitPrice", "Domain.Finance.Payables.VendorInvoiceLine.UnitPrice#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("unit_price");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "VatAmount", "Domain.Finance.Payables.VendorInvoiceLine.VatAmount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("vat_amount");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "VatTaxBase", "Domain.Finance.Payables.VendorInvoiceLine.VatTaxBase#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("vat_tax_base");
+                        });
+
+                    b.HasKey("VendorInvoiceId", "LineNumber")
+                        .HasName("pk_vendor_invoice_lines");
+
+                    b.HasIndex("ItemId")
+                        .HasDatabaseName("ix_vendor_invoice_lines_item_id");
+
+                    b.HasIndex("PurchaseOrderId")
+                        .HasDatabaseName("ix_vendor_invoice_lines_purchase_order_id");
+
+                    b.HasIndex("TaxCodeId")
+                        .HasDatabaseName("ix_vendor_invoice_lines_tax_code_id");
+
+                    b.HasIndex("UomId")
+                        .HasDatabaseName("ix_vendor_invoice_lines_uom_id");
+
+                    b.HasIndex("GoodsReceiptId", "GoodsReceiptLineNumber")
+                        .HasDatabaseName("ix_vendor_invoice_lines_goods_receipt_id_goods_receipt_line_nu");
+
+                    b.ToTable("vendor_invoice_lines", "finance");
+                });
+
+            modelBuilder.Entity("Domain.Finance.Receivables.CustomerAdvanceApplication", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CustomerReceiptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_receipt_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<Guid>("SalesInvoiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sales_invoice_id");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Amount", "Domain.Finance.Receivables.CustomerAdvanceApplication.Amount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("amount");
+                        });
+
+                    b.HasKey("Id")
+                        .HasName("pk_customer_advance_applications");
+
+                    b.HasIndex("CustomerReceiptId")
+                        .HasDatabaseName("ix_customer_advance_applications_customer_receipt_id");
+
+                    b.HasIndex("SalesInvoiceId")
+                        .HasDatabaseName("ix_customer_advance_applications_sales_invoice_id");
+
+                    b.ToTable("customer_advance_applications", "finance");
+                });
+
             modelBuilder.Entity("Domain.Finance.Receivables.CustomerReceipt", b =>
                 {
                     b.Property<Guid>("Id")
@@ -616,6 +1594,10 @@ namespace Infrastructure.Database.Migrations
                     b.Property<Guid>("CashAccountId")
                         .HasColumnType("uuid")
                         .HasColumnName("cash_account_id");
+
+                    b.Property<Guid?>("CashBankAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cash_bank_account_id");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -657,11 +1639,38 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("reference");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Posted")
+                        .HasColumnName("status");
+
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
+
+                    b.Property<DateOnly?>("VoidDate")
+                        .HasColumnType("date")
+                        .HasColumnName("void_date");
+
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("void_reason");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "AdvanceAmount", "Domain.Finance.Receivables.CustomerReceipt.AdvanceAmount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("advance_amount");
+                        });
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "Amount", "Domain.Finance.Receivables.CustomerReceipt.Amount#Money", b1 =>
                         {
@@ -673,11 +1682,24 @@ namespace Infrastructure.Database.Migrations
                                 .HasColumnName("amount");
                         });
 
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "AppliedAdvanceAmount", "Domain.Finance.Receivables.CustomerReceipt.AppliedAdvanceAmount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("applied_advance_amount");
+                        });
+
                     b.HasKey("Id")
                         .HasName("pk_customer_receipts");
 
                     b.HasIndex("CashAccountId")
                         .HasDatabaseName("ix_customer_receipts_cash_account_id");
+
+                    b.HasIndex("CashBankAccountId")
+                        .HasDatabaseName("ix_customer_receipts_cash_bank_account_id");
 
                     b.HasIndex("Number")
                         .IsUnique()
@@ -843,6 +1865,11 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("quantity");
 
+                    b.Property<decimal>("QuantityInvoiced")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("quantity_invoiced");
+
                     b.Property<decimal>("UnitCost")
                         .HasPrecision(18, 6)
                         .HasColumnType("numeric(18,6)")
@@ -860,6 +1887,16 @@ namespace Infrastructure.Database.Migrations
                                 .HasPrecision(18, 2)
                                 .HasColumnType("numeric(18,2)")
                                 .HasColumnName("value");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "ValueInvoiced", "Domain.Inventory.GoodsReceipts.GoodsReceiptLine.ValueInvoiced#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("value_invoiced");
                         });
 
                     b.HasKey("GoodsReceiptId", "LineNumber")
@@ -2006,6 +3043,11 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("character varying(30)")
                         .HasColumnName("phone");
 
+                    b.Property<decimal>("PriceTolerancePercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("price_tolerance_percent");
+
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -2923,6 +3965,155 @@ namespace Infrastructure.Database.Migrations
                     b.ToTable("role_permissions", "identity");
                 });
 
+            modelBuilder.Entity("Domain.Sales.CreditNotes.SalesCreditNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("number");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("SalesInvoiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sales_invoice_id");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Subtotal", "Domain.Sales.CreditNotes.SalesCreditNote.Subtotal#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("subtotal");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Total", "Domain.Sales.CreditNotes.SalesCreditNote.Total#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("total");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "VatAmount", "Domain.Sales.CreditNotes.SalesCreditNote.VatAmount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("vat_amount");
+                        });
+
+                    b.HasKey("Id")
+                        .HasName("pk_sales_credit_notes");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_sales_credit_notes_branch_id");
+
+                    b.HasIndex("Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sales_credit_notes_number");
+
+                    b.HasIndex("SalesInvoiceId")
+                        .HasDatabaseName("ix_sales_credit_notes_sales_invoice_id");
+
+                    b.HasIndex("CustomerId", "Date")
+                        .HasDatabaseName("ix_sales_credit_notes_customer_id_date");
+
+                    b.ToTable("sales_credit_notes", "sales");
+                });
+
+            modelBuilder.Entity("Domain.Sales.CreditNotes.SalesCreditNoteLine", b =>
+                {
+                    b.Property<Guid>("SalesCreditNoteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sales_credit_note_id");
+
+                    b.Property<int>("InvoiceLineNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("invoice_line_number");
+
+                    b.Property<Guid>("CycleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cycle_id");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Amount", "Domain.Sales.CreditNotes.SalesCreditNoteLine.Amount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("amount");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "VatAmount", "Domain.Sales.CreditNotes.SalesCreditNoteLine.VatAmount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("vat_amount");
+                        });
+
+                    b.HasKey("SalesCreditNoteId", "InvoiceLineNumber")
+                        .HasName("pk_sales_credit_note_lines");
+
+                    b.HasIndex("CycleId")
+                        .HasDatabaseName("ix_sales_credit_note_lines_cycle_id");
+
+                    b.ToTable("sales_credit_note_lines", "sales");
+                });
+
             modelBuilder.Entity("Domain.Sales.DeliveryOrders.DeliveryOrder", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3183,6 +4374,16 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "CreditedAmount", "Domain.Sales.SalesInvoices.SalesInvoice.CreditedAmount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("credited_amount");
+                        });
+
                     b.ComplexProperty(typeof(Dictionary<string, object>), "PaidAmount", "Domain.Sales.SalesInvoices.SalesInvoice.PaidAmount#Money", b1 =>
                         {
                             b1.IsRequired();
@@ -3292,6 +4493,16 @@ namespace Infrastructure.Database.Migrations
                                 .HasPrecision(18, 2)
                                 .HasColumnType("numeric(18,2)")
                                 .HasColumnName("amount");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "CreditedAmount", "Domain.Sales.SalesInvoices.SalesInvoiceLine.CreditedAmount#Money", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 2)
+                                .HasColumnType("numeric(18,2)")
+                                .HasColumnName("credited_amount");
                         });
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "PricePerKg", "Domain.Sales.SalesInvoices.SalesInvoiceLine.PricePerKg#Money", b1 =>
@@ -3700,6 +4911,120 @@ namespace Infrastructure.Database.Migrations
                         .HasConstraintName("fk_accounts_accounts_parent_id");
                 });
 
+            modelBuilder.Entity("Domain.Finance.CashBank.BankReconciliation", b =>
+                {
+                    b.HasOne("Domain.MasterData.Branches.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_bank_reconciliations_branches_branch_id");
+
+                    b.HasOne("Domain.Finance.CashBank.CashBankAccount", null)
+                        .WithMany()
+                        .HasForeignKey("CashBankAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_bank_reconciliations_cash_bank_accounts_cash_bank_account_id");
+                });
+
+            modelBuilder.Entity("Domain.Finance.CashBank.BankStatementLine", b =>
+                {
+                    b.HasOne("Domain.Finance.CashBank.BankReconciliation", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("BankReconciliationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_bank_statement_lines_bank_reconciliations_bank_reconciliati");
+
+                    b.HasOne("Domain.Finance.Journals.JournalEntry", null)
+                        .WithMany()
+                        .HasForeignKey("MatchedJournalEntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_bank_statement_lines_journal_entries_matched_journal_entry_");
+                });
+
+            modelBuilder.Entity("Domain.Finance.CashBank.BankTransfer", b =>
+                {
+                    b.HasOne("Domain.MasterData.Branches.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_bank_transfers_branches_branch_id");
+
+                    b.HasOne("Domain.Finance.CashBank.CashBankAccount", null)
+                        .WithMany()
+                        .HasForeignKey("FromCashBankAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_bank_transfers_cash_bank_accounts_from_cash_bank_account_id");
+
+                    b.HasOne("Domain.Finance.CashBank.CashBankAccount", null)
+                        .WithMany()
+                        .HasForeignKey("ToCashBankAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_bank_transfers_cash_bank_accounts_to_cash_bank_account_id");
+                });
+
+            modelBuilder.Entity("Domain.Finance.CashBank.CashBankAccount", b =>
+                {
+                    b.HasOne("Domain.Finance.Accounts.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cash_bank_accounts_accounts_account_id");
+
+                    b.HasOne("Domain.MasterData.Branches.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cash_bank_accounts_branches_branch_id");
+                });
+
+            modelBuilder.Entity("Domain.Finance.CashBank.CashTransaction", b =>
+                {
+                    b.HasOne("Domain.MasterData.Branches.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cash_transactions_branches_branch_id");
+
+                    b.HasOne("Domain.Finance.CashBank.CashBankAccount", null)
+                        .WithMany()
+                        .HasForeignKey("CashBankAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cash_transactions_cash_bank_accounts_cash_bank_account_id");
+                });
+
+            modelBuilder.Entity("Domain.Finance.CashBank.CashTransactionLine", b =>
+                {
+                    b.HasOne("Domain.Finance.Accounts.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cash_transaction_lines_accounts_account_id");
+
+                    b.HasOne("Domain.Finance.CashBank.CashTransaction", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("CashTransactionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_cash_transaction_lines_cash_transactions_cash_transaction_id");
+
+                    b.HasOne("Domain.Finance.CostCenters.CostCenter", null)
+                        .WithMany()
+                        .HasForeignKey("CostCenterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_cash_transaction_lines_cost_centers_cost_center_id");
+                });
+
             modelBuilder.Entity("Domain.Finance.JournalMappings.JournalMapping", b =>
                 {
                     b.HasOne("Domain.MasterData.Branches.Branch", null)
@@ -3807,6 +5132,131 @@ namespace Infrastructure.Database.Migrations
                         .HasConstraintName("fk_journal_lines_journal_entries_journal_entry_id");
                 });
 
+            modelBuilder.Entity("Domain.Finance.Payables.PaymentVoucher", b =>
+                {
+                    b.HasOne("Domain.MasterData.Branches.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_payment_vouchers_branches_branch_id");
+
+                    b.HasOne("Domain.Finance.CashBank.CashBankAccount", null)
+                        .WithMany()
+                        .HasForeignKey("CashBankAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_payment_vouchers_cash_bank_accounts_cash_bank_account_id");
+
+                    b.HasOne("Domain.MasterData.Vendors.Vendor", null)
+                        .WithMany()
+                        .HasForeignKey("VendorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_payment_vouchers_vendors_vendor_id");
+                });
+
+            modelBuilder.Entity("Domain.Finance.Payables.PaymentVoucherAllocation", b =>
+                {
+                    b.HasOne("Domain.Finance.Payables.PaymentVoucher", null)
+                        .WithMany("Allocations")
+                        .HasForeignKey("PaymentVoucherId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_payment_voucher_allocations_payment_vouchers_payment_vouche");
+
+                    b.HasOne("Domain.Finance.Payables.VendorInvoice", null)
+                        .WithMany()
+                        .HasForeignKey("VendorInvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_payment_voucher_allocations_vendor_invoices_vendor_invoice_");
+                });
+
+            modelBuilder.Entity("Domain.Finance.Payables.VendorInvoice", b =>
+                {
+                    b.HasOne("Domain.MasterData.Branches.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_vendor_invoices_branches_branch_id");
+
+                    b.HasOne("Domain.MasterData.TaxCodes.TaxCode", null)
+                        .WithMany()
+                        .HasForeignKey("IncomeTaxCodeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_vendor_invoices_tax_codes_income_tax_code_id");
+
+                    b.HasOne("Domain.MasterData.Vendors.Vendor", null)
+                        .WithMany()
+                        .HasForeignKey("VendorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_vendor_invoices_vendors_vendor_id");
+                });
+
+            modelBuilder.Entity("Domain.Finance.Payables.VendorInvoiceLine", b =>
+                {
+                    b.HasOne("Domain.Inventory.GoodsReceipts.GoodsReceipt", null)
+                        .WithMany()
+                        .HasForeignKey("GoodsReceiptId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_vendor_invoice_lines_goods_receipts_goods_receipt_id");
+
+                    b.HasOne("Domain.MasterData.Items.Item", null)
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_vendor_invoice_lines_items_item_id");
+
+                    b.HasOne("Domain.Procurement.PurchaseOrders.PurchaseOrder", null)
+                        .WithMany()
+                        .HasForeignKey("PurchaseOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_vendor_invoice_lines_purchase_orders_purchase_order_id");
+
+                    b.HasOne("Domain.MasterData.TaxCodes.TaxCode", null)
+                        .WithMany()
+                        .HasForeignKey("TaxCodeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_vendor_invoice_lines_tax_codes_tax_code_id");
+
+                    b.HasOne("Domain.MasterData.Uoms.Uom", null)
+                        .WithMany()
+                        .HasForeignKey("UomId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_vendor_invoice_lines_uoms_uom_id");
+
+                    b.HasOne("Domain.Finance.Payables.VendorInvoice", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("VendorInvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_vendor_invoice_lines_vendor_invoices_vendor_invoice_id");
+                });
+
+            modelBuilder.Entity("Domain.Finance.Receivables.CustomerAdvanceApplication", b =>
+                {
+                    b.HasOne("Domain.Finance.Receivables.CustomerReceipt", null)
+                        .WithMany("Applications")
+                        .HasForeignKey("CustomerReceiptId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_advance_applications_customer_receipts_customer_re");
+
+                    b.HasOne("Domain.Sales.SalesInvoices.SalesInvoice", null)
+                        .WithMany()
+                        .HasForeignKey("SalesInvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_advance_applications_sales_invoices_sales_invoice_");
+                });
+
             modelBuilder.Entity("Domain.Finance.Receivables.CustomerReceipt", b =>
                 {
                     b.HasOne("Domain.MasterData.Branches.Branch", null)
@@ -3822,6 +5272,12 @@ namespace Infrastructure.Database.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_customer_receipts_accounts_cash_account_id");
+
+                    b.HasOne("Domain.Finance.CashBank.CashBankAccount", null)
+                        .WithMany()
+                        .HasForeignKey("CashBankAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_customer_receipts_cash_bank_accounts_cash_bank_account_id");
 
                     b.HasOne("Domain.MasterData.Customers.Customer", null)
                         .WithMany()
@@ -4352,6 +5808,47 @@ namespace Infrastructure.Database.Migrations
                         .HasConstraintName("fk_role_permissions_roles_role_id");
                 });
 
+            modelBuilder.Entity("Domain.Sales.CreditNotes.SalesCreditNote", b =>
+                {
+                    b.HasOne("Domain.MasterData.Branches.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sales_credit_notes_branches_branch_id");
+
+                    b.HasOne("Domain.MasterData.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sales_credit_notes_customers_customer_id");
+
+                    b.HasOne("Domain.Sales.SalesInvoices.SalesInvoice", null)
+                        .WithMany()
+                        .HasForeignKey("SalesInvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sales_credit_notes_sales_invoices_sales_invoice_id");
+                });
+
+            modelBuilder.Entity("Domain.Sales.CreditNotes.SalesCreditNoteLine", b =>
+                {
+                    b.HasOne("Domain.Partnership.Cycles.ProductionCycle", null)
+                        .WithMany()
+                        .HasForeignKey("CycleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sales_credit_note_lines_production_cycles_cycle_id");
+
+                    b.HasOne("Domain.Sales.CreditNotes.SalesCreditNote", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("SalesCreditNoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_sales_credit_note_lines_sales_credit_notes_sales_credit_not");
+                });
+
             modelBuilder.Entity("Domain.Sales.DeliveryOrders.DeliveryOrder", b =>
                 {
                     b.HasOne("Domain.MasterData.Branches.Branch", null)
@@ -4559,6 +6056,16 @@ namespace Infrastructure.Database.Migrations
                         .HasConstraintName("fk_user_roles_users_user_id");
                 });
 
+            modelBuilder.Entity("Domain.Finance.CashBank.BankReconciliation", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Domain.Finance.CashBank.CashTransaction", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
             modelBuilder.Entity("Domain.Finance.JournalMappings.JournalMapping", b =>
                 {
                     b.Navigation("Lines");
@@ -4574,9 +6081,21 @@ namespace Infrastructure.Database.Migrations
                     b.Navigation("Lines");
                 });
 
+            modelBuilder.Entity("Domain.Finance.Payables.PaymentVoucher", b =>
+                {
+                    b.Navigation("Allocations");
+                });
+
+            modelBuilder.Entity("Domain.Finance.Payables.VendorInvoice", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
             modelBuilder.Entity("Domain.Finance.Receivables.CustomerReceipt", b =>
                 {
                     b.Navigation("Allocations");
+
+                    b.Navigation("Applications");
                 });
 
             modelBuilder.Entity("Domain.Inventory.GoodsReceipts.GoodsReceipt", b =>
@@ -4633,6 +6152,11 @@ namespace Infrastructure.Database.Migrations
             modelBuilder.Entity("Domain.Roles.Role", b =>
                 {
                     b.Navigation("Permissions");
+                });
+
+            modelBuilder.Entity("Domain.Sales.CreditNotes.SalesCreditNote", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("Domain.Sales.DeliveryOrders.DeliveryOrder", b =>

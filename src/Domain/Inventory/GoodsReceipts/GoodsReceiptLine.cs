@@ -44,4 +44,39 @@ public sealed class GoodsReceiptLine
     public decimal UnitCost { get; private set; }
 
     public Money Value { get; private set; }
+
+    /// <summary>
+    /// Quantity (in the order line's unit) billed on vendor invoices (draft or posted); the 3-way match
+    /// never lets it exceed the received quantity.
+    /// </summary>
+    public decimal QuantityInvoiced { get; private set; }
+
+    /// <summary>
+    /// Receipt value already cleared from GRNI by those invoices.
+    /// </summary>
+    public Money ValueInvoiced { get; private set; } = new(0m);
+
+    public decimal UninvoicedQuantity => Quantity - QuantityInvoiced;
+
+    /// <summary>
+    /// Bills part of the receipt and returns its receipt value; the last part takes the remaining value so the
+    /// receipt is cleared from GRNI to the cent.
+    /// </summary>
+    internal Money Invoice(decimal quantity)
+    {
+        Money value = quantity == UninvoicedQuantity
+            ? Value - ValueInvoiced
+            : Value * (quantity / Quantity);
+
+        QuantityInvoiced += quantity;
+        ValueInvoiced += value;
+
+        return value;
+    }
+
+    internal void ReleaseInvoice(decimal quantity, Money value)
+    {
+        QuantityInvoiced -= quantity;
+        ValueInvoiced -= value;
+    }
 }

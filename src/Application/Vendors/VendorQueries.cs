@@ -13,7 +13,8 @@ internal static class VendorQueries
                v.tax_identity_npwp AS Npwp, v.tax_identity_nitku AS Nitku, v.tax_identity_is_pkp AS IsPkp,
                v.address AS Address, v.phone AS Phone, v.email AS Email, v.payment_term_days AS PaymentTermDays,
                v.bank_account_bank_name AS BankName, v.bank_account_account_number AS AccountNumber,
-               v.bank_account_account_holder_name AS AccountHolderName, v.is_active AS IsActive
+               v.bank_account_account_holder_name AS AccountHolderName, v.price_tolerance_percent AS PriceTolerancePercent,
+               v.is_active AS IsActive
         FROM master.vendors v
         """;
 
@@ -32,6 +33,7 @@ internal static class VendorQueries
         public string? BankName { get; set; }
         public string? AccountNumber { get; set; }
         public string? AccountHolderName { get; set; }
+        public decimal PriceTolerancePercent { get; set; }
         public bool IsActive { get; set; }
 
         public VendorResponse ToResponse() => new()
@@ -45,6 +47,7 @@ internal static class VendorQueries
             Email = Email,
             PaymentTermDays = PaymentTermDays,
             BankAccount = new BankAccountResponse(BankName, AccountNumber, AccountHolderName),
+            PriceTolerancePercent = PriceTolerancePercent,
             IsActive = IsActive
         };
     }

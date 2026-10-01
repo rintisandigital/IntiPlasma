@@ -1,5 +1,6 @@
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
+using Domain.Finance.Receivables;
 using Domain.Sales.DeliveryOrders;
 using Domain.Sales.SalesInvoices;
 using Domain.Sales.SalesOrders;
@@ -22,7 +23,7 @@ internal static class SalesSupport
     /// <summary>
     /// What the customer owes or has on order, company-wide (a customer's credit limit is not per branch):
     /// outstanding posted invoices + draft invoices + delivered but uninvoiced deliveries + the undelivered part of
-    /// other approved sales orders (estimated, excluding VAT).
+    /// other approved sales orders (estimated, excluding VAT) − unapplied advances.
     /// </summary>
     public static async Task<Money> CreditExposureAsync(
         IApplicationDbContext context,
@@ -49,8 +50,15 @@ internal static class SalesSupport
             Money.Zero, (total, i) => total + (i.Status == SalesInvoiceStatus.Draft ? i.Total : i.Outstanding));
 
         exposure = uninvoiced.Aggregate(exposure, (total, d) => total + d.Amount);
+        exposure = openOrders.Aggregate(exposure, (total, o) => total + o.OutstandingEstimatedAmount);
 
-        return openOrders.Aggregate(exposure, (total, o) => total + o.OutstandingEstimatedAmount);
+        // Advances received but not applied yet (uang muka) cover part of the exposure, so a customer without credit
+        // can buy after paying in advance.
+        List<CustomerReceipt> receipts = await context.CustomerReceipts.AsNoTracking()
+            .Where(r => r.CustomerId == customerId && r.Status == CustomerReceiptStatus.Posted)
+            .ToListAsync(cancellationToken);
+
+        return receipts.Aggregate(exposure, (total, r) => total - r.UnappliedAdvance);
     }
 
     /// <summary>

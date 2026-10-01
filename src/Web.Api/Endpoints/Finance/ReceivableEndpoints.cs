@@ -10,6 +10,10 @@ namespace Web.Api.Endpoints.Finance;
 
 internal sealed class ReceivableEndpoints : IEndpoint
 {
+    public sealed record ApplyAdvanceRequest(DateOnly Date, IReadOnlyList<ReceiptAllocationRequest> Allocations);
+
+    public sealed record VoidRequest(DateOnly Date, string Reason);
+
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         MapReceipts(app.MapGroup("finance/customer-receipts").WithTags(Tags.CustomerReceipts));
@@ -60,6 +64,32 @@ internal sealed class ReceivableEndpoints : IEndpoint
         })
         .HasPermission(Permissions.ReceivablesManage)
         .WithIdempotency();
+
+        group.MapPost("{customerReceiptId:guid}/apply-advance", async (
+            Guid customerReceiptId,
+            ApplyAdvanceRequest request,
+            ICommandHandler<ApplyCustomerAdvanceCommand> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result result = await handler.Handle(
+                new ApplyCustomerAdvanceCommand(customerReceiptId, request.Date, request.Allocations), cancellationToken);
+
+            return result.Match(Results.NoContent, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.ReceivablesManage);
+
+        group.MapPost("{customerReceiptId:guid}/void", async (
+            Guid customerReceiptId,
+            VoidRequest request,
+            ICommandHandler<VoidCustomerReceiptCommand> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result result = await handler.Handle(
+                new VoidCustomerReceiptCommand(customerReceiptId, request.Date, request.Reason), cancellationToken);
+
+            return result.Match(Results.NoContent, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.ReceivablesVoid);
     }
 
     private static void MapReports(RouteGroupBuilder group)

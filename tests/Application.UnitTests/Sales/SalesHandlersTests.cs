@@ -7,6 +7,7 @@ using Application.Sales;
 using Application.UnitTests.Abstractions;
 using Domain.Common;
 using Domain.Finance.Accounts;
+using Domain.Finance.CashBank;
 using Domain.Finance.Receivables;
 using Domain.MasterData.Branches;
 using Domain.MasterData.Coops;
@@ -66,7 +67,7 @@ public sealed class SalesHandlersTests : BaseHandlerTest
 
         Result<CreateCustomerReceiptResponse> receipt = await new CreateCustomerReceiptCommandHandler(context, AllBranches(), Numbers(), Clock())
             .Handle(
-                new CreateCustomerReceiptCommand(s.BranchId, s.Customer.Id, HarvestDate.AddDays(3), s.Bank.Id, "TRF-01", null,
+                new CreateCustomerReceiptCommand(s.Bank.Id, s.Customer.Id, HarvestDate.AddDays(3), "TRF-01", null,
                     [new ReceiptAllocationRequest(posted.Id, 30_000_000m)]),
                 CancellationToken.None);
 
@@ -143,21 +144,52 @@ public sealed class SalesHandlersTests : BaseHandlerTest
     }
 
     [Fact]
-    public async Task Receipt_Should_RequireAPostableAssetAccount()
+    public async Task Advance_Should_CoverTheCreditExposure_AndBeAppliedToTheInvoice()
     {
         await using TestDbContext context = CreateDbContext();
         Setup s = await SeedAsync(context);
-        Account revenue = Account.Create("4-1101", "Penjualan", AccountType.Revenue, null, true, null).Value;
-        context.Accounts.Add(revenue);
+
+        // An open order of Rp 40.000.000 against a limit of Rp 50.000.000; a second one would exceed it by 30 jt,
+        // unless the customer pays Rp 30.000.000 in advance.
+        await CreateApprovedOrderAsync(context, s, birds: 1_000);
+        Guid second = await CreateOrderAsync(context, s, birds: 1_000);
+
+        Result<CreateCustomerReceiptResponse> advance = await new CreateCustomerReceiptCommandHandler(context, AllBranches(), Numbers(), Clock())
+            .Handle(new CreateCustomerReceiptCommand(s.Bank.Id, s.Customer.Id, OrderDate, "DP", null, [], 30_000_000m), CancellationToken.None);
+
+        (await new ApproveSalesOrderCommandHandler(context, AllBranches(), User(), Clock())
+            .Handle(new ApproveSalesOrderCommand(second, null), CancellationToken.None)).IsSuccess.ShouldBeTrue();
+
+        Guid orderId = (await context.SalesOrders.OrderBy(o => o.Id).FirstAsync()).Id;
+        Guid delivery = (await Deliver(context, orderId, s.FirstHarvest)).Value.Id;
+        Guid invoiceId = (await new CreateSalesInvoiceCommandHandler(context, AllBranches(), Clock())
+            .Handle(new CreateSalesInvoiceCommand([delivery], HarvestDate, null), CancellationToken.None)).Value;
+        await new PostSalesInvoiceCommandHandler(context, AllBranches(), Numbers(), User(), Clock())
+            .Handle(new PostSalesInvoiceCommand(invoiceId), CancellationToken.None);
+
+        Result applied = await new ApplyCustomerAdvanceCommandHandler(context, AllBranches(), Clock()).Handle(
+            new ApplyCustomerAdvanceCommand(advance.Value.Id, HarvestDate, [new ReceiptAllocationRequest(invoiceId, 20_000_000m)]),
+            CancellationToken.None);
+
+        applied.IsSuccess.ShouldBeTrue();
+        (await context.SalesInvoices.SingleAsync()).Outstanding.ShouldBe(new Money(4_000_000m));
+        (await context.CustomerReceipts.SingleAsync()).UnappliedAdvance.ShouldBe(new Money(10_000_000m));
+    }
+
+    [Fact]
+    public async Task Receipt_Should_RequireACashBankAccountOfItsBranch()
+    {
+        await using TestDbContext context = CreateDbContext();
+        Setup s = await SeedAsync(context);
+        s.Bank.Update(s.Bank.Name, s.Bank.BankName, s.Bank.AccountNumber, isActive: false);
         await context.SaveChangesAsync();
 
         Result<CreateCustomerReceiptResponse> result = await new CreateCustomerReceiptCommandHandler(context, AllBranches(), Numbers(), Clock())
             .Handle(
-                new CreateCustomerReceiptCommand(s.BranchId, s.Customer.Id, HarvestDate, revenue.Id, null, null,
-                    [new ReceiptAllocationRequest(Guid.NewGuid(), 1m)]),
+                new CreateCustomerReceiptCommand(s.Bank.Id, s.Customer.Id, HarvestDate, null, null, [], 1m),
                 CancellationToken.None);
 
-        result.Error.ShouldBe(CustomerReceiptErrors.InvalidCashAccount);
+        result.Error.ShouldBe(CashBankErrors.Unusable(s.Bank.Id));
     }
 
     private static Task<Result<CreateDeliveryOrderResponse>> Deliver(TestDbContext context, Guid orderId, Guid harvestId) =>
@@ -230,7 +262,9 @@ public sealed class SalesHandlersTests : BaseHandlerTest
         var kg = Uom.Create("KG", "Kilogram");
         var liveBird = Item.Create("AYM", "Ayam Hidup", ItemCategory.LiveBird, kg.Id, null);
         var customer = Customer.Create("RPA-01", "RPA Sejahtera", TaxIdentity.None, null, null, null, 14, new Money(50_000_000m));
-        Account bank = Account.Create("1-1201", "Bank Operasional", AccountType.Asset, null, true, null).Value;
+        Account bankAccount = Account.Create("1-1201", "Bank Operasional", AccountType.Asset, null, true, null).Value;
+        CashBankAccount bank = CashBankAccount.Create(
+            "BCA", "BCA Operasional", CashBankAccountType.Bank, branch.Id, bankAccount.Id, true, "BCA", "1234567890").Value;
 
         Farmer farmer = Farmer.Create("INT", "Farm Inti", FarmerType.Inti, branch.Id, null, TaxIdentity.None, null, null, BankAccount.None).Value;
         Coop coop = Coop.Create(farmer, "KDG-A", "Kandang A", 5_000, HouseType.ClosedHouse, null, null, null).Value;
@@ -244,7 +278,8 @@ public sealed class SalesHandlersTests : BaseHandlerTest
         context.Uoms.Add(kg);
         context.Items.Add(liveBird);
         context.Customers.Add(customer);
-        context.Accounts.Add(bank);
+        context.Accounts.Add(bankAccount);
+        context.CashBankAccounts.Add(bank);
         context.Farmers.Add(farmer);
         context.Coops.Add(coop);
         context.Warehouses.Add(warehouse);
@@ -258,7 +293,7 @@ public sealed class SalesHandlersTests : BaseHandlerTest
         Guid BranchId,
         Item LiveBird,
         Customer Customer,
-        Account Bank,
+        CashBankAccount Bank,
         ProductionCycle Cycle,
         Guid FirstHarvest,
         Guid SecondHarvest);

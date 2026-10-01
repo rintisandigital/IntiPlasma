@@ -12,6 +12,16 @@ public static class GoodsReceiptErrors
         "Inventory.CoopHasNoOpenCycle",
         $"The coop '{coopId}' has no planned or running production cycle to receive stock for");
 
+    public static Error LineNotFound(int lineNumber) => Error.Problem(
+        "GoodsReceipts.LineNotFound",
+        $"The goods receipt has no line {lineNumber}");
+
+    public static Error OverInvoiced(string number, int lineNumber, decimal uninvoiced) => Error.Problem(
+        "GoodsReceipts.OverInvoiced",
+        string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"Line {lineNumber} of goods receipt {number} can be invoiced for at most the uninvoiced quantity of {uninvoiced:0.####}"));
+
     public static readonly Error InvalidWarehouse = Error.Problem(
         "GoodsReceipts.InvalidWarehouse",
         "The warehouse must be active and belong to the branch of the purchase order");

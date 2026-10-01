@@ -22,5 +22,10 @@ public sealed record VendorResponse
 
     public BankAccountResponse BankAccount { get; init; }
 
+    /// <summary>
+    /// Accepted difference between vendor invoice price and purchase order price, in percent.
+    /// </summary>
+    public decimal PriceTolerancePercent { get; init; }
+
     public bool IsActive { get; init; }
 }

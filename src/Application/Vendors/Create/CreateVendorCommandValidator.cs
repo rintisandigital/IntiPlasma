@@ -15,5 +15,6 @@ internal sealed class CreateVendorCommandValidator : AbstractValidator<CreateVen
         RuleFor(c => c.Phone).MaximumLength(30);
         RuleFor(c => c.Email).MaximumLength(256).EmailAddress().When(c => !string.IsNullOrWhiteSpace(c.Email));
         RuleFor(c => c.PaymentTermDays).InclusiveBetween(0, 365);
+        RuleFor(c => c.PriceTolerancePercent).InclusiveBetween(0, 100);
     }
 }

@@ -16,6 +16,18 @@ public static class AccountingEvents
     public const string PlasmaSettlement = "PlasmaSettlement";
     public const string PlasmaPayment = "PlasmaPayment";
     public const string StockReturnFromCycle = "StockReturnFromCycle";
+    public const string CustomerAdvanceApplied = "CustomerAdvanceApplied";
+    public const string SalesCreditNote = "SalesCreditNote";
+
+    /// <summary>
+    /// Journal source of cash-in/cash-out transactions; their lines name the accounts, so they have no mapping.
+    /// </summary>
+    public const string CashTransaction = "CashTransaction";
+
+    /// <summary>
+    /// Journal source of transfers between cash/bank accounts (Dr destination / Cr source); no mapping.
+    /// </summary>
+    public const string BankTransfer = "BankTransfer";
 
     public static readonly IReadOnlyList<AccountingEventDefinition> All =
     [
@@ -27,7 +39,8 @@ public static class AccountingEvents
         ]),
         new(VendorInvoice, "Tagihan vendor (invoice pembelian)",
         [
-            new("GoodsValue", "DPP barang yang sudah diterima"),
+            new("GoodsValue", "Nilai penerimaan barang yang ditagih (hapus hutang belum ditagih)"),
+            new("PriceVariance", "Selisih harga invoice terhadap harga PO (negatif = lebih murah)"),
             new("InputVat", "PPN masukan"),
             new("IncomeTaxWithheld", "PPh dipotong")
         ]),
@@ -49,7 +62,17 @@ public static class AccountingEvents
         ]),
         new(CustomerReceipt, "Penerimaan pembayaran customer",
         [
-            new("Received", "Jumlah diterima (akun kas/bank bisa ditentukan per transaksi)")
+            new("Received", "Jumlah diterima untuk invoice (akun kas/bank bisa ditentukan per transaksi)"),
+            new("Advance", "Uang muka penjualan (sisa penerimaan yang belum dialokasikan ke invoice)")
+        ]),
+        new(CustomerAdvanceApplied, "Penerapan uang muka penjualan ke invoice",
+        [
+            new("Applied", "Uang muka yang diterapkan ke invoice")
+        ]),
+        new(SalesCreditNote, "Nota kredit / retur penjualan",
+        [
+            new("SalesReturn", "Potongan/retur penjualan (DPP)"),
+            new("OutputVat", "Koreksi PPN keluaran")
         ]),
         new(StockReturnFromCycle, "Retur sisa sapronak dari kandang ke gudang induk",
         [

@@ -160,7 +160,7 @@ tests/
 - Sales Order/Kontrak customer → Delivery Order (panen, timbangan ekor & kg, per truk) → Sales Invoice.
 - Customer Receipt (bank/kas), partial payment, AR ledger & AR aging.
 
-### Fase 6 — AP & Cash/Bank
+### Fase 6 — AP & Cash/Bank ✅ (selesai 2026-10-01, lihat §12)
 - Vendor Invoice (3-way match PO–GR–Invoice), Payment Voucher, multi/partial payment, AP ledger & aging.
 - Cash In/Out, Petty Cash, Bank Transfer, Bank Reconciliation, Cash & Bank Ledger.
 - Sisa AR dari Fase 5 (keputusan 2026-10-01): *void* penerimaan customer (jurnal pembalik), uang muka penjualan, nota kredit/retur penjualan.
@@ -423,3 +423,72 @@ Migration: `Phase5_SalesReceivables` (schema `sales`; tabel penerimaan di `finan
 - `TaxRate.TaxBaseRatio` disimpan dengan presisi (10,8), sehingga 11/12 tersimpan sebagai 0,91666667. Contoh hasil verifikasi: DPP 40.400.000 → PPN 4.444.000,02 (seharusnya 4.444.000). **Keputusan 2026-10-01**: PPN 12% DPP nilai lain diinput sebagai **tarif efektif 11% dengan rasio DPP 1**.
 - Penerimaan belum bisa dibatalkan/di-*void*, dan belum ada uang muka penjualan maupun nota kredit/retur penjualan. **Diputuskan masuk Fase 6.**
 - Diverifikasi end-to-end ke PostgreSQL lokal (database sementara), **43 skenario lulus**: penolakan item non-ayam, credit limit (ditolak lalu override dengan alasan), batal SO, DO + replay idempotency, panen ganda (409), DO ke SO batal / sebelum tanggal panen, panen belum terkirim, batal DO mengembalikan sisa SO, draft invoice (tanpa nomor, DO terkunci, batal draft melepas DO), PPN dengan rasio DPP, jatuh tempo, posting bernomor & final, penerimaan parsial (tolak lebih bayar & akun non-aset), kartu piutang, aging (1–30 hari & per tanggal lampau), 2 jurnal otomatis tanpa error, neraca saldo seimbang (Piutang 14.844.000,02; Penjualan 40.400.000; PPN Keluaran 4.444.000,02; Bank 30.000.000), tutup siklus ditolak selama panen belum terjual/invoice masih draft lalu berhasil setelah posting.
+
+---
+
+## 12. Realisasi Fase 6 — AP, Kas & Bank, sisa AR
+
+Migration: `Phase6_PayablesCashBank` (tabel baru di schema `finance` dan `sales`; kolom baru di `master.vendors`, `inventory.goods_receipt_lines`, `sales.sales_invoices`/`_lines`, `finance.customer_receipts`).
+
+**Keputusan (2026-10-01)**
+| Topik | Keputusan |
+|---|---|
+| Selisih harga invoice vendor vs PO | **Toleransi per vendor** (`priceTolerancePercent`, default 0 = harus sama). Selisih dijurnal ke akun selisih (5-1301). Di atas toleransi hanya bisa diposting lewat `post-with-variance` (permission `payables:approve-variance` + alasan). |
+| Approval Payment Voucher | **Maker-checker**: Draft → Approved (oleh user lain) → Paid |
+| Kas & bank | **Master Kas/Bank** (`CashBankAccount`: Kas / Bank / Kas Kecil, per cabang) yang menunjuk tepat satu akun COA |
+| Rekonsiliasi bank | Baris rekening koran diinput atau diimpor **CSV**, lalu dicocokkan dengan mutasi buku |
+| PPN 12% DPP nilai lain | Diinput sebagai **tarif efektif 11% dengan rasio DPP 1** |
+
+**Master Kas/Bank** (`/api/v1/finance/cash-bank-accounts`)
+- Kode, nama, tipe (`Cash`/`Bank`/`PettyCash`), cabang, akun COA (aset, postable, aktif; **satu akun COA hanya untuk satu kas/bank**), bank & nomor rekening (wajib untuk tipe Bank). Daftar menampilkan saldo buku.
+- `GET {id}/ledger?from=&to=` → **buku kas/bank**: saldo awal, mutasi masuk/keluar dengan saldo berjalan, saldo akhir.
+
+**Kas Masuk / Keluar** (`/api/v1/finance/cash-transactions`)
+- Transaksi lain-lain (bunga, listrik, biaya kas kecil, setoran modal) dengan ≥1 baris akun lawan (+ cost center). Baris tidak boleh memakai akun kas/bank itu sendiri.
+- Kas **masuk** bisa diposting langsung dari Draft. Kas **keluar** wajib `approve` oleh user lain (`cash-bank:approve`), baru `post`. Nomor `BKM/...` / `BKK/...` diberikan saat posting. Draft/approved bisa dibatalkan.
+- Jurnal otomatis dari barisnya sendiri (tanpa mapping): masuk = Dr kas/bank / Cr akun baris; keluar = Dr akun baris / Cr kas/bank.
+
+**Transfer / Pemindahbukuan & Kas Kecil** (`/api/v1/finance/bank-transfers`)
+- Antar dua kas/bank **dalam satu cabang**, langsung terposting (`TRF/...`): Dr tujuan / Cr asal. Pengisian kas kecil = transfer bank → kas kecil; pengeluaran kas kecil = kas keluar dari akun kas kecil.
+
+**Vendor Invoice / Tagihan Vendor** (`/api/v1/finance/vendor-invoices`)
+- **3-way match**: tiap baris menagih baris BPB (PO–BPB–Invoice) vendor & cabang yang sama, qty (satuan PO) ≤ qty diterima yang belum ditagih. Qty & nilai tertagih disimpan di baris BPB (`quantity_invoiced`, `value_invoiced`). Tagihan terakhir menghapus sisa nilai BPB sampai ke sen.
+- `GET uninvoiced-receipts?vendorId=` → BPB yang belum ditagih.
+- Draft (tanpa nomor) → `post` (nomor `VI/...`). Nomor invoice vendor unik per vendor (kecuali yang dibatalkan). PPN masukan dari kode PPN baris PO. **PPh** dipotong opsional (kode PPh di header, dasar = DPP). Total hutang = DPP + PPN − PPh.
+- Jurnal `VendorInvoice`: `GoodsValue` Dr GRNI / Cr Hutang Usaha (nilai BPB), `PriceVariance` Dr Selisih / Cr Hutang Usaha (negatif → sisi dibalik), `InputVat` Dr PPN Masukan, `IncomeTaxWithheld` Dr Hutang Usaha / Cr Hutang PPh 23.
+- Batal draft → qty BPB bisa ditagih lagi.
+
+**Payment Voucher** (`/api/v1/finance/payment-vouchers`)
+- Membayar ≥1 invoice terposting satu vendor dari satu kas/bank; parsial boleh, tidak melebihi outstanding. Nomor `PV/...` saat dibuat. `approve` (checker, bukan pembuat; `payables:approve`) → `pay` dengan tanggal bayar aktual (`payables:pay`) → invoice PartiallyPaid/Paid. Jurnal `VendorPayment`: Dr Hutang Usaha / Cr akun kas/bank PV.
+
+**Laporan hutang** (`/api/v1/finance/payables`): `ledger?vendorId=&from=&to=` (kartu hutang) dan `aging?asOf=` (umur hutang per vendor, bucket sama dengan AR).
+
+**Rekonsiliasi Bank** (`/api/v1/finance/bank-reconciliations`)
+- `POST` {cashBankAccountId (tipe Bank), statementDate, statementBalance}. Hanya satu yang berjalan per rekening; tanggal harus setelah rekonsiliasi selesai terakhir.
+- Baris rekening koran: `POST {id}/statement-lines` (JSON) atau `.../import` {csv}: `tanggal,keterangan,debet,kredit` (sudut pandang bank: debet = keluar, kredit = masuk), pemisah `,` atau `;`, tanggal `yyyy-MM-dd` / `dd/MM/yyyy`, header opsional, field ber-kutip didukung.
+- Pencocokan: `auto-match` (nominal sama, selisih tanggal ≤ 3 hari, terdekat dulu) atau manual `statement-lines/{n}/match` {journalEntryId, journalLineNumber}. Satu mutasi buku hanya bisa clear sekali (unique index lintas rekonsiliasi).
+- Detail menampilkan saldo buku, **mutasi buku belum clear** (setoran/cek dalam perjalanan), dan selisih. `complete` hanya bila semua baris rekening koran cocok dan saldo rekening koran = saldo buku − belum clear. Biaya/bunga bank yang belum dibukukan dicatat dulu lewat kas masuk/keluar.
+
+**Sisa AR dari Fase 5**
+- **Uang muka penjualan**: penerimaan customer boleh berisi `advanceAmount` (tanpa/selain alokasi). Jurnal: `Received` Dr kas/bank / Cr Piutang, `Advance` Dr kas/bank / Cr Uang Muka Penjualan (2-1501). `POST customer-receipts/{id}/apply-advance` menerapkan uang muka ke invoice. Jurnal `CustomerAdvanceApplied`: Dr Uang Muka / Cr Piutang. **Uang muka yang belum diterapkan mengurangi exposure credit limit**, sehingga customer limit 0 bisa membeli setelah bayar di muka.
+- **Void penerimaan** (`POST customer-receipts/{id}/void` {date, reason}, permission `receivables:void`): alokasi dikembalikan ke invoice, jurnal dibalik pada tanggal void (`CustomerReceipt.Reversal`). Ditolak bila uang mukanya sudah diterapkan.
+- **Nota kredit / retur penjualan** (`/api/v1/sales/credit-notes`, nomor `CN/...`): mengurangi baris invoice terposting (DPP) dengan PPN proporsional tarif baris; tidak melebihi sisa baris maupun outstanding invoice. Jurnal `SalesCreditNote`: Dr Potongan & Retur Penjualan (4-1901) & Dr PPN Keluaran / Cr Piutang. Invoice kini punya `creditedAmount`; outstanding = total − dibayar − dikredit.
+- Kartu piutang kini memuat: Invoice, Receipt (bagian yang dialokasikan), ReceiptVoid, AdvanceApplied, CreditNote. Aging memperhitungkan void, penerapan uang muka, dan nota kredit per tanggal.
+
+**⚠️ Perubahan API (breaking) dari Fase 5**
+- `POST /finance/customer-receipts`: body kini `{ cashBankAccountId, customerId, receiptDate, reference, notes, allocations, advanceAmount }`. `branchId` diambil dari kas/bank, sedangkan `cashAccountId` (akun COA) diganti `cashBankAccountId`. Penerimaan lama tetap valid (status `Posted`, `cashBankAccountId` null).
+
+**Perbaikan & perubahan teknis**
+- Perhitungan pajak dipindah ke `TaxCode.Calculate` (dipakai invoice penjualan & vendor). Error `SalesInvoices.NoTaxRate` → `TaxCodes.NoRate`.
+- `IAutoJournalService`: `PostLinesAsync` (jurnal dari baris dokumen sendiri) dan `ReverseAsync` (membalik jurnal otomatis sumber tertentu, idempotent).
+- Seeder mapping kini juga **menambah komponen baru ke mapping default yang sudah ada** (mis. `VendorInvoice.PriceVariance`, `CustomerReceipt.Advance`) tanpa mengubah komponen lain. Diverifikasi dengan menghapus komponen dari DB lalu restart.
+- Posting VI/PV/kas/void/nota kredit mengecek periode fiskal terbuka lebih dulu, sehingga tidak jatuh ke dead letter outbox.
+
+**Permission baru**: `cash-bank:read/manage/approve/reconcile`, `payables:read/manage/approve-variance/approve/pay`, `receivables:void`.
+
+**Catatan**
+- Vendor invoice hanya untuk barang ber-PO (3-way match). Biaya jasa/non-PO dibayar lewat kas keluar. Hutang non-PO & nota debit vendor belum ada.
+- Transfer antar cabang belum didukung (perlu akun antar-cabang).
+- PPh atas invoice vendor selalu dijurnal ke akun mapping `IncomeTaxWithheld` (default Hutang PPh 23). PPh 22/4(2) perlu override mapping per cabang atau per akun ke depan.
+- Rate limiter global 100 request/menit per user berlaku (untuk skrip verifikasi dinaikkan lewat env `RateLimiting__Global__PermitLimit`).
+- Diverifikasi end-to-end ke PostgreSQL lokal (database sementara), **70 skenario lulus**, termasuk user checker kedua, CSV rekening koran (pemisah `;`, tanggal campuran, field ber-kutip), rekonsiliasi dua periode dengan cek dalam perjalanan (pencocokan manual karena lewat 3 hari), dan neraca saldo seimbang (GRNI 7,5 jt; Selisih Harga 200 rb; PPN Masukan 2.860.000; Hutang PPh 23 348.000; Hutang Usaha 4.546.000; Uang Muka Penjualan 1.266.000; Retur Penjualan 1 jt; PPN Keluaran 4.334.000; Piutang 0).

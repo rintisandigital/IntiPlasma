@@ -28,6 +28,13 @@ public sealed class Vendor : AggregateRoot
     public string? Email { get; private set; }
     public int PaymentTermDays { get; private set; }
     public BankAccount BankAccount { get; private set; } = BankAccount.None;
+
+    /// <summary>
+    /// Maximum difference (in percent of the order price) between the price on the vendor invoice and the purchase
+    /// order price that is accepted without approval. Zero means the prices must match exactly.
+    /// </summary>
+    public decimal PriceTolerancePercent { get; private set; }
+
     public bool IsActive { get; private set; }
 
     public static Vendor Create(
@@ -65,5 +72,17 @@ public sealed class Vendor : AggregateRoot
         PaymentTermDays = paymentTermDays;
         BankAccount = bankAccount;
         IsActive = isActive;
+    }
+
+    public Result SetPriceTolerance(decimal percent)
+    {
+        if (percent is < 0 or > 100)
+        {
+            return Result.Failure(VendorErrors.InvalidPriceTolerance);
+        }
+
+        PriceTolerancePercent = percent;
+
+        return Result.Success();
     }
 }

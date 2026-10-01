@@ -12,4 +12,5 @@ public sealed record UpdateVendorCommand(
     string? Email,
     int PaymentTermDays,
     BankAccountRequest BankAccount,
-    bool IsActive) : ICommand;
+    bool IsActive,
+    decimal? PriceTolerancePercent = null) : ICommand;

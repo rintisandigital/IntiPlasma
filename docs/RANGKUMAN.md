@@ -1,7 +1,7 @@
 # Rangkuman Proyek — Aplikasi Peternakan Ayam Broiler Inti-Plasma
 
-> Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4) dan 2026-10-01 (Fase 5).
-> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§11. Dokumen ini adalah titik awal untuk melanjutkan Fase 6.
+> Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4) dan 2026-10-01 (Fase 5 & 6).
+> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§12. Dokumen ini adalah titik awal untuk melanjutkan Fase 7.
 
 ---
 
@@ -27,12 +27,16 @@
 | 9 | Pengakuan HPP penjualan | **Ditunda ke Fase 7** (dari biaya siklus); invoice hanya menjurnal piutang, penjualan, dan PPN keluaran |
 | 10 | Sales Order | **Wajib sebelum DO** |
 | 11 | PPN "DPP nilai lain" (12% × 11/12) | Diinput sebagai **tarif efektif 11% dengan rasio DPP 1** (menghindari selisih sen akibat presisi rasio) |
-| 12 | Void penerimaan customer, uang muka penjualan, nota kredit/retur penjualan | **Masuk Fase 6** |
+| 12 | Void penerimaan customer, uang muka penjualan, nota kredit/retur penjualan | **Masuk Fase 6** (selesai) |
+| 13 | Selisih harga invoice vendor vs PO | **Toleransi % per vendor** (default 0); selisih ke akun Selisih (5-1301); di atas toleransi perlu approval (`payables:approve-variance` + alasan) |
+| 14 | Payment Voucher | **Maker-checker**: Draft → Approved (user lain) → Paid |
+| 15 | Kas & bank | **Master Kas/Bank** (Kas / Bank / Kas Kecil per cabang) → tepat satu akun COA |
+| 16 | Rekonsiliasi bank | Rekening koran diinput / diimpor **CSV**, dicocokkan (auto ±3 hari atau manual) dengan mutasi buku |
 
 ## 3. Arsitektur & Konvensi Kode
 
 **Struktur**
-- Monolith dengan bounded context per folder + **schema PostgreSQL** sendiri: `identity`, `infrastructure`, `master`, `partnership`, `finance`, `procurement`, `inventory`, `production`.
+- Monolith dengan bounded context per folder + **schema PostgreSQL** sendiri: `identity`, `infrastructure`, `master`, `partnership`, `finance`, `procurement`, `inventory`, `production`, `sales`.
 - Write side: handler → `IApplicationDbContext` (DbSet = repository) → method domain → `SaveChangesAsync`.
 - Read side: handler → `IDbConnectionFactory` + Dapper; satu `NpgsqlDataSource` dipakai EF & Dapper.
 
@@ -101,6 +105,17 @@
 - **Tutup siklus** kini mensyaratkan semua panen ada di DO yang ditagih invoice **terposting**.
 - Perbaikan: replay `Idempotency-Key` kini camelCase, sama dengan respons pertama (bug Fase 0).
 
+### Fase 6 — AP, Kas & Bank, sisa AR ✅
+- **Master Kas/Bank** (`finance/cash-bank-accounts`) + **buku kas/bank** (`{id}/ledger`).
+- **Kas masuk/keluar** (`finance/cash-transactions`): keluar wajib maker-checker; nomor `BKM`/`BKK` saat posting; jurnal dari baris dokumen sendiri (`IAutoJournalService.PostLinesAsync`).
+- **Transfer** antar kas/bank satu cabang (`finance/bank-transfers`), termasuk pengisian kas kecil.
+- **Vendor Invoice** (`finance/vendor-invoices`): 3-way match ke baris BPB (qty & nilai tertagih disimpan di BPB), PPN masukan dari PO, PPh dipotong opsional, selisih harga + toleransi vendor; Draft → `post`/`post-with-variance` (nomor `VI`).
+- **Payment Voucher** (`finance/payment-vouchers`): Draft → approve (checker) → pay (tanggal aktual); **kartu & aging hutang** (`finance/payables`).
+- **Rekonsiliasi bank** (`finance/bank-reconciliations`): impor CSV, auto/manual match, selesai bila semua cocok & saldo seimbang; mutasi buku hanya bisa clear sekali.
+- **Sisa AR**: uang muka penjualan (mengurangi exposure credit limit) + penerapan ke invoice; **void** penerimaan (jurnal dibalik, `IAutoJournalService.ReverseAsync`); **nota kredit** (`sales/credit-notes`).
+- ⚠️ Body `POST finance/customer-receipts` berubah: `cashBankAccountId` menggantikan `branchId` + `cashAccountId`; tambah `advanceAmount`.
+- Seeder mapping kini juga menambah **komponen** baru ke mapping default yang sudah ada.
+
 ## 5. Alur Akuntansi yang Sudah Berjalan
 
 | Transaksi | Jurnal otomatis |
@@ -111,9 +126,16 @@
 | Retur dari kandang | Dr Persediaan — Cr Ayam Dalam Proses |
 | Pemakaian harian | *(tanpa jurnal; biaya sudah di Ayam Dalam Proses, hanya kuantitas untuk FCR)* |
 | Posting invoice penjualan | Dr Piutang Usaha — Cr Penjualan Ayam Hidup (DPP) & Cr PPN Keluaran |
-| Penerimaan customer | Dr Kas/Bank (akun dipilih per transaksi) — Cr Piutang Usaha |
+| Penerimaan customer | Dr Kas/Bank (dari kas/bank penerimaan) — Cr Piutang Usaha (bagian dialokasikan) & Cr Uang Muka Penjualan (uang muka) |
+| Penerapan uang muka | Dr Uang Muka Penjualan — Cr Piutang Usaha |
+| Void penerimaan | Jurnal pembalik (`CustomerReceipt.Reversal`) pada tanggal void |
+| Nota kredit penjualan | Dr Potongan & Retur Penjualan + Dr PPN Keluaran — Cr Piutang Usaha |
+| Vendor invoice | Dr GRNI (nilai BPB) + Dr/Cr Selisih Harga + Dr PPN Masukan — Cr Hutang Usaha; Dr Hutang Usaha — Cr Hutang PPh |
+| Payment voucher | Dr Hutang Usaha — Cr Kas/Bank (dari PV) |
+| Kas masuk / keluar | Dr Kas/Bank — Cr akun baris / Dr akun baris — Cr Kas/Bank (tanpa mapping) |
+| Transfer kas/bank | Dr kas/bank tujuan — Cr kas/bank asal (tanpa mapping) |
 
-Sudah ada di katalog tetapi belum dipakai (untuk fase berikut): `VendorInvoice`, `VendorPayment`, `PlasmaSettlement`, `PlasmaPayment`, dan komponen `SalesInvoice.CostOfGoodsSold` (HPP, Fase 7).
+Sudah ada di katalog tetapi belum dipakai (untuk fase berikut): `PlasmaSettlement`, `PlasmaPayment`, dan komponen `SalesInvoice.CostOfGoodsSold` (HPP, Fase 7).
 
 ## 6. Pelajaran & Jebakan Teknis
 
@@ -125,15 +147,18 @@ Sudah ada di katalog tetapi belum dipakai (untuk fase berikut): `VendorInvoice`,
 - Tanggal server saat pengembangan = 2026-09-30; data uji harus bertanggal ≤ hari ini.
 - **Owned type di TestDbContext (InMemory)**: satu instance `Money` tidak boleh dipakai bersama oleh dua entity (mis. harga disalin dari baris SO ke baris DO). Simpan salinan (`money with { }`); di PostgreSQL (complex type) hal ini tidak bermasalah.
 - Respons error API membawa kode error di field `title` (ProblemDetails), bukan `code`.
+- **Rate limiter global**: 100 request/menit per user (`RateLimiting:Global`). Skrip verifikasi end-to-end menaikkannya lewat env `RateLimiting__Global__PermitLimit=10000`.
+- Hindari `sed` bernomor baris saat menyunting file yang baru diubah — pernah menimpa baris `HasKey` di `TestDbContext`. Pakai Edit dengan konteks unik.
+- Dokumen yang jurnalnya diposting lewat outbox (VI, PV, kas, void, nota kredit) mengecek **periode fiskal terbuka** saat posting, agar tidak jatuh ke dead letter.
 
 ## 7. Cara Kerja & Verifikasi
 
 - Setiap fase: domain + unit test invariant → command/query + validator → EF config + migration → endpoint + permission → **verifikasi end-to-end** ke PostgreSQL lokal pada database sementara `intiplasma_verify` (dibuat & dihapus otomatis; database `intiplasma` milik user tidak disentuh).
 - User yang melakukan **commit & migrate** setelah tiap fase.
-- Status test saat ini: **134 test lulus** (85 domain, 31 application, 8 arsitektur, 10 integration).
+- Status test saat ini: **148 test lulus** (97 domain, 33 application, 8 arsitektur, 10 integration).
 - Integration test (Testcontainers) **sudah bisa dijalankan** di mesin dev (container runtime tersedia) — `dotnet test IntiPlasma.slnx`.
-- Verifikasi end-to-end Fase 5 memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`.
-- Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`.
+- Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
+- Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`.
 
 ## 8. Catatan Terbuka / Hutang Teknis
 
@@ -143,16 +168,16 @@ Sudah ada di katalog tetapi belum dipakai (untuk fase berikut): `VendorInvoice`,
 - Belum ada penutupan tahun buku (laba/rugi → laba ditahan) → Fase 8.
 - Satu admin tunggal tidak bisa menyelesaikan jurnal manual (maker-checker) → perlu user kedua.
 - Presisi rasio DPP: `TaxBaseRatio` (10,8) menyimpan 11/12 sebagai 0,91666667 sehingga PPN bisa meleset beberapa sen. **Diputuskan**: PPN 12% DPP nilai lain diinput sebagai tarif 11% dengan rasio 1. Rasio ≠ 1 tetap didukung, tetapi hindari pecahan berulang.
-- Void penerimaan customer, uang muka penjualan, nota kredit/retur penjualan → **Fase 6**.
+- Vendor invoice hanya untuk barang ber-PO; hutang non-PO (jasa) & nota debit vendor belum ada (sementara lewat kas keluar).
+- Transfer antar cabang belum didukung (perlu akun antar-cabang).
+- PPh vendor selalu ke akun mapping `IncomeTaxWithheld` (default Hutang PPh 23); PPh 22/4(2) perlu override.
+- Exposure credit limit memuat semua penerimaan customer ke memori (uang muka belum diterapkan) — perlu query SQL bila datanya besar.
 
-## 9. Langkah Berikutnya — Fase 6: AP & Cash/Bank
+## 9. Langkah Berikutnya — Fase 7: HPP & Settlement Plasma
 
 Rencana (lihat PLAN.md §4 & §5):
-- Vendor Invoice dengan **3-way match** PO–BPB–Invoice, PPN Masukan & PPh dipotong → jurnal `VendorInvoice` (GRNI / Hutang Usaha / PPN Masukan / Hutang PPh).
-- Payment Voucher (multi/parsial) → jurnal `VendorPayment`; AP ledger & aging (pola sama dengan AR Fase 5).
-- Cash In/Out, Petty Cash, Bank Transfer, Bank Reconciliation, Cash & Bank Ledger.
-- **Sisa AR dari Fase 5 (disepakati masuk Fase 6)**:
-  - *Void* penerimaan customer: alokasi invoice dikembalikan + jurnal pembalik (`JournalEntry.Reverse` atas jurnal otomatis `CustomerReceipt`).
-  - Uang muka penjualan (deposit ke akun 2-1501), dialokasikan ke invoice kemudian. Customer dengan limit 0 bisa membayar di muka.
-  - Nota kredit / retur penjualan atas invoice terposting (koreksi harga/berat, PPN ikut dikoreksi; akun 4-1901).
-- Setelah itu: Fase 7 (HPP & Settlement Plasma — termasuk pengakuan HPP penjualan), Fase 8 (Laporan Keuangan & pajak).
+- **CycleCost / HPP per siklus**: akumulasi biaya dari Ayam Dalam Proses per siklus (DOC, pakan, OVK dari transfer/penerimaan − retur, biaya lain, alokasi overhead) → HPP per kg & per ekor; estimasi HPP berjalan harian.
+- **Pengakuan HPP penjualan** (keputusan #9): Dr HPP Ayam Hidup — Cr Ayam Dalam Proses, saat tutup siklus (atau per invoice dengan HPP estimasi — perlu keputusan).
+- **PlasmaSettlement** dengan `ISettlementPolicy` per skema kontrak (`PriceContract`: nilai ayam @harga jaminan − sapronak @harga kontrak + bonus/insentif − potongan; `ProfitSharing`: % bagi hasil), PPh atas settlement per kontrak, approval, slip per plasma; siklus → `Settled` (terkunci). Jurnal `PlasmaSettlement`.
+- **Pembayaran plasma**: Payment Voucher saat ini hanya untuk vendor → perlu penerima (payee) peternak plasma + jurnal `PlasmaPayment` (Dr Hutang Plasma — Cr Kas/Bank).
+- Setelah itu: Fase 8 (Laporan Keuangan & pajak, tutup tahun buku).

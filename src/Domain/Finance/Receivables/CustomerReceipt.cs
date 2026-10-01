@@ -4,13 +4,16 @@ using SharedKernel;
 namespace Domain.Finance.Receivables;
 
 /// <summary>
-/// Penerimaan pembayaran customer into a cash or bank account, allocated to one or more posted invoices of the
-/// customer in the same branch. Partial payment is allowed; an allocation can never exceed the invoice's outstanding.
-/// Posting raises the event that journals Dr kas/bank / Cr piutang usaha.
+/// Penerimaan pembayaran customer into a cash/bank account, allocated to posted invoices of the customer in the same
+/// branch; whatever is not allocated is kept as an advance (uang muka penjualan) and applied to invoices later.
+/// Partial payment is allowed; an allocation can never exceed the invoice's outstanding.
+/// Posting journals Dr kas/bank / Cr piutang usaha (allocated) and Cr uang muka penjualan (advance).
+/// A receipt can be voided (reversal journal) as long as none of its advance has been applied.
 /// </summary>
 public sealed class CustomerReceipt : AggregateRoot
 {
     private readonly List<CustomerReceiptAllocation> _allocations = [];
+    private readonly List<CustomerAdvanceApplication> _applications = [];
 
     private CustomerReceipt(Guid id)
         : base(id)
@@ -27,11 +30,29 @@ public sealed class CustomerReceipt : AggregateRoot
     public DateOnly ReceiptDate { get; private set; }
 
     /// <summary>
-    /// The cash or bank account (chart of accounts) the money was received into; debited by the journal.
+    /// The cash/bank account the money was received into. Null only for receipts recorded before cash/bank accounts
+    /// existed (phase 5).
+    /// </summary>
+    public Guid? CashBankAccountId { get; private set; }
+
+    /// <summary>
+    /// The chart of accounts account of the cash/bank account; debited by the journal.
     /// </summary>
     public Guid CashAccountId { get; private set; }
 
-    public Money Amount { get; private set; } = Money.Zero;
+    /// <summary>
+    /// Total received: allocations + advance.
+    /// </summary>
+    public Money Amount { get; private set; } = new(0m);
+
+    /// <summary>
+    /// Part of the receipt not allocated to an invoice on receipt (uang muka penjualan).
+    /// </summary>
+    public Money AdvanceAmount { get; private set; } = new(0m);
+
+    public Money AppliedAdvanceAmount { get; private set; } = new(0m);
+
+    public CustomerReceiptStatus Status { get; private set; }
 
     /// <summary>
     /// Transfer reference, giro number, etc.
@@ -39,7 +60,12 @@ public sealed class CustomerReceipt : AggregateRoot
     public string? Reference { get; private set; }
 
     public string? Notes { get; private set; }
+    public DateOnly? VoidDate { get; private set; }
+    public string? VoidReason { get; private set; }
     public IReadOnlyCollection<CustomerReceiptAllocation> Allocations => [.. _allocations];
+    public IReadOnlyCollection<CustomerAdvanceApplication> Applications => [.. _applications];
+
+    public Money UnappliedAdvance => Status == CustomerReceiptStatus.Voided ? Money.Zero : AdvanceAmount - AppliedAdvanceAmount;
 
     /// <summary>
     /// Creates the receipt. Does not change the invoices: the caller registers each allocation on its invoice
@@ -50,12 +76,19 @@ public sealed class CustomerReceipt : AggregateRoot
         Guid branchId,
         Guid customerId,
         DateOnly receiptDate,
+        Guid? cashBankAccountId,
         Guid cashAccountId,
         string? reference,
         string? notes,
-        IReadOnlyList<(SalesInvoice Invoice, Money Amount)> allocations)
+        IReadOnlyList<(SalesInvoice Invoice, Money Amount)> allocations,
+        Money advanceAmount)
     {
-        Result validation = Validate(branchId, customerId, receiptDate, allocations);
+        if (advanceAmount.IsNegative || allocations.Count == 0 && advanceAmount.IsZero)
+        {
+            return Result.Failure<CustomerReceipt>(CustomerReceiptErrors.NoAllocations);
+        }
+
+        Result validation = ValidateAllocations(branchId, customerId, receiptDate, allocations);
         if (validation.IsFailure)
         {
             return Result.Failure<CustomerReceipt>(validation.Error);
@@ -67,10 +100,13 @@ public sealed class CustomerReceipt : AggregateRoot
             BranchId = branchId,
             CustomerId = customerId,
             ReceiptDate = receiptDate,
+            CashBankAccountId = cashBankAccountId,
             CashAccountId = cashAccountId,
             Reference = reference,
             Notes = notes,
-            Amount = allocations.Aggregate(Money.Zero, (total, a) => total + a.Amount)
+            Status = CustomerReceiptStatus.Posted,
+            AdvanceAmount = advanceAmount with { },
+            Amount = allocations.Aggregate(advanceAmount, (total, a) => total + a.Amount)
         };
 
         receipt._allocations.AddRange(allocations.Select(a => new CustomerReceiptAllocation(receipt.Id, a.Invoice.Id, a.Amount)));
@@ -80,17 +116,100 @@ public sealed class CustomerReceipt : AggregateRoot
         return receipt;
     }
 
-    private static Result Validate(
-        Guid branchId,
-        Guid customerId,
-        DateOnly receiptDate,
-        IReadOnlyList<(SalesInvoice Invoice, Money Amount)> allocations)
+    /// <summary>
+    /// Applies (part of) the advance to posted invoices and registers the payments on them.
+    /// Each application journals Dr uang muka penjualan / Cr piutang usaha.
+    /// </summary>
+    /// <param name="invoices">The invoices to apply to (tracked).</param>
+    public Result ApplyAdvance(DateOnly date, IReadOnlyList<(SalesInvoice Invoice, Money Amount)> allocations)
     {
+        if (Status != CustomerReceiptStatus.Posted)
+        {
+            return Result.Failure(CustomerReceiptErrors.Voided(Id));
+        }
+
         if (allocations.Count == 0)
         {
             return Result.Failure(CustomerReceiptErrors.NoAllocations);
         }
 
+        if (date < ReceiptDate)
+        {
+            return Result.Failure(CustomerReceiptErrors.ApplicationBeforeReceipt);
+        }
+
+        Money total = allocations.Aggregate(Money.Zero, (sum, a) => sum + a.Amount);
+        if (total > UnappliedAdvance)
+        {
+            return Result.Failure(CustomerReceiptErrors.AdvanceExceeded(UnappliedAdvance));
+        }
+
+        Result validation = ValidateAllocations(BranchId, CustomerId, date, allocations);
+        if (validation.IsFailure)
+        {
+            return validation;
+        }
+
+        foreach ((SalesInvoice invoice, Money amount) in allocations)
+        {
+            invoice.RegisterPayment(amount);
+
+            var application = new CustomerAdvanceApplication(Guid.CreateVersion7(), Id, invoice.Id, date, amount);
+            _applications.Add(application);
+
+            Raise(new CustomerAdvanceAppliedDomainEvent(Id, application.Id));
+        }
+
+        AppliedAdvanceAmount += total;
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Voids the receipt: takes the allocations back from the invoices; the journal is reversed on the void date.
+    /// </summary>
+    /// <param name="invoices">The invoices of the allocations (tracked).</param>
+    public Result Void(DateOnly date, string reason, IReadOnlyList<SalesInvoice> invoices)
+    {
+        if (Status != CustomerReceiptStatus.Posted)
+        {
+            return Result.Failure(CustomerReceiptErrors.Voided(Id));
+        }
+
+        if (_applications.Count > 0)
+        {
+            return Result.Failure(CustomerReceiptErrors.AdvanceAlreadyApplied);
+        }
+
+        if (date < ReceiptDate)
+        {
+            return Result.Failure(CustomerReceiptErrors.VoidBeforeReceipt);
+        }
+
+        foreach (CustomerReceiptAllocation allocation in _allocations)
+        {
+            Result reversed = invoices.Single(i => i.Id == allocation.SalesInvoiceId).ReversePayment(allocation.Amount);
+            if (reversed.IsFailure)
+            {
+                return reversed;
+            }
+        }
+
+        Status = CustomerReceiptStatus.Voided;
+        VoidDate = date;
+        VoidReason = reason;
+
+        Raise(new CustomerReceiptVoidedDomainEvent(Id));
+
+        return Result.Success();
+    }
+
+    private static Result ValidateAllocations(
+        Guid branchId,
+        Guid customerId,
+        DateOnly date,
+        IReadOnlyList<(SalesInvoice Invoice, Money Amount)> allocations)
+    {
         if (allocations.GroupBy(a => a.Invoice.Id).Any(g => g.Count() > 1))
         {
             return Result.Failure(CustomerReceiptErrors.DuplicateInvoice);
@@ -113,7 +232,7 @@ public sealed class CustomerReceipt : AggregateRoot
                 return Result.Failure(SalesInvoiceErrors.OverPayment(invoice.Number!, invoice.Outstanding));
             }
 
-            if (receiptDate < invoice.InvoiceDate)
+            if (date < invoice.InvoiceDate)
             {
                 return Result.Failure(CustomerReceiptErrors.BeforeInvoiceDate(invoice.Number!));
             }
@@ -129,7 +248,7 @@ public sealed class CustomerReceiptAllocation
     {
         CustomerReceiptId = customerReceiptId;
         SalesInvoiceId = salesInvoiceId;
-        Amount = amount;
+        Amount = amount with { };
     }
 
     private CustomerReceiptAllocation()
@@ -141,4 +260,39 @@ public sealed class CustomerReceiptAllocation
     public Money Amount { get; private set; }
 }
 
+/// <summary>
+/// Part of a receipt's advance applied to an invoice on a date.
+/// </summary>
+public sealed class CustomerAdvanceApplication
+{
+    internal CustomerAdvanceApplication(Guid id, Guid customerReceiptId, Guid salesInvoiceId, DateOnly date, Money amount)
+    {
+        Id = id;
+        CustomerReceiptId = customerReceiptId;
+        SalesInvoiceId = salesInvoiceId;
+        Date = date;
+        Amount = amount with { };
+    }
+
+    private CustomerAdvanceApplication()
+    {
+    }
+
+    public Guid Id { get; private set; }
+    public Guid CustomerReceiptId { get; private set; }
+    public Guid SalesInvoiceId { get; private set; }
+    public DateOnly Date { get; private set; }
+    public Money Amount { get; private set; }
+}
+
+public enum CustomerReceiptStatus
+{
+    Posted = 1,
+    Voided = 9
+}
+
 public sealed record CustomerReceiptPostedDomainEvent(Guid CustomerReceiptId) : DomainEvent;
+
+public sealed record CustomerReceiptVoidedDomainEvent(Guid CustomerReceiptId) : DomainEvent;
+
+public sealed record CustomerAdvanceAppliedDomainEvent(Guid CustomerReceiptId, Guid ApplicationId) : DomainEvent;

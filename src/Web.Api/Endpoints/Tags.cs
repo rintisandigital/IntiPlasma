@@ -33,4 +33,11 @@ public static class Tags
     public const string SalesInvoices = "Sales - Invoices";
     public const string CustomerReceipts = "Finance - Customer Receipts";
     public const string Receivables = "Finance - Receivables";
+    public const string CreditNotes = "Sales - Credit Notes";
+    public const string CashBankAccounts = "Finance - Cash & Bank Accounts";
+    public const string CashTransactions = "Finance - Cash In/Out & Transfers";
+    public const string BankReconciliations = "Finance - Bank Reconciliation";
+    public const string VendorInvoices = "Finance - Vendor Invoices";
+    public const string PaymentVouchers = "Finance - Payment Vouchers";
+    public const string Payables = "Finance - Payables";
 }

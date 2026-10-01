@@ -100,6 +100,34 @@ public sealed class GoodsReceipt : AggregateRoot
         return receipt;
     }
 
+    /// <summary>
+    /// 3-way match: bills a quantity (order unit) of a receipt line on a vendor invoice and returns its receipt value
+    /// (the amount cleared from hutang belum ditagih).
+    /// </summary>
+    public Result<Money> RegisterInvoice(int lineNumber, decimal quantity)
+    {
+        GoodsReceiptLine? line = _lines.Find(l => l.LineNumber == lineNumber);
+        if (line is null)
+        {
+            return Result.Failure<Money>(GoodsReceiptErrors.LineNotFound(lineNumber));
+        }
+
+        if (quantity <= 0 || quantity > line.UninvoicedQuantity)
+        {
+            return Result.Failure<Money>(GoodsReceiptErrors.OverInvoiced(Number, lineNumber, line.UninvoicedQuantity));
+        }
+
+        return line.Invoice(quantity);
+    }
+
+    /// <summary>
+    /// Takes back a billed quantity when its draft vendor invoice is cancelled.
+    /// </summary>
+    public void ReleaseInvoice(int lineNumber, decimal quantity, Money value)
+    {
+        _lines.Single(l => l.LineNumber == lineNumber).ReleaseInvoice(quantity, value);
+    }
+
     private static Result Validate(
         PurchaseOrder order,
         Warehouse warehouse,

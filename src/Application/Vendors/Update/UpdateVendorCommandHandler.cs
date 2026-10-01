@@ -41,6 +41,16 @@ internal sealed class UpdateVendorCommandHandler(IApplicationDbContext context)
             bankAccount.Value,
             command.IsActive);
 
+        // Omitted tolerance keeps the current one.
+        if (command.PriceTolerancePercent is not null)
+        {
+            Result tolerance = vendor.SetPriceTolerance(command.PriceTolerancePercent.Value);
+            if (tolerance.IsFailure)
+            {
+                return tolerance;
+            }
+        }
+
         await context.SaveChangesAsync(cancellationToken);
 
         return Result.Success();

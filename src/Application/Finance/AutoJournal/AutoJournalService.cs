@@ -18,11 +18,7 @@ internal sealed class AutoJournalService(
 {
     public async Task<Result<Guid>> PostAsync(AccountingEntry entry, CancellationToken cancellationToken = default)
     {
-        Guid? existingId = await context.JournalEntries
-            .Where(j => j.SourceType == entry.EventType && j.SourceId == entry.SourceId)
-            .Select(j => (Guid?)j.Id)
-            .SingleOrDefaultAsync(cancellationToken);
-
+        Guid? existingId = await FindExistingAsync(entry.EventType, entry.SourceId, cancellationToken);
         if (existingId is not null)
         {
             return existingId.Value;
@@ -34,36 +30,75 @@ internal sealed class AutoJournalService(
             return Result.Failure<Guid>(lines.Error);
         }
 
-        Result<JournalEntry> journal = JournalEntry.CreateAutomatic(
-            entry.BranchId, entry.Date, entry.Description, entry.EventType, entry.SourceId, lines.Value);
+        return await CreateAndPostAsync(
+            entry.EventType, entry.SourceId, entry.BranchId, entry.Date, entry.Description, lines.Value, cancellationToken);
+    }
 
-        if (journal.IsFailure)
+    public async Task<Result<Guid>> PostLinesAsync(
+        string sourceType,
+        Guid sourceId,
+        Guid branchId,
+        DateOnly date,
+        string description,
+        IReadOnlyList<JournalLineInput> lines,
+        CancellationToken cancellationToken = default)
+    {
+        Guid? existingId = await FindExistingAsync(sourceType, sourceId, cancellationToken);
+        if (existingId is not null)
         {
-            return Result.Failure<Guid>(journal.Error);
+            return existingId.Value;
         }
 
-        Result<FiscalPeriod> period = await JournalSupport.FindPeriodAsync(context, entry.Date, cancellationToken);
+        Result references = await JournalSupport.ValidateReferencesAsync(context, lines, cancellationToken);
+        if (references.IsFailure)
+        {
+            return Result.Failure<Guid>(references.Error);
+        }
+
+        return await CreateAndPostAsync(sourceType, sourceId, branchId, date, description, lines, cancellationToken);
+    }
+
+    public async Task<Result<Guid>> ReverseAsync(
+        string sourceType,
+        Guid sourceId,
+        DateOnly date,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        JournalEntry? journal = await context.JournalEntries
+            .Include(j => j.Lines)
+            .SingleOrDefaultAsync(j => j.SourceType == sourceType && j.SourceId == sourceId, cancellationToken);
+
+        if (journal is null)
+        {
+            return Result.Failure<Guid>(JournalErrors.SourceNotJournaled(sourceType, sourceId));
+        }
+
+        if (journal.Status == JournalStatus.Reversed)
+        {
+            return journal.ReversedById!.Value;
+        }
+
+        Result<FiscalPeriod> period = await JournalSupport.FindPeriodAsync(context, date, cancellationToken);
         if (period.IsFailure)
         {
             return Result.Failure<Guid>(period.Error);
         }
 
         string number = await JournalSupport.NextNumberAsync(
-            context, numberGenerator, JournalSource.Automatic, entry.BranchId, entry.Date, cancellationToken);
+            context, numberGenerator, JournalSource.Automatic, journal.BranchId, date, cancellationToken);
 
-        Guid? postedBy = userContext.IsAuthenticated ? userContext.UserId : null;
-
-        Result posted = journal.Value.Post(number, period.Value, postedBy, dateTimeProvider.UtcNow);
-        if (posted.IsFailure)
+        Result<JournalEntry> reversal = journal.Reverse(date, reason, number, period.Value, CurrentUser, dateTimeProvider.UtcNow);
+        if (reversal.IsFailure)
         {
-            return Result.Failure<Guid>(posted.Error);
+            return Result.Failure<Guid>(reversal.Error);
         }
 
-        context.JournalEntries.Add(journal.Value);
+        context.JournalEntries.Add(reversal.Value);
 
         await context.SaveChangesAsync(cancellationToken);
 
-        return journal.Value.Id;
+        return reversal.Value.Id;
     }
 
     public async Task<Result<IReadOnlyList<JournalLineInput>>> BuildLinesAsync(
@@ -99,5 +134,50 @@ internal sealed class AutoJournalService(
         Result references = await JournalSupport.ValidateReferencesAsync(context, lines.Value, cancellationToken);
 
         return references.IsSuccess ? lines : Result.Failure<IReadOnlyList<JournalLineInput>>(references.Error);
+    }
+
+    private Guid? CurrentUser => userContext.IsAuthenticated ? userContext.UserId : null;
+
+    private Task<Guid?> FindExistingAsync(string sourceType, Guid sourceId, CancellationToken cancellationToken) =>
+        context.JournalEntries
+            .Where(j => j.SourceType == sourceType && j.SourceId == sourceId)
+            .Select(j => (Guid?)j.Id)
+            .SingleOrDefaultAsync(cancellationToken);
+
+    private async Task<Result<Guid>> CreateAndPostAsync(
+        string sourceType,
+        Guid sourceId,
+        Guid branchId,
+        DateOnly date,
+        string description,
+        IReadOnlyList<JournalLineInput> lines,
+        CancellationToken cancellationToken)
+    {
+        Result<JournalEntry> journal = JournalEntry.CreateAutomatic(branchId, date, description, sourceType, sourceId, lines);
+        if (journal.IsFailure)
+        {
+            return Result.Failure<Guid>(journal.Error);
+        }
+
+        Result<FiscalPeriod> period = await JournalSupport.FindPeriodAsync(context, date, cancellationToken);
+        if (period.IsFailure)
+        {
+            return Result.Failure<Guid>(period.Error);
+        }
+
+        string number = await JournalSupport.NextNumberAsync(
+            context, numberGenerator, JournalSource.Automatic, branchId, date, cancellationToken);
+
+        Result posted = journal.Value.Post(number, period.Value, CurrentUser, dateTimeProvider.UtcNow);
+        if (posted.IsFailure)
+        {
+            return Result.Failure<Guid>(posted.Error);
+        }
+
+        context.JournalEntries.Add(journal.Value);
+
+        await context.SaveChangesAsync(cancellationToken);
+
+        return journal.Value.Id;
     }
 }

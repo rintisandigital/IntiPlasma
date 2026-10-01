@@ -103,6 +103,7 @@ internal static class FinanceSeeder
         (AccountingEvents.PurchaseReceipt, "FeedReceived", "1-1402", "2-1102"),
         (AccountingEvents.PurchaseReceipt, "OvkReceived", "1-1403", "2-1102"),
         (AccountingEvents.VendorInvoice, "GoodsValue", "2-1102", "2-1101"),
+        (AccountingEvents.VendorInvoice, "PriceVariance", "5-1301", "2-1101"),
         (AccountingEvents.VendorInvoice, "InputVat", "1-1601", "2-1101"),
         (AccountingEvents.VendorInvoice, "IncomeTaxWithheld", "2-1101", "2-1303"),
         (AccountingEvents.VendorPayment, "Paid", "2-1101", "1-1201"),
@@ -113,6 +114,10 @@ internal static class FinanceSeeder
         (AccountingEvents.SalesInvoice, "OutputVat", "1-1301", "2-1301"),
         (AccountingEvents.SalesInvoice, "CostOfGoodsSold", "5-1101", "1-1501"),
         (AccountingEvents.CustomerReceipt, "Received", "1-1201", "1-1301"),
+        (AccountingEvents.CustomerReceipt, "Advance", "1-1201", "2-1501"),
+        (AccountingEvents.CustomerAdvanceApplied, "Applied", "2-1501", "1-1301"),
+        (AccountingEvents.SalesCreditNote, "SalesReturn", "4-1901", "1-1301"),
+        (AccountingEvents.SalesCreditNote, "OutputVat", "2-1301", "1-1301"),
         (AccountingEvents.PlasmaSettlement, "PlasmaIncome", "5-1201", "2-1201"),
         (AccountingEvents.PlasmaSettlement, "IncomeTaxWithheld", "2-1201", "2-1303"),
         (AccountingEvents.PlasmaSettlement, "Deduction", "2-1201", "1-1302"),
@@ -150,33 +155,44 @@ internal static class FinanceSeeder
 
     /// <summary>
     /// Adds the default mapping of an accounting event that has no default mapping yet (e.g. an event introduced by a
-    /// later release), provided every account it needs still exists under its seeded code. Existing mappings are never touched.
+    /// later release), and adds components introduced later to an existing default mapping, provided every account
+    /// needed still exists under its seeded code. Mapped components are never changed.
     /// </summary>
     private static async Task SeedMissingMappingsAsync(
         ApplicationDbContext dbContext,
         Dictionary<string, Guid> accountIds,
         CancellationToken cancellationToken)
     {
-        List<string> mappedEvents = await dbContext.JournalMappings
+        List<JournalMapping> defaults = await dbContext.JournalMappings
+            .Include(m => m.Lines)
             .Where(m => m.BranchId == null)
-            .Select(m => m.EventType)
             .ToListAsync(cancellationToken);
 
-        foreach (IGrouping<string, (string Event, string Component, string Debit, string Credit)> group in
-                 Mappings.Where(m => !mappedEvents.Contains(m.Event)).GroupBy(m => m.Event))
+        foreach (IGrouping<string, (string Event, string Component, string Debit, string Credit)> group in Mappings.GroupBy(m => m.Event))
         {
-            if (!group.All(m => accountIds.ContainsKey(m.Debit) && accountIds.ContainsKey(m.Credit)))
+            JournalMapping? existing = defaults.Find(m => m.EventType == group.Key);
+
+            var missing = group
+                .Where(m => existing is null || existing.Lines.All(l => l.Component != m.Component))
+                .Where(m => accountIds.ContainsKey(m.Debit) && accountIds.ContainsKey(m.Credit))
+                .Select(m => (m.Component, accountIds[m.Debit], accountIds[m.Credit], (Guid?)null))
+                .ToList();
+
+            if (missing.Count == 0)
             {
                 continue;
             }
 
-            JournalMapping mapping = JournalMapping.Create(
-                group.Key,
-                branchId: null,
-                "Mapping default (seed)",
-                [.. group.Select(m => (m.Component, accountIds[m.Debit], accountIds[m.Credit], (Guid?)null))]).Value;
+            if (existing is null)
+            {
+                dbContext.JournalMappings.Add(JournalMapping.Create(group.Key, branchId: null, "Mapping default (seed)", missing).Value);
+                continue;
+            }
 
-            dbContext.JournalMappings.Add(mapping);
+            existing.Update(
+                existing.Description,
+                existing.IsActive,
+                [.. existing.Lines.Select(l => (l.Component, l.DebitAccountId, l.CreditAccountId, l.CostCenterId)), .. missing]);
         }
     }
 }

@@ -91,6 +91,8 @@ internal sealed class GoodsReceiptLineConfiguration : IEntityTypeConfiguration<G
         builder.Property(l => l.BaseQuantity).HasPrecision(InventoryPrecision.Quantity, InventoryPrecision.QuantityScale);
         builder.Property(l => l.UnitCost).HasPrecision(InventoryPrecision.UnitCost, StockLedgerEntry.UnitCostDecimals);
         builder.ComplexMoney(l => l.Value, "value");
+        builder.Property(l => l.QuantityInvoiced).HasPrecision(InventoryPrecision.Quantity, InventoryPrecision.QuantityScale);
+        builder.ComplexMoney(l => l.ValueInvoiced, "value_invoiced");
 
         builder.HasOne<Item>().WithMany().HasForeignKey(l => l.ItemId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Uom>().WithMany().HasForeignKey(l => l.UomId).OnDelete(DeleteBehavior.Restrict);

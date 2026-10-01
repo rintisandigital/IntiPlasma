@@ -3,6 +3,7 @@ using Domain.MasterData.Customers;
 using Domain.MasterData.Items;
 using Domain.MasterData.TaxCodes;
 using Domain.Partnership.Cycles;
+using Domain.Sales.CreditNotes;
 using Domain.Sales.DeliveryOrders;
 using Domain.Sales.SalesInvoices;
 using Domain.Sales.SalesOrders;
@@ -119,6 +120,7 @@ internal sealed class SalesInvoiceConfiguration : IEntityTypeConfiguration<Sales
         builder.ComplexMoney(i => i.VatAmount, "vat_amount");
         builder.ComplexMoney(i => i.Total, "total");
         builder.ComplexMoney(i => i.PaidAmount, "paid_amount");
+        builder.ComplexMoney(i => i.CreditedAmount, "credited_amount");
         builder.HasIndex(i => i.Number).IsUnique().HasFilter("number IS NOT NULL");
         builder.HasIndex(i => new { i.BranchId, i.InvoiceDate });
         builder.HasIndex(i => new { i.CustomerId, i.Status });
@@ -143,6 +145,7 @@ internal sealed class SalesInvoiceLineConfiguration : IEntityTypeConfiguration<S
         builder.ComplexMoney(l => l.Amount, "amount");
         builder.ComplexMoney(l => l.VatTaxBase, "vat_tax_base");
         builder.ComplexMoney(l => l.VatAmount, "vat_amount");
+        builder.ComplexMoney(l => l.CreditedAmount, "credited_amount");
         builder.HasIndex(l => l.DeliveryOrderId);
         builder.HasIndex(l => l.CycleId);
 
@@ -150,5 +153,43 @@ internal sealed class SalesInvoiceLineConfiguration : IEntityTypeConfiguration<S
         builder.HasOne<Item>().WithMany().HasForeignKey(l => l.ItemId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<ProductionCycle>().WithMany().HasForeignKey(l => l.CycleId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<TaxCode>().WithMany().HasForeignKey(l => l.TaxCodeId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class SalesCreditNoteConfiguration : IEntityTypeConfiguration<SalesCreditNote>
+{
+    public void Configure(EntityTypeBuilder<SalesCreditNote> builder)
+    {
+        builder.ToTable("sales_credit_notes", Schemas.Sales);
+        builder.HasKey(n => n.Id);
+        builder.Property(n => n.Number).HasMaxLength(50);
+        builder.Property(n => n.Reason).HasMaxLength(500);
+        builder.ComplexMoney(n => n.Subtotal, "subtotal");
+        builder.ComplexMoney(n => n.VatAmount, "vat_amount");
+        builder.ComplexMoney(n => n.Total, "total");
+        builder.HasIndex(n => n.Number).IsUnique();
+        builder.HasIndex(n => n.SalesInvoiceId);
+        builder.HasIndex(n => new { n.CustomerId, n.Date });
+
+        builder.HasOne<Branch>().WithMany().HasForeignKey(n => n.BranchId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Customer>().WithMany().HasForeignKey(n => n.CustomerId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<SalesInvoice>().WithMany().HasForeignKey(n => n.SalesInvoiceId).OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasMany(n => n.Lines).WithOne().HasForeignKey(l => l.SalesCreditNoteId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(n => n.Lines).HasField("_lines").UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class SalesCreditNoteLineConfiguration : IEntityTypeConfiguration<SalesCreditNoteLine>
+{
+    public void Configure(EntityTypeBuilder<SalesCreditNoteLine> builder)
+    {
+        builder.ToTable("sales_credit_note_lines", Schemas.Sales);
+        builder.HasKey(l => new { l.SalesCreditNoteId, l.InvoiceLineNumber });
+        builder.ComplexMoney(l => l.Amount, "amount");
+        builder.ComplexMoney(l => l.VatAmount, "vat_amount");
+        builder.HasIndex(l => l.CycleId);
+
+        builder.HasOne<ProductionCycle>().WithMany().HasForeignKey(l => l.CycleId).OnDelete(DeleteBehavior.Restrict);
     }
 }

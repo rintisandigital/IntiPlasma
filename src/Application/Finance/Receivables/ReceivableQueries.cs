@@ -38,12 +38,16 @@ public sealed record CustomerReceiptResponse
         """
         SELECT r.id AS Id, r.number AS Number, r.branch_id AS BranchId, b.code AS BranchCode,
                r.customer_id AS CustomerId, c.code AS CustomerCode, c.name AS CustomerName, r.receipt_date AS ReceiptDate,
+               r.cash_bank_account_id AS CashBankAccountId, cb.code AS CashBankCode,
                r.cash_account_id AS CashAccountId, a.code AS CashAccountCode, a.name AS CashAccountName,
-               r.amount AS Amount, r.reference AS Reference, r.notes AS Notes
+               r.amount AS Amount, r.advance_amount AS AdvanceAmount, r.applied_advance_amount AS AppliedAdvanceAmount,
+               CASE WHEN r.status = 'Voided' THEN 0 ELSE r.advance_amount - r.applied_advance_amount END AS UnappliedAdvance,
+               r.status AS Status, r.reference AS Reference, r.notes AS Notes, r.void_date AS VoidDate, r.void_reason AS VoidReason
         FROM finance.customer_receipts r
         JOIN master.branches b ON b.id = r.branch_id
         JOIN master.customers c ON c.id = r.customer_id
         JOIN finance.accounts a ON a.id = r.cash_account_id
+        LEFT JOIN finance.cash_bank_accounts cb ON cb.id = r.cash_bank_account_id
         """;
 
     public Guid Id { get; init; }
@@ -62,25 +66,57 @@ public sealed record CustomerReceiptResponse
 
     public DateOnly ReceiptDate { get; init; }
 
+    /// <summary>
+    /// Null for receipts recorded before cash/bank accounts existed.
+    /// </summary>
+    public Guid? CashBankAccountId { get; init; }
+
+    public string? CashBankCode { get; init; }
+
     public Guid CashAccountId { get; init; }
 
     public string CashAccountCode { get; init; }
 
     public string CashAccountName { get; init; }
 
+    /// <summary>
+    /// Total received: allocations + advance.
+    /// </summary>
     public decimal Amount { get; init; }
+
+    /// <summary>
+    /// Uang muka penjualan received with this receipt.
+    /// </summary>
+    public decimal AdvanceAmount { get; init; }
+
+    public decimal AppliedAdvanceAmount { get; init; }
+
+    public decimal UnappliedAdvance { get; init; }
+
+    public string Status { get; init; }
 
     public string? Reference { get; init; }
 
     public string? Notes { get; init; }
 
+    public DateOnly? VoidDate { get; init; }
+
+    public string? VoidReason { get; init; }
+
     /// <summary>
     /// Only filled by the detail endpoint.
     /// </summary>
     public IReadOnlyList<CustomerReceiptAllocationResponse>? Allocations { get; init; }
+
+    /// <summary>
+    /// Advance applied to invoices later; only filled by the detail endpoint.
+    /// </summary>
+    public IReadOnlyList<AdvanceApplicationResponse>? Applications { get; init; }
 }
 
 public sealed record CustomerReceiptAllocationResponse(Guid SalesInvoiceId, string InvoiceNumber, DateOnly InvoiceDate, decimal Amount);
+
+public sealed record AdvanceApplicationResponse(Guid Id, Guid SalesInvoiceId, string InvoiceNumber, DateOnly Date, decimal Amount);
 
 public sealed record ReceivableLedgerResponse(
     Guid CustomerId,
@@ -94,7 +130,7 @@ public sealed record ReceivableLedgerResponse(
     decimal ClosingBalance,
     IReadOnlyList<ReceivableLedgerLine> Lines);
 
-/// <param name="DocumentType">"Invoice" or "Receipt".</param>
+/// <param name="DocumentType">"Invoice", "Receipt", "ReceiptVoid", "AdvanceApplied" or "CreditNote".</param>
 public sealed record ReceivableLedgerLine(
     string DocumentType,
     Guid DocumentId,
@@ -170,6 +206,42 @@ internal static class ReceivableSql
         (@AllBranches OR {alias}.branch_id = ANY(@BranchIds))
         AND (@BranchId::uuid IS NULL OR {alias}.branch_id = @BranchId)
         """;
+
+    /// <summary>
+    /// Every movement of a customer's receivable (@CustomerId): posted invoices (debit), the invoice part of receipts
+    /// (credit; an advance is not a receivable movement), voided receipts (debit on the void date), advances applied
+    /// to invoices (credit) and credit notes (credit).
+    /// </summary>
+    public static readonly string Movements =
+        $"""
+        SELECT 'Invoice' AS DocumentType, i.id AS DocumentId, i.number AS Number, i.invoice_date AS Date,
+               b.code AS BranchCode, i.notes AS Description, i.total AS Debit, 0::numeric AS Credit
+        FROM sales.sales_invoices i
+        JOIN master.branches b ON b.id = i.branch_id
+        WHERE i.customer_id = @CustomerId AND {PostedInvoice} AND {Branch("i")}
+        UNION ALL
+        SELECT 'Receipt', r.id, r.number, r.receipt_date, b.code, r.reference, 0::numeric, r.amount - r.advance_amount
+        FROM finance.customer_receipts r
+        JOIN master.branches b ON b.id = r.branch_id
+        WHERE r.customer_id = @CustomerId AND r.amount > r.advance_amount AND {Branch("r")}
+        UNION ALL
+        SELECT 'ReceiptVoid', r.id, r.number, r.void_date, b.code, r.void_reason, r.amount - r.advance_amount, 0::numeric
+        FROM finance.customer_receipts r
+        JOIN master.branches b ON b.id = r.branch_id
+        WHERE r.customer_id = @CustomerId AND r.status = 'Voided' AND r.amount > r.advance_amount AND {Branch("r")}
+        UNION ALL
+        SELECT 'AdvanceApplied', p.id, r.number, p.date, b.code, i.number, 0::numeric, p.amount
+        FROM finance.customer_advance_applications p
+        JOIN finance.customer_receipts r ON r.id = p.customer_receipt_id
+        JOIN sales.sales_invoices i ON i.id = p.sales_invoice_id
+        JOIN master.branches b ON b.id = r.branch_id
+        WHERE r.customer_id = @CustomerId AND {Branch("r")}
+        UNION ALL
+        SELECT 'CreditNote', n.id, n.number, n.date, b.code, n.reason, 0::numeric, n.total
+        FROM sales.sales_credit_notes n
+        JOIN master.branches b ON b.id = n.branch_id
+        WHERE n.customer_id = @CustomerId AND {Branch("n")}
+        """;
 }
 
 internal sealed class GetCustomerReceiptsQueryHandler(IDbConnectionFactory dbConnectionFactory, IBranchAccess branchAccess)
@@ -216,6 +288,12 @@ internal sealed class GetCustomerReceiptByIdQueryHandler(IDbConnectionFactory db
             JOIN sales.sales_invoices i ON i.id = a.sales_invoice_id
             WHERE a.customer_receipt_id = @CustomerReceiptId
             ORDER BY i.invoice_date, i.number;
+
+            SELECT p.id AS Id, p.sales_invoice_id AS SalesInvoiceId, i.number AS InvoiceNumber, p.date AS Date, p.amount AS Amount
+            FROM finance.customer_advance_applications p
+            JOIN sales.sales_invoices i ON i.id = p.sales_invoice_id
+            WHERE p.customer_receipt_id = @CustomerReceiptId
+            ORDER BY p.date, i.number;
             """;
 
         await using SqlMapper.GridReader multi = await connection.QueryMultipleAsync(
@@ -233,7 +311,11 @@ internal sealed class GetCustomerReceiptByIdQueryHandler(IDbConnectionFactory db
             return Result.Failure<CustomerReceiptResponse>(access.Error);
         }
 
-        return receipt with { Allocations = [.. await multi.ReadAsync<CustomerReceiptAllocationResponse>()] };
+        return receipt with
+        {
+            Allocations = [.. await multi.ReadAsync<CustomerReceiptAllocationResponse>()],
+            Applications = [.. await multi.ReadAsync<AdvanceApplicationResponse>()]
+        };
     }
 }
 
@@ -255,25 +337,12 @@ internal sealed class GetReceivableLedgerQueryHandler(IDbConnectionFactory dbCon
             $"""
             SELECT c.id AS Id, c.code AS Code, c.name AS Name FROM master.customers c WHERE c.id = @CustomerId;
 
-            SELECT COALESCE((SELECT SUM(i.total) FROM sales.sales_invoices i
-                             WHERE i.customer_id = @CustomerId AND {ReceivableSql.PostedInvoice}
-                               AND i.invoice_date < @From AND {ReceivableSql.Branch("i")}), 0)
-                 - COALESCE((SELECT SUM(r.amount) FROM finance.customer_receipts r
-                             WHERE r.customer_id = @CustomerId AND r.receipt_date < @From AND {ReceivableSql.Branch("r")}), 0);
+            WITH m AS ({ReceivableSql.Movements})
+            SELECT COALESCE(SUM(m.Debit - m.Credit), 0) FROM m WHERE m.Date < @From;
 
-            SELECT * FROM (
-                SELECT 'Invoice' AS DocumentType, i.id AS DocumentId, i.number AS Number, i.invoice_date AS Date,
-                       b.code AS BranchCode, i.notes AS Description, i.total AS Debit, 0::numeric AS Credit
-                FROM sales.sales_invoices i
-                JOIN master.branches b ON b.id = i.branch_id
-                WHERE i.customer_id = @CustomerId AND {ReceivableSql.PostedInvoice}
-                  AND i.invoice_date BETWEEN @From AND @To AND {ReceivableSql.Branch("i")}
-                UNION ALL
-                SELECT 'Receipt', r.id, r.number, r.receipt_date, b.code, r.reference, 0::numeric, r.amount
-                FROM finance.customer_receipts r
-                JOIN master.branches b ON b.id = r.branch_id
-                WHERE r.customer_id = @CustomerId
-                  AND r.receipt_date BETWEEN @From AND @To AND {ReceivableSql.Branch("r")}) m
+            WITH m AS ({ReceivableSql.Movements})
+            SELECT m.DocumentType, m.DocumentId, m.Number, m.Date, m.BranchCode, m.Description, m.Debit, m.Credit
+            FROM m WHERE m.Date BETWEEN @From AND @To
             ORDER BY m.Date, m.DocumentType, m.Number;
             """;
 
@@ -340,10 +409,16 @@ internal sealed class GetReceivableAgingQueryHandler(IDbConnectionFactory dbConn
                 SELECT i.id AS SalesInvoiceId, i.number AS Number, b.code AS BranchCode,
                        i.customer_id AS CustomerId, c.code AS CustomerCode, c.name AS CustomerName,
                        i.invoice_date AS InvoiceDate, i.due_date AS DueDate, i.total AS Total,
-                       i.total - COALESCE((SELECT SUM(a.amount)
-                                           FROM finance.customer_receipt_allocations a
-                                           JOIN finance.customer_receipts r ON r.id = a.customer_receipt_id
-                                           WHERE a.sales_invoice_id = i.id AND r.receipt_date <= @AsOf), 0) AS Outstanding
+                       i.total
+                       - COALESCE((SELECT SUM(a.amount)
+                                   FROM finance.customer_receipt_allocations a
+                                   JOIN finance.customer_receipts r ON r.id = a.customer_receipt_id
+                                   WHERE a.sales_invoice_id = i.id AND r.receipt_date <= @AsOf
+                                     AND (r.status <> 'Voided' OR r.void_date > @AsOf)), 0)
+                       - COALESCE((SELECT SUM(p.amount) FROM finance.customer_advance_applications p
+                                   WHERE p.sales_invoice_id = i.id AND p.date <= @AsOf), 0)
+                       - COALESCE((SELECT SUM(n.total) FROM sales.sales_credit_notes n
+                                   WHERE n.sales_invoice_id = i.id AND n.date <= @AsOf), 0) AS Outstanding
                 FROM sales.sales_invoices i
                 JOIN master.branches b ON b.id = i.branch_id
                 JOIN master.customers c ON c.id = i.customer_id

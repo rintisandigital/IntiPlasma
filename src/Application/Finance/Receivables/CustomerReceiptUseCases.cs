@@ -3,12 +3,13 @@ using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Numbering;
 using Application.Finance.AutoJournal;
+using Application.Finance.CashBank;
+using Application.Finance.Journals;
 using Application.Inventory;
 using Application.Production;
-using Domain.Finance.Accounts;
+using Domain.Finance.CashBank;
 using Domain.Finance.JournalMappings;
 using Domain.Finance.Receivables;
-using Domain.MasterData.Branches;
 using Domain.MasterData.Customers;
 using Domain.Sales.SalesInvoices;
 using FluentValidation;
@@ -20,34 +21,116 @@ namespace Application.Finance.Receivables;
 public sealed record ReceiptAllocationRequest(Guid SalesInvoiceId, decimal Amount);
 
 /// <summary>
-/// Penerimaan pembayaran customer into a cash/bank account, allocated to posted invoices of the customer in the branch.
+/// Penerimaan pembayaran customer into a cash/bank account of the branch, allocated to posted invoices of the
+/// customer; <paramref name="AdvanceAmount"/> is received as uang muka penjualan to apply to invoices later.
 /// </summary>
 public sealed record CreateCustomerReceiptCommand(
-    Guid BranchId,
+    Guid CashBankAccountId,
     Guid CustomerId,
     DateOnly ReceiptDate,
-    Guid CashAccountId,
     string? Reference,
     string? Notes,
-    IReadOnlyList<ReceiptAllocationRequest> Allocations) : ICommand<CreateCustomerReceiptResponse>;
+    IReadOnlyList<ReceiptAllocationRequest> Allocations,
+    decimal AdvanceAmount = 0) : ICommand<CreateCustomerReceiptResponse>;
 
 public sealed record CreateCustomerReceiptResponse(Guid Id, string Number, decimal Amount);
+
+/// <summary>
+/// Applies (part of) a receipt's advance to posted invoices of the customer.
+/// </summary>
+public sealed record ApplyCustomerAdvanceCommand(
+    Guid CustomerReceiptId,
+    DateOnly Date,
+    IReadOnlyList<ReceiptAllocationRequest> Allocations) : ICommand;
+
+/// <summary>
+/// Voids a receipt (e.g. a bounced giro): its allocations are taken back from the invoices and its journal is reversed
+/// on the void date.
+/// </summary>
+public sealed record VoidCustomerReceiptCommand(Guid CustomerReceiptId, DateOnly Date, string Reason) : ICommand;
+
+internal sealed class ReceiptAllocationRequestValidator : AbstractValidator<ReceiptAllocationRequest>
+{
+    public ReceiptAllocationRequestValidator()
+    {
+        RuleFor(a => a.SalesInvoiceId).NotEmpty();
+        RuleFor(a => a.Amount).GreaterThan(0);
+    }
+}
 
 internal sealed class CreateCustomerReceiptCommandValidator : AbstractValidator<CreateCustomerReceiptCommand>
 {
     public CreateCustomerReceiptCommandValidator()
     {
-        RuleFor(c => c.BranchId).NotEmpty();
+        RuleFor(c => c.CashBankAccountId).NotEmpty();
         RuleFor(c => c.CustomerId).NotEmpty();
-        RuleFor(c => c.CashAccountId).NotEmpty();
         RuleFor(c => c.Reference).MaximumLength(100);
         RuleFor(c => c.Notes).MaximumLength(1000);
+        RuleFor(c => c.AdvanceAmount).GreaterThanOrEqualTo(0);
+        RuleFor(c => c.Allocations).NotEmpty().When(c => c.AdvanceAmount == 0);
+        RuleForEach(c => c.Allocations).SetValidator(new ReceiptAllocationRequestValidator());
+    }
+}
+
+internal sealed class ApplyCustomerAdvanceCommandValidator : AbstractValidator<ApplyCustomerAdvanceCommand>
+{
+    public ApplyCustomerAdvanceCommandValidator()
+    {
+        RuleFor(c => c.CustomerReceiptId).NotEmpty();
         RuleFor(c => c.Allocations).NotEmpty();
-        RuleForEach(c => c.Allocations).ChildRules(allocation =>
+        RuleForEach(c => c.Allocations).SetValidator(new ReceiptAllocationRequestValidator());
+    }
+}
+
+internal sealed class VoidCustomerReceiptCommandValidator : AbstractValidator<VoidCustomerReceiptCommand>
+{
+    public VoidCustomerReceiptCommandValidator()
+    {
+        RuleFor(c => c.CustomerReceiptId).NotEmpty();
+        RuleFor(c => c.Reason).NotEmpty().MaximumLength(500);
+    }
+}
+
+internal static class CustomerReceiptSupport
+{
+    public static async Task<Result<List<(SalesInvoice Invoice, Money Amount)>>> LoadAllocationsAsync(
+        IApplicationDbContext context,
+        IReadOnlyList<ReceiptAllocationRequest> requests,
+        CancellationToken cancellationToken)
+    {
+        var invoiceIds = requests.Select(a => a.SalesInvoiceId).Distinct().ToList();
+        List<SalesInvoice> invoices = await context.SalesInvoices
+            .Where(i => invoiceIds.Contains(i.Id))
+            .ToListAsync(cancellationToken);
+
+        Guid missing = invoiceIds.Find(id => invoices.TrueForAll(i => i.Id != id));
+        if (missing != Guid.Empty)
         {
-            allocation.RuleFor(a => a.SalesInvoiceId).NotEmpty();
-            allocation.RuleFor(a => a.Amount).GreaterThan(0);
-        });
+            return Result.Failure<List<(SalesInvoice, Money)>>(SalesInvoiceErrors.NotFound(missing));
+        }
+
+        return requests.Select(a => (invoices.Single(i => i.Id == a.SalesInvoiceId), new Money(a.Amount))).ToList();
+    }
+
+    public static async Task<Result<CustomerReceipt>> LoadAsync(
+        IApplicationDbContext context,
+        IBranchAccess branchAccess,
+        Guid customerReceiptId,
+        CancellationToken cancellationToken)
+    {
+        CustomerReceipt? receipt = await context.CustomerReceipts
+            .Include(r => r.Allocations)
+            .Include(r => r.Applications)
+            .SingleOrDefaultAsync(r => r.Id == customerReceiptId, cancellationToken);
+
+        if (receipt is null)
+        {
+            return Result.Failure<CustomerReceipt>(CustomerReceiptErrors.NotFound(customerReceiptId));
+        }
+
+        Result access = await branchAccess.EnsureAccessAsync(receipt.BranchId, cancellationToken);
+
+        return access.IsSuccess ? receipt : Result.Failure<CustomerReceipt>(access.Error);
     }
 }
 
@@ -67,15 +150,23 @@ internal sealed class CreateCustomerReceiptCommandHandler(
             return Result.Failure<CreateCustomerReceiptResponse>(notFuture.Error);
         }
 
-        Result access = await branchAccess.EnsureAccessAsync(command.BranchId, cancellationToken);
+        CashBankAccount? cashBank = await context.CashBankAccounts.AsNoTracking()
+            .SingleOrDefaultAsync(a => a.Id == command.CashBankAccountId, cancellationToken);
+
+        if (cashBank is null)
+        {
+            return Result.Failure<CreateCustomerReceiptResponse>(CashBankErrors.NotFound(command.CashBankAccountId));
+        }
+
+        Result access = await branchAccess.EnsureAccessAsync(cashBank.BranchId, cancellationToken);
         if (access.IsFailure)
         {
             return Result.Failure<CreateCustomerReceiptResponse>(access.Error);
         }
 
-        if (!await context.Branches.AnyAsync(b => b.Id == command.BranchId && b.IsActive, cancellationToken))
+        if (!cashBank.IsActive)
         {
-            return Result.Failure<CreateCustomerReceiptResponse>(BranchErrors.NotFound(command.BranchId));
+            return Result.Failure<CreateCustomerReceiptResponse>(CashBankErrors.Unusable(cashBank.Id));
         }
 
         if (!await context.Customers.AnyAsync(c => c.Id == command.CustomerId, cancellationToken))
@@ -83,35 +174,20 @@ internal sealed class CreateCustomerReceiptCommandHandler(
             return Result.Failure<CreateCustomerReceiptResponse>(CustomerErrors.NotFound(command.CustomerId));
         }
 
-        bool validCashAccount = await context.Accounts.AnyAsync(
-            a => a.Id == command.CashAccountId && a.IsActive && a.IsPostable && a.Type == AccountType.Asset,
-            cancellationToken);
+        Result<List<(SalesInvoice Invoice, Money Amount)>> allocations =
+            await CustomerReceiptSupport.LoadAllocationsAsync(context, command.Allocations, cancellationToken);
 
-        if (!validCashAccount)
+        if (allocations.IsFailure)
         {
-            return Result.Failure<CreateCustomerReceiptResponse>(CustomerReceiptErrors.InvalidCashAccount);
+            return Result.Failure<CreateCustomerReceiptResponse>(allocations.Error);
         }
 
-        var invoiceIds = command.Allocations.Select(a => a.SalesInvoiceId).Distinct().ToList();
-        List<SalesInvoice> invoices = await context.SalesInvoices
-            .Where(i => invoiceIds.Contains(i.Id))
-            .ToListAsync(cancellationToken);
-
-        Guid missing = invoiceIds.Find(id => invoices.TrueForAll(i => i.Id != id));
-        if (missing != Guid.Empty)
-        {
-            return Result.Failure<CreateCustomerReceiptResponse>(SalesInvoiceErrors.NotFound(missing));
-        }
-
-        List<(SalesInvoice Invoice, Money Amount)> allocations =
-        [
-            .. command.Allocations.Select(a => (invoices.Single(i => i.Id == a.SalesInvoiceId), new Money(a.Amount)))
-        ];
+        var advance = new Money(command.AdvanceAmount);
 
         // Validated with a placeholder number first so a rejected receipt does not consume a document number.
         Result<CustomerReceipt> validation = CustomerReceipt.Create(
-            string.Empty, command.BranchId, command.CustomerId, command.ReceiptDate, command.CashAccountId,
-            command.Reference, command.Notes, allocations);
+            string.Empty, cashBank.BranchId, command.CustomerId, command.ReceiptDate, cashBank.Id, cashBank.AccountId,
+            command.Reference, command.Notes, allocations.Value, advance);
 
         if (validation.IsFailure)
         {
@@ -119,13 +195,13 @@ internal sealed class CreateCustomerReceiptCommandHandler(
         }
 
         string number = await numberGenerator.NextForBranchAsync(
-            context, DocumentPrefix, command.BranchId, command.ReceiptDate, cancellationToken);
+            context, DocumentPrefix, cashBank.BranchId, command.ReceiptDate, cancellationToken);
 
         CustomerReceipt receipt = CustomerReceipt.Create(
-            number, command.BranchId, command.CustomerId, command.ReceiptDate, command.CashAccountId,
-            command.Reference, command.Notes, allocations).Value;
+            number, cashBank.BranchId, command.CustomerId, command.ReceiptDate, cashBank.Id, cashBank.AccountId,
+            command.Reference, command.Notes, allocations.Value, advance).Value;
 
-        foreach ((SalesInvoice invoice, Money amount) in allocations)
+        foreach ((SalesInvoice invoice, Money amount) in allocations.Value)
         {
             Result paid = invoice.RegisterPayment(amount);
             if (paid.IsFailure)
@@ -142,8 +218,95 @@ internal sealed class CreateCustomerReceiptCommandHandler(
     }
 }
 
+internal sealed class ApplyCustomerAdvanceCommandHandler(
+    IApplicationDbContext context,
+    IBranchAccess branchAccess,
+    IDateTimeProvider dateTimeProvider) : ICommandHandler<ApplyCustomerAdvanceCommand>
+{
+    public async Task<Result> Handle(ApplyCustomerAdvanceCommand command, CancellationToken cancellationToken)
+    {
+        Result notFuture = DailyRecordingSupport.EnsureNotFuture(command.Date, dateTimeProvider);
+        if (notFuture.IsFailure)
+        {
+            return notFuture;
+        }
+
+        Result<CustomerReceipt> receipt = await CustomerReceiptSupport.LoadAsync(
+            context, branchAccess, command.CustomerReceiptId, cancellationToken);
+
+        if (receipt.IsFailure)
+        {
+            return receipt;
+        }
+
+        Result<List<(SalesInvoice Invoice, Money Amount)>> allocations =
+            await CustomerReceiptSupport.LoadAllocationsAsync(context, command.Allocations, cancellationToken);
+
+        if (allocations.IsFailure)
+        {
+            return allocations;
+        }
+
+        Result applied = receipt.Value.ApplyAdvance(command.Date, allocations.Value);
+        if (applied.IsFailure)
+        {
+            return applied;
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+
+        return Result.Success();
+    }
+}
+
+internal sealed class VoidCustomerReceiptCommandHandler(
+    IApplicationDbContext context,
+    IBranchAccess branchAccess,
+    IDateTimeProvider dateTimeProvider) : ICommandHandler<VoidCustomerReceiptCommand>
+{
+    public async Task<Result> Handle(VoidCustomerReceiptCommand command, CancellationToken cancellationToken)
+    {
+        Result notFuture = DailyRecordingSupport.EnsureNotFuture(command.Date, dateTimeProvider);
+        if (notFuture.IsFailure)
+        {
+            return notFuture;
+        }
+
+        Result<CustomerReceipt> receipt = await CustomerReceiptSupport.LoadAsync(
+            context, branchAccess, command.CustomerReceiptId, cancellationToken);
+
+        if (receipt.IsFailure)
+        {
+            return receipt;
+        }
+
+        // The reversal journal is posted from the outbox; reject a closed period now rather than dead-letter it later.
+        Result<Domain.Finance.FiscalPeriods.FiscalPeriod> period = await JournalSupport.FindPeriodAsync(context, command.Date, cancellationToken);
+        if (period.IsFailure)
+        {
+            return period;
+        }
+
+        var invoiceIds = receipt.Value.Allocations.Select(a => a.SalesInvoiceId).ToList();
+        List<SalesInvoice> invoices = await context.SalesInvoices
+            .Where(i => invoiceIds.Contains(i.Id))
+            .ToListAsync(cancellationToken);
+
+        Result voided = receipt.Value.Void(command.Date, command.Reason, invoices);
+        if (voided.IsFailure)
+        {
+            return voided;
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+
+        return Result.Success();
+    }
+}
+
 /// <summary>
-/// Journals a customer receipt: Dr the cash/bank account of the receipt / Cr piutang usaha.
+/// Journals a customer receipt: Dr the cash/bank account / Cr piutang usaha for the allocated part and
+/// Cr uang muka penjualan for the advance.
 /// </summary>
 internal sealed class CustomerReceiptPostedDomainEventHandler(IApplicationDbContext context, IAutoJournalService autoJournal)
     : IDomainEventHandler<CustomerReceiptPostedDomainEvent>
@@ -164,7 +327,58 @@ internal sealed class CustomerReceiptPostedDomainEventHandler(IApplicationDbCont
             receipt.BranchId,
             receipt.ReceiptDate,
             $"Penerimaan {receipt.Number} dari {customer}",
-            [new AccountingAmount("Received", receipt.Amount, DebitAccountId: receipt.CashAccountId)]),
+            [
+                new AccountingAmount("Received", receipt.Amount - receipt.AdvanceAmount, DebitAccountId: receipt.CashAccountId),
+                new AccountingAmount("Advance", receipt.AdvanceAmount, DebitAccountId: receipt.CashAccountId)
+            ]),
+            cancellationToken);
+    }
+}
+
+/// <summary>
+/// Reverses the journal of a voided customer receipt on the void date.
+/// </summary>
+internal sealed class CustomerReceiptVoidedDomainEventHandler(IApplicationDbContext context, IAutoJournalService autoJournal)
+    : IDomainEventHandler<CustomerReceiptVoidedDomainEvent>
+{
+    public async Task Handle(CustomerReceiptVoidedDomainEvent domainEvent, CancellationToken cancellationToken)
+    {
+        CustomerReceipt receipt = await context.CustomerReceipts.AsNoTracking()
+            .SingleAsync(r => r.Id == domainEvent.CustomerReceiptId, cancellationToken);
+
+        await AutoJournalPosting.EnsureAsync(
+            autoJournal.ReverseAsync(
+                AccountingEvents.CustomerReceipt, receipt.Id, receipt.VoidDate!.Value, $"void {receipt.Number}: {receipt.VoidReason}", cancellationToken),
+            $"void of customer receipt {receipt.Number}");
+    }
+}
+
+/// <summary>
+/// Journals an advance applied to an invoice: Dr uang muka penjualan / Cr piutang usaha.
+/// </summary>
+internal sealed class CustomerAdvanceAppliedDomainEventHandler(IApplicationDbContext context, IAutoJournalService autoJournal)
+    : IDomainEventHandler<CustomerAdvanceAppliedDomainEvent>
+{
+    public async Task Handle(CustomerAdvanceAppliedDomainEvent domainEvent, CancellationToken cancellationToken)
+    {
+        CustomerReceipt receipt = await context.CustomerReceipts.AsNoTracking()
+            .Include(r => r.Applications)
+            .SingleAsync(r => r.Id == domainEvent.CustomerReceiptId, cancellationToken);
+
+        CustomerAdvanceApplication application = receipt.Applications.Single(a => a.Id == domainEvent.ApplicationId);
+
+        string invoice = await context.SalesInvoices
+            .Where(i => i.Id == application.SalesInvoiceId)
+            .Select(i => i.Number!)
+            .SingleAsync(cancellationToken);
+
+        await InventoryAccounting.PostAsync(autoJournal, new AccountingEntry(
+            AccountingEvents.CustomerAdvanceApplied,
+            application.Id,
+            receipt.BranchId,
+            application.Date,
+            $"Uang muka {receipt.Number} untuk {invoice}",
+            [new AccountingAmount("Applied", application.Amount)]),
             cancellationToken);
     }
 }

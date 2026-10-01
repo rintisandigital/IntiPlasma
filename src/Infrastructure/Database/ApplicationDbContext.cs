@@ -1,11 +1,13 @@
 using System.Linq.Expressions;
 using Application.Abstractions.Data;
 using Domain.Finance.Accounts;
+using Domain.Finance.CashBank;
 using Domain.Finance.CostCenters;
 using Domain.Finance.FiscalPeriods;
 using Domain.Finance.JournalMappings;
 using Domain.Finance.Journals;
 using Domain.Finance.JournalTemplates;
+using Domain.Finance.Payables;
 using Domain.Finance.Receivables;
 using Domain.Inventory.GoodsReceipts;
 using Domain.Inventory.Stock;
@@ -25,6 +27,7 @@ using Domain.Partnership.Cycles;
 using Domain.Procurement.PurchaseOrders;
 using Domain.Production.DailyRecordings;
 using Domain.Roles;
+using Domain.Sales.CreditNotes;
 using Domain.Sales.DeliveryOrders;
 using Domain.Sales.SalesInvoices;
 using Domain.Sales.SalesOrders;
@@ -107,6 +110,20 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<SalesInvoice> SalesInvoices { get; set; }
 
     public DbSet<CustomerReceipt> CustomerReceipts { get; set; }
+
+    public DbSet<SalesCreditNote> SalesCreditNotes { get; set; }
+
+    public DbSet<CashBankAccount> CashBankAccounts { get; set; }
+
+    public DbSet<CashTransaction> CashTransactions { get; set; }
+
+    public DbSet<BankTransfer> BankTransfers { get; set; }
+
+    public DbSet<BankReconciliation> BankReconciliations { get; set; }
+
+    public DbSet<VendorInvoice> VendorInvoices { get; set; }
+
+    public DbSet<PaymentVoucher> PaymentVouchers { get; set; }
 
     internal DbSet<OutboxMessage> OutboxMessages { get; set; }
 

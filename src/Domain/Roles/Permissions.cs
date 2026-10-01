@@ -157,6 +157,56 @@ public static class Permissions
     /// </summary>
     public const string ReceivablesManage = "receivables:manage";
 
+    /// <summary>
+    /// Void customer receipts (reverses their journal).
+    /// </summary>
+    public const string ReceivablesVoid = "receivables:void";
+
+    /// <summary>
+    /// Cash/bank accounts, cash transactions, transfers, cash &amp; bank ledger and reconciliations (read only).
+    /// </summary>
+    public const string CashBankRead = "cash-bank:read";
+
+    /// <summary>
+    /// Manage cash/bank accounts, record cash-in/cash-out (draft), post cash-in and bank transfers.
+    /// </summary>
+    public const string CashBankManage = "cash-bank:manage";
+
+    /// <summary>
+    /// Approve and post cash-out transactions created by someone else (checker).
+    /// </summary>
+    public const string CashBankApprove = "cash-bank:approve";
+
+    /// <summary>
+    /// Bank reconciliation (statement lines, matching, completion).
+    /// </summary>
+    public const string CashBankReconcile = "cash-bank:reconcile";
+
+    /// <summary>
+    /// Vendor invoices, payment vouchers, payable ledger and aging (read only).
+    /// </summary>
+    public const string PayablesRead = "payables:read";
+
+    /// <summary>
+    /// Register and post vendor invoices within the price tolerance; create payment vouchers (maker).
+    /// </summary>
+    public const string PayablesManage = "payables:manage";
+
+    /// <summary>
+    /// Post vendor invoices whose price differs from the purchase order above the vendor's tolerance.
+    /// </summary>
+    public const string PayablesApproveVariance = "payables:approve-variance";
+
+    /// <summary>
+    /// Approve payment vouchers created by someone else (checker).
+    /// </summary>
+    public const string PayablesApprove = "payables:approve";
+
+    /// <summary>
+    /// Pay approved payment vouchers (treasury).
+    /// </summary>
+    public const string PayablesPay = "payables:pay";
+
     public static readonly IReadOnlyList<string> All =
     [
         UsersRead,
@@ -202,7 +252,17 @@ public static class Permissions
         SalesDeliver,
         SalesInvoice,
         ReceivablesRead,
-        ReceivablesManage
+        ReceivablesManage,
+        ReceivablesVoid,
+        CashBankRead,
+        CashBankManage,
+        CashBankApprove,
+        CashBankReconcile,
+        PayablesRead,
+        PayablesManage,
+        PayablesApproveVariance,
+        PayablesApprove,
+        PayablesPay
     ];
 
     public static bool Exists(string permission) => All.Contains(permission);

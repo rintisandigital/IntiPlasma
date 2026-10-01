@@ -48,7 +48,12 @@ public sealed class SalesInvoice : AggregateRoot
     public string? CancellationReason { get; private set; }
     public IReadOnlyCollection<SalesInvoiceLine> Lines => [.. _lines];
 
-    public Money Outstanding => Total - PaidAmount;
+    /// <summary>
+    /// Total of the posted credit notes (nota kredit), VAT included.
+    /// </summary>
+    public Money CreditedAmount { get; private set; } = new(0m);
+
+    public Money Outstanding => Total - PaidAmount - CreditedAmount;
 
     public bool IsPayable => Status is SalesInvoiceStatus.Posted or SalesInvoiceStatus.PartiallyPaid;
 
@@ -83,7 +88,10 @@ public sealed class SalesInvoice : AggregateRoot
 
         foreach (DeliveryOrderLine deliveryLine in deliveries.OrderBy(d => d.DeliveryDate).ThenBy(d => d.Number).SelectMany(d => d.Lines))
         {
-            Result<VatCalculation> vat = CalculateVat(deliveryLine.TaxCodeId, deliveryLine.Amount, invoiceDate, taxCodes);
+            Result<TaxCalculation> vat = deliveryLine.TaxCodeId is null
+                ? TaxCalculation.None
+                : taxCodes[deliveryLine.TaxCodeId.Value].Calculate(deliveryLine.Amount, invoiceDate);
+
             if (vat.IsFailure)
             {
                 return Result.Failure<SalesInvoice>(vat.Error);
@@ -164,9 +172,57 @@ public sealed class SalesInvoice : AggregateRoot
         }
 
         PaidAmount += amount;
-        Status = Outstanding.IsZero ? SalesInvoiceStatus.Paid : SalesInvoiceStatus.PartiallyPaid;
+        UpdateSettlementStatus();
 
         return Result.Success();
+    }
+
+    /// <summary>
+    /// Takes back a payment of a voided customer receipt.
+    /// </summary>
+    public Result ReversePayment(Money amount)
+    {
+        if (amount > PaidAmount)
+        {
+            return Result.Failure(SalesInvoiceErrors.InvalidPaymentReversal(Id));
+        }
+
+        PaidAmount -= amount;
+        UpdateSettlementStatus();
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Applies a posted credit note: reduces the credited lines and the outstanding.
+    /// </summary>
+    public Result ApplyCreditNote(IReadOnlyList<(int LineNumber, Money Amount)> lines, Money total)
+    {
+        if (!IsPayable)
+        {
+            return Result.Failure(SalesInvoiceErrors.NotPayable(Id));
+        }
+
+        foreach ((int lineNumber, Money amount) in lines)
+        {
+            _lines.Single(l => l.LineNumber == lineNumber).AddCredit(amount);
+        }
+
+        CreditedAmount += total;
+        UpdateSettlementStatus();
+
+        return Result.Success();
+    }
+
+    private void UpdateSettlementStatus()
+    {
+        if (Outstanding.IsZero)
+        {
+            Status = SalesInvoiceStatus.Paid;
+            return;
+        }
+
+        Status = PaidAmount.IsZero ? SalesInvoiceStatus.Posted : SalesInvoiceStatus.PartiallyPaid;
     }
 
     private static Result Validate(IReadOnlyList<DeliveryOrder> deliveries, DateOnly invoiceDate)
@@ -196,40 +252,6 @@ public sealed class SalesInvoice : AggregateRoot
             ? Result.Failure(SalesInvoiceErrors.BeforeDeliveryDate)
             : Result.Success();
     }
-
-    private static Result<VatCalculation> CalculateVat(
-        Guid? taxCodeId,
-        Money amount,
-        DateOnly invoiceDate,
-        IReadOnlyDictionary<Guid, TaxCode> taxCodes)
-    {
-        if (taxCodeId is null)
-        {
-            return VatCalculation.None;
-        }
-
-        TaxCode taxCode = taxCodes[taxCodeId.Value];
-        if (taxCode.VatTreatment != VatTreatment.Taxable)
-        {
-            return VatCalculation.None with { TaxCodeId = taxCode.Id };
-        }
-
-        TaxRate? rate = taxCode.GetRateOn(invoiceDate);
-        if (rate is null)
-        {
-            return Result.Failure<VatCalculation>(SalesInvoiceErrors.NoTaxRate(taxCode.Code, invoiceDate));
-        }
-
-        Money taxBase = amount * rate.TaxBaseRatio;
-
-        return new VatCalculation(taxCode.Id, rate.RatePercent, taxBase, taxBase * (rate.RatePercent / 100m));
-    }
-}
-
-/// <param name="TaxBase">DPP: the line amount × the rate's tax base ratio.</param>
-public sealed record VatCalculation(Guid? TaxCodeId, decimal RatePercent, Money TaxBase, Money VatAmount)
-{
-    public static readonly VatCalculation None = new(null, 0m, Money.Zero, Money.Zero);
 }
 
 public enum SalesInvoiceStatus

@@ -231,7 +231,8 @@ public sealed record SalesInvoiceResponse
                i.customer_id AS CustomerId, c.code AS CustomerCode, c.name AS CustomerName,
                i.invoice_date AS InvoiceDate, i.due_date AS DueDate, i.status AS Status, i.notes AS Notes,
                i.subtotal AS Subtotal, i.vat_amount AS VatAmount, i.total AS Total, i.paid_amount AS PaidAmount,
-               (i.total - i.paid_amount) AS Outstanding, i.posted_at_utc AS PostedAtUtc,
+               i.credited_amount AS CreditedAmount,
+               (i.total - i.paid_amount - i.credited_amount) AS Outstanding, i.posted_at_utc AS PostedAtUtc,
                i.cancellation_reason AS CancellationReason
         FROM sales.sales_invoices i
         JOIN master.branches b ON b.id = i.branch_id
@@ -273,6 +274,11 @@ public sealed record SalesInvoiceResponse
     public decimal Total { get; init; }
 
     public decimal PaidAmount { get; init; }
+
+    /// <summary>
+    /// Total of the credit notes (VAT included).
+    /// </summary>
+    public decimal CreditedAmount { get; init; }
 
     public decimal Outstanding { get; init; }
 
@@ -608,6 +614,60 @@ internal sealed class GetUndeliveredHarvestsQueryHandler(IDbConnectionFactory db
                 sql,
                 new { scope.AllBranches, scope.BranchIds, query.BranchId, query.CycleId },
                 cancellationToken: cancellationToken));
+
+        return rows.ToList();
+    }
+}
+
+/// <summary>
+/// Credit notes, optionally of one invoice or customer.
+/// </summary>
+public sealed record GetSalesCreditNotesQuery(Guid? SalesInvoiceId, Guid? CustomerId, Guid? BranchId)
+    : IQuery<IReadOnlyList<SalesCreditNoteResponse>>;
+
+public sealed record SalesCreditNoteResponse(
+    Guid Id,
+    string Number,
+    Guid BranchId,
+    string BranchCode,
+    Guid CustomerId,
+    string CustomerName,
+    Guid SalesInvoiceId,
+    string InvoiceNumber,
+    DateOnly Date,
+    string Reason,
+    decimal Subtotal,
+    decimal VatAmount,
+    decimal Total);
+
+internal sealed class GetSalesCreditNotesQueryHandler(IDbConnectionFactory dbConnectionFactory, IBranchAccess branchAccess)
+    : IQueryHandler<GetSalesCreditNotesQuery, IReadOnlyList<SalesCreditNoteResponse>>
+{
+    public async Task<Result<IReadOnlyList<SalesCreditNoteResponse>>> Handle(GetSalesCreditNotesQuery query, CancellationToken cancellationToken)
+    {
+        BranchScope scope = await branchAccess.GetScopeAsync(cancellationToken);
+
+        await using DbConnection connection = await dbConnectionFactory.OpenConnectionAsync(cancellationToken);
+
+        string sql =
+            $"""
+            SELECT n.id AS Id, n.number AS Number, n.branch_id AS BranchId, b.code AS BranchCode, n.customer_id AS CustomerId,
+                   c.name AS CustomerName, n.sales_invoice_id AS SalesInvoiceId, i.number AS InvoiceNumber, n.date AS Date,
+                   n.reason AS Reason, n.subtotal AS Subtotal, n.vat_amount AS VatAmount, n.total AS Total
+            FROM sales.sales_credit_notes n
+            JOIN master.branches b ON b.id = n.branch_id
+            JOIN master.customers c ON c.id = n.customer_id
+            JOIN sales.sales_invoices i ON i.id = n.sales_invoice_id
+            WHERE {SalesSql.Branch("n")}
+              AND (@SalesInvoiceId::uuid IS NULL OR n.sales_invoice_id = @SalesInvoiceId)
+              AND (@CustomerId::uuid IS NULL OR n.customer_id = @CustomerId)
+            ORDER BY n.date DESC, n.number DESC;
+            """;
+
+        IEnumerable<SalesCreditNoteResponse> rows = await connection.QueryAsync<SalesCreditNoteResponse>(new CommandDefinition(
+            sql,
+            new { scope.AllBranches, scope.BranchIds, query.BranchId, query.SalesInvoiceId, query.CustomerId },
+            cancellationToken: cancellationToken));
 
         return rows.ToList();
     }

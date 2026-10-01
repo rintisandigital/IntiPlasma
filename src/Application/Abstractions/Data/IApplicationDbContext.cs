@@ -1,9 +1,11 @@
 using Domain.Finance.Accounts;
+using Domain.Finance.CashBank;
 using Domain.Finance.CostCenters;
 using Domain.Finance.FiscalPeriods;
 using Domain.Finance.JournalMappings;
 using Domain.Finance.Journals;
 using Domain.Finance.JournalTemplates;
+using Domain.Finance.Payables;
 using Domain.Finance.Receivables;
 using Domain.Inventory.GoodsReceipts;
 using Domain.Inventory.Stock;
@@ -23,6 +25,7 @@ using Domain.Partnership.Cycles;
 using Domain.Procurement.PurchaseOrders;
 using Domain.Production.DailyRecordings;
 using Domain.Roles;
+using Domain.Sales.CreditNotes;
 using Domain.Sales.DeliveryOrders;
 using Domain.Sales.SalesInvoices;
 using Domain.Sales.SalesOrders;
@@ -74,6 +77,14 @@ public interface IApplicationDbContext
     DbSet<DeliveryOrder> DeliveryOrders { get; }
     DbSet<SalesInvoice> SalesInvoices { get; }
     DbSet<CustomerReceipt> CustomerReceipts { get; }
+    DbSet<SalesCreditNote> SalesCreditNotes { get; }
+
+    DbSet<CashBankAccount> CashBankAccounts { get; }
+    DbSet<CashTransaction> CashTransactions { get; }
+    DbSet<BankTransfer> BankTransfers { get; }
+    DbSet<BankReconciliation> BankReconciliations { get; }
+    DbSet<VendorInvoice> VendorInvoices { get; }
+    DbSet<PaymentVoucher> PaymentVouchers { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

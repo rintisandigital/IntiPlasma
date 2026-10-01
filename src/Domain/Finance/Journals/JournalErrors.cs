@@ -32,6 +32,10 @@ public static class JournalErrors
         "Journals.SelfApprovalNotAllowed",
         "A journal must be approved by someone other than its creator");
 
+    public static Error SourceNotJournaled(string sourceType, Guid sourceId) => Error.NotFound(
+        "Journals.SourceNotJournaled",
+        $"No automatic journal exists for {sourceType} '{sourceId}'");
+
     public static readonly Error ReversalBeforeOriginal = Error.Problem(
         "Journals.ReversalBeforeOriginal",
         "A reversal cannot be dated before the journal it reverses");

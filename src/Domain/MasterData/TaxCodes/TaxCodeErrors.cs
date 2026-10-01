@@ -27,6 +27,10 @@ public static class TaxCodeErrors
         "TaxCodes.InvalidRate",
         "The rate must be between 0 and 100 percent");
 
+    public static Error NoRate(string taxCode, DateOnly date) => Error.Problem(
+        "TaxCodes.NoRate",
+        $"The tax code {taxCode} has no rate in effect on {date:yyyy-MM-dd}");
+
     public static readonly Error InvalidTaxBaseRatio = Error.Problem(
         "TaxCodes.InvalidTaxBaseRatio",
         "The tax base ratio (DPP) must be greater than 0 and at most 1");

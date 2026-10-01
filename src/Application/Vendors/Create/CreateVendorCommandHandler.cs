@@ -34,6 +34,12 @@ internal sealed class CreateVendorCommandHandler(IApplicationDbContext context)
             command.PaymentTermDays,
             bankAccount.Value);
 
+        Result tolerance = vendor.SetPriceTolerance(command.PriceTolerancePercent ?? 0m);
+        if (tolerance.IsFailure)
+        {
+            return Result.Failure<Guid>(tolerance.Error);
+        }
+
         if (await context.Vendors.AnyAsync(v => v.Code == vendor.Code, cancellationToken))
         {
             return Result.Failure<Guid>(VendorErrors.CodeNotUnique(vendor.Code));

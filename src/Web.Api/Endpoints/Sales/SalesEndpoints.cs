@@ -26,6 +26,36 @@ internal sealed class SalesEndpoints : IEndpoint
         MapSalesOrders(app.MapGroup("sales/orders").WithTags(Tags.SalesOrders));
         MapDeliveryOrders(app.MapGroup("sales").WithTags(Tags.DeliveryOrders));
         MapInvoices(app.MapGroup("sales/invoices").WithTags(Tags.SalesInvoices));
+        MapCreditNotes(app.MapGroup("sales/credit-notes").WithTags(Tags.CreditNotes));
+    }
+
+    private static void MapCreditNotes(RouteGroupBuilder group)
+    {
+        group.MapGet("", async (
+            Guid? salesInvoiceId,
+            Guid? customerId,
+            Guid? branchId,
+            IQueryHandler<GetSalesCreditNotesQuery, IReadOnlyList<SalesCreditNoteResponse>> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<IReadOnlyList<SalesCreditNoteResponse>> result = await handler.Handle(
+                new GetSalesCreditNotesQuery(salesInvoiceId, customerId, branchId), cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.SalesRead);
+
+        group.MapPost("", async (
+            CreateSalesCreditNoteCommand command,
+            ICommandHandler<CreateSalesCreditNoteCommand, CreateSalesCreditNoteResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<CreateSalesCreditNoteResponse> result = await handler.Handle(command, cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.SalesInvoice)
+        .WithIdempotency();
     }
 
     private static void MapSalesOrders(RouteGroupBuilder group)

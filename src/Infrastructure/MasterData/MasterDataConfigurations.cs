@@ -124,6 +124,7 @@ internal sealed class VendorConfiguration : IEntityTypeConfiguration<Vendor>
         builder.Property(v => v.Address).HasMaxLength(500);
         builder.Property(v => v.Phone).HasMaxLength(30);
         builder.Property(v => v.Email).HasMaxLength(256);
+        builder.Property(v => v.PriceTolerancePercent).HasPrecision(5, 2);
         builder.HasIndex(v => v.Code).IsUnique();
         builder.ComplexTaxIdentity(v => v.TaxIdentity);
         builder.ComplexBankAccount(v => v.BankAccount);

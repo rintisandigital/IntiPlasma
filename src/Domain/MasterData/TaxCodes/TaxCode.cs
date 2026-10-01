@@ -98,4 +98,32 @@ public sealed class TaxCode : AggregateRoot
         _rates
             .Where(r => r.EffectiveFrom <= date)
             .MaxBy(r => r.EffectiveFrom);
+
+    /// <summary>
+    /// VAT on an amount (excluding VAT) at the rate in effect on the date. Exempt and not-collected VAT codes yield
+    /// no VAT. Also used for income tax withholding (PPh), where the amount is the withholding base.
+    /// </summary>
+    public Result<TaxCalculation> Calculate(Money amount, DateOnly date)
+    {
+        if (Type == TaxType.Vat && VatTreatment != TaxCodes.VatTreatment.Taxable)
+        {
+            return TaxCalculation.None with { TaxCodeId = Id };
+        }
+
+        TaxRate? rate = GetRateOn(date);
+        if (rate is null)
+        {
+            return Result.Failure<TaxCalculation>(TaxCodeErrors.NoRate(Code, date));
+        }
+
+        Money taxBase = amount * rate.TaxBaseRatio;
+
+        return new TaxCalculation(Id, rate.RatePercent, taxBase, taxBase * (rate.RatePercent / 100m));
+    }
+}
+
+/// <param name="TaxBase">DPP: the amount × the rate's tax base ratio.</param>
+public sealed record TaxCalculation(Guid? TaxCodeId, decimal RatePercent, Money TaxBase, Money TaxAmount)
+{
+    public static readonly TaxCalculation None = new(null, 0m, Money.Zero, Money.Zero);
 }

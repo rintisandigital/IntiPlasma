@@ -1,5 +1,6 @@
 using Domain.Finance.Receivables;
 using Domain.MasterData.TaxCodes;
+using Domain.Sales.CreditNotes;
 using Domain.Sales.DeliveryOrders;
 using Domain.Sales.SalesInvoices;
 using Domain.Sales.SalesOrders;
@@ -209,7 +210,7 @@ public sealed class SalesTests
         ppn.SetRates([(new DateOnly(2027, 1, 1), 12m, 1m)]);
 
         SalesInvoice.CreateDraft([delivery], OrderDate, 0, null, taxCodes).Error
-            .ShouldBe(SalesInvoiceErrors.NoTaxRate("PPN12", OrderDate));
+            .ShouldBe(TaxCodeErrors.NoRate("PPN12", OrderDate));
         delivery.Status.ShouldBe(DeliveryOrderStatus.Delivered);
     }
 
@@ -274,22 +275,99 @@ public sealed class SalesTests
         DeliveryOrder delivery = Deliver(ApprovedOrder(), Harvest(1_000, 2_000m));
         SalesInvoice invoice = SalesInvoice.CreateDraft([delivery], OrderDate, 0, null, new Dictionary<Guid, TaxCode>()).Value;
         invoice.Post("INV/1", null, DateTime.UtcNow);
-        var cash = Guid.NewGuid();
 
-        CustomerReceipt.Create("RCV/1", BranchId, Guid.NewGuid(), OrderDate, cash, null, null, [(invoice, new Money(1m))])
+        Receipt(Guid.NewGuid(), OrderDate, [(invoice, new Money(1m))])
             .Error.ShouldBe(CustomerReceiptErrors.InvoiceMismatch(invoice.Id));
 
-        CustomerReceipt.Create("RCV/1", BranchId, CustomerId, OrderDate, cash, null, null, [(invoice, new Money(40_000_001m))])
+        Receipt(CustomerId, OrderDate, [(invoice, new Money(40_000_001m))])
             .Error.Code.ShouldBe("SalesInvoices.OverPayment");
 
-        CustomerReceipt.Create("RCV/1", BranchId, CustomerId, OrderDate.AddDays(-1), cash, null, null, [(invoice, new Money(1m))])
+        Receipt(CustomerId, OrderDate.AddDays(-1), [(invoice, new Money(1m))])
             .Error.ShouldBe(CustomerReceiptErrors.BeforeInvoiceDate("INV/1"));
 
-        CustomerReceipt receipt = CustomerReceipt.Create(
-            "RCV/1", BranchId, CustomerId, OrderDate, cash, "TRF-001", null, [(invoice, new Money(10_000_000m))]).Value;
+        Receipt(CustomerId, OrderDate, []).Error.ShouldBe(CustomerReceiptErrors.NoAllocations);
 
-        receipt.Amount.ShouldBe(new Money(10_000_000m));
+        CustomerReceipt receipt = Receipt(CustomerId, OrderDate, [(invoice, new Money(10_000_000m))], new Money(5_000_000m)).Value;
+
+        receipt.Amount.ShouldBe(new Money(15_000_000m));
+        receipt.UnappliedAdvance.ShouldBe(new Money(5_000_000m));
         receipt.DomainEvents.OfType<CustomerReceiptPostedDomainEvent>().ShouldHaveSingleItem();
         invoice.PaidAmount.ShouldBe(Money.Zero); // the caller registers the payment
     }
+
+    [Fact]
+    public void Advance_Should_BeAppliedLater_AndBlockTheVoid()
+    {
+        SalesInvoice invoice = PostedInvoice();
+        CustomerReceipt receipt = Receipt(CustomerId, OrderDate, [], new Money(30_000_000m)).Value;
+
+        receipt.ApplyAdvance(OrderDate, [(invoice, new Money(30_000_001m))]).Error
+            .ShouldBe(CustomerReceiptErrors.AdvanceExceeded(new Money(30_000_000m)));
+
+        receipt.ApplyAdvance(OrderDate.AddDays(1), [(invoice, new Money(25_000_000m))]).IsSuccess.ShouldBeTrue();
+
+        invoice.PaidAmount.ShouldBe(new Money(25_000_000m));
+        receipt.UnappliedAdvance.ShouldBe(new Money(5_000_000m));
+        receipt.DomainEvents.OfType<CustomerAdvanceAppliedDomainEvent>().ShouldHaveSingleItem();
+        receipt.Void(OrderDate.AddDays(2), "giro tolak", [invoice]).Error.ShouldBe(CustomerReceiptErrors.AdvanceAlreadyApplied);
+    }
+
+    [Fact]
+    public void Void_Should_TakeThePaymentsBackFromTheInvoices()
+    {
+        SalesInvoice invoice = PostedInvoice();
+        CustomerReceipt receipt = Receipt(CustomerId, OrderDate, [(invoice, new Money(40_000_000m))]).Value;
+        invoice.RegisterPayment(new Money(40_000_000m));
+        invoice.Status.ShouldBe(SalesInvoiceStatus.Paid);
+
+        receipt.Void(OrderDate.AddDays(-1), "x", [invoice]).Error.ShouldBe(CustomerReceiptErrors.VoidBeforeReceipt);
+        receipt.Void(OrderDate.AddDays(3), "giro tolak", [invoice]).IsSuccess.ShouldBeTrue();
+
+        receipt.Status.ShouldBe(CustomerReceiptStatus.Voided);
+        invoice.Status.ShouldBe(SalesInvoiceStatus.Posted);
+        invoice.Outstanding.ShouldBe(new Money(40_000_000m));
+        receipt.DomainEvents.OfType<CustomerReceiptVoidedDomainEvent>().ShouldHaveSingleItem();
+        receipt.Void(OrderDate.AddDays(3), "lagi", [invoice]).Error.ShouldBe(CustomerReceiptErrors.Voided(receipt.Id));
+    }
+
+    [Fact]
+    public void CreditNote_Should_ReduceTheInvoice_WithProportionalVat()
+    {
+        var ppn = TaxCode.CreateVat("PPN11", "PPN 11%", VatTreatment.Taxable);
+        ppn.SetRates([(new DateOnly(2025, 1, 1), 11m, 1m)]);
+        DeliveryOrder delivery = Deliver(ApprovedOrder(ppn.Id), Harvest(1_000, 2_000m));
+        SalesInvoice invoice = SalesInvoice.CreateDraft([delivery], OrderDate, 0, null, new Dictionary<Guid, TaxCode> { [ppn.Id] = ppn }).Value;
+        invoice.Post("INV/1", null, DateTime.UtcNow);
+
+        // DPP 40.000.000 + PPN 4.400.000; credit 1.000.000 of DPP (e.g. susut timbang) with PPN 110.000.
+        SalesCreditNote.Create("CN/1", invoice, OrderDate, "susut", [(1, new Money(40_000_001m))])
+            .Error.Code.ShouldBe("SalesCreditNotes.AboveCreditable");
+
+        SalesCreditNote creditNote = SalesCreditNote.Create("CN/1", invoice, OrderDate, "susut", [(1, new Money(1_000_000m))]).Value;
+
+        creditNote.VatAmount.ShouldBe(new Money(110_000m));
+        creditNote.Total.ShouldBe(new Money(1_110_000m));
+
+        invoice.ApplyCreditNote([(1, creditNote.Lines.Single().Amount)], creditNote.Total);
+
+        invoice.Outstanding.ShouldBe(new Money(43_290_000m));
+        invoice.Lines.Single().CreditableAmount.ShouldBe(new Money(39_000_000m));
+    }
+
+    private static SalesInvoice PostedInvoice()
+    {
+        DeliveryOrder delivery = Deliver(ApprovedOrder(), Harvest(1_000, 2_000m));
+        SalesInvoice invoice = SalesInvoice.CreateDraft([delivery], OrderDate, 0, null, new Dictionary<Guid, TaxCode>()).Value;
+        invoice.Post("INV/1", null, DateTime.UtcNow);
+
+        return invoice;
+    }
+
+    private static Result<CustomerReceipt> Receipt(
+        Guid customerId,
+        DateOnly date,
+        IReadOnlyList<(SalesInvoice Invoice, Money Amount)> allocations,
+        Money? advance = null) =>
+        CustomerReceipt.Create(
+            "RCV/1", BranchId, customerId, date, Guid.NewGuid(), Guid.NewGuid(), "TRF-001", null, allocations, advance ?? Money.Zero);
 }

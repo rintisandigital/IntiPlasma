@@ -21,9 +21,9 @@ public static class SalesInvoiceErrors
         "SalesInvoices.OverPayment",
         string.Create(CultureInfo.InvariantCulture, $"The payment for invoice {number} must be positive and cannot exceed the outstanding {outstanding}"));
 
-    public static Error NoTaxRate(string taxCode, DateOnly date) => Error.Problem(
-        "SalesInvoices.NoTaxRate",
-        $"The VAT code {taxCode} has no rate in effect on {date:yyyy-MM-dd}");
+    public static Error InvalidPaymentReversal(Guid salesInvoiceId) => Error.Problem(
+        "SalesInvoices.InvalidPaymentReversal",
+        $"The sales invoice with the Id = '{salesInvoiceId}' has not received that much payment");
 
     public static readonly Error NoDeliveries = Error.Problem(
         "SalesInvoices.NoDeliveries",

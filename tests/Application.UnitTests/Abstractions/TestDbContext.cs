@@ -1,11 +1,13 @@
 using System.Text.Json;
 using Application.Abstractions.Data;
 using Domain.Finance.Accounts;
+using Domain.Finance.CashBank;
 using Domain.Finance.CostCenters;
 using Domain.Finance.FiscalPeriods;
 using Domain.Finance.JournalMappings;
 using Domain.Finance.Journals;
 using Domain.Finance.JournalTemplates;
+using Domain.Finance.Payables;
 using Domain.Finance.Receivables;
 using Domain.Inventory.GoodsReceipts;
 using Domain.Inventory.Stock;
@@ -25,6 +27,7 @@ using Domain.Partnership.Cycles;
 using Domain.Procurement.PurchaseOrders;
 using Domain.Production.DailyRecordings;
 using Domain.Roles;
+using Domain.Sales.CreditNotes;
 using Domain.Sales.DeliveryOrders;
 using Domain.Sales.SalesInvoices;
 using Domain.Sales.SalesOrders;
@@ -104,6 +107,20 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
 
     public DbSet<CustomerReceipt> CustomerReceipts { get; set; }
 
+    public DbSet<SalesCreditNote> SalesCreditNotes { get; set; }
+
+    public DbSet<CashBankAccount> CashBankAccounts { get; set; }
+
+    public DbSet<CashTransaction> CashTransactions { get; set; }
+
+    public DbSet<BankTransfer> BankTransfers { get; set; }
+
+    public DbSet<BankReconciliation> BankReconciliations { get; set; }
+
+    public DbSet<VendorInvoice> VendorInvoices { get; set; }
+
+    public DbSet<PaymentVoucher> PaymentVouchers { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>().Navigation(u => u.Roles).HasField("_roles");
@@ -176,6 +193,7 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
         {
             b.HasKey(l => new { l.GoodsReceiptId, l.LineNumber });
             b.OwnsOne(l => l.Value);
+            b.OwnsOne(l => l.ValueInvoiced);
         });
 
         modelBuilder.Entity<StockTransfer>().Navigation(t => t.Lines).HasField("_lines");
@@ -243,6 +261,7 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
             b.OwnsOne(i => i.VatAmount);
             b.OwnsOne(i => i.Total);
             b.OwnsOne(i => i.PaidAmount);
+            b.OwnsOne(i => i.CreditedAmount);
         });
         modelBuilder.Entity<SalesInvoiceLine>(b =>
         {
@@ -251,16 +270,92 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
             b.OwnsOne(l => l.Amount);
             b.OwnsOne(l => l.VatTaxBase);
             b.OwnsOne(l => l.VatAmount);
+            b.OwnsOne(l => l.CreditedAmount);
         });
 
         modelBuilder.Entity<CustomerReceipt>(b =>
         {
             b.Navigation(r => r.Allocations).HasField("_allocations");
+            b.Navigation(r => r.Applications).HasField("_applications");
             b.OwnsOne(r => r.Amount);
+            b.OwnsOne(r => r.AdvanceAmount);
+            b.OwnsOne(r => r.AppliedAdvanceAmount);
         });
         modelBuilder.Entity<CustomerReceiptAllocation>(b =>
         {
             b.HasKey(a => new { a.CustomerReceiptId, a.SalesInvoiceId });
+            b.OwnsOne(a => a.Amount);
+        });
+        modelBuilder.Entity<CustomerAdvanceApplication>(b =>
+        {
+            b.Property(a => a.Id).ValueGeneratedNever();
+            b.OwnsOne(a => a.Amount);
+        });
+
+        modelBuilder.Entity<SalesCreditNote>(b =>
+        {
+            b.Navigation(n => n.Lines).HasField("_lines");
+            b.OwnsOne(n => n.Subtotal);
+            b.OwnsOne(n => n.VatAmount);
+            b.OwnsOne(n => n.Total);
+        });
+        modelBuilder.Entity<SalesCreditNoteLine>(b =>
+        {
+            b.HasKey(l => new { l.SalesCreditNoteId, l.InvoiceLineNumber });
+            b.OwnsOne(l => l.Amount);
+            b.OwnsOne(l => l.VatAmount);
+        });
+
+        modelBuilder.Entity<CashTransaction>(b =>
+        {
+            b.Navigation(t => t.Lines).HasField("_lines");
+            b.OwnsOne(t => t.Amount);
+        });
+        modelBuilder.Entity<CashTransactionLine>(b =>
+        {
+            b.HasKey(l => new { l.CashTransactionId, l.LineNumber });
+            b.OwnsOne(l => l.Amount);
+        });
+        modelBuilder.Entity<BankTransfer>().OwnsOne(t => t.Amount);
+        modelBuilder.Entity<BankReconciliation>(b =>
+        {
+            b.Navigation(r => r.Lines).HasField("_lines");
+            b.OwnsOne(r => r.StatementBalance);
+        });
+        modelBuilder.Entity<BankStatementLine>(b =>
+        {
+            b.HasKey(l => new { l.BankReconciliationId, l.LineNumber });
+            b.OwnsOne(l => l.Amount);
+        });
+
+        modelBuilder.Entity<VendorInvoice>(b =>
+        {
+            b.Navigation(i => i.Lines).HasField("_lines");
+            b.OwnsOne(i => i.Subtotal);
+            b.OwnsOne(i => i.GoodsValue);
+            b.OwnsOne(i => i.VatAmount);
+            b.OwnsOne(i => i.IncomeTaxAmount);
+            b.OwnsOne(i => i.Total);
+            b.OwnsOne(i => i.PaidAmount);
+        });
+        modelBuilder.Entity<VendorInvoiceLine>(b =>
+        {
+            b.HasKey(l => new { l.VendorInvoiceId, l.LineNumber });
+            b.OwnsOne(l => l.OrderUnitPrice);
+            b.OwnsOne(l => l.UnitPrice);
+            b.OwnsOne(l => l.Amount);
+            b.OwnsOne(l => l.GoodsValue);
+            b.OwnsOne(l => l.VatTaxBase);
+            b.OwnsOne(l => l.VatAmount);
+        });
+        modelBuilder.Entity<PaymentVoucher>(b =>
+        {
+            b.Navigation(p => p.Allocations).HasField("_allocations");
+            b.OwnsOne(p => p.Amount);
+        });
+        modelBuilder.Entity<PaymentVoucherAllocation>(b =>
+        {
+            b.HasKey(a => new { a.PaymentVoucherId, a.VendorInvoiceId });
             b.OwnsOne(a => a.Amount);
         });
     }
