@@ -49,6 +49,11 @@ public sealed record GetUndeliveredHarvestsQuery(Guid? BranchId, Guid? CycleId) 
 
 public sealed record SalesOrderResponse
 {
+    /// <summary>
+    /// Lampiran: attachment ids; metadata via <c>GET /attachments?ids=</c>.
+    /// </summary>
+    public Guid[] Documents { get; init; } = [];
+
     public const string Select =
         """
         SELECT o.id AS Id, o.number AS Number, o.branch_id AS BranchId, b.code AS BranchCode,
@@ -57,7 +62,8 @@ public sealed record SalesOrderResponse
                s.birds AS Birds, s.delivered_birds AS DeliveredBirds, s.delivered_weight_kg AS DeliveredWeightKg,
                s.estimated_amount AS EstimatedAmount,
                o.approved_at_utc AS ApprovedAtUtc, o.credit_override_reason AS CreditOverrideReason,
-               o.cancellation_reason AS CancellationReason
+               o.cancellation_reason AS CancellationReason,
+               o.documents AS Documents
         FROM sales.sales_orders o
         JOIN master.branches b ON b.id = o.branch_id
         JOIN master.customers c ON c.id = o.customer_id
@@ -133,6 +139,11 @@ public sealed record SalesOrderLineResponse(
 
 public sealed record DeliveryOrderResponse
 {
+    /// <summary>
+    /// Lampiran: attachment ids; metadata via <c>GET /attachments?ids=</c>.
+    /// </summary>
+    public Guid[] Documents { get; init; } = [];
+
     public const string Select =
         """
         SELECT d.id AS Id, d.number AS Number, d.branch_id AS BranchId, b.code AS BranchCode,
@@ -140,7 +151,8 @@ public sealed record DeliveryOrderResponse
                d.customer_id AS CustomerId, c.code AS CustomerCode, c.name AS CustomerName,
                d.delivery_date AS DeliveryDate, d.vehicle_number AS VehicleNumber, d.driver_name AS DriverName,
                d.status AS Status, d.sales_invoice_id AS SalesInvoiceId, i.number AS SalesInvoiceNumber, d.notes AS Notes,
-               s.birds AS Birds, s.weight_kg AS WeightKg, s.amount AS Amount, d.cancellation_reason AS CancellationReason
+               s.birds AS Birds, s.weight_kg AS WeightKg, s.amount AS Amount, d.cancellation_reason AS CancellationReason,
+               d.documents AS Documents
         FROM sales.delivery_orders d
         JOIN master.branches b ON b.id = d.branch_id
         JOIN sales.sales_orders o ON o.id = d.sales_order_id

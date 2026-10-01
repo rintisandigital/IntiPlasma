@@ -1,4 +1,5 @@
 using Domain.Costing.PlasmaSettlements;
+using Domain.Documents.Attachments;
 using Domain.Finance.Accounts;
 using Domain.Finance.CashBank;
 using Domain.Finance.CostCenters;
@@ -88,6 +89,9 @@ public interface IApplicationDbContext
     DbSet<PaymentVoucher> PaymentVouchers { get; }
 
     DbSet<PlasmaSettlement> PlasmaSettlements { get; }
+
+    DbSet<Attachment> Attachments { get; }
+    DbSet<AttachmentLink> AttachmentLinks { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

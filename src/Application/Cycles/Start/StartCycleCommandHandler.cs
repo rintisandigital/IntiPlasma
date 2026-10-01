@@ -1,7 +1,9 @@
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
+using Application.Documents;
 using Application.Inventory;
 using Application.Abstractions.Messaging;
+using Domain.Documents.Attachments;
 using Domain.Inventory.Stock;
 using Domain.MasterData.Items;
 using Domain.MasterData.Warehouses;
@@ -10,7 +12,10 @@ using SharedKernel;
 
 namespace Application.Cycles.Start;
 
-internal sealed class StartCycleCommandHandler(IApplicationDbContext context, IBranchAccess branchAccess)
+internal sealed class StartCycleCommandHandler(
+    IApplicationDbContext context,
+    IBranchAccess branchAccess,
+    IAttachmentService attachments)
     : ICommandHandler<StartCycleCommand, int>
 {
     public async Task<Result<int>> Handle(StartCycleCommand command, CancellationToken cancellationToken)
@@ -56,6 +61,17 @@ internal sealed class StartCycleCommandHandler(IApplicationDbContext context, IB
             }
 
             context.StockLedgerEntries.Add(balance.Issue(movement, line.Quantity).Value);
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            cycle.Value,
+            AttachmentOwner.Of(AttachmentOwnerTypes.Cycle, cycle.Value.Id),
+            cycle.Value.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return Result.Failure<int>(documents.Error);
         }
 
         await context.SaveChangesAsync(cancellationToken);

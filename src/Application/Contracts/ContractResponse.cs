@@ -2,12 +2,18 @@ namespace Application.Contracts;
 
 public sealed record ContractResponse
 {
+    /// <summary>
+    /// Lampiran: attachment ids; metadata via <c>GET /attachments?ids=</c>.
+    /// </summary>
+    public Guid[] Documents { get; init; } = [];
+
     public const string Select =
         """
         SELECT c.id AS Id, c.code AS Code, c.name AS Name, c.branch_id AS BranchId, b.code AS BranchCode,
                c.scheme AS Scheme, c.status AS Status, c.valid_from AS ValidFrom, c.valid_to AS ValidTo,
                c.plasma_profit_share_percent AS PlasmaProfitSharePercent, c.income_tax_code_id AS IncomeTaxCodeId,
-               t.code AS IncomeTaxCode, c.notes AS Notes
+               t.code AS IncomeTaxCode, c.notes AS Notes,
+               c.documents AS Documents
         FROM partnership.contracts c
         JOIN master.branches b ON b.id = c.branch_id
         LEFT JOIN master.tax_codes t ON t.id = c.income_tax_code_id

@@ -1,3 +1,4 @@
+using Application.Documents;
 using FluentValidation;
 
 namespace Application.Cycles.Start;
@@ -13,5 +14,6 @@ internal sealed class StartCycleCommandValidator : AbstractValidator<StartCycleC
             l.RuleFor(x => x.ItemId).NotEmpty();
             l.RuleFor(x => x.Quantity).GreaterThan(0);
         });
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }

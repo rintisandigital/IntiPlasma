@@ -1,4 +1,5 @@
 using System.Globalization;
+using Domain.Common;
 using Domain.Finance.Payables;
 using Domain.MasterData.TaxCodes;
 using Domain.Partnership.Contracts;
@@ -13,7 +14,7 @@ namespace Domain.Costing.PlasmaSettlements;
 /// Draft (recalculable) → Approved by someone other than the creator (journaled, cycle Settled) → (Partially) Paid
 /// through payment vouchers. A negative result (rugi) is not paid but becomes the plasma's debt (piutang plasma).
 /// </summary>
-public sealed class PlasmaSettlement : AggregateRoot, IPayable
+public sealed class PlasmaSettlement : AggregateRoot, IPayable, IHasDocuments
 {
     private readonly List<PlasmaSettlementLine> _lines = [];
 
@@ -75,6 +76,16 @@ public sealed class PlasmaSettlement : AggregateRoot, IPayable
     string? IPayable.Number => Number;
 
     DateOnly IPayable.DocumentDate => SettlementDate;
+
+    /// <summary>
+    /// Lampiran: ids of the attached photos and documents.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    public Result SetDocuments(IEnumerable<Guid>? documents) =>
+        Status == PlasmaSettlementStatus.Cancelled
+            ? Result.Failure(DocumentErrors.OwnerCancelled)
+            : DocumentList.Apply(documents, value => Documents = value);
 
     /// <param name="incomeTaxCode">The contract's PPh code with its rates, if the contract withholds income tax.</param>
     public static Result<PlasmaSettlement> Create(

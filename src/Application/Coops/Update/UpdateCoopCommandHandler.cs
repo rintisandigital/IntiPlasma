@@ -1,13 +1,18 @@
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Documents;
+using Domain.Documents.Attachments;
 using Domain.MasterData.Coops;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
 namespace Application.Coops.Update;
 
-internal sealed class UpdateCoopCommandHandler(IApplicationDbContext context, IBranchAccess branchAccess)
+internal sealed class UpdateCoopCommandHandler(
+    IApplicationDbContext context,
+    IBranchAccess branchAccess,
+    IAttachmentService attachments)
     : ICommandHandler<UpdateCoopCommand>
 {
     public async Task<Result> Handle(UpdateCoopCommand command, CancellationToken cancellationToken)
@@ -37,6 +42,17 @@ internal sealed class UpdateCoopCommandHandler(IApplicationDbContext context, IB
         if (result.IsFailure)
         {
             return result;
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            coop,
+            AttachmentOwner.Of(AttachmentOwnerTypes.Coop, coop.Id),
+            coop.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return documents;
         }
 
         await context.SaveChangesAsync(cancellationToken);

@@ -1,3 +1,4 @@
+using Domain.Common;
 using Domain.Sales.SalesInvoices;
 using SharedKernel;
 
@@ -10,7 +11,7 @@ namespace Domain.Finance.Receivables;
 /// Posting journals Dr kas/bank / Cr piutang usaha (allocated) and Cr uang muka penjualan (advance).
 /// A receipt can be voided (reversal journal) as long as none of its advance has been applied.
 /// </summary>
-public sealed class CustomerReceipt : AggregateRoot
+public sealed class CustomerReceipt : AggregateRoot, IHasDocuments
 {
     private readonly List<CustomerReceiptAllocation> _allocations = [];
     private readonly List<CustomerAdvanceApplication> _applications = [];
@@ -66,6 +67,16 @@ public sealed class CustomerReceipt : AggregateRoot
     public IReadOnlyCollection<CustomerAdvanceApplication> Applications => [.. _applications];
 
     public Money UnappliedAdvance => Status == CustomerReceiptStatus.Voided ? Money.Zero : AdvanceAmount - AppliedAdvanceAmount;
+
+    /// <summary>
+    /// Lampiran: ids of the attached photos and documents.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    public Result SetDocuments(IEnumerable<Guid>? documents) =>
+        Status == CustomerReceiptStatus.Voided
+            ? Result.Failure(DocumentErrors.OwnerCancelled)
+            : DocumentList.Apply(documents, value => Documents = value);
 
     /// <summary>
     /// Creates the receipt. Does not change the invoices: the caller registers each allocation on its invoice

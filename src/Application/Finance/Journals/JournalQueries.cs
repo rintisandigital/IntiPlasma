@@ -21,6 +21,11 @@ public sealed record GetJournalByIdQuery(Guid JournalId) : IQuery<JournalRespons
 
 public sealed record JournalResponse
 {
+    /// <summary>
+    /// Lampiran: attachment ids; metadata via <c>GET /attachments?ids=</c>.
+    /// </summary>
+    public Guid[] Documents { get; init; } = [];
+
     public const string Select =
         """
         SELECT j.id AS Id, j.number AS Number, j.branch_id AS BranchId, b.code AS BranchCode, j.date AS Date,
@@ -30,7 +35,8 @@ public sealed record JournalResponse
                (SELECT COALESCE(SUM(l.credit), 0) FROM finance.journal_lines l WHERE l.journal_entry_id = j.id) AS TotalCredit,
                j.created_by AS CreatedBy, j.approved_by AS ApprovedBy, j.approved_at_utc AS ApprovedAtUtc,
                j.posted_by AS PostedBy, j.posted_at_utc AS PostedAtUtc,
-               j.reversal_of_id AS ReversalOfId, j.reversed_by_id AS ReversedById
+               j.reversal_of_id AS ReversalOfId, j.reversed_by_id AS ReversedById,
+               j.documents AS Documents
         FROM finance.journal_entries j
         JOIN master.branches b ON b.id = j.branch_id
         """;

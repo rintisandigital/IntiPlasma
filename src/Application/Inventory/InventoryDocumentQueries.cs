@@ -36,6 +36,11 @@ public sealed record GetStockTransferByIdQuery(Guid StockTransferId) : IQuery<In
 /// </summary>
 public sealed record InventoryDocumentResponse
 {
+    /// <summary>
+    /// Lampiran: attachment ids; metadata via <c>GET /attachments?ids=</c>.
+    /// </summary>
+    public Guid[] Documents { get; init; } = [];
+
     public Guid Id { get; init; }
 
     public string Number { get; init; }
@@ -94,7 +99,8 @@ internal static class InventoryDocumentSql
         SELECT r.id AS Id, r.number AS Number, r.branch_id AS BranchId, b.code AS BranchCode, r.receipt_date AS Date,
                o.number AS Reference, v.name AS Party, w.code AS WarehouseCode, r.cycle_id AS CycleId, c.number AS CycleNumber,
                r.notes AS Notes,
-               (SELECT COALESCE(SUM(l.value), 0) FROM inventory.goods_receipt_lines l WHERE l.goods_receipt_id = r.id) AS TotalValue
+               (SELECT COALESCE(SUM(l.value), 0) FROM inventory.goods_receipt_lines l WHERE l.goods_receipt_id = r.id) AS TotalValue,
+               r.documents AS Documents
         FROM inventory.goods_receipts r
         JOIN master.branches b ON b.id = r.branch_id
         JOIN procurement.purchase_orders o ON o.id = r.purchase_order_id
@@ -108,7 +114,8 @@ internal static class InventoryDocumentSql
         SELECT t.id AS Id, t.number AS Number, t.branch_id AS BranchId, b.code AS BranchCode, t.transfer_date AS Date,
                wf.code AS Reference, NULL AS Party, wt.code AS WarehouseCode, t.cycle_id AS CycleId, c.number AS CycleNumber,
                t.notes AS Notes,
-               (SELECT COALESCE(SUM(l.value), 0) FROM inventory.stock_transfer_lines l WHERE l.stock_transfer_id = t.id) AS TotalValue
+               (SELECT COALESCE(SUM(l.value), 0) FROM inventory.stock_transfer_lines l WHERE l.stock_transfer_id = t.id) AS TotalValue,
+               t.documents AS Documents
         FROM inventory.stock_transfers t
         JOIN master.branches b ON b.id = t.branch_id
         JOIN master.warehouses wf ON wf.id = t.from_warehouse_id
@@ -303,7 +310,8 @@ internal static class StockReturnSql
         SELECT t.id AS Id, t.number AS Number, t.branch_id AS BranchId, b.code AS BranchCode, t.return_date AS Date,
                wf.code AS Reference, t.reason AS Party, wt.code AS WarehouseCode, t.cycle_id AS CycleId, c.number AS CycleNumber,
                t.notes AS Notes,
-               (SELECT COALESCE(SUM(l.value), 0) FROM inventory.stock_return_lines l WHERE l.stock_return_id = t.id) AS TotalValue
+               (SELECT COALESCE(SUM(l.value), 0) FROM inventory.stock_return_lines l WHERE l.stock_return_id = t.id) AS TotalValue,
+               t.documents AS Documents
         FROM inventory.stock_returns t
         JOIN master.branches b ON b.id = t.branch_id
         JOIN master.warehouses wf ON wf.id = t.from_warehouse_id

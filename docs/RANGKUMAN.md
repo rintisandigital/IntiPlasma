@@ -1,7 +1,7 @@
 # Rangkuman Proyek — Aplikasi Peternakan Ayam Broiler Inti-Plasma
 
-> Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4) dan 2026-10-01 (Fase 5–8).
-> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§14. Seluruh fase rencana awal (0–8) selesai; lihat §9 untuk backlog berikutnya.
+> Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4), 2026-10-01 (Fase 5–8) dan 2026-10-02 (Fase 9 — lampiran dokumen).
+> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§16. Seluruh fase rencana awal (0–8) dan Fase 9 selesai; lihat §9 untuk backlog berikutnya.
 
 ---
 
@@ -42,11 +42,15 @@
 | 24 | Arus kas | **Metode langsung**, kategori arus kas per akun COA (Operating/Investing/Financing) |
 | 25 | Profitabilitas | **Tanpa alokasi overhead** (margin kontribusi); overhead terlihat per cabang |
 | 26 | Laporan pajak | **Rekap PPN & PPh + ekspor CSV**; XML Coretax menyusul |
+| 27 | Lampiran dokumen | Entity `Attachment` + `Guid[] Documents` di 21 entity (peternak, kandang, vendor, customer, kontrak, chick-in, panen, recording + revisi, BPB, retur, transfer, mutasi pakan, PO, SO, DO, VI, PV, kas, penerimaan, jurnal manual, settlement) |
+| 28 | Lampiran setelah dokumen final | Boleh lewat `PUT …/documents` di semua status kecuali **Cancelled/Voided** |
+| 29 | Hapus lampiran terpakai | **Ditolak (409)**; lampiran yatim (Temporary > 24 jam) dibersihkan job |
+| 30 | Tipe & ukuran | **JPEG/PNG/WEBP + PDF, maks 10 MB**, maks 20 lampiran per entity; storage lokal dulu (S3/MinIO menyusul) |
 
 ## 3. Arsitektur & Konvensi Kode
 
 **Struktur**
-- Monolith dengan bounded context per folder + **schema PostgreSQL** sendiri: `identity`, `infrastructure`, `master`, `partnership`, `finance`, `procurement`, `inventory`, `production`, `sales`.
+- Monolith dengan bounded context per folder + **schema PostgreSQL** sendiri: `identity`, `infrastructure`, `master`, `partnership`, `finance`, `procurement`, `inventory`, `production`, `sales`, `costing`, `documents`.
 - Write side: handler → `IApplicationDbContext` (DbSet = repository) → method domain → `SaveChangesAsync`.
 - Read side: handler → `IDbConnectionFactory` + Dapper; satu `NpgsqlDataSource` dipakai EF & Dapper.
 
@@ -140,6 +144,13 @@
 - **Monitoring event gagal** (`system/failed-events`, retry).
 - **Pajak** (`finance/tax`): rekap PPN keluaran/retur/masukan & PPh dipotong per masa + ekspor CSV.
 
+### Fase 9 — Lampiran Dokumen ✅
+- **Upload dulu, lalu link**: `POST attachments` (multipart) → id → dikirim sebagai `documents` di create/update, atau belakangan lewat `PUT {resource}/{id}/documents` (juga untuk dokumen approved/posted/paid; cancelled/voided ditolak).
+- Tipe dideteksi dari isi file (*magic bytes*), SHA-256, path `yyyy/MM/{id}`; upload ulang dengan `id` sama idempotent (cocok untuk mobile offline).
+- Tabel `documents.attachment_links` = indeks balik (satu lampiran bisa punya beberapa pemilik, mis. mutasi pakan). Lampiran Temporary hanya terlihat oleh pengunggah; Linked mengikuti cabang pemilik.
+- Pre-check lampiran dipanggil **sebelum** nomor dokumen diambil. Job `AttachmentCleanupJob` menghapus lampiran yatim. Detail respons kini memuat `documents`.
+- Permission baru `attachments:upload|read|delete`. ⚠️ `PUT contracts/{id}` body tetap; lampiran kontrak lewat `PUT contracts/{id}/documents`.
+
 ## 5. Alur Akuntansi yang Sudah Berjalan
 
 | Transaksi | Jurnal otomatis |
@@ -178,6 +189,8 @@ Semua event di katalog kini sudah dipakai.
 - **Owned type di TestDbContext (InMemory)**: satu instance `Money` tidak boleh dipakai bersama oleh dua entity (mis. harga disalin dari baris SO ke baris DO). Simpan salinan (`money with { }`); di PostgreSQL (complex type) hal ini tidak bermasalah.
 - Respons error API membawa kode error di field `title` (ProblemDetails), bukan `code`.
 - **Rate limiter global**: 100 request/menit per user (`RateLimiting:Global`). Skrip verifikasi end-to-end menaikkannya lewat env `RateLimiting__Global__PermitLimit=10000`.
+- **Kolom array (`uuid[]`) + Dapper**: row/response harus kelas/record dengan setter atau `init`; record posisional gagal di-*bind*. Di `TestDbContext` (InMemory) `Guid[]` jalan tanpa converter, tetapi `AttachmentLink` perlu `HasKey` eksplisit.
+- Penomoran dokumen (`IDocumentNumberGenerator`) langsung *commit* di luar transaksi EF → semua validasi (termasuk lampiran) harus selesai **sebelum** nomor diambil.
 - Hindari `sed` bernomor baris saat menyunting file yang baru diubah — pernah menimpa baris `HasKey` di `TestDbContext`. Pakai Edit dengan konteks unik.
 - Dokumen yang jurnalnya diposting lewat outbox (VI, PV, kas, void, nota kredit) mengecek **periode fiskal terbuka** saat posting, agar tidak jatuh ke dead letter.
 
@@ -185,10 +198,10 @@ Semua event di katalog kini sudah dipakai.
 
 - Setiap fase: domain + unit test invariant → command/query + validator → EF config + migration → endpoint + permission → **verifikasi end-to-end** ke PostgreSQL lokal pada database sementara `intiplasma_verify` (dibuat & dihapus otomatis; database `intiplasma` milik user tidak disentuh).
 - User yang melakukan **commit & migrate** setelah tiap fase.
-- Status test saat ini: **156 test lulus** (104 domain, 34 application, 8 arsitektur, 10 integration).
+- Status test saat ini: **182 test lulus** (120 domain, 41 application, 8 arsitektur, 13 integration).
 - Integration test (Testcontainers) **sudah bisa dijalankan** di mesin dev (container runtime tersedia) — `dotnet test IntiPlasma.slnx`.
-- Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario, Fase 7: 32 skenario, Fase 8: 35 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
-- Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`, `Phase8_ReportingClosing`.
+- Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario, Fase 7: 32 skenario, Fase 8: 35 skenario, Fase 9: 79 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
+- Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`, `Phase8_ReportingClosing`, `Phase9_Attachments`.
 
 ## 8. Catatan Terbuka / Hutang Teknis
 
@@ -204,6 +217,7 @@ Semua event di katalog kini sudah dipakai.
 - Exposure credit limit memuat semua penerimaan customer ke memori (uang muka belum diterapkan) — perlu query SQL bila datanya besar.
 - Biaya siklus baru sapronak; biaya lain/overhead (listrik, tenaga kerja, penyusutan kandang inti) belum dialokasikan ke siklus.
 - Belum ada sub-ledger piutang plasma per peternak: potongan hutang di settlement hanya dibatasi pendapatan − PPh, belum dicek terhadap saldo piutangnya.
+- Lampiran: storage lokal hanya untuk satu instance (perlu S3/MinIO sebelum scale-out); batas 10 MB & tipe file masih konstanta; belum ada thumbnail/kompresi; `PUT …/documents` pada PV *paid* & PV plasma belum diuji end-to-end.
 - Siklus lama yang ditutup sebelum Fase 7 tidak punya `ClosingCost`; invoice lama punya `costAmount` 0 (tidak ada penyesuaian HPP untuk siklus tersebut).
 
 ## 9. Langkah Berikutnya — Backlog setelah Fase 8

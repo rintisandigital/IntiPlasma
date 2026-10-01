@@ -1,3 +1,4 @@
+using Domain.Common;
 using Domain.MasterData.Coops;
 using Domain.MasterData.Farmers;
 using Domain.Partnership.Contracts;
@@ -9,7 +10,7 @@ namespace Domain.Partnership.Cycles;
 /// Siklus / masa produksi of one coop, from chick-in until harvest and settlement.
 /// A coop can only have one open cycle at a time (also enforced by a unique index).
 /// </summary>
-public sealed class ProductionCycle : AggregateRoot
+public sealed class ProductionCycle : AggregateRoot, IHasDocuments
 {
     public static readonly IReadOnlyList<CycleStatus> OpenStatuses =
         [CycleStatus.Planned, CycleStatus.Active, CycleStatus.Harvesting];
@@ -156,6 +157,22 @@ public sealed class ProductionCycle : AggregateRoot
     }
 
     /// <summary>
+    /// Replaces the attachments of a harvest. Allowed in every status except cancelled, because weighbridge
+    /// tickets often arrive after the cycle is closed.
+    /// </summary>
+    public Result SetHarvestDocuments(Guid harvestId, IEnumerable<Guid>? documents)
+    {
+        if (Status == CycleStatus.Cancelled)
+        {
+            return Result.Failure(DocumentErrors.OwnerCancelled);
+        }
+
+        CycleHarvest? harvest = _harvests.Find(h => h.Id == harvestId);
+
+        return harvest is null ? Result.Failure(CycleErrors.HarvestNotFound(harvestId)) : harvest.SetDocuments(documents);
+    }
+
+    /// <summary>
     /// Closes a fully harvested cycle. The caller checks that no sapronak is left in the coop warehouse
     /// and calculates the performance from the recordings and the cost from the stock card.
     /// </summary>
@@ -195,6 +212,16 @@ public sealed class ProductionCycle : AggregateRoot
 
         return Result.Success();
     }
+
+    /// <summary>
+    /// Lampiran: ids of the attached photos and documents.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    public Result SetDocuments(IEnumerable<Guid>? documents) =>
+        Status == CycleStatus.Cancelled
+            ? Result.Failure(DocumentErrors.OwnerCancelled)
+            : DocumentList.Apply(documents, value => Documents = value);
 
     /// <summary>
     /// Plans a new cycle. The caller must first make sure the coop has no other open cycle.

@@ -23,7 +23,8 @@ internal sealed class FarmerEndpoints : IEndpoint
         string? Address,
         string? Phone,
         BankAccountRequest BankAccount,
-        bool IsActive);
+        bool IsActive,
+        IReadOnlyList<Guid>? Documents = null);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
@@ -82,7 +83,8 @@ internal sealed class FarmerEndpoints : IEndpoint
                 request.Address,
                 request.Phone,
                 request.BankAccount,
-                request.IsActive);
+                request.IsActive,
+                request.Documents);
 
             Result result = await handler.Handle(command, cancellationToken);
 

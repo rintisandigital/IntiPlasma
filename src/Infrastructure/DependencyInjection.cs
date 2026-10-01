@@ -3,11 +3,13 @@ using Application.Abstractions.Authentication;
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Numbering;
+using Application.Abstractions.Storage;
 using Dapper;
 using Infrastructure.Authentication;
 using Infrastructure.Authorization;
 using Infrastructure.Database;
 using Infrastructure.Database.Interceptors;
+using Infrastructure.Documents;
 using Infrastructure.DomainEvents;
 using Infrastructure.Numbering;
 using Infrastructure.Outbox;
@@ -80,6 +82,10 @@ public static class DependencyInjection
 
         services.AddOptions<OutboxOptions>().Bind(configuration.GetSection(OutboxOptions.SectionName));
         services.AddHostedService<OutboxProcessor>();
+
+        services.AddOptions<FileStorageOptions>().Bind(configuration.GetSection(FileStorageOptions.SectionName));
+        services.AddSingleton<IFileStorage, LocalFileStorage>();
+        services.AddHostedService<AttachmentCleanupJob>();
 
         return services;
     }

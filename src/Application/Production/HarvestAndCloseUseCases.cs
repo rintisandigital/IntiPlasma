@@ -2,8 +2,10 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Costing;
+using Application.Documents;
 using Application.Inventory;
 using Application.Sales;
+using Domain.Documents.Attachments;
 using Domain.MasterData.Items;
 using Domain.MasterData.Warehouses;
 using Domain.Partnership.Cycles;
@@ -16,7 +18,14 @@ namespace Application.Production;
 /// <summary>
 /// Panen: birds caught and weighed. The first harvest moves the cycle to Harvesting.
 /// </summary>
-public sealed record RecordHarvestCommand(Guid CycleId, DateOnly Date, int Birds, decimal WeightKg, string? Notes) : ICommand<Guid>;
+/// <param name="Documents">Lampiran: tiket timbangan, foto truk.</param>
+public sealed record RecordHarvestCommand(
+    Guid CycleId,
+    DateOnly Date,
+    int Birds,
+    decimal WeightKg,
+    string? Notes,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<Guid>;
 
 /// <summary>
 /// Tutup siklus: requires the whole population to be harvested (or recorded as dead/culled), the coop warehouse
@@ -34,13 +43,15 @@ internal sealed class RecordHarvestCommandValidator : AbstractValidator<RecordHa
         RuleFor(c => c.Birds).GreaterThan(0);
         RuleFor(c => c.WeightKg).GreaterThan(0);
         RuleFor(c => c.Notes).MaximumLength(500);
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
 internal sealed class RecordHarvestCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
-    IDateTimeProvider dateTimeProvider) : ICommandHandler<RecordHarvestCommand, Guid>
+    IDateTimeProvider dateTimeProvider,
+    IAttachmentService attachments) : ICommandHandler<RecordHarvestCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(RecordHarvestCommand command, CancellationToken cancellationToken)
     {
@@ -60,6 +71,18 @@ internal sealed class RecordHarvestCommandHandler(
         if (harvest.IsFailure)
         {
             return Result.Failure<Guid>(harvest.Error);
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            ids => cycle.Value.SetHarvestDocuments(harvest.Value.Id, ids),
+            () => harvest.Value.Documents,
+            AttachmentOwner.Of(AttachmentOwnerTypes.Harvest, harvest.Value.Id),
+            cycle.Value.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return Result.Failure<Guid>(documents.Error);
         }
 
         await context.SaveChangesAsync(cancellationToken);

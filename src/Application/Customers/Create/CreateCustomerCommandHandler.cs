@@ -1,13 +1,15 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Documents;
 using Domain.Common;
+using Domain.Documents.Attachments;
 using Domain.MasterData.Customers;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
 namespace Application.Customers.Create;
 
-internal sealed class CreateCustomerCommandHandler(IApplicationDbContext context)
+internal sealed class CreateCustomerCommandHandler(IApplicationDbContext context, IAttachmentService attachments)
     : ICommandHandler<CreateCustomerCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateCustomerCommand command, CancellationToken cancellationToken)
@@ -31,6 +33,17 @@ internal sealed class CreateCustomerCommandHandler(IApplicationDbContext context
         if (await context.Customers.AnyAsync(c => c.Code == customer.Code, cancellationToken))
         {
             return Result.Failure<Guid>(CustomerErrors.CodeNotUnique(customer.Code));
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            customer,
+            AttachmentOwner.Of(AttachmentOwnerTypes.Customer, customer.Id),
+            null,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return Result.Failure<Guid>(documents.Error);
         }
 
         context.Customers.Add(customer);

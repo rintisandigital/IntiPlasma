@@ -14,4 +14,5 @@ public sealed record UpdateFarmerCommand(
     string? Address,
     string? Phone,
     BankAccountRequest BankAccount,
-    bool IsActive) : ICommand;
+    bool IsActive,
+    IReadOnlyList<Guid>? Documents = null) : ICommand;

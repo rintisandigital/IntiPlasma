@@ -22,6 +22,11 @@ public sealed record GetCyclePerformanceQuery(Guid CycleId) : IQuery<CyclePerfor
 
 public sealed record DailyRecordingResponse
 {
+    /// <summary>
+    /// Lampiran: attachment ids; metadata via <c>GET /attachments?ids=</c>.
+    /// </summary>
+    public Guid[] Documents { get; init; } = [];
+
     public Guid Id { get; init; }
 
     public Guid CycleId { get; init; }
@@ -71,7 +76,13 @@ public sealed record UsageResponse(
     string BaseUomCode,
     decimal Value);
 
-public sealed record RevisionResponse(int RevisionNumber, string Reason, JsonElement PreviousValues, Guid? RevisedBy, DateTime RevisedAtUtc);
+public sealed record RevisionResponse(
+    int RevisionNumber,
+    string Reason,
+    JsonElement PreviousValues,
+    Guid? RevisedBy,
+    DateTime RevisedAtUtc,
+    Guid[] Documents);
 
 public sealed record CyclePerformanceResponse(
     Guid CycleId,
@@ -93,7 +104,22 @@ public sealed record DailyPerformance(
     decimal? AverageBodyWeightGram,
     CyclePerformance Cumulative);
 
-public sealed record HarvestResponse(Guid Id, DateOnly Date, int AgeDays, int Birds, decimal WeightKg, decimal AverageWeightKg, string? Notes);
+/// <remarks>Init properties rather than a positional record: Dapper cannot bind the documents array to a constructor.</remarks>
+public sealed record HarvestResponse
+{
+    public Guid Id { get; init; }
+    public DateOnly Date { get; init; }
+    public int AgeDays { get; init; }
+    public int Birds { get; init; }
+    public decimal WeightKg { get; init; }
+    public decimal AverageWeightKg { get; init; }
+    public string? Notes { get; init; }
+
+    /// <summary>
+    /// Lampiran: tiket timbangan, foto truk.
+    /// </summary>
+    public Guid[] Documents { get; init; } = [];
+}
 
 internal static class DailyRecordingSql
 {
@@ -104,7 +130,8 @@ internal static class DailyRecordingSql
                COALESCE((SELECT SUM(u.base_quantity) FROM production.daily_recording_usages u
                          JOIN master.items i ON i.id = u.item_id
                          WHERE u.daily_recording_id = r.id AND i.category = 'Feed'), 0) AS FeedKg,
-               r.notes AS Notes, r.revision_number AS RevisionNumber, r.created_at_utc AS CreatedAtUtc
+               r.notes AS Notes, r.revision_number AS RevisionNumber, r.created_at_utc AS CreatedAtUtc,
+               r.documents AS Documents
         FROM production.daily_recordings r
         """;
 }
@@ -159,7 +186,7 @@ internal sealed class GetDailyRecordingByIdQueryHandler(IDbConnectionFactory dbC
             ORDER BY i.category, i.code;
 
             SELECT v.revision_number AS RevisionNumber, v.reason AS Reason, v.previous_values::text AS PreviousValues,
-                   v.revised_by AS RevisedBy, v.revised_at_utc AS RevisedAtUtc
+                   v.revised_by AS RevisedBy, v.revised_at_utc AS RevisedAtUtc, v.documents AS Documents
             FROM production.daily_recording_revisions v
             WHERE v.daily_recording_id = @Id
             ORDER BY v.revision_number DESC;
@@ -184,13 +211,22 @@ internal sealed class GetDailyRecordingByIdQueryHandler(IDbConnectionFactory dbC
         List<RevisionResponse> revisions =
         [
             .. (await multi.ReadAsync<RevisionRow>()).Select(r => new RevisionResponse(
-                r.RevisionNumber, r.Reason, JsonSerializer.Deserialize<JsonElement>(r.PreviousValues), r.RevisedBy, r.RevisedAtUtc))
+                r.RevisionNumber, r.Reason, JsonSerializer.Deserialize<JsonElement>(r.PreviousValues), r.RevisedBy, r.RevisedAtUtc, r.Documents))
         ];
 
         return recording with { Usages = usages, Revisions = revisions };
     }
 
-    private sealed record RevisionRow(int RevisionNumber, string Reason, string PreviousValues, Guid? RevisedBy, DateTime RevisedAtUtc);
+    // A class, not a positional record: Dapper cannot bind a PostgreSQL array to a constructor parameter.
+    internal sealed class RevisionRow
+    {
+        public int RevisionNumber { get; set; }
+        public string Reason { get; set; }
+        public string PreviousValues { get; set; }
+        public Guid? RevisedBy { get; set; }
+        public DateTime RevisedAtUtc { get; set; }
+        public Guid[] Documents { get; set; } = [];
+    }
 }
 
 internal sealed class GetCyclePerformanceQueryHandler(IDbConnectionFactory dbConnectionFactory, IBranchAccess branchAccess)
@@ -220,7 +256,7 @@ internal sealed class GetCyclePerformanceQueryHandler(IDbConnectionFactory dbCon
             ORDER BY r.date;
 
             SELECT h.id AS Id, h.date AS Date, h.age_days AS AgeDays, h.birds AS Birds, h.weight_kg AS WeightKg,
-                   round(h.weight_kg / h.birds, 3) AS AverageWeightKg, h.notes AS Notes
+                   round(h.weight_kg / h.birds, 3) AS AverageWeightKg, h.notes AS Notes, h.documents AS Documents
             FROM partnership.cycle_harvests h
             WHERE h.cycle_id = @CycleId
             ORDER BY h.date;

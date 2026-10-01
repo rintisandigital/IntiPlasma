@@ -1,13 +1,15 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Documents;
 using Domain.Common;
+using Domain.Documents.Attachments;
 using Domain.MasterData.Vendors;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
 namespace Application.Vendors.Create;
 
-internal sealed class CreateVendorCommandHandler(IApplicationDbContext context)
+internal sealed class CreateVendorCommandHandler(IApplicationDbContext context, IAttachmentService attachments)
     : ICommandHandler<CreateVendorCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateVendorCommand command, CancellationToken cancellationToken)
@@ -43,6 +45,17 @@ internal sealed class CreateVendorCommandHandler(IApplicationDbContext context)
         if (await context.Vendors.AnyAsync(v => v.Code == vendor.Code, cancellationToken))
         {
             return Result.Failure<Guid>(VendorErrors.CodeNotUnique(vendor.Code));
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            vendor,
+            AttachmentOwner.Of(AttachmentOwnerTypes.Vendor, vendor.Id),
+            null,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return Result.Failure<Guid>(documents.Error);
         }
 
         context.Vendors.Add(vendor);

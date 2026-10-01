@@ -10,7 +10,7 @@ namespace Web.Api.Endpoints.Costing;
 
 internal sealed class CostingEndpoints : IEndpoint
 {
-    public sealed record RecalculateRequest(DateOnly SettlementDate, decimal DebtDeduction, string? Notes);
+    public sealed record RecalculateRequest(DateOnly SettlementDate, decimal DebtDeduction, string? Notes, IReadOnlyList<Guid>? Documents = null);
 
     public sealed record ReasonRequest(string Reason);
 
@@ -79,7 +79,8 @@ internal sealed class CostingEndpoints : IEndpoint
             CancellationToken cancellationToken) =>
         {
             Result result = await handler.Handle(
-                new RecalculatePlasmaSettlementCommand(plasmaSettlementId, request.SettlementDate, request.DebtDeduction, request.Notes),
+                new RecalculatePlasmaSettlementCommand(
+                    plasmaSettlementId, request.SettlementDate, request.DebtDeduction, request.Notes, request.Documents),
                 cancellationToken);
 
             return result.Match(Results.NoContent, CustomResults.Problem);

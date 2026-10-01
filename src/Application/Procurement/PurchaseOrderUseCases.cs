@@ -3,7 +3,9 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Numbering;
+using Application.Documents;
 using Application.Inventory;
+using Domain.Documents.Attachments;
 using Domain.MasterData.Branches;
 using Domain.MasterData.Items;
 using Domain.MasterData.TaxCodes;
@@ -23,7 +25,8 @@ public sealed record CreatePurchaseOrderCommand(
     DateOnly OrderDate,
     DateOnly? ExpectedDate,
     string? Notes,
-    IReadOnlyList<PurchaseOrderLineRequest> Lines) : ICommand<CreatePurchaseOrderResponse>;
+    IReadOnlyList<PurchaseOrderLineRequest> Lines,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<CreatePurchaseOrderResponse>;
 
 public sealed record CreatePurchaseOrderResponse(Guid Id, string Number);
 
@@ -32,7 +35,8 @@ public sealed record UpdatePurchaseOrderCommand(
     DateOnly OrderDate,
     DateOnly? ExpectedDate,
     string? Notes,
-    IReadOnlyList<PurchaseOrderLineRequest> Lines) : ICommand;
+    IReadOnlyList<PurchaseOrderLineRequest> Lines,
+    IReadOnlyList<Guid>? Documents = null) : ICommand;
 
 public sealed record ApprovePurchaseOrderCommand(Guid PurchaseOrderId) : ICommand;
 
@@ -60,6 +64,7 @@ internal sealed class CreatePurchaseOrderCommandValidator : AbstractValidator<Cr
         RuleFor(c => c.Notes).MaximumLength(1000);
         RuleFor(c => c.Lines).NotEmpty();
         RuleForEach(c => c.Lines).SetValidator(new PurchaseOrderLineRequestValidator());
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
@@ -71,6 +76,7 @@ internal sealed class UpdatePurchaseOrderCommandValidator : AbstractValidator<Up
         RuleFor(c => c.Notes).MaximumLength(1000);
         RuleFor(c => c.Lines).NotEmpty();
         RuleForEach(c => c.Lines).SetValidator(new PurchaseOrderLineRequestValidator());
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
@@ -158,7 +164,8 @@ internal static class PurchaseOrderSupport
 internal sealed class CreatePurchaseOrderCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
-    IDocumentNumberGenerator numberGenerator) : ICommandHandler<CreatePurchaseOrderCommand, CreatePurchaseOrderResponse>
+    IDocumentNumberGenerator numberGenerator,
+    IAttachmentService attachments) : ICommandHandler<CreatePurchaseOrderCommand, CreatePurchaseOrderResponse>
 {
     public async Task<Result<CreatePurchaseOrderResponse>> Handle(CreatePurchaseOrderCommand command, CancellationToken cancellationToken)
     {
@@ -193,11 +200,28 @@ internal sealed class CreatePurchaseOrderCommandHandler(
             return Result.Failure<CreatePurchaseOrderResponse>(validation.Error);
         }
 
+        Result attachable = await attachments.EnsureAttachableAsync(command.BranchId, command.Documents, cancellationToken);
+        if (attachable.IsFailure)
+        {
+            return Result.Failure<CreatePurchaseOrderResponse>(attachable.Error);
+        }
+
         string number = await numberGenerator.NextForBranchAsync(
             context, PurchaseOrderSupport.DocumentPrefix, command.BranchId, command.OrderDate, cancellationToken);
 
         PurchaseOrder order = PurchaseOrder.Create(
             number, command.BranchId, command.VendorId, command.OrderDate, command.ExpectedDate, command.Notes, lines.Value).Value;
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            order,
+            AttachmentOwner.Of(AttachmentOwnerTypes.PurchaseOrder, order.Id),
+            order.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return Result.Failure<CreatePurchaseOrderResponse>(documents.Error);
+        }
 
         context.PurchaseOrders.Add(order);
 
@@ -207,7 +231,10 @@ internal sealed class CreatePurchaseOrderCommandHandler(
     }
 }
 
-internal sealed class UpdatePurchaseOrderCommandHandler(IApplicationDbContext context, IBranchAccess branchAccess)
+internal sealed class UpdatePurchaseOrderCommandHandler(
+    IApplicationDbContext context,
+    IBranchAccess branchAccess,
+    IAttachmentService attachments)
     : ICommandHandler<UpdatePurchaseOrderCommand>
 {
     public async Task<Result> Handle(UpdatePurchaseOrderCommand command, CancellationToken cancellationToken)
@@ -228,6 +255,17 @@ internal sealed class UpdatePurchaseOrderCommandHandler(IApplicationDbContext co
         if (result.IsFailure)
         {
             return result;
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            order.Value,
+            AttachmentOwner.Of(AttachmentOwnerTypes.PurchaseOrder, order.Value.Id),
+            order.Value.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return documents;
         }
 
         await context.SaveChangesAsync(cancellationToken);

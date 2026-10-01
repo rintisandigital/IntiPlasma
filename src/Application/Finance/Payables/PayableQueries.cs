@@ -50,6 +50,11 @@ public sealed record GetPayableAgingQuery(DateOnly AsOf, Guid? BranchId, Guid? V
 
 public sealed record VendorInvoiceResponse
 {
+    /// <summary>
+    /// Lampiran: attachment ids; metadata via <c>GET /attachments?ids=</c>.
+    /// </summary>
+    public Guid[] Documents { get; init; } = [];
+
     public const string Select =
         """
         SELECT i.id AS Id, i.number AS Number, i.branch_id AS BranchId, b.code AS BranchCode,
@@ -61,7 +66,8 @@ public sealed record VendorInvoiceResponse
                i.income_tax_amount AS IncomeTaxAmount, i.total AS Total, i.paid_amount AS PaidAmount,
                (i.total - i.paid_amount) AS Outstanding, i.max_price_deviation_percent AS MaxPriceDeviationPercent,
                i.price_variance_approval_reason AS PriceVarianceApprovalReason, i.posted_at_utc AS PostedAtUtc,
-               i.cancellation_reason AS CancellationReason
+               i.cancellation_reason AS CancellationReason,
+               i.documents AS Documents
         FROM finance.vendor_invoices i
         JOIN master.branches b ON b.id = i.branch_id
         JOIN master.vendors v ON v.id = i.vendor_id
@@ -179,6 +185,11 @@ public sealed record UninvoicedReceiptLineResponse(
 
 public sealed record PaymentVoucherResponse
 {
+    /// <summary>
+    /// Lampiran: attachment ids; metadata via <c>GET /attachments?ids=</c>.
+    /// </summary>
+    public Guid[] Documents { get; init; } = [];
+
     public const string Select =
         """
         SELECT p.id AS Id, p.number AS Number, p.branch_id AS BranchId, b.code AS BranchCode,
@@ -187,7 +198,8 @@ public sealed record PaymentVoucherResponse
                p.vendor_id AS VendorId, p.farmer_id AS FarmerId,
                p.cash_bank_account_id AS CashBankAccountId, cb.code AS CashBankCode, cb.name AS CashBankName,
                p.payment_date AS PaymentDate, p.reference AS Reference, p.notes AS Notes, p.amount AS Amount, p.status AS Status,
-               p.approved_at_utc AS ApprovedAtUtc, p.paid_at_utc AS PaidAtUtc, p.cancellation_reason AS CancellationReason
+               p.approved_at_utc AS ApprovedAtUtc, p.paid_at_utc AS PaidAtUtc, p.cancellation_reason AS CancellationReason,
+               p.documents AS Documents
         FROM finance.payment_vouchers p
         JOIN master.branches b ON b.id = p.branch_id
         LEFT JOIN master.vendors v ON v.id = p.vendor_id

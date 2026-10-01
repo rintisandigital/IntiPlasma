@@ -13,7 +13,7 @@ namespace Domain.Partnership.Contracts;
 /// Terms are editable only while the contract is a draft. Once active, a contract is immutable;
 /// changed terms need a new contract. Production cycles take a snapshot of the terms when they are planned.
 /// </summary>
-public sealed class PartnershipContract : AggregateRoot
+public sealed class PartnershipContract : AggregateRoot, IHasDocuments
 {
     private readonly List<ContractInputPrice> _inputPrices = [];
     private readonly List<ContractLiveBirdPrice> _liveBirdPrices = [];
@@ -55,6 +55,14 @@ public sealed class PartnershipContract : AggregateRoot
     public IReadOnlyCollection<ContractInputPrice> InputPrices => [.. _inputPrices];
     public IReadOnlyCollection<ContractLiveBirdPrice> LiveBirdPrices => [.. _liveBirdPrices];
     public IReadOnlyCollection<ContractIncentive> Incentives => [.. _incentives];
+
+    /// <summary>
+    /// Lampiran: ids of the attached photos and documents.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    public Result SetDocuments(IEnumerable<Guid>? documents) =>
+        DocumentList.Apply(documents, value => Documents = value);
 
     public static Result<PartnershipContract> Create(string code, Guid branchId, ContractScheme scheme, ContractTerms terms)
     {

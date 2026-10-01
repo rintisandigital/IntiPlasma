@@ -2,7 +2,9 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Numbering;
+using Application.Documents;
 using Application.Production;
+using Domain.Documents.Attachments;
 using Domain.Sales.DeliveryOrders;
 using Domain.Sales.SalesOrders;
 using FluentValidation;
@@ -23,7 +25,8 @@ public sealed record CreateDeliveryOrderCommand(
     string? VehicleNumber,
     string? DriverName,
     string? Notes,
-    IReadOnlyList<DeliveryOrderLineRequest> Lines) : ICommand<CreateDeliveryOrderResponse>;
+    IReadOnlyList<DeliveryOrderLineRequest> Lines,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<CreateDeliveryOrderResponse>;
 
 public sealed record CreateDeliveryOrderResponse(Guid Id, string Number);
 
@@ -47,6 +50,7 @@ internal sealed class CreateDeliveryOrderCommandValidator : AbstractValidator<Cr
             line.RuleFor(l => l.SalesOrderLineNumber).GreaterThan(0);
             line.RuleFor(l => l.HarvestId).NotEmpty();
         });
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
@@ -63,7 +67,8 @@ internal sealed class CreateDeliveryOrderCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
     IDocumentNumberGenerator numberGenerator,
-    IDateTimeProvider dateTimeProvider) : ICommandHandler<CreateDeliveryOrderCommand, CreateDeliveryOrderResponse>
+    IDateTimeProvider dateTimeProvider,
+    IAttachmentService attachments) : ICommandHandler<CreateDeliveryOrderCommand, CreateDeliveryOrderResponse>
 {
     private const string DocumentPrefix = "DO";
 
@@ -96,6 +101,12 @@ internal sealed class CreateDeliveryOrderCommandHandler(
             return Result.Failure<CreateDeliveryOrderResponse>(validation.Error);
         }
 
+        Result attachable = await attachments.EnsureAttachableAsync(order.Value.BranchId, command.Documents, cancellationToken);
+        if (attachable.IsFailure)
+        {
+            return Result.Failure<CreateDeliveryOrderResponse>(attachable.Error);
+        }
+
         string number = await numberGenerator.NextForBranchAsync(
             context, DocumentPrefix, order.Value.BranchId, command.DeliveryDate, cancellationToken);
 
@@ -109,6 +120,17 @@ internal sealed class CreateDeliveryOrderCommandHandler(
             {
                 return Result.Failure<CreateDeliveryOrderResponse>(registered.Error);
             }
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            delivery,
+            AttachmentOwner.Of(AttachmentOwnerTypes.DeliveryOrder, delivery.Id),
+            delivery.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return Result.Failure<CreateDeliveryOrderResponse>(documents.Error);
         }
 
         context.DeliveryOrders.Add(delivery);

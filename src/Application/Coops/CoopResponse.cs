@@ -2,6 +2,11 @@ namespace Application.Coops;
 
 public sealed record CoopResponse
 {
+    /// <summary>
+    /// Lampiran: attachment ids; metadata via <c>GET /attachments?ids=</c>.
+    /// </summary>
+    public Guid[] Documents { get; init; } = [];
+
     public const string Select =
         """
         SELECT c.id AS Id, c.code AS Code, c.name AS Name, c.farmer_id AS FarmerId, f.code AS FarmerCode,
@@ -9,7 +14,8 @@ public sealed record CoopResponse
                c.capacity AS Capacity, c.house_type AS HouseType, c.address AS Address,
                c.latitude AS Latitude, c.longitude AS Longitude, c.is_active AS IsActive,
                (SELECT pc.id FROM partnership.production_cycles pc
-                WHERE pc.coop_id = c.id AND pc.status IN ('Planned', 'Active', 'Harvesting')) AS OpenCycleId
+                WHERE pc.coop_id = c.id AND pc.status IN ('Planned', 'Active', 'Harvesting')) AS OpenCycleId,
+               c.documents AS Documents
         FROM master.coops c
         JOIN master.farmers f ON f.id = c.farmer_id
         JOIN master.branches b ON b.id = c.branch_id

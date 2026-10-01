@@ -55,6 +55,11 @@ public sealed record ConsumedInputResponse(Guid ItemId, string ItemCode, string 
 
 public sealed record PlasmaSettlementResponse
 {
+    /// <summary>
+    /// Lampiran: attachment ids; metadata via <c>GET /attachments?ids=</c>.
+    /// </summary>
+    public Guid[] Documents { get; init; } = [];
+
     public const string Select =
         """
         SELECT s.id AS Id, s.number AS Number, s.branch_id AS BranchId, b.code AS BranchCode,
@@ -64,7 +69,8 @@ public sealed record PlasmaSettlementResponse
                s.income_tax_rate_percent AS IncomeTaxRatePercent, s.income_tax_amount AS IncomeTaxAmount,
                s.debt_deduction AS DebtDeduction, s.net_payable AS NetPayable, s.deficit AS Deficit, s.paid_amount AS PaidAmount,
                (s.net_payable - s.paid_amount) AS Outstanding, s.approved_at_utc AS ApprovedAtUtc,
-               s.cancellation_reason AS CancellationReason
+               s.cancellation_reason AS CancellationReason,
+               s.documents AS Documents
         FROM costing.plasma_settlements s
         JOIN master.branches b ON b.id = s.branch_id
         JOIN partnership.production_cycles c ON c.id = s.cycle_id

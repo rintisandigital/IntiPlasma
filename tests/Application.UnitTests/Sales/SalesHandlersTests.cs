@@ -66,7 +66,7 @@ public sealed class SalesHandlersTests : BaseHandlerTest
         posted.Total.ShouldBe(new Money(40_400_000m));
         posted.DueDate.ShouldBe(HarvestDate.AddDays(14));
 
-        Result<CreateCustomerReceiptResponse> receipt = await new CreateCustomerReceiptCommandHandler(context, AllBranches(), Numbers(), Clock())
+        Result<CreateCustomerReceiptResponse> receipt = await new CreateCustomerReceiptCommandHandler(context, AllBranches(), Numbers(), Clock(), CreateAttachments(context))
             .Handle(
                 new CreateCustomerReceiptCommand(s.Bank.Id, s.Customer.Id, HarvestDate.AddDays(3), "TRF-01", null,
                     [new ReceiptAllocationRequest(posted.Id, 30_000_000m)]),
@@ -155,7 +155,7 @@ public sealed class SalesHandlersTests : BaseHandlerTest
         await CreateApprovedOrderAsync(context, s, birds: 1_000);
         Guid second = await CreateOrderAsync(context, s, birds: 1_000);
 
-        Result<CreateCustomerReceiptResponse> advance = await new CreateCustomerReceiptCommandHandler(context, AllBranches(), Numbers(), Clock())
+        Result<CreateCustomerReceiptResponse> advance = await new CreateCustomerReceiptCommandHandler(context, AllBranches(), Numbers(), Clock(), CreateAttachments(context))
             .Handle(new CreateCustomerReceiptCommand(s.Bank.Id, s.Customer.Id, OrderDate, "DP", null, [], 30_000_000m), CancellationToken.None);
 
         (await new ApproveSalesOrderCommandHandler(context, AllBranches(), User(), Clock())
@@ -185,7 +185,7 @@ public sealed class SalesHandlersTests : BaseHandlerTest
         s.Bank.Update(s.Bank.Name, s.Bank.BankName, s.Bank.AccountNumber, isActive: false);
         await context.SaveChangesAsync();
 
-        Result<CreateCustomerReceiptResponse> result = await new CreateCustomerReceiptCommandHandler(context, AllBranches(), Numbers(), Clock())
+        Result<CreateCustomerReceiptResponse> result = await new CreateCustomerReceiptCommandHandler(context, AllBranches(), Numbers(), Clock(), CreateAttachments(context))
             .Handle(
                 new CreateCustomerReceiptCommand(s.Bank.Id, s.Customer.Id, HarvestDate, null, null, [], 1m),
                 CancellationToken.None);
@@ -194,13 +194,13 @@ public sealed class SalesHandlersTests : BaseHandlerTest
     }
 
     private static Task<Result<CreateDeliveryOrderResponse>> Deliver(TestDbContext context, Guid orderId, Guid harvestId) =>
-        new CreateDeliveryOrderCommandHandler(context, AllBranches(), Numbers(), Clock()).Handle(
+        new CreateDeliveryOrderCommandHandler(context, AllBranches(), Numbers(), Clock(), CreateAttachments(context)).Handle(
             new CreateDeliveryOrderCommand(orderId, HarvestDate, "D 1234 AB", "Asep", null, [new DeliveryOrderLineRequest(1, harvestId)]),
             CancellationToken.None);
 
     private static async Task<Guid> CreateOrderAsync(TestDbContext context, Setup s, int birds)
     {
-        Result<CreateSalesOrderResponse> created = await new CreateSalesOrderCommandHandler(context, AllBranches(), Numbers()).Handle(
+        Result<CreateSalesOrderResponse> created = await new CreateSalesOrderCommandHandler(context, AllBranches(), Numbers(), CreateAttachments(context)).Handle(
             new CreateSalesOrderCommand(s.BranchId, s.Customer.Id, OrderDate, null, null,
                 [new SalesOrderLineRequest(s.LiveBird.Id, birds, birds * 2m, 20_000m, null)]),
             CancellationToken.None);

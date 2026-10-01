@@ -23,7 +23,8 @@ internal sealed class CustomerEndpoints : IEndpoint
         string? Email,
         int PaymentTermDays,
         decimal CreditLimit,
-        bool IsActive);
+        bool IsActive,
+        IReadOnlyList<Guid>? Documents = null);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
@@ -81,7 +82,8 @@ internal sealed class CustomerEndpoints : IEndpoint
                 request.Email,
                 request.PaymentTermDays,
                 request.CreditLimit,
-                request.IsActive);
+                request.IsActive,
+                request.Documents);
 
             Result result = await handler.Handle(command, cancellationToken);
 

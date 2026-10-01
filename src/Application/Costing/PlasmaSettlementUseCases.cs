@@ -3,12 +3,14 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Numbering;
+using Application.Documents;
 using Application.Finance.AutoJournal;
 using Application.Finance.Journals;
 using Application.Inventory;
 using Application.Production;
 using Application.Sales;
 using Domain.Costing.PlasmaSettlements;
+using Domain.Documents.Attachments;
 using Domain.Finance.JournalMappings;
 using Domain.MasterData.TaxCodes;
 using Domain.Partnership.Cycles;
@@ -26,7 +28,8 @@ public sealed record CreatePlasmaSettlementCommand(
     Guid CycleId,
     DateOnly SettlementDate,
     decimal DebtDeduction,
-    string? Notes) : ICommand<CreatePlasmaSettlementResponse>;
+    string? Notes,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<CreatePlasmaSettlementResponse>;
 
 public sealed record CreatePlasmaSettlementResponse(Guid Id, string Number);
 
@@ -37,7 +40,8 @@ public sealed record RecalculatePlasmaSettlementCommand(
     Guid PlasmaSettlementId,
     DateOnly SettlementDate,
     decimal DebtDeduction,
-    string? Notes) : ICommand;
+    string? Notes,
+    IReadOnlyList<Guid>? Documents = null) : ICommand;
 
 /// <summary>
 /// Approval by someone other than the creator (checker): journals the settlement and locks the cycle (Settled).
@@ -53,6 +57,7 @@ internal sealed class CreatePlasmaSettlementCommandValidator : AbstractValidator
         RuleFor(c => c.CycleId).NotEmpty();
         RuleFor(c => c.DebtDeduction).GreaterThanOrEqualTo(0);
         RuleFor(c => c.Notes).MaximumLength(1000);
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
@@ -63,6 +68,7 @@ internal sealed class RecalculatePlasmaSettlementCommandValidator : AbstractVali
         RuleFor(c => c.PlasmaSettlementId).NotEmpty();
         RuleFor(c => c.DebtDeduction).GreaterThanOrEqualTo(0);
         RuleFor(c => c.Notes).MaximumLength(1000);
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
@@ -174,7 +180,8 @@ internal sealed class CreatePlasmaSettlementCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
     IDocumentNumberGenerator numberGenerator,
-    IDateTimeProvider dateTimeProvider) : ICommandHandler<CreatePlasmaSettlementCommand, CreatePlasmaSettlementResponse>
+    IDateTimeProvider dateTimeProvider,
+    IAttachmentService attachments) : ICommandHandler<CreatePlasmaSettlementCommand, CreatePlasmaSettlementResponse>
 {
     private const string DocumentPrefix = "STL";
 
@@ -218,11 +225,28 @@ internal sealed class CreatePlasmaSettlementCommandHandler(
             return Result.Failure<CreatePlasmaSettlementResponse>(validation.Error);
         }
 
+        Result attachable = await attachments.EnsureAttachableAsync(cycle.Value.BranchId, command.Documents, cancellationToken);
+        if (attachable.IsFailure)
+        {
+            return Result.Failure<CreatePlasmaSettlementResponse>(attachable.Error);
+        }
+
         string number = await numberGenerator.NextForBranchAsync(
             context, DocumentPrefix, cycle.Value.BranchId, command.SettlementDate, cancellationToken);
 
         PlasmaSettlement settlement = PlasmaSettlement.Create(
             number, cycle.Value, command.SettlementDate, input, incomeTax, deduction, command.Notes).Value;
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            settlement,
+            AttachmentOwner.Of(AttachmentOwnerTypes.PlasmaSettlement, settlement.Id),
+            settlement.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return Result.Failure<CreatePlasmaSettlementResponse>(documents.Error);
+        }
 
         context.PlasmaSettlements.Add(settlement);
 
@@ -235,7 +259,8 @@ internal sealed class CreatePlasmaSettlementCommandHandler(
 internal sealed class RecalculatePlasmaSettlementCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
-    IDateTimeProvider dateTimeProvider) : ICommandHandler<RecalculatePlasmaSettlementCommand>
+    IDateTimeProvider dateTimeProvider,
+    IAttachmentService attachments) : ICommandHandler<RecalculatePlasmaSettlementCommand>
 {
     public async Task<Result> Handle(RecalculatePlasmaSettlementCommand command, CancellationToken cancellationToken)
     {
@@ -275,6 +300,17 @@ internal sealed class RecalculatePlasmaSettlementCommandHandler(
         if (result.IsFailure)
         {
             return result;
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            settlement.Value,
+            AttachmentOwner.Of(AttachmentOwnerTypes.PlasmaSettlement, settlement.Value.Id),
+            settlement.Value.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return documents;
         }
 
         await context.SaveChangesAsync(cancellationToken);

@@ -16,9 +16,10 @@ internal sealed class ProductionEndpoints : IEndpoint
         int Culling,
         decimal? AverageBodyWeightGram,
         string? Notes,
-        IReadOnlyList<UsageRequest> Usages);
+        IReadOnlyList<UsageRequest> Usages,
+        IReadOnlyList<Guid>? Documents = null);
 
-    public sealed record HarvestRequest(DateOnly Date, int Birds, decimal WeightKg, string? Notes);
+    public sealed record HarvestRequest(DateOnly Date, int Birds, decimal WeightKg, string? Notes, IReadOnlyList<Guid>? Documents = null);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
@@ -79,7 +80,8 @@ internal sealed class ProductionEndpoints : IEndpoint
                 request.Culling,
                 request.AverageBodyWeightGram,
                 request.Notes,
-                request.Usages);
+                request.Usages,
+                request.Documents);
 
             Result result = await handler.Handle(command, cancellationToken);
 
@@ -107,7 +109,7 @@ internal sealed class ProductionEndpoints : IEndpoint
             ICommandHandler<RecordHarvestCommand, Guid> handler,
             CancellationToken cancellationToken) =>
         {
-            var command = new RecordHarvestCommand(cycleId, request.Date, request.Birds, request.WeightKg, request.Notes);
+            var command = new RecordHarvestCommand(cycleId, request.Date, request.Birds, request.WeightKg, request.Notes, request.Documents);
 
             Result<Guid> result = await handler.Handle(command, cancellationToken);
 

@@ -15,7 +15,8 @@ internal sealed class PurchaseOrderEndpoints : IEndpoint
         DateOnly OrderDate,
         DateOnly? ExpectedDate,
         string? Notes,
-        IReadOnlyList<PurchaseOrderLineRequest> Lines);
+        IReadOnlyList<PurchaseOrderLineRequest> Lines,
+        IReadOnlyList<Guid>? Documents = null);
 
     public sealed record CancelRequest(string Reason);
 
@@ -72,7 +73,7 @@ internal sealed class PurchaseOrderEndpoints : IEndpoint
             CancellationToken cancellationToken) =>
         {
             var command = new UpdatePurchaseOrderCommand(
-                purchaseOrderId, request.OrderDate, request.ExpectedDate, request.Notes, request.Lines);
+                purchaseOrderId, request.OrderDate, request.ExpectedDate, request.Notes, request.Lines, request.Documents);
 
             Result result = await handler.Handle(command, cancellationToken);
 

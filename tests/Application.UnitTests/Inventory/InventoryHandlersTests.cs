@@ -30,8 +30,8 @@ public sealed class InventoryHandlersTests : BaseHandlerTest
         Setup s = await SeedAsync(context);
         IDocumentNumberGenerator numbers = Numbers();
 
-        var receive = new CreateGoodsReceiptCommandHandler(context, AllBranches(), numbers);
-        var transfer = new CreateStockTransferCommandHandler(context, AllBranches(), numbers);
+        var receive = new CreateGoodsReceiptCommandHandler(context, AllBranches(), numbers, CreateAttachments(context));
+        var transfer = new CreateStockTransferCommandHandler(context, AllBranches(), numbers, CreateAttachments(context));
 
         // Act: receive 20 SAK (1.000 KG) at Rp 430.000/SAK, then send 10 SAK (500 KG) to the coop.
         Result<CreateGoodsReceiptResponse> received = await receive.Handle(
@@ -65,7 +65,7 @@ public sealed class InventoryHandlersTests : BaseHandlerTest
         // Arrange
         await using TestDbContext context = CreateDbContext();
         Setup s = await SeedAsync(context);
-        var transfer = new CreateStockTransferCommandHandler(context, AllBranches(), Numbers());
+        var transfer = new CreateStockTransferCommandHandler(context, AllBranches(), Numbers(), CreateAttachments(context));
 
         // Act
         Result<CreateStockTransferResponse> result = await transfer.Handle(
@@ -84,7 +84,7 @@ public sealed class InventoryHandlersTests : BaseHandlerTest
         await using TestDbContext context = CreateDbContext();
         Setup s = await SeedAsync(context);
         IDocumentNumberGenerator numbers = Numbers();
-        var receive = new CreateGoodsReceiptCommandHandler(context, AllBranches(), numbers);
+        var receive = new CreateGoodsReceiptCommandHandler(context, AllBranches(), numbers, CreateAttachments(context));
 
         // Act
         Result<CreateGoodsReceiptResponse> result = await receive.Handle(

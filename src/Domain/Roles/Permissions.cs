@@ -232,6 +232,21 @@ public static class Permissions
     /// </summary>
     public const string SystemOutbox = "system:outbox";
 
+    /// <summary>
+    /// Upload attachments (lampiran: foto/dokumen) to be attached to masters and transactions.
+    /// </summary>
+    public const string AttachmentsUpload = "attachments:upload";
+
+    /// <summary>
+    /// See and download attachments (branch-scoped; temporary attachments only by their uploader).
+    /// </summary>
+    public const string AttachmentsRead = "attachments:read";
+
+    /// <summary>
+    /// Delete attachments that are no longer attached to any document.
+    /// </summary>
+    public const string AttachmentsDelete = "attachments:delete";
+
     public static readonly IReadOnlyList<string> All =
     [
         UsersRead,
@@ -292,7 +307,10 @@ public static class Permissions
         SettlementsManage,
         SettlementsApprove,
         TaxReportsRead,
-        SystemOutbox
+        SystemOutbox,
+        AttachmentsUpload,
+        AttachmentsRead,
+        AttachmentsDelete
     ];
 
     public static bool Exists(string permission) => All.Contains(permission);

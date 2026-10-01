@@ -1,3 +1,6 @@
+using Domain.Common;
+using SharedKernel;
+
 namespace Domain.Partnership.Cycles;
 
 /// <summary>
@@ -29,5 +32,13 @@ public sealed class CycleHarvest
     public decimal WeightKg { get; private set; }
     public string? Notes { get; private set; }
 
+    /// <summary>
+    /// Lampiran: tiket timbangan, foto truk.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
     public decimal AverageWeightKg => Birds == 0 ? 0 : WeightKg / Birds;
+
+    internal Result SetDocuments(IEnumerable<Guid>? documents) =>
+        DocumentList.Apply(documents, value => Documents = value);
 }

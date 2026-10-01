@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Domain.Common;
 using Domain.Partnership.Cycles;
 using SharedKernel;
 
@@ -10,7 +11,7 @@ namespace Domain.Production.DailyRecordings;
 /// A recording can be revised with a reason while the cycle is open; every revision keeps a copy of the previous
 /// values, so the history is auditable.
 /// </summary>
-public sealed class DailyRecording : AggregateRoot
+public sealed class DailyRecording : AggregateRoot, IHasDocuments
 {
     private static readonly JsonSerializerOptions SnapshotOptions = new(JsonSerializerDefaults.Web);
 
@@ -59,6 +60,14 @@ public sealed class DailyRecording : AggregateRoot
     public IReadOnlyCollection<DailyRecordingUsage> Usages => [.. _usages];
     public IReadOnlyCollection<DailyRecordingRevision> Revisions => [.. _revisions];
 
+    /// <summary>
+    /// Lampiran: ids of the attached photos and documents.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    public Result SetDocuments(IEnumerable<Guid>? documents) =>
+        DocumentList.Apply(documents, value => Documents = value);
+
     /// <param name="id">Optional client-generated id (offline mobile entry); retries with the same id are idempotent.</param>
     public static Result<DailyRecording> Create(
         Guid? id,
@@ -104,6 +113,18 @@ public sealed class DailyRecording : AggregateRoot
         Raise(new DailyRecordingSavedDomainEvent(Id));
 
         return Result.Success();
+    }
+
+    /// <summary>
+    /// Replaces the attachments of one revision (the revision values themselves never change).
+    /// </summary>
+    public Result SetRevisionDocuments(int revisionNumber, IEnumerable<Guid>? documents)
+    {
+        DailyRecordingRevision? revision = _revisions.Find(r => r.RevisionNumber == revisionNumber);
+
+        return revision is null
+            ? Result.Failure(DailyRecordingErrors.RevisionNotFound(revisionNumber))
+            : revision.SetDocuments(documents);
     }
 
     /// <summary>

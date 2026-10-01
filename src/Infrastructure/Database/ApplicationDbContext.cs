@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Application.Abstractions.Data;
 using Domain.Costing.PlasmaSettlements;
+using Domain.Documents.Attachments;
 using Domain.Finance.Accounts;
 using Domain.Finance.CashBank;
 using Domain.Finance.CostCenters;
@@ -49,6 +50,8 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     internal const string ConcurrencyTokenProperty = "Version";
 
     private const int EnumMaxLength = 30;
+
+    private const string DocumentsProperty = "Documents";
 
     public DbSet<User> Users { get; set; }
 
@@ -128,6 +131,10 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
 
     public DbSet<PlasmaSettlement> PlasmaSettlements { get; set; }
 
+    public DbSet<Attachment> Attachments { get; set; }
+
+    public DbSet<AttachmentLink> AttachmentLinks { get; set; }
+
     internal DbSet<OutboxMessage> OutboxMessages { get; set; }
 
     internal DbSet<DocumentSequence> DocumentSequences { get; set; }
@@ -146,6 +153,12 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
             if (clrType.IsAssignableTo(typeof(AggregateRoot)))
             {
                 modelBuilder.Entity(clrType).Property<uint>(ConcurrencyTokenProperty).IsRowVersion();
+            }
+
+            // Attachment id lists (lampiran) of masters and transactions: uuid[] defaulting to an empty array.
+            if (entityType.FindProperty(DocumentsProperty) is { } documents && documents.ClrType == typeof(Guid[]))
+            {
+                documents.SetDefaultValueSql("'{}'");
             }
 
             if (clrType.IsAssignableTo(typeof(ISoftDeletable)))

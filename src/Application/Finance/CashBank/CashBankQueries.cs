@@ -58,13 +58,19 @@ public sealed record CashBankAccountResponse(
 
 public sealed record CashTransactionResponse
 {
+    /// <summary>
+    /// Lampiran: attachment ids; metadata via <c>GET /attachments?ids=</c>.
+    /// </summary>
+    public Guid[] Documents { get; init; } = [];
+
     public const string Select =
         """
         SELECT t.id AS Id, t.number AS Number, t.branch_id AS BranchId, b.code AS BranchCode,
                t.cash_bank_account_id AS CashBankAccountId, cb.code AS CashBankCode, cb.name AS CashBankName,
                t.direction AS Direction, t.date AS Date, t.description AS Description, t.reference AS Reference,
                t.status AS Status, t.amount AS Amount, t.approved_at_utc AS ApprovedAtUtc, t.posted_at_utc AS PostedAtUtc,
-               t.cancellation_reason AS CancellationReason
+               t.cancellation_reason AS CancellationReason,
+               t.documents AS Documents
         FROM finance.cash_transactions t
         JOIN master.branches b ON b.id = t.branch_id
         JOIN finance.cash_bank_accounts cb ON cb.id = t.cash_bank_account_id

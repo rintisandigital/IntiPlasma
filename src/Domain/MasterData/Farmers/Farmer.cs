@@ -7,7 +7,7 @@ namespace Domain.MasterData.Farmers;
 /// Peternak. An Inti farmer is a company-owned farm; a Plasma farmer is a partner who raises the
 /// company's birds under a partnership contract (kontrak kemitraan). One farmer owns many coops.
 /// </summary>
-public sealed class Farmer : AggregateRoot
+public sealed class Farmer : AggregateRoot, IHasDocuments
 {
     private Farmer(Guid id, string code, FarmerType type, Guid branchId)
         : base(id)
@@ -42,6 +42,14 @@ public sealed class Farmer : AggregateRoot
     public BankAccount BankAccount { get; private set; } = BankAccount.None;
 
     public bool IsActive { get; private set; }
+
+    /// <summary>
+    /// Lampiran: ids of the attached photos and documents.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    public Result SetDocuments(IEnumerable<Guid>? documents) =>
+        DocumentList.Apply(documents, value => Documents = value);
 
     public static Result<Farmer> Create(
         string code,

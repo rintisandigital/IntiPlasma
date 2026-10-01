@@ -64,6 +64,13 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("cycle_id");
 
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
+
                     b.Property<Guid>("FarmerId")
                         .HasColumnType("uuid")
                         .HasColumnName("farmer_id");
@@ -251,6 +258,152 @@ namespace Infrastructure.Database.Migrations
                         .HasName("pk_plasma_settlement_lines");
 
                     b.ToTable("plasma_settlement_lines", "costing");
+                });
+
+            modelBuilder.Entity("Domain.Documents.Attachments.Attachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<string>("Checksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("checksum");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("content_type");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Extension")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("extension");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("file_name");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size_bytes");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("StoragePath")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("storage_path");
+
+                    b.Property<string>("StoredFileName")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("stored_file_name");
+
+                    b.Property<DateTime?>("UnlinkedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("unlinked_at_utc");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_attachments");
+
+                    b.HasIndex("Checksum")
+                        .HasDatabaseName("ix_attachments_checksum");
+
+                    b.HasIndex("Status", "UnlinkedAtUtc")
+                        .HasDatabaseName("ix_attachments_status_unlinked_at_utc");
+
+                    b.ToTable("attachments", "documents");
+                });
+
+            modelBuilder.Entity("Domain.Documents.Attachments.AttachmentLink", b =>
+                {
+                    b.Property<string>("OwnerType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("owner_type");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("OwnerKey")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("owner_key");
+
+                    b.Property<Guid>("AttachmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("attachment_id");
+
+                    b.HasKey("OwnerType", "OwnerId", "OwnerKey", "AttachmentId")
+                        .HasName("pk_attachment_links");
+
+                    b.HasIndex("AttachmentId")
+                        .HasDatabaseName("ix_attachment_links_attachment_id");
+
+                    b.ToTable("attachment_links", "documents");
                 });
 
             modelBuilder.Entity("Domain.Finance.Accounts.Account", b =>
@@ -697,6 +850,13 @@ namespace Infrastructure.Database.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("direction");
+
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
 
                     b.Property<DateTime?>("ModifiedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -1169,6 +1329,13 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("description");
 
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
+
                     b.Property<DateTime?>("ModifiedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_at_utc");
@@ -1343,6 +1510,13 @@ namespace Infrastructure.Database.Migrations
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("created_by");
+
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
 
                     b.Property<Guid?>("FarmerId")
                         .HasColumnType("uuid")
@@ -1521,6 +1695,13 @@ namespace Infrastructure.Database.Migrations
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("created_by");
+
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
 
                     b.Property<DateOnly>("DueDate")
                         .HasColumnType("date")
@@ -1892,6 +2073,13 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("customer_id");
 
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
+
                     b.Property<DateTime?>("ModifiedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_at_utc");
@@ -2051,6 +2239,13 @@ namespace Infrastructure.Database.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("delivery_note_number");
+
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
 
                     b.Property<DateTime?>("ModifiedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -2378,6 +2573,13 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("cycle_id");
 
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
+
                     b.Property<Guid>("FromWarehouseId")
                         .HasColumnType("uuid")
                         .HasColumnName("from_warehouse_id");
@@ -2520,6 +2722,13 @@ namespace Infrastructure.Database.Migrations
                     b.Property<Guid?>("CycleId")
                         .HasColumnType("uuid")
                         .HasColumnName("cycle_id");
+
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
 
                     b.Property<Guid>("FromWarehouseId")
                         .HasColumnType("uuid")
@@ -2734,6 +2943,13 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by");
 
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
+
                     b.Property<Guid>("FarmerId")
                         .HasColumnType("uuid")
                         .HasColumnName("farmer_id");
@@ -2819,6 +3035,13 @@ namespace Infrastructure.Database.Migrations
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("created_by");
+
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)
@@ -2926,6 +3149,13 @@ namespace Infrastructure.Database.Migrations
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("created_by");
+
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
@@ -3292,6 +3522,13 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by");
 
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
@@ -3612,6 +3849,13 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by");
 
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
+
                     b.Property<Guid?>("IncomeTaxCodeId")
                         .HasColumnType("uuid")
                         .HasColumnName("income_tax_code_id");
@@ -3704,6 +3948,13 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("date")
                         .HasColumnName("date");
 
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -3774,6 +4025,13 @@ namespace Infrastructure.Database.Migrations
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("created_by");
+
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
 
                     b.Property<Guid>("FarmerId")
                         .HasColumnType("uuid")
@@ -3894,6 +4152,13 @@ namespace Infrastructure.Database.Migrations
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("created_by");
+
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
 
                     b.Property<DateOnly?>("ExpectedDate")
                         .HasColumnType("date")
@@ -4055,6 +4320,13 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("date")
                         .HasColumnName("date");
 
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
+
                     b.Property<DateTime?>("ModifiedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_at_utc");
@@ -4107,6 +4379,13 @@ namespace Infrastructure.Database.Migrations
                     b.Property<int>("RevisionNumber")
                         .HasColumnType("integer")
                         .HasColumnName("revision_number");
+
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
 
                     b.Property<string>("PreviousValues")
                         .IsRequired()
@@ -4430,6 +4709,13 @@ namespace Infrastructure.Database.Migrations
                     b.Property<DateOnly>("DeliveryDate")
                         .HasColumnType("date")
                         .HasColumnName("delivery_date");
+
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
 
                     b.Property<string>("DriverName")
                         .HasMaxLength(100)
@@ -4893,6 +5179,13 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("date")
                         .HasColumnName("delivery_date");
 
+                    b.PrimitiveCollection<Guid[]>("Documents")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("documents")
+                        .HasDefaultValueSql("'{}'");
+
                     b.Property<DateTime?>("ModifiedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_at_utc");
@@ -5242,6 +5535,16 @@ namespace Infrastructure.Database.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_plasma_settlement_lines_plasma_settlements_plasma_settlemen");
+                });
+
+            modelBuilder.Entity("Domain.Documents.Attachments.AttachmentLink", b =>
+                {
+                    b.HasOne("Domain.Documents.Attachments.Attachment", null)
+                        .WithMany()
+                        .HasForeignKey("AttachmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_attachment_links_attachments_attachment_id");
                 });
 
             modelBuilder.Entity("Domain.Finance.Accounts.Account", b =>

@@ -1,5 +1,6 @@
 ﻿using Application.Abstractions.Behaviors;
 using Application.Abstractions.Messaging;
+using Application.Documents;
 using Application.Finance.AutoJournal;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,6 +38,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly, includeInternalTypes: true);
 
         services.AddScoped<IAutoJournalService, AutoJournalService>();
+        services.AddScoped<IAttachmentService, AttachmentService>();
 
         return services;
     }

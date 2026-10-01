@@ -1,3 +1,4 @@
+using Domain.Common;
 using Domain.MasterData.Warehouses;
 using SharedKernel;
 
@@ -8,7 +9,7 @@ namespace Domain.Inventory.StockReturns;
 /// It takes the value out of the cycle again (Dr persediaan / Cr ayam dalam proses). Moving feed from one coop to
 /// another always goes through a central warehouse: a return from the first coop followed by a transfer to the second.
 /// </summary>
-public sealed class StockReturn : AggregateRoot
+public sealed class StockReturn : AggregateRoot, IHasDocuments
 {
     private readonly List<StockReturnLine> _lines = [];
 
@@ -35,6 +36,14 @@ public sealed class StockReturn : AggregateRoot
     public string Reason { get; private set; }
     public string? Notes { get; private set; }
     public IReadOnlyCollection<StockReturnLine> Lines => [.. _lines];
+
+    /// <summary>
+    /// Lampiran: ids of the attached photos and documents.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    public Result SetDocuments(IEnumerable<Guid>? documents) =>
+        DocumentList.Apply(documents, value => Documents = value);
 
     public static Result<StockReturn> Create(
         string number,

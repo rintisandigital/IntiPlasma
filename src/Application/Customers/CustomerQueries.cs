@@ -12,7 +12,8 @@ internal static class CustomerQueries
         SELECT c.id AS Id, c.code AS Code, c.name AS Name,
                c.tax_identity_npwp AS Npwp, c.tax_identity_nitku AS Nitku, c.tax_identity_is_pkp AS IsPkp,
                c.address AS Address, c.phone AS Phone, c.email AS Email, c.payment_term_days AS PaymentTermDays,
-               c.credit_limit AS CreditLimit, c.is_active AS IsActive
+               c.credit_limit AS CreditLimit, c.is_active AS IsActive,
+               c.documents AS Documents
         FROM master.customers c
         """;
 
@@ -30,6 +31,7 @@ internal static class CustomerQueries
         public int PaymentTermDays { get; set; }
         public decimal CreditLimit { get; set; }
         public bool IsActive { get; set; }
+        public Guid[] Documents { get; set; } = [];
 
         public CustomerResponse ToResponse() => new()
         {
@@ -42,7 +44,8 @@ internal static class CustomerQueries
             Email = Email,
             PaymentTermDays = PaymentTermDays,
             CreditLimit = CreditLimit,
-            IsActive = IsActive
+            IsActive = IsActive,
+            Documents = Documents
         };
     }
 }

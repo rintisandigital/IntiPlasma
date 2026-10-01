@@ -3,10 +3,12 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Numbering;
+using Application.Documents;
 using Application.Finance.AutoJournal;
 using Application.Finance.Journals;
 using Application.Inventory;
 using Application.Production;
+using Domain.Documents.Attachments;
 using Domain.Finance.JournalMappings;
 using Domain.Finance.Payables;
 using Domain.Inventory.GoodsReceipts;
@@ -36,7 +38,8 @@ public sealed record CreateVendorInvoiceCommand(
     DateOnly InvoiceDate,
     Guid? IncomeTaxCodeId,
     string? Notes,
-    IReadOnlyList<VendorInvoiceLineRequest> Lines) : ICommand<Guid>;
+    IReadOnlyList<VendorInvoiceLineRequest> Lines,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<Guid>;
 
 /// <summary>
 /// Posts a draft vendor invoice. A price difference above the vendor's tolerance needs
@@ -63,6 +66,7 @@ internal sealed class CreateVendorInvoiceCommandValidator : AbstractValidator<Cr
             line.RuleFor(l => l.Quantity).GreaterThan(0);
             line.RuleFor(l => l.UnitPrice).GreaterThan(0);
         });
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
@@ -110,7 +114,8 @@ internal static class VendorInvoiceSupport
 internal sealed class CreateVendorInvoiceCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
-    IDateTimeProvider dateTimeProvider) : ICommandHandler<CreateVendorInvoiceCommand, Guid>
+    IDateTimeProvider dateTimeProvider,
+    IAttachmentService attachments) : ICommandHandler<CreateVendorInvoiceCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateVendorInvoiceCommand command, CancellationToken cancellationToken)
     {
@@ -182,6 +187,17 @@ internal sealed class CreateVendorInvoiceCommandHandler(
         if (invoice.IsFailure)
         {
             return Result.Failure<Guid>(invoice.Error);
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            invoice.Value,
+            AttachmentOwner.Of(AttachmentOwnerTypes.VendorInvoice, invoice.Value.Id),
+            invoice.Value.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return Result.Failure<Guid>(documents.Error);
         }
 
         context.VendorInvoices.Add(invoice.Value);

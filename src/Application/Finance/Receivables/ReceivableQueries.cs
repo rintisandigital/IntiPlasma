@@ -34,6 +34,11 @@ public sealed record GetReceivableAgingQuery(DateOnly AsOf, Guid? BranchId, Guid
 
 public sealed record CustomerReceiptResponse
 {
+    /// <summary>
+    /// Lampiran: attachment ids; metadata via <c>GET /attachments?ids=</c>.
+    /// </summary>
+    public Guid[] Documents { get; init; } = [];
+
     public const string Select =
         """
         SELECT r.id AS Id, r.number AS Number, r.branch_id AS BranchId, b.code AS BranchCode,
@@ -42,7 +47,8 @@ public sealed record CustomerReceiptResponse
                r.cash_account_id AS CashAccountId, a.code AS CashAccountCode, a.name AS CashAccountName,
                r.amount AS Amount, r.advance_amount AS AdvanceAmount, r.applied_advance_amount AS AppliedAdvanceAmount,
                CASE WHEN r.status = 'Voided' THEN 0 ELSE r.advance_amount - r.applied_advance_amount END AS UnappliedAdvance,
-               r.status AS Status, r.reference AS Reference, r.notes AS Notes, r.void_date AS VoidDate, r.void_reason AS VoidReason
+               r.status AS Status, r.reference AS Reference, r.notes AS Notes, r.void_date AS VoidDate, r.void_reason AS VoidReason,
+               r.documents AS Documents
         FROM finance.customer_receipts r
         JOIN master.branches b ON b.id = r.branch_id
         JOIN master.customers c ON c.id = r.customer_id

@@ -2,7 +2,10 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Numbering;
+using Application.Documents;
 using Application.Inventory.StockTransfers;
+using Domain.Common;
+using Domain.Documents.Attachments;
 using Domain.Inventory.StockReturns;
 using Domain.Inventory.StockTransfers;
 using Domain.MasterData.Items;
@@ -23,7 +26,8 @@ public sealed record CreateStockReturnCommand(
     DateOnly ReturnDate,
     string Reason,
     string? Notes,
-    IReadOnlyList<StockTransferLineRequest> Lines) : ICommand<CreateStockReturnResponse>;
+    IReadOnlyList<StockTransferLineRequest> Lines,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<CreateStockReturnResponse>;
 
 public sealed record CreateStockReturnResponse(Guid Id, string Number, Guid CycleId);
 
@@ -38,7 +42,8 @@ public sealed record CreateFeedMutationCommand(
     Guid ToCoopWarehouseId,
     DateOnly MutationDate,
     string Reason,
-    IReadOnlyList<StockTransferLineRequest> Lines) : ICommand<CreateFeedMutationResponse>;
+    IReadOnlyList<StockTransferLineRequest> Lines,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<CreateFeedMutationResponse>;
 
 public sealed record CreateFeedMutationResponse(
     Guid ReturnId,
@@ -58,6 +63,7 @@ internal sealed class CreateStockReturnCommandValidator : AbstractValidator<Crea
         RuleFor(c => c.Notes).MaximumLength(1000);
         RuleFor(c => c.Lines).NotEmpty();
         RuleForEach(c => c.Lines).SetValidator(new StockTransferLineRequestValidator());
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
@@ -71,13 +77,15 @@ internal sealed class CreateFeedMutationCommandValidator : AbstractValidator<Cre
         RuleFor(c => c.Reason).NotEmpty().MaximumLength(300);
         RuleFor(c => c.Lines).NotEmpty();
         RuleForEach(c => c.Lines).SetValidator(new StockTransferLineRequestValidator());
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
 internal sealed class CreateStockReturnCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
-    IDocumentNumberGenerator numberGenerator) : ICommandHandler<CreateStockReturnCommand, CreateStockReturnResponse>
+    IDocumentNumberGenerator numberGenerator,
+    IAttachmentService attachments) : ICommandHandler<CreateStockReturnCommand, CreateStockReturnResponse>
 {
     public const string DocumentPrefix = "RTR";
 
@@ -92,12 +100,29 @@ internal sealed class CreateStockReturnCommandHandler(
             return Result.Failure<CreateStockReturnResponse>(draft.Error);
         }
 
+        Result attachable = await attachments.EnsureAttachableAsync(draft.Value.From.BranchId, command.Documents, cancellationToken);
+        if (attachable.IsFailure)
+        {
+            return Result.Failure<CreateStockReturnResponse>(attachable.Error);
+        }
+
         StockReturn stockReturn = await draft.Value.CreateAsync(context, numberGenerator, cancellationToken);
 
         Result moved = await StockPosting.PostReturnAsync(context, new StockBalances(context), stockReturn, cancellationToken);
         if (moved.IsFailure)
         {
             return Result.Failure<CreateStockReturnResponse>(moved.Error);
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            stockReturn,
+            AttachmentOwner.Of(AttachmentOwnerTypes.StockReturn, stockReturn.Id),
+            stockReturn.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return Result.Failure<CreateStockReturnResponse>(documents.Error);
         }
 
         context.StockReturns.Add(stockReturn);
@@ -199,7 +224,8 @@ internal sealed record StockReturnDraft(
 internal sealed class CreateFeedMutationCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
-    IDocumentNumberGenerator numberGenerator) : ICommandHandler<CreateFeedMutationCommand, CreateFeedMutationResponse>
+    IDocumentNumberGenerator numberGenerator,
+    IAttachmentService attachments) : ICommandHandler<CreateFeedMutationCommand, CreateFeedMutationResponse>
 {
     public async Task<Result<CreateFeedMutationResponse>> Handle(CreateFeedMutationCommand command, CancellationToken cancellationToken)
     {
@@ -228,6 +254,12 @@ internal sealed class CreateFeedMutationCommandHandler(
             return Result.Failure<CreateFeedMutationResponse>(StockReturnErrors.MutationTargetMustBeCoop);
         }
 
+        Result attachable = await attachments.EnsureAttachableAsync(returnDraft.Value.From.BranchId, command.Documents, cancellationToken);
+        if (attachable.IsFailure)
+        {
+            return Result.Failure<CreateFeedMutationResponse>(attachable.Error);
+        }
+
         StockReturn stockReturn = await returnDraft.Value.CreateAsync(context, numberGenerator, cancellationToken);
         StockTransfer transfer = await transferDraft.Value.CreateAsync(context, numberGenerator, cancellationToken);
 
@@ -244,6 +276,20 @@ internal sealed class CreateFeedMutationCommandHandler(
         if (transferred.IsFailure)
         {
             return Result.Failure<CreateFeedMutationResponse>(transferred.Error);
+        }
+
+        // Both documents of the mutation carry the same attachments.
+        foreach ((IHasDocuments document, AttachmentOwner owner, Guid branchId) in new (IHasDocuments, AttachmentOwner, Guid)[]
+                 {
+                     (stockReturn, AttachmentOwner.Of(AttachmentOwnerTypes.StockReturn, stockReturn.Id), stockReturn.BranchId),
+                     (transfer, AttachmentOwner.Of(AttachmentOwnerTypes.StockTransfer, transfer.Id), transfer.BranchId)
+                 })
+        {
+            Result documents = await attachments.ApplyDocumentsAsync(document, owner, branchId, command.Documents, cancellationToken);
+            if (documents.IsFailure)
+            {
+                return Result.Failure<CreateFeedMutationResponse>(documents.Error);
+            }
         }
 
         context.StockReturns.Add(stockReturn);

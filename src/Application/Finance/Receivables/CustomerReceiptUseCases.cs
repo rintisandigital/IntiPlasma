@@ -2,11 +2,13 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Numbering;
+using Application.Documents;
 using Application.Finance.AutoJournal;
 using Application.Finance.CashBank;
 using Application.Finance.Journals;
 using Application.Inventory;
 using Application.Production;
+using Domain.Documents.Attachments;
 using Domain.Finance.CashBank;
 using Domain.Finance.JournalMappings;
 using Domain.Finance.Receivables;
@@ -31,7 +33,8 @@ public sealed record CreateCustomerReceiptCommand(
     string? Reference,
     string? Notes,
     IReadOnlyList<ReceiptAllocationRequest> Allocations,
-    decimal AdvanceAmount = 0) : ICommand<CreateCustomerReceiptResponse>;
+    decimal AdvanceAmount = 0,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<CreateCustomerReceiptResponse>;
 
 public sealed record CreateCustomerReceiptResponse(Guid Id, string Number, decimal Amount);
 
@@ -69,6 +72,7 @@ internal sealed class CreateCustomerReceiptCommandValidator : AbstractValidator<
         RuleFor(c => c.AdvanceAmount).GreaterThanOrEqualTo(0);
         RuleFor(c => c.Allocations).NotEmpty().When(c => c.AdvanceAmount == 0);
         RuleForEach(c => c.Allocations).SetValidator(new ReceiptAllocationRequestValidator());
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
@@ -138,7 +142,8 @@ internal sealed class CreateCustomerReceiptCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
     IDocumentNumberGenerator numberGenerator,
-    IDateTimeProvider dateTimeProvider) : ICommandHandler<CreateCustomerReceiptCommand, CreateCustomerReceiptResponse>
+    IDateTimeProvider dateTimeProvider,
+    IAttachmentService attachments) : ICommandHandler<CreateCustomerReceiptCommand, CreateCustomerReceiptResponse>
 {
     private const string DocumentPrefix = "RCV";
 
@@ -194,6 +199,12 @@ internal sealed class CreateCustomerReceiptCommandHandler(
             return Result.Failure<CreateCustomerReceiptResponse>(validation.Error);
         }
 
+        Result attachable = await attachments.EnsureAttachableAsync(cashBank.BranchId, command.Documents, cancellationToken);
+        if (attachable.IsFailure)
+        {
+            return Result.Failure<CreateCustomerReceiptResponse>(attachable.Error);
+        }
+
         string number = await numberGenerator.NextForBranchAsync(
             context, DocumentPrefix, cashBank.BranchId, command.ReceiptDate, cancellationToken);
 
@@ -208,6 +219,17 @@ internal sealed class CreateCustomerReceiptCommandHandler(
             {
                 return Result.Failure<CreateCustomerReceiptResponse>(paid.Error);
             }
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            receipt,
+            AttachmentOwner.Of(AttachmentOwnerTypes.CustomerReceipt, receipt.Id),
+            receipt.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return Result.Failure<CreateCustomerReceiptResponse>(documents.Error);
         }
 
         context.CustomerReceipts.Add(receipt);

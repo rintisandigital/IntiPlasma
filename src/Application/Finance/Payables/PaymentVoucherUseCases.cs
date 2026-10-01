@@ -3,11 +3,13 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Numbering;
+using Application.Documents;
 using Application.Finance.AutoJournal;
 using Application.Finance.Journals;
 using Application.Inventory;
 using Application.Production;
 using Domain.Costing.PlasmaSettlements;
+using Domain.Documents.Attachments;
 using Domain.Finance.CashBank;
 using Domain.Finance.JournalMappings;
 using Domain.Finance.Payables;
@@ -32,7 +34,8 @@ public sealed record CreatePaymentVoucherCommand(
     DateOnly PaymentDate,
     string? Reference,
     string? Notes,
-    IReadOnlyList<PaymentAllocationRequest> Allocations) : ICommand<CreatePaymentVoucherResponse>;
+    IReadOnlyList<PaymentAllocationRequest> Allocations,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<CreatePaymentVoucherResponse>;
 
 /// <summary>
 /// Drafts a payment voucher paying approved settlements of a plasma farmer from a cash/bank account (maker).
@@ -43,7 +46,8 @@ public sealed record CreatePlasmaPaymentVoucherCommand(
     DateOnly PaymentDate,
     string? Reference,
     string? Notes,
-    IReadOnlyList<SettlementPaymentRequest> Allocations) : ICommand<CreatePaymentVoucherResponse>;
+    IReadOnlyList<SettlementPaymentRequest> Allocations,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<CreatePaymentVoucherResponse>;
 
 public sealed record CreatePaymentVoucherResponse(Guid Id, string Number, decimal Amount);
 
@@ -73,6 +77,7 @@ internal sealed class CreatePaymentVoucherCommandValidator : AbstractValidator<C
             allocation.RuleFor(a => a.VendorInvoiceId).NotEmpty();
             allocation.RuleFor(a => a.Amount).GreaterThan(0);
         });
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
@@ -90,6 +95,7 @@ internal sealed class CreatePlasmaPaymentVoucherCommandValidator : AbstractValid
             allocation.RuleFor(a => a.PlasmaSettlementId).NotEmpty();
             allocation.RuleFor(a => a.Amount).GreaterThan(0);
         });
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
@@ -151,6 +157,8 @@ internal static class PaymentVoucherSupport
         IApplicationDbContext context,
         IBranchAccess branchAccess,
         IDocumentNumberGenerator numberGenerator,
+        IAttachmentService attachments,
+        IReadOnlyList<Guid>? attachmentIds,
         PayeeType payeeType,
         Guid payeeId,
         Guid cashBankAccountId,
@@ -202,10 +210,27 @@ internal static class PaymentVoucherSupport
             return Result.Failure<CreatePaymentVoucherResponse>(validation.Error);
         }
 
+        Result attachable = await attachments.EnsureAttachableAsync(cashBank.BranchId, attachmentIds, cancellationToken);
+        if (attachable.IsFailure)
+        {
+            return Result.Failure<CreatePaymentVoucherResponse>(attachable.Error);
+        }
+
         string number = await numberGenerator.NextForBranchAsync(context, DocumentPrefix, cashBank.BranchId, paymentDate, cancellationToken);
 
         PaymentVoucher voucher = PaymentVoucher.Create(
             number, cashBank.BranchId, payeeType, payeeId, cashBank.Id, paymentDate, reference, notes, allocations).Value;
+
+        Result attached = await attachments.ApplyDocumentsAsync(
+            voucher,
+            AttachmentOwner.Of(AttachmentOwnerTypes.PaymentVoucher, voucher.Id),
+            voucher.BranchId,
+            attachmentIds,
+            cancellationToken);
+        if (attached.IsFailure)
+        {
+            return Result.Failure<CreatePaymentVoucherResponse>(attached.Error);
+        }
 
         context.PaymentVouchers.Add(voucher);
 
@@ -218,7 +243,8 @@ internal static class PaymentVoucherSupport
 internal sealed class CreatePaymentVoucherCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
-    IDocumentNumberGenerator numberGenerator) : ICommandHandler<CreatePaymentVoucherCommand, CreatePaymentVoucherResponse>
+    IDocumentNumberGenerator numberGenerator,
+    IAttachmentService attachments) : ICommandHandler<CreatePaymentVoucherCommand, CreatePaymentVoucherResponse>
 {
     public async Task<Result<CreatePaymentVoucherResponse>> Handle(CreatePaymentVoucherCommand command, CancellationToken cancellationToken)
     {
@@ -228,7 +254,8 @@ internal sealed class CreatePaymentVoucherCommandHandler(
         }
 
         return await PaymentVoucherSupport.CreateAsync(
-            context, branchAccess, numberGenerator, PayeeType.Vendor, command.VendorId, command.CashBankAccountId, command.PaymentDate,
+            context, branchAccess, numberGenerator, attachments, command.Documents, PayeeType.Vendor, command.VendorId,
+            command.CashBankAccountId, command.PaymentDate,
             command.Reference, command.Notes, [.. command.Allocations.Select(a => (a.VendorInvoiceId, a.Amount))], cancellationToken);
     }
 }
@@ -236,7 +263,8 @@ internal sealed class CreatePaymentVoucherCommandHandler(
 internal sealed class CreatePlasmaPaymentVoucherCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
-    IDocumentNumberGenerator numberGenerator) : ICommandHandler<CreatePlasmaPaymentVoucherCommand, CreatePaymentVoucherResponse>
+    IDocumentNumberGenerator numberGenerator,
+    IAttachmentService attachments) : ICommandHandler<CreatePlasmaPaymentVoucherCommand, CreatePaymentVoucherResponse>
 {
     public async Task<Result<CreatePaymentVoucherResponse>> Handle(CreatePlasmaPaymentVoucherCommand command, CancellationToken cancellationToken)
     {
@@ -246,7 +274,8 @@ internal sealed class CreatePlasmaPaymentVoucherCommandHandler(
         }
 
         return await PaymentVoucherSupport.CreateAsync(
-            context, branchAccess, numberGenerator, PayeeType.Farmer, command.FarmerId, command.CashBankAccountId, command.PaymentDate,
+            context, branchAccess, numberGenerator, attachments, command.Documents, PayeeType.Farmer, command.FarmerId,
+            command.CashBankAccountId, command.PaymentDate,
             command.Reference, command.Notes, [.. command.Allocations.Select(a => (a.PlasmaSettlementId, a.Amount))], cancellationToken);
     }
 }

@@ -12,4 +12,5 @@ public sealed record CreateVendorCommand(
     string? Email,
     int PaymentTermDays,
     BankAccountRequest BankAccount,
-    decimal? PriceTolerancePercent = null) : ICommand<Guid>;
+    decimal? PriceTolerancePercent = null,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<Guid>;

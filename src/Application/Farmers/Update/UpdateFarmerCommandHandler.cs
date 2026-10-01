@@ -1,14 +1,19 @@
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Documents;
 using Domain.Common;
+using Domain.Documents.Attachments;
 using Domain.MasterData.Farmers;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
 namespace Application.Farmers.Update;
 
-internal sealed class UpdateFarmerCommandHandler(IApplicationDbContext context, IBranchAccess branchAccess)
+internal sealed class UpdateFarmerCommandHandler(
+    IApplicationDbContext context,
+    IBranchAccess branchAccess,
+    IAttachmentService attachments)
     : ICommandHandler<UpdateFarmerCommand>
 {
     public async Task<Result> Handle(UpdateFarmerCommand command, CancellationToken cancellationToken)
@@ -50,6 +55,17 @@ internal sealed class UpdateFarmerCommandHandler(IApplicationDbContext context, 
         if (result.IsFailure)
         {
             return result;
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            farmer,
+            AttachmentOwner.Of(AttachmentOwnerTypes.Farmer, farmer.Id),
+            farmer.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return documents;
         }
 
         await context.SaveChangesAsync(cancellationToken);

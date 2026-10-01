@@ -1,6 +1,8 @@
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Documents;
+using Domain.Documents.Attachments;
 using Domain.MasterData.Coops;
 using Domain.MasterData.Farmers;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +10,10 @@ using SharedKernel;
 
 namespace Application.Coops.Create;
 
-internal sealed class CreateCoopCommandHandler(IApplicationDbContext context, IBranchAccess branchAccess)
+internal sealed class CreateCoopCommandHandler(
+    IApplicationDbContext context,
+    IBranchAccess branchAccess,
+    IAttachmentService attachments)
     : ICommandHandler<CreateCoopCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateCoopCommand command, CancellationToken cancellationToken)
@@ -45,6 +50,17 @@ internal sealed class CreateCoopCommandHandler(IApplicationDbContext context, IB
         if (await context.Coops.AnyAsync(c => c.Code == coop.Value.Code, cancellationToken))
         {
             return Result.Failure<Guid>(CoopErrors.CodeNotUnique(coop.Value.Code));
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            coop.Value,
+            AttachmentOwner.Of(AttachmentOwnerTypes.Coop, coop.Value.Id),
+            coop.Value.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return Result.Failure<Guid>(documents.Error);
         }
 
         context.Coops.Add(coop.Value);

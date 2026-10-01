@@ -19,6 +19,11 @@ public sealed record GetPurchaseOrderByIdQuery(Guid PurchaseOrderId) : IQuery<Pu
 
 public sealed record PurchaseOrderResponse
 {
+    /// <summary>
+    /// Lampiran: attachment ids; metadata via <c>GET /attachments?ids=</c>.
+    /// </summary>
+    public Guid[] Documents { get; init; } = [];
+
     public const string Select =
         """
         SELECT o.id AS Id, o.number AS Number, o.branch_id AS BranchId, b.code AS BranchCode,
@@ -26,7 +31,8 @@ public sealed record PurchaseOrderResponse
                o.order_date AS OrderDate, o.expected_date AS ExpectedDate, o.status AS Status, o.notes AS Notes,
                (SELECT COALESCE(SUM(l.quantity * l.unit_price), 0) FROM procurement.purchase_order_lines l
                 WHERE l.purchase_order_id = o.id)::numeric(18,2) AS Subtotal,
-               o.approved_at_utc AS ApprovedAtUtc, o.cancellation_reason AS CancellationReason
+               o.approved_at_utc AS ApprovedAtUtc, o.cancellation_reason AS CancellationReason,
+               o.documents AS Documents
         FROM procurement.purchase_orders o
         JOIN master.branches b ON b.id = o.branch_id
         JOIN master.vendors v ON v.id = o.vendor_id

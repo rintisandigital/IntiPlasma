@@ -1,3 +1,4 @@
+using Application.Documents;
 using FluentValidation;
 
 namespace Application.Contracts.Create;
@@ -10,5 +11,6 @@ internal sealed class CreateContractCommandValidator : AbstractValidator<CreateC
         RuleFor(c => c.BranchId).NotEmpty();
         RuleFor(c => c.Scheme).IsInEnum();
         RuleFor(c => c.Terms).NotNull().SetValidator(new ContractTermsRequestValidator());
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }

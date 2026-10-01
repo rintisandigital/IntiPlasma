@@ -11,4 +11,5 @@ public sealed record CreateCustomerCommand(
     string? Phone,
     string? Email,
     int PaymentTermDays,
-    decimal CreditLimit) : ICommand<Guid>;
+    decimal CreditLimit,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<Guid>;

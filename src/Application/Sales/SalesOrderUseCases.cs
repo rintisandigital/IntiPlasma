@@ -3,6 +3,8 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Numbering;
+using Application.Documents;
+using Domain.Documents.Attachments;
 using Domain.MasterData.Branches;
 using Domain.MasterData.Customers;
 using Domain.MasterData.Items;
@@ -24,7 +26,8 @@ public sealed record CreateSalesOrderCommand(
     DateOnly OrderDate,
     DateOnly? DeliveryDate,
     string? Notes,
-    IReadOnlyList<SalesOrderLineRequest> Lines) : ICommand<CreateSalesOrderResponse>;
+    IReadOnlyList<SalesOrderLineRequest> Lines,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<CreateSalesOrderResponse>;
 
 public sealed record CreateSalesOrderResponse(Guid Id, string Number);
 
@@ -33,7 +36,8 @@ public sealed record UpdateSalesOrderCommand(
     DateOnly OrderDate,
     DateOnly? DeliveryDate,
     string? Notes,
-    IReadOnlyList<SalesOrderLineRequest> Lines) : ICommand;
+    IReadOnlyList<SalesOrderLineRequest> Lines,
+    IReadOnlyList<Guid>? Documents = null) : ICommand;
 
 /// <summary>
 /// Approves a draft order after the credit check. With <paramref name="CreditOverrideReason"/> the order may exceed
@@ -65,6 +69,7 @@ internal sealed class CreateSalesOrderCommandValidator : AbstractValidator<Creat
         RuleFor(c => c.Notes).MaximumLength(1000);
         RuleFor(c => c.Lines).NotEmpty();
         RuleForEach(c => c.Lines).SetValidator(new SalesOrderLineRequestValidator());
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
@@ -76,6 +81,7 @@ internal sealed class UpdateSalesOrderCommandValidator : AbstractValidator<Updat
         RuleFor(c => c.Notes).MaximumLength(1000);
         RuleFor(c => c.Lines).NotEmpty();
         RuleForEach(c => c.Lines).SetValidator(new SalesOrderLineRequestValidator());
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
@@ -141,7 +147,8 @@ internal static class SalesOrderSupport
 internal sealed class CreateSalesOrderCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
-    IDocumentNumberGenerator numberGenerator) : ICommandHandler<CreateSalesOrderCommand, CreateSalesOrderResponse>
+    IDocumentNumberGenerator numberGenerator,
+    IAttachmentService attachments) : ICommandHandler<CreateSalesOrderCommand, CreateSalesOrderResponse>
 {
     public async Task<Result<CreateSalesOrderResponse>> Handle(CreateSalesOrderCommand command, CancellationToken cancellationToken)
     {
@@ -176,11 +183,28 @@ internal sealed class CreateSalesOrderCommandHandler(
             return Result.Failure<CreateSalesOrderResponse>(validation.Error);
         }
 
+        Result attachable = await attachments.EnsureAttachableAsync(command.BranchId, command.Documents, cancellationToken);
+        if (attachable.IsFailure)
+        {
+            return Result.Failure<CreateSalesOrderResponse>(attachable.Error);
+        }
+
         string number = await numberGenerator.NextForBranchAsync(
             context, SalesOrderSupport.DocumentPrefix, command.BranchId, command.OrderDate, cancellationToken);
 
         SalesOrder order = SalesOrder.Create(
             number, command.BranchId, command.CustomerId, command.OrderDate, command.DeliveryDate, command.Notes, lines.Value).Value;
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            order,
+            AttachmentOwner.Of(AttachmentOwnerTypes.SalesOrder, order.Id),
+            order.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return Result.Failure<CreateSalesOrderResponse>(documents.Error);
+        }
 
         context.SalesOrders.Add(order);
 
@@ -190,7 +214,10 @@ internal sealed class CreateSalesOrderCommandHandler(
     }
 }
 
-internal sealed class UpdateSalesOrderCommandHandler(IApplicationDbContext context, IBranchAccess branchAccess)
+internal sealed class UpdateSalesOrderCommandHandler(
+    IApplicationDbContext context,
+    IBranchAccess branchAccess,
+    IAttachmentService attachments)
     : ICommandHandler<UpdateSalesOrderCommand>
 {
     public async Task<Result> Handle(UpdateSalesOrderCommand command, CancellationToken cancellationToken)
@@ -211,6 +238,17 @@ internal sealed class UpdateSalesOrderCommandHandler(IApplicationDbContext conte
         if (result.IsFailure)
         {
             return result;
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            order.Value,
+            AttachmentOwner.Of(AttachmentOwnerTypes.SalesOrder, order.Value.Id),
+            order.Value.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return documents;
         }
 
         await context.SaveChangesAsync(cancellationToken);

@@ -1,3 +1,4 @@
+using Domain.Common;
 using Domain.Finance.FiscalPeriods;
 using SharedKernel;
 
@@ -9,7 +10,7 @@ namespace Domain.Finance.Journals;
 /// immediately. A posted journal is immutable; corrections are made by reversing it.
 /// The document number is assigned when the journal is posted, so posted numbers have no gaps.
 /// </summary>
-public sealed class JournalEntry : AggregateRoot
+public sealed class JournalEntry : AggregateRoot, IHasDocuments
 {
     public const int MinimumLines = 2;
 
@@ -72,6 +73,17 @@ public sealed class JournalEntry : AggregateRoot
     public Money TotalDebit => _lines.Aggregate(Money.Zero, (total, line) => total + line.Debit);
 
     public Money TotalCredit => _lines.Aggregate(Money.Zero, (total, line) => total + line.Credit);
+
+    /// <summary>
+    /// Lampiran: ids of the attached photos and documents.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    /// <remarks>Only manual journals carry attachments (bukti pendukung); automatic journals point to their source document.</remarks>
+    public Result SetDocuments(IEnumerable<Guid>? documents) =>
+        Source == JournalSource.Manual
+            ? DocumentList.Apply(documents, value => Documents = value)
+            : Result.Failure(DocumentErrors.NotAllowed);
 
     public static Result<JournalEntry> CreateManual(
         Guid branchId,

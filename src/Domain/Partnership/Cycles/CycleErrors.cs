@@ -8,6 +8,10 @@ public static class CycleErrors
         "Cycles.NotFound",
         $"The production cycle with the Id = '{cycleId}' was not found");
 
+    public static Error HarvestNotFound(Guid harvestId) => Error.NotFound(
+        "Cycles.HarvestNotFound",
+        $"The harvest with the Id = '{harvestId}' was not found");
+
     public static Error CoopHasOpenCycle(Guid coopId) => Error.Conflict(
         "Cycles.CoopHasOpenCycle",
         $"The coop with the Id = '{coopId}' already has an open production cycle");

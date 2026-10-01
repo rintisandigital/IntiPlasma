@@ -35,6 +35,9 @@ public sealed class IntegrationTestWebAppFactory : WebApplicationFactory<Program
         // Relax rate limiting so the test suite is not throttled.
         builder.UseSetting("RateLimiting:Global:PermitLimit", "100000");
         builder.UseSetting("RateLimiting:Authentication:PermitLimit", "100000");
+
+        // Uploaded attachments go to a throw-away folder.
+        builder.UseSetting("FileStorage:RootPath", Path.Combine(Path.GetTempPath(), $"intiplasma-tests-{Guid.NewGuid():N}"));
     }
 
     public async Task InitializeAsync()

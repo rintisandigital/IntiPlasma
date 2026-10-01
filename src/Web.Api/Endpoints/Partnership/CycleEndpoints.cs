@@ -16,7 +16,7 @@ namespace Web.Api.Endpoints.Partnership;
 
 internal sealed class CycleEndpoints : IEndpoint
 {
-    public sealed record StartRequest(DateOnly ChickInDate, IReadOnlyList<ChickInLine> Lines);
+    public sealed record StartRequest(DateOnly ChickInDate, IReadOnlyList<ChickInLine> Lines, IReadOnlyList<Guid>? Documents = null);
 
     public sealed record CancelRequest(string Reason);
 
@@ -72,7 +72,7 @@ internal sealed class CycleEndpoints : IEndpoint
             ICommandHandler<StartCycleCommand, int> handler,
             CancellationToken cancellationToken) =>
         {
-            var command = new StartCycleCommand(cycleId, request.ChickInDate, request.Lines);
+            var command = new StartCycleCommand(cycleId, request.ChickInDate, request.Lines, request.Documents);
 
             Result<int> result = await handler.Handle(command, cancellationToken);
 

@@ -1,3 +1,4 @@
+using System.Globalization;
 using SharedKernel;
 
 namespace Domain.Production.DailyRecordings;
@@ -7,6 +8,10 @@ public static class DailyRecordingErrors
     public static Error NotFound(Guid recordingId) => Error.NotFound(
         "DailyRecordings.NotFound",
         $"The daily recording with the Id = '{recordingId}' was not found");
+
+    public static Error RevisionNotFound(int revisionNumber) => Error.NotFound(
+        "DailyRecordings.RevisionNotFound",
+        string.Create(CultureInfo.InvariantCulture, $"Revision {revisionNumber} of the daily recording was not found"));
 
     public static Error AlreadyRecorded(DateOnly date) => Error.Conflict(
         "DailyRecordings.AlreadyRecorded",

@@ -13,4 +13,5 @@ public sealed record UpdateVendorCommand(
     int PaymentTermDays,
     BankAccountRequest BankAccount,
     bool IsActive,
-    decimal? PriceTolerancePercent = null) : ICommand;
+    decimal? PriceTolerancePercent = null,
+    IReadOnlyList<Guid>? Documents = null) : ICommand;

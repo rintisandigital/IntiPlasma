@@ -11,7 +11,11 @@ namespace Web.Api.Endpoints.Finance;
 
 internal sealed class JournalEndpoints : IEndpoint
 {
-    public sealed record UpdateRequest(DateOnly Date, string Description, IReadOnlyList<JournalLineRequest> Lines);
+    public sealed record UpdateRequest(
+        DateOnly Date,
+        string Description,
+        IReadOnlyList<JournalLineRequest> Lines,
+        IReadOnlyList<Guid>? Documents = null);
 
     public sealed record ReverseRequest(DateOnly Date, string Reason);
 
@@ -68,7 +72,7 @@ internal sealed class JournalEndpoints : IEndpoint
             ICommandHandler<UpdateJournalCommand> handler,
             CancellationToken cancellationToken) =>
         {
-            var command = new UpdateJournalCommand(journalId, request.Date, request.Description, request.Lines);
+            var command = new UpdateJournalCommand(journalId, request.Date, request.Description, request.Lines, request.Documents);
 
             Result result = await handler.Handle(command, cancellationToken);
 

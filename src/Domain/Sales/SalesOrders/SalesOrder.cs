@@ -1,3 +1,4 @@
+using Domain.Common;
 using SharedKernel;
 
 namespace Domain.Sales.SalesOrders;
@@ -7,7 +8,7 @@ namespace Domain.Sales.SalesOrders;
 /// per kg. Draft → Approved → (Partially) Delivered → Closed. Delivery orders are registered against the lines;
 /// the number of birds delivered can never exceed the ordered birds, the weight is whatever the scale says.
 /// </summary>
-public sealed class SalesOrder : AggregateRoot
+public sealed class SalesOrder : AggregateRoot, IHasDocuments
 {
     private readonly List<SalesOrderLine> _lines = [];
 
@@ -57,6 +58,16 @@ public sealed class SalesOrder : AggregateRoot
     public bool CanDeliver => Status is SalesOrderStatus.Approved or SalesOrderStatus.PartiallyDelivered;
 
     public bool IsOpen => Status is SalesOrderStatus.Draft or SalesOrderStatus.Approved or SalesOrderStatus.PartiallyDelivered;
+
+    /// <summary>
+    /// Lampiran: ids of the attached photos and documents.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    public Result SetDocuments(IEnumerable<Guid>? documents) =>
+        Status == SalesOrderStatus.Cancelled
+            ? Result.Failure(DocumentErrors.OwnerCancelled)
+            : DocumentList.Apply(documents, value => Documents = value);
 
     public static Result<SalesOrder> Create(
         string number,

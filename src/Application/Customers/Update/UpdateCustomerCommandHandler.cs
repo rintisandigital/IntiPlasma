@@ -1,13 +1,15 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Documents;
 using Domain.Common;
+using Domain.Documents.Attachments;
 using Domain.MasterData.Customers;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
 namespace Application.Customers.Update;
 
-internal sealed class UpdateCustomerCommandHandler(IApplicationDbContext context)
+internal sealed class UpdateCustomerCommandHandler(IApplicationDbContext context, IAttachmentService attachments)
     : ICommandHandler<UpdateCustomerCommand>
 {
     public async Task<Result> Handle(UpdateCustomerCommand command, CancellationToken cancellationToken)
@@ -35,6 +37,17 @@ internal sealed class UpdateCustomerCommandHandler(IApplicationDbContext context
             command.PaymentTermDays,
             new Money(command.CreditLimit),
             command.IsActive);
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            customer,
+            AttachmentOwner.Of(AttachmentOwnerTypes.Customer, customer.Id),
+            null,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return documents;
+        }
 
         await context.SaveChangesAsync(cancellationToken);
 

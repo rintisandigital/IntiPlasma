@@ -6,7 +6,7 @@ namespace Domain.MasterData.Customers;
 /// <summary>
 /// Buyer of live birds (bakul, RPA/rumah potong ayam, trader).
 /// </summary>
-public sealed class Customer : AggregateRoot
+public sealed class Customer : AggregateRoot, IHasDocuments
 {
     private Customer(Guid id, string code, string name)
         : base(id)
@@ -34,6 +34,14 @@ public sealed class Customer : AggregateRoot
     public Money CreditLimit { get; private set; } = Money.Zero;
 
     public bool IsActive { get; private set; }
+
+    /// <summary>
+    /// Lampiran: ids of the attached photos and documents.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    public Result SetDocuments(IEnumerable<Guid>? documents) =>
+        DocumentList.Apply(documents, value => Documents = value);
 
     public static Customer Create(
         string code,

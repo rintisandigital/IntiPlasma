@@ -1,3 +1,4 @@
+using Domain.Common;
 using Domain.MasterData.Warehouses;
 using SharedKernel;
 
@@ -9,7 +10,7 @@ namespace Domain.Inventory.StockTransfers;
 /// the stock is part of the cycle cost (persediaan ayam dalam proses). Lines are valued at moving average cost when
 /// the stock is issued.
 /// </summary>
-public sealed class StockTransfer : AggregateRoot
+public sealed class StockTransfer : AggregateRoot, IHasDocuments
 {
     private readonly List<StockTransferLine> _lines = [];
 
@@ -39,6 +40,14 @@ public sealed class StockTransfer : AggregateRoot
     public bool IsToCycle => CycleId is not null;
 
     public Money TotalValue => _lines.Aggregate(Money.Zero, (total, line) => total + line.Value);
+
+    /// <summary>
+    /// Lampiran: ids of the attached photos and documents.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    public Result SetDocuments(IEnumerable<Guid>? documents) =>
+        DocumentList.Apply(documents, value => Documents = value);
 
     public static Result<StockTransfer> Create(
         string number,

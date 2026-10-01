@@ -174,6 +174,11 @@ tests/
 - Laba Rugi, Neraca, Arus Kas, Analisa Profitabilitas (per siklus, per kandang, per peternak, per cabang).
 - Tutup periode (period closing) + validasi.
 
+### Fase 9 — Lampiran Dokumen (Attachment) ✅ (selesai 2026-10-02, rencana §15, realisasi §16)
+- Entity `Attachment` berisi metadata file (nama, ukuran, MIME, path, checksum) + tabel referensi `attachment_links`. Penyimpanan file lewat `IFileStorage` (lokal dulu).
+- `IAttachmentService` Save/Get/Delete/SyncLinks + endpoint upload/unduh/hapus + job pembersih lampiran yatim.
+- Properti `Guid[] Documents` di 21 entity (master, produksi, gudang, pengadaan, penjualan, finance, settlement), diisi lewat command simpan/ubah dan `PUT …/documents`.
+
 Per fase, definisi selesai: domain + unit test invariant → command/query + validator → EF config + migration → endpoint + permission → integration test alur utama.
 
 ---
@@ -593,3 +598,202 @@ Migration: `Phase8_ReportingClosing` (kolom `cash_flow_category` di `finance.acc
   - Laba rugi 31.550.000; neraca seimbang (aset 636,1 jt); arus kas operasi +35.275.000 / investasi −200 jt / pendanaan +600 jt, konsisten dengan buku besar.
   - Profitabilitas per siklus/peternak/cabang; rekap PPN Juni (masukan 825 rb) & Juli (keluaran 4,4 jt); PPh 23 150 rb; ekspor CSV.
   - Checklist dengan event gagal & jurnal draft sebagai pemblokir; tutup Jan–Des dengan jurnal penutup (Laba Ditahan 31.550.000, akun P&L nol); buka kembali Desember (jurnal dibalik), posting susulan, tutup ulang (Laba Ditahan 31.550.001).
+
+---
+
+## 15. Rencana Fase 9 — Lampiran Dokumen (Attachment)
+
+**Tujuan**: setiap transaksi/master penting bisa membawa lampiran (foto kandang, KTP peternak, surat jalan, tiket timbangan, bukti transfer, dsb.). File diunggah dulu dan mendapat `Id`. Daftar `Id` itu dikirim sebagai `documents` saat simpan/ubah entity, atau belakangan lewat `PUT …/documents`. Pola dua langkah ini cocok untuk mobile PPL yang offline: unggah saat ada sinyal, lalu kirim recording.
+
+**Keputusan (2026-10-02)**
+| # | Topik | Keputusan |
+|---|---|---|
+| 1 | "Inventory" | **BPB (`GoodsReceipt`) dan Retur Stok (`StockReturn`)** |
+| 2 | Cakupan entity | 21 entity pada §15.2 (semua yang diminta + rekomendasi yang disetujui) |
+| 3 | Lampiran untuk dokumen yang sudah final | **Ya**: endpoint `PUT /{resource}/{id}/documents` di setiap entity |
+| 4 | Hapus lampiran yang masih dipakai | **Ditolak (409)**; lepas dulu dari entity |
+| 5 | Lampiran yatim | **Dibersihkan job** setelah 24 jam tanpa referensi |
+| 6 | Tipe & ukuran file | **Foto (jpeg/png/webp) + PDF, maks 10 MB per file**, maks 20 lampiran per entity |
+| 7 | Storage | Lokal (volume Docker) dulu; S3/MinIO saat multi-instance |
+| 8 | Kompresi/thumbnail | Tidak di fase ini; foto dikompresi di sisi mobile |
+
+### 15.1 Desain
+
+**Entity `Attachment`** (`Domain/Documents/Attachments`, schema PostgreSQL `documents`, tabel `attachments`), `AggregateRoot` + `ISoftDeletable`:
+
+| Properti | Keterangan |
+|---|---|
+| `Id` | Guid v7 (boleh dibuat klien, sama seperti recording offline) |
+| `FileName` | nama file asli dari klien, sudah disanitasi (maks 255) |
+| `StoredFileName` | nama file di storage = `{Id}{ext}` (nama asli tidak pernah dipakai sebagai path) |
+| `Extension` | mis. `.jpg`, `.pdf` |
+| `ContentType` | MIME hasil deteksi *magic bytes*, bukan hanya header dari klien |
+| `SizeBytes` | `long` |
+| `StoragePath` | path relatif terhadap root storage, mis. `2026/10/{Id}.jpg` |
+| `Checksum` | SHA-256 (hex) untuk integritas & deteksi duplikat |
+| `Kind` | `Photo` / `Document` (diturunkan dari MIME) |
+| `BranchId` | opsional; diisi dari entity pemilik saat link (Vendor/Customer tidak punya cabang → `null`) |
+| `Description` | opsional (maks 500) |
+| `Status` | `Temporary` (belum dipakai) ↔ `Linked` (punya ≥1 referensi) |
+| `UnlinkedAtUtc` | waktu kembali menjadi `Temporary` (dasar job pembersih) |
+| audit + `deleted_at_utc` | dari `AggregateRoot` / `ISoftDeletable` |
+
+**Tabel referensi `documents.attachment_links`** (`attachment_id`, `owner_type`, `owner_id`, `owner_key`), PK gabungan semua kolom.
+- Kolom `Guid[] Documents` di entity tetap menjadi sumber data entity. Tabel ini indeks baliknya: lampiran dipakai siapa saja.
+- Dibutuhkan karena (a) **mutasi pakan** menyimpan lampiran yang sama di `StockReturn` dan `StockTransfer`, sehingga satu lampiran bisa punya >1 pemilik; (b) cek "masih dipakai" saat hapus dan job pembersih tidak perlu memindai 21 kolom `uuid[]`.
+- `owner_key` untuk entity anak tanpa Guid sendiri: `DailyRecordingRevision` ber-PK (`DailyRecordingId`, `RevisionNumber`) → `owner_id` = id recording, `owner_key` = nomor revisi. Entity lain: `owner_key` = `''`.
+
+**Penyimpanan file**: `IFileStorage` (Application/Abstractions/Storage) dengan `SaveAsync(path, stream)`, `OpenReadAsync(path)`, `DeleteAsync(path)`, `ExistsAsync(path)`. Implementasi awal `LocalFileStorage` (Infrastructure/Storage), konfigurasi `FileStorage:RootPath` (dev: `./.containers/uploads`, Docker: volume `/app/uploads`).
+
+**Service `IAttachmentService`** (Application/Documents):
+- `SaveAsync(Stream content, string fileName, string? contentType, Guid? id, string? description)` → `Result<AttachmentResponse>`. Urutannya: validasi ukuran & tipe, hitung SHA-256, tulis file, lalu simpan entity. Bila DB gagal, file dihapus lagi. Bila `id` sudah ada dengan checksum sama, data lama dikembalikan (idempotent untuk retry mobile); checksum beda → 409.
+- `GetAsync(Guid id)` → metadata; `OpenAsync(Guid id)` → stream + content type + nama file (untuk unduh).
+- `GetManyAsync(IReadOnlyCollection<Guid> ids)` → metadata banyak lampiran sekaligus.
+- `DeleteAsync(Guid id)` → soft delete entity + hapus file fisik. Ditolak (`Attachments.InUse`, 409) bila masih punya baris di `attachment_links`.
+- `SyncLinksAsync(AttachmentOwner owner, Guid? branchId, IReadOnlyCollection<Guid> ids)` → dipanggil handler entity, **tanpa** `SaveChanges` (ikut transaksi handler). Langkahnya:
+  - Pastikan semua id ada & belum dihapus → gagal `Attachments.NotFound` (400).
+  - Pastikan cabang lampiran kosong atau sama dengan cabang pemilik → gagal `Attachments.BranchMismatch` (400).
+  - Tambah link baru dan hapus link yang tidak ada lagi di daftar.
+  - Perbarui status: punya link → `Linked`; tidak punya link → `Temporary` + `UnlinkedAtUtc`.
+  - `AttachmentOwner` = (`OwnerType`, `OwnerId`, `OwnerKey`); `OwnerType` berupa konstanta (`Farmer`, `Coop`, `DailyRecordingRevision`, …).
+
+**Validasi upload** (`FileStorageOptions`): `MaxFileSizeMb` = 10; whitelist MIME `image/jpeg`, `image/png`, `image/webp`, `application/pdf`; nama file disanitasi (buang path & karakter kontrol). Limit Kestrel/`FormOptions` disamakan (10 MB + overhead multipart).
+
+**Endpoint lampiran** (`/api/v1/attachments`, file `AttachmentEndpoints.cs`):
+- `POST /`: `multipart/form-data` (`file`, `id?`, `description?`) → 201 + metadata.
+- `GET /{id}`: metadata. `GET /{id}/content`: unduh file (`Content-Disposition`; foto boleh `inline`).
+- `GET /?ids=a,b,c`: metadata banyak lampiran (untuk tampilan detail entity).
+- `DELETE /{id}`.
+- Otorisasi unduh: lampiran `Linked` dengan `BranchId` ikut branch-scope; lampiran `Temporary` hanya untuk pengunggahnya (atau `branches:access-all`).
+- Permission baru: `attachments:upload`, `attachments:read`, `attachments:delete`. Role PPL, Gudang, Sales, dan Finance mendapat upload & read.
+
+**Properti `Documents` di entity**
+- Domain: `public Guid[] Documents { get; private set; } = [];` + `Result SetDocuments(IEnumerable<Guid> ids)` (distinct, tolak `Guid.Empty`, maks 20). Logika bersama di helper SharedKernel/Domain (`DocumentList.Normalize`) agar tidak diulang 21 kali; error `Documents.TooMany` / `Documents.Invalid`.
+- EF: kolom `documents uuid[] not null default '{}'` (Npgsql memetakan `Guid[]` langsung). Tidak ada FK; integritas dijaga `SyncLinksAsync`. `TestDbContext` (InMemory) butuh value converter + `ValueComparer` untuk `Guid[]`.
+- Command create/update: tambah `IReadOnlyList<Guid>? Documents`. Create: `null` = kosong. Update: `null` = tidak diubah (kompatibel dengan klien lama), `[]` = kosongkan, isi = ganti seluruh daftar.
+- Handler: `SetDocuments` → `SyncLinksAsync(...)` → `SaveChangesAsync` dalam satu transaksi.
+- Respons detail (`GetById`): tambah `documents: Guid[]`; metadata diambil klien lewat `GET /attachments?ids=`. ⚠️ Jebakan Dapper (RANGKUMAN §6): array PostgreSQL tidak bisa dipetakan ke konstruktor record → row class bersetter atau result set terpisah.
+
+**Endpoint `PUT …/documents`** (keputusan #3)
+- Body `{ "documents": [guid, …] }` → ganti seluruh daftar, respons 204.
+- Satu command generik per entity (`SetXxxDocumentsCommand`) di file use case masing-masing modul. Handler-nya memakai pola yang sama: muat entity → cek akses cabang → `SetDocuments` → `SyncLinksAsync`.
+- **Boleh di semua status**, termasuk dokumen approved/posted/paid/closed, karena hanya lampiran yang berubah (bukan nilai, status, atau jurnal). Satu-satunya pengecualian: dokumen `Cancelled`/`Voided` ditolak (`Documents.OwnerCancelled`) agar arsip pembatalan tidak berubah.
+- Permission: permission tulis milik resource tersebut (mis. PO → permission ubah PO). Tidak ada permission baru.
+- Konkurensi: entity tetap memakai `xmin`, jadi konflik → 409 seperti biasa.
+
+### 15.2 Entity yang diberi `Documents` (21 entity)
+
+| # | Entity | Aggregate | Command create/update yang diubah | `PUT …/documents` | Catatan |
+|---|---|---|---|---|---|
+| 1 | Peternak | `Farmer` | `CreateFarmerCommand`, `UpdateFarmerCommand` | `farmers/{id}/documents` | |
+| 2 | Kandang | `Coop` | `CreateCoopCommand`, `UpdateCoopCommand` | `coops/{id}/documents` | |
+| 3 | Vendor | `Vendor` | `CreateVendorCommand`, `UpdateVendorCommand` | `vendors/{id}/documents` | tanpa cabang; `Vendor.Update` saat ini `void` |
+| 4 | Customer | `Customer` | `CreateCustomerCommand`, `UpdateCustomerCommand` | `customers/{id}/documents` | tanpa cabang; `Customer.Update` saat ini `void` |
+| 5 | Kontrak kemitraan | `PartnershipContract` | `CreateContractCommand`, `UpdateContractCommand` | `contracts/{id}/documents` | `UpdateTerms` hanya Draft; lampiran kontrak aktif lewat PUT |
+| 6 | Chick-in | `ProductionCycle` | `StartCycleCommand` | `cycles/{id}/documents` | lampiran disimpan di siklus (surat jalan DOC, foto box) |
+| 7 | Panen | `CycleHarvest` (anak `ProductionCycle`, punya `Id`) | `RecordHarvestCommand` | `cycles/{cycleId}/harvests/{harvestId}/documents` | tiket timbangan, foto truk |
+| 8 | Daily Recording | `DailyRecording` | `CreateDailyRecordingCommand` | `production/daily-recordings/{id}/documents` | |
+| 9 | Revisi Daily Recording | `DailyRecordingRevision` (anak, PK gabungan) | `ReviseDailyRecordingCommand` (endpoint `PUT production/daily-recordings/{id}`) | `production/daily-recordings/{id}/revisions/{revisionNumber}/documents` | `owner_key` = nomor revisi |
+| 10 | BPB | `GoodsReceipt` | `CreateGoodsReceiptCommand` | `inventory/goods-receipts/{id}/documents` | surat jalan vendor |
+| 11 | Retur stok | `StockReturn` | `CreateStockReturnCommand` | `inventory/stock-returns/{id}/documents` | |
+| 12 | Transfer stok (pengiriman sapronak) | `StockTransfer` | `CreateStockTransferCommand` | `inventory/stock-transfers/{id}/documents` | |
+| 13 | Mutasi pakan | `StockReturn` + `StockTransfer` (dibuat bersamaan) | `CreateFeedMutationCommand` | lewat #11 / #12 | daftar yang sama disimpan di kedua dokumen → 2 baris link per lampiran |
+| 14 | Purchase Order | `PurchaseOrder` | `CreatePurchaseOrderCommand`, `UpdatePurchaseOrderCommand` | `purchase-orders/{id}/documents` | |
+| 15 | Sales Order | `SalesOrder` | `CreateSalesOrderCommand`, `UpdateSalesOrderCommand` | `sales/orders/{id}/documents` | |
+| 16 | Delivery Order | `DeliveryOrder` | `CreateDeliveryOrderCommand` | `sales/delivery-orders/{id}/documents` | DO tidak punya update; surat jalan bertanda tangan lewat PUT |
+| 17 | Vendor Invoice | `VendorInvoice` | `CreateVendorInvoiceCommand` | `finance/vendor-invoices/{id}/documents` | invoice & faktur pajak vendor |
+| 18 | Payment Voucher | `PaymentVoucher` | `CreatePaymentVoucherCommand`, `CreatePlasmaPaymentVoucherCommand` | `finance/payment-vouchers/{id}/documents` | bukti transfer biasanya ada setelah `pay` → lewat PUT |
+| 19 | Kas masuk/keluar | `CashTransaction` | `CreateCashTransactionCommand` | `finance/cash-transactions/{id}/documents` | |
+| 20 | Penerimaan customer | `CustomerReceipt` | `CreateCustomerReceiptCommand` | `finance/customer-receipts/{id}/documents` | `Voided` ditolak |
+| 21 | Jurnal manual | `JournalEntry` | `CreateJournalCommand`, `UpdateJournalCommand` | `finance/journals/{id}/documents` | hanya jurnal manual; jurnal otomatis ditolak (`Documents.NotAllowed`) |
+| 22 | Settlement plasma | `PlasmaSettlement` | `CreatePlasmaSettlementCommand`, `RecalculatePlasmaSettlementCommand` | `costing/settlements/{id}/documents` | |
+
+> Total 21 tabel (mutasi pakan memakai tabel #11 & #12). Kolom `documents` di `StockReturn`/`StockTransfer` sudah mencakup mutasi pakan.
+
+**Tidak perlu**: Branch, Uom, Item, TaxCode, Warehouse, Account, CostCenter, FiscalPeriod, JournalMapping, JournalTemplate, Role, User, CashBankAccount, BankReconciliation; juga SalesInvoice, SalesCreditNote, BankTransfer (belum dipilih, bisa menyusul dengan pola yang sama).
+
+### 15.3 Daftar task
+
+1. **Domain lampiran**: `Attachment`, `AttachmentLink`, `AttachmentKind`, `AttachmentStatus`, `AttachmentErrors`, konstanta `AttachmentOwnerTypes`. Unit test: sanitasi nama, transisi `Temporary ↔ Linked`, hapus saat masih punya link.
+2. **Domain entity**: helper `DocumentList` + error `Documents.*`; properti `Documents` + `SetDocuments` di 21 entity §15.2. `Vendor.Update`/`Customer.Update` tetap `void`; `SetDocuments` terpisah mengembalikan `Result`. Unit test `SetDocuments` (distinct, kosong, `Guid.Empty`, maks 20) + aturan status (cancelled/voided, jurnal otomatis).
+3. **Application lampiran**: `IFileStorage`, `IAttachmentService` (+ `SyncLinksAsync`), validator upload, `AttachmentResponse`, query metadata (Dapper), `FileStorageOptions`.
+4. **Infrastructure**: `LocalFileStorage`; EF config `attachments` & `attachment_links` (schema `documents`); kolom `documents uuid[]` di 21 tabel; `DbSet` di `IApplicationDbContext` & `TestDbContext` (converter + comparer `Guid[]`).
+5. **Application entity**: tambahkan `Documents` ke command & validator create/update (§15.2 kolom 4), panggil `SetDocuments` + `SyncLinksAsync` di handler. `CreateFeedMutationCommand` menyinkronkan link untuk dua pemilik. Tambahkan `documents` ke respons detail.
+6. **Application `SetXxxDocumentsCommand`**: 21 command + handler (termasuk revisi recording), cek akses cabang & status.
+7. **Web.Api**: `AttachmentEndpoints` (multipart, unduh, metadata banyak, delete), 21 route `PUT …/documents`, permission `attachments:*` + seed role, limit ukuran request.
+8. **Background job** `AttachmentCleanupJob` (`BackgroundService`, interval `FileStorage:CleanupIntervalMinutes`): hapus permanen (DB + file) lampiran `Temporary` dengan `UnlinkedAtUtc`/`CreatedAtUtc` > `FileStorage:OrphanRetentionHours` (24). Ditambah lampiran soft-deleted yang file fisiknya gagal dihapus.
+9. **Migration** `Phase9_Attachments`; **docker-compose**: volume `./.containers/uploads:/app/uploads`; `.gitignore` untuk folder uploads.
+10. **Test**:
+    - Application test handler: sync gagal bila id tidak ada / sudah dihapus / beda cabang; update `null` vs `[]`; PUT pada dokumen cancelled ditolak.
+    - Integration test: upload → create entity → get → delete ditolak → lepas → job membersihkan.
+11. **Verifikasi end-to-end** di `intiplasma_verify`:
+    - Upload foto & PDF; tipe salah & > 10 MB ditolak.
+    - Create/update tiap entity dengan `documents`; update `null` vs `[]`.
+    - Mutasi pakan: 2 link per lampiran; lepas dari satu dokumen, lampiran tetap `Linked`.
+    - `PUT …/documents` pada PO approved, DO, PV paid (boleh) & dokumen cancelled (ditolak).
+    - Unduh lintas cabang (403); hapus lampiran terpakai (409); upload ulang dengan `id` sama (idempotent); job pembersih.
+12. **Dokumentasi**: "Realisasi Fase 9" di PLAN.md + update RANGKUMAN.md (keputusan #27–#30, endpoint baru).
+
+---
+
+## 16. Realisasi Fase 9 — Lampiran Dokumen (Attachment)
+
+Migration: `Phase9_Attachments`. Isinya schema baru `documents` (tabel `attachments` dan `attachment_links`), plus kolom `documents uuid[] NOT NULL DEFAULT '{}'` di 21 tabel: `master.farmers/coops/vendors/customers`, `partnership.contracts/production_cycles/cycle_harvests`, `production.daily_recordings/daily_recording_revisions`, `inventory.goods_receipts/stock_returns/stock_transfers`, `procurement.purchase_orders`, `sales.sales_orders/delivery_orders`, `finance.vendor_invoices/payment_vouchers/cash_transactions/customer_receipts/journal_entries`, `costing.plasma_settlements`.
+
+**Domain**
+- `Attachment` (`Domain/Documents/Attachments`) adalah aggregate + `ISoftDeletable`. Isinya nama file asli yang sudah disanitasi, `StoredFileName` = `{id:N}{ext}`, `StoragePath` = `yyyy/MM/{id:N}{ext}`, MIME, ukuran, SHA-256, `Kind` (Photo/Document), `BranchId`, `Status` (Temporary ↔ Linked), dan `UnlinkedAtUtc`.
+  - Aturan: lampiran mengikuti cabang pemilik pertamanya. Lampiran itu tidak bisa dipakai di dokumen cabang lain (`Attachments.BranchMismatch`). Lampiran yang masih Linked tidak bisa dihapus (`Attachments.InUse`, 409).
+- `AttachmentLink` (`owner_type`, `owner_id`, `owner_key`, `attachment_id`) adalah indeks balik. `owner_key` diisi nomor revisi untuk `DailyRecordingRevision`; untuk entity lain kosong.
+- `IHasDocuments` + `DocumentList` (`Domain/Common`): menghapus duplikat dengan urutan tetap, menolak `Guid.Empty`, maksimal 20 lampiran (`Documents.Invalid`/`TooMany`).
+  - Dokumen `Cancelled` (siklus, PO, SO, DO, VI, PV, kas, settlement) dan penerimaan `Voided` → `Documents.OwnerCancelled` (409).
+  - Jurnal otomatis → `Documents.NotAllowed`.
+- Entity anak tanpa aggregate sendiri diubah lewat aggregate-nya: `ProductionCycle.SetHarvestDocuments(harvestId, …)` dan `DailyRecording.SetRevisionDocuments(revisionNumber, …)`.
+
+**Application**
+- `IFileStorage` (`Abstractions/Storage`) dan `IAttachmentService` (`Documents`) dengan operasi berikut:
+  - `SaveAsync`: buffer maksimal 10 MB, deteksi tipe dari *magic bytes* (JPEG/PNG/WEBP/PDF), SHA-256, tulis file lalu simpan metadata; bila DB gagal, file dihapus. `id` dari klien bersifat idempotent untuk isi yang sama; isi berbeda → `Attachments.IdConflict` (409).
+  - `GetAsync`, `GetManyAsync` (id yang tidak terlihat dilewati), `OpenAsync`, `DeleteAsync` (soft delete + hapus file).
+  - `EnsureAttachableAsync`: pre-check tanpa perubahan. Dipanggil **sebelum mengambil nomor dokumen** (BPB, transfer, retur, mutasi, PO, SO, DO, PV, penerimaan, settlement) agar lampiran yang salah tidak menghabiskan nomor.
+  - `SyncLinksAsync`: menambah/melepas link dan memperbarui status, tanpa `SaveChanges` sehingga ikut transaksi handler. Lampiran yang masih dipakai pemilik lain (termasuk yang baru ditambahkan di unit kerja yang sama) tetap Linked.
+- Aturan baca: user `branches:access-all` melihat semua. Lampiran Temporary hanya terlihat oleh pengunggahnya. Lampiran Linked mengikuti cabangnya; lampiran tanpa cabang (vendor/customer) terlihat semua user. Lampiran yang tidak terlihat dianggap tidak ada (404 / `Attachments.Unknown`).
+- `DocumentsExtensions.ApplyDocumentsAsync`: `null` = tidak diubah (create: kosong), `[]` = kosongkan, isi = ganti seluruh daftar. `ValidDocuments()` untuk validator.
+- Semua command create/update di §15.2 mendapat parameter opsional terakhir `IReadOnlyList<Guid>? Documents = null` (kompatibel dengan klien lama).
+  - Mutasi pakan menyimpan daftar yang sama di retur dan transfer (2 link per lampiran).
+  - Revisi recording menyimpan lampiran di entri revisi baru.
+  - Menghapus draft jurnal melepas lampirannya.
+- `SetDocumentsCommand` **generik** (satu command + handler untuk 21 entity, *switch* per `AttachmentOwnerTypes`), bukan 21 command terpisah seperti di rencana. Handler-nya memuat entity, mengecek akses cabang, menjalankan `SetDocuments`, lalu `SyncLinksAsync`.
+- Respons detail (dan list yang memakai SELECT yang sama) mendapat `documents: Guid[]`. Yang ikut: peternak, kandang, vendor, customer, kontrak, siklus, recording + `revisions[].documents`, `performance.harvests[].documents`, BPB/transfer/retur, PO, SO, DO, VI, PV, kas, penerimaan, jurnal, settlement.
+  - `HarvestResponse` dan row revisi diubah dari record posisional ke properti `init`/setter (jebakan Dapper + array). Bentuk JSON-nya tetap sama.
+
+**Infrastructure**
+- `LocalFileStorage`: path dibatasi di dalam root, tulis ke file `.tmp` lalu *move*.
+- `FileStorageOptions` (`FileStorage:RootPath` default `uploads` relatif ke folder aplikasi, `OrphanRetentionHours` 24, `CleanupIntervalMinutes` 60, `CleanupBatchSize` 100).
+- `AttachmentCleanupJob` (`BackgroundService`, jalan saat start lalu tiap interval). Lampiran Temporary dengan `coalesce(unlinked_at_utc, created_at_utc)` lebih lama dari retensi dihapus permanen (`ExecuteDelete` dengan syarat status tetap Temporary, lalu file-nya).
+- Kolom `documents` diberi default `'{}'` lewat konvensi di `ApplicationDbContext` (setiap properti `Guid[] Documents`).
+- docker-compose: volume `./.containers/uploads:/app/uploads`. `.gitignore`: `**/uploads/`.
+
+**Endpoint**
+- `/api/v1/attachments`:
+  - `POST` multipart (`file`, `id?`, `description?`) → 200 + metadata. Limit request 11 MB; antiforgery dimatikan karena API memakai JWT.
+  - `GET ?ids=a,b,c` (maks 100) dan `GET /{id}`.
+  - `GET /{id}/content`: foto *inline* (atau `?download=true`), PDF selalu *attachment*, mendukung range.
+  - `DELETE /{id}` → 204 / 409.
+- `PUT {resource}/{id}/documents` dengan body `{ "documents": [...] }` → 204. Resource: `farmers`, `coops`, `vendors`, `customers`, `contracts`, `cycles`, `production/daily-recordings`, `inventory/goods-receipts|stock-returns|stock-transfers`, `purchase-orders`, `sales/orders`, `sales/delivery-orders`, `finance/vendor-invoices|payment-vouchers|cash-transactions|customer-receipts|journals`, `costing/settlements`. Ditambah `cycles/{cycleId}/harvests/{harvestId}/documents` dan `production/daily-recordings/{id}/revisions/{n}/documents`. Permission memakai permission tulis resource-nya (mis. PO → `purchasing:manage`, DO → `sales:deliver`, revisi → `production:revise`).
+- Body update yang diperluas dengan `documents` opsional: PUT farmers/coops/vendors/customers, PUT purchase-orders, PUT sales/orders, PUT finance/journals, PUT costing/settlements (recalculate), PUT production/daily-recordings (revisi), POST cycles/{id}/start, POST cycles/{id}/harvests. POST create lain langsung menerima `documents` di body command.
+- ⚠️ `PUT contracts/{id}` body-nya tetap `ContractTermsRequest` (tidak diubah agar tidak *breaking*). Lampiran kontrak diubah lewat `PUT contracts/{id}/documents`.
+- Permission baru: `attachments:upload`, `attachments:read`, `attachments:delete`. Role tidak di-seed (dibuat lewat API); Administrator otomatis mendapat semuanya.
+
+**Catatan**
+- Batas 10 MB dan whitelist tipe adalah konstanta di `AttachmentFileTypes`, bukan konfigurasi.
+- Lampiran tanpa cabang (dari vendor/customer) yang sudah dilepas bisa dipakai lagi di cabang mana pun dan akan mengambil cabang pemilik barunya.
+- Docker: user container (`app`) harus punya hak tulis ke `./.containers/uploads`.
+- `LocalFileStorage` hanya cocok untuk satu instance. Sebelum *scale-out*, ganti dengan implementasi `IFileStorage` S3/MinIO.
+- Diverifikasi end-to-end ke PostgreSQL lokal (database sementara), **79 skenario lulus**:
+  - Upload 4 tipe; tipe/ukuran/kosong ditolak; idempotensi & konflik id; path `yyyy/MM`; unduh inline vs attachment; metadata banyak.
+  - Create/update `documents` di semua entity §15.2 (master, kontrak, chick-in, recording + revisi, BPB, transfer, mutasi, panen, SO, DO, retur, VI, PV, kas, penerimaan, jurnal, settlement); `null` vs `[]`.
+  - `PUT …/documents` pada kontrak aktif, PO approved, DO, kas terposting, panen di siklus closed (boleh); SO cancelled & penerimaan void (409); jurnal otomatis (400).
+  - Nomor BPB tidak terpakai saat lampiran salah; mutasi pakan 2 link; hapus lampiran terpakai 409; hapus draft jurnal melepas lampiran.
+  - Akses user lain/cabang lain (404/403).
+  - Job pembersih: 9 lampiran Temporary kedaluwarsa terhapus (DB + file); 30 lampiran Linked utuh.
+  - Belum diuji end-to-end: `PUT …/documents` pada PV yang sudah *paid* dan PV plasma (jalur kode sama dengan PV vendor draft yang sudah diuji).
+- Test: 120 domain (+16), 41 application (+7), 8 arsitektur, 13 integration (+3, termasuk upload → link → hapus via HTTP).

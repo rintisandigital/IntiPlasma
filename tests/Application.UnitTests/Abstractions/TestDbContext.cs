@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Application.Abstractions.Data;
 using Domain.Costing.PlasmaSettlements;
+using Domain.Documents.Attachments;
 using Domain.Finance.Accounts;
 using Domain.Finance.CashBank;
 using Domain.Finance.CostCenters;
@@ -124,6 +125,10 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
 
     public DbSet<PlasmaSettlement> PlasmaSettlements { get; set; }
 
+    public DbSet<Attachment> Attachments { get; set; }
+
+    public DbSet<AttachmentLink> AttachmentLinks { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>().Navigation(u => u.Roles).HasField("_roles");
@@ -243,6 +248,9 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
             b.OwnsOne(u => u.Value);
         });
         modelBuilder.Entity<DailyRecordingRevision>().HasKey(v => new { v.DailyRecordingId, v.RevisionNumber });
+
+        modelBuilder.Entity<AttachmentLink>().HasKey(l => new { l.OwnerType, l.OwnerId, l.OwnerKey, l.AttachmentId });
+        modelBuilder.Entity<Attachment>().HasQueryFilter(a => !a.IsDeleted);
         modelBuilder.Entity<CycleHarvest>().Property(h => h.Id).ValueGeneratedNever();
 
         modelBuilder.Entity<SalesOrder>().Navigation(o => o.Lines).HasField("_lines");

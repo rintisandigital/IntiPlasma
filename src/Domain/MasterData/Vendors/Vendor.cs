@@ -6,7 +6,7 @@ namespace Domain.MasterData.Vendors;
 /// <summary>
 /// Supplier of sapronak (DOC hatchery, feed mill, OVK distributor) or services.
 /// </summary>
-public sealed class Vendor : AggregateRoot
+public sealed class Vendor : AggregateRoot, IHasDocuments
 {
     private Vendor(Guid id, string code, string name)
         : base(id)
@@ -36,6 +36,14 @@ public sealed class Vendor : AggregateRoot
     public decimal PriceTolerancePercent { get; private set; }
 
     public bool IsActive { get; private set; }
+
+    /// <summary>
+    /// Lampiran: ids of the attached photos and documents.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    public Result SetDocuments(IEnumerable<Guid>? documents) =>
+        DocumentList.Apply(documents, value => Documents = value);
 
     public static Vendor Create(
         string code,

@@ -1,3 +1,4 @@
+using Domain.Common;
 using Domain.MasterData.Items;
 using Domain.MasterData.Warehouses;
 using Domain.Procurement.PurchaseOrders;
@@ -10,7 +11,7 @@ namespace Domain.Inventory.GoodsReceipts;
 /// DOC can also be delivered directly to a coop warehouse, in which case it belongs to the coop's open cycle.
 /// Stock is valued at the order price (excluding VAT) per base unit.
 /// </summary>
-public sealed class GoodsReceipt : AggregateRoot
+public sealed class GoodsReceipt : AggregateRoot, IHasDocuments
 {
     private readonly List<GoodsReceiptLine> _lines = [];
 
@@ -45,6 +46,14 @@ public sealed class GoodsReceipt : AggregateRoot
     public IReadOnlyCollection<GoodsReceiptLine> Lines => [.. _lines];
 
     public Money TotalValue => _lines.Aggregate(Money.Zero, (total, line) => total + line.Value);
+
+    /// <summary>
+    /// Lampiran: ids of the attached photos and documents.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    public Result SetDocuments(IEnumerable<Guid>? documents) =>
+        DocumentList.Apply(documents, value => Documents = value);
 
     /// <param name="lines">Received quantities per order line, with the quantity converted to the item's base unit.</param>
     /// <param name="itemCategories">Category of every item on the order.</param>

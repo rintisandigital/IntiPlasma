@@ -1,3 +1,4 @@
+using Application.Documents;
 using FluentValidation;
 
 namespace Application.Coops.Create;
@@ -12,5 +13,6 @@ internal sealed class CreateCoopCommandValidator : AbstractValidator<CreateCoopC
         RuleFor(c => c.Capacity).GreaterThan(0);
         RuleFor(c => c.HouseType).IsInEnum();
         RuleFor(c => c.Address).MaximumLength(500);
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }

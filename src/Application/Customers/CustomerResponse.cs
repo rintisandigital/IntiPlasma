@@ -4,6 +4,11 @@ namespace Application.Customers;
 
 public sealed record CustomerResponse
 {
+    /// <summary>
+    /// Lampiran: attachment ids; metadata via <c>GET /attachments?ids=</c>.
+    /// </summary>
+    public Guid[] Documents { get; init; } = [];
+
     public Guid Id { get; init; }
 
     public string Code { get; init; }

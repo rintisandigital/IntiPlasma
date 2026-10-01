@@ -2,7 +2,9 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Numbering;
+using Application.Documents;
 using Application.Procurement;
+using Domain.Documents.Attachments;
 using Domain.Inventory.GoodsReceipts;
 using Domain.Inventory.Stock;
 using Domain.MasterData.Items;
@@ -26,7 +28,8 @@ public sealed record CreateGoodsReceiptCommand(
     DateOnly ReceiptDate,
     string? DeliveryNoteNumber,
     string? Notes,
-    IReadOnlyList<GoodsReceiptLineRequest> Lines) : ICommand<CreateGoodsReceiptResponse>;
+    IReadOnlyList<GoodsReceiptLineRequest> Lines,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<CreateGoodsReceiptResponse>;
 
 public sealed record CreateGoodsReceiptResponse(Guid Id, string Number);
 
@@ -40,13 +43,15 @@ internal sealed class CreateGoodsReceiptCommandValidator : AbstractValidator<Cre
         RuleFor(c => c.Notes).MaximumLength(1000);
         RuleFor(c => c.Lines).NotEmpty();
         RuleForEach(c => c.Lines).ChildRules(l => l.RuleFor(x => x.Quantity).GreaterThan(0));
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
 internal sealed class CreateGoodsReceiptCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
-    IDocumentNumberGenerator numberGenerator) : ICommandHandler<CreateGoodsReceiptCommand, CreateGoodsReceiptResponse>
+    IDocumentNumberGenerator numberGenerator,
+    IAttachmentService attachments) : ICommandHandler<CreateGoodsReceiptCommand, CreateGoodsReceiptResponse>
 {
     public const string DocumentPrefix = "BPB";
 
@@ -92,6 +97,12 @@ internal sealed class CreateGoodsReceiptCommandHandler(
             return Result.Failure<CreateGoodsReceiptResponse>(validation.Error);
         }
 
+        Result attachable = await attachments.EnsureAttachableAsync(order.Value.BranchId, command.Documents, cancellationToken);
+        if (attachable.IsFailure)
+        {
+            return Result.Failure<CreateGoodsReceiptResponse>(attachable.Error);
+        }
+
         string number = await numberGenerator.NextForBranchAsync(
             context, DocumentPrefix, order.Value.BranchId, command.ReceiptDate, cancellationToken);
 
@@ -123,6 +134,17 @@ internal sealed class CreateGoodsReceiptCommandHandler(
             }
 
             context.StockLedgerEntries.Add(entry.Value);
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            receipt,
+            AttachmentOwner.Of(AttachmentOwnerTypes.GoodsReceipt, receipt.Id),
+            receipt.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return Result.Failure<CreateGoodsReceiptResponse>(documents.Error);
         }
 
         context.GoodsReceipts.Add(receipt);

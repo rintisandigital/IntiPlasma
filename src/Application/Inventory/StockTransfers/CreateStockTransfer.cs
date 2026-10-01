@@ -2,6 +2,8 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Numbering;
+using Application.Documents;
+using Domain.Documents.Attachments;
 using Domain.Inventory.StockTransfers;
 using Domain.MasterData.Items;
 using Domain.MasterData.Warehouses;
@@ -23,7 +25,8 @@ public sealed record CreateStockTransferCommand(
     Guid ToWarehouseId,
     DateOnly TransferDate,
     string? Notes,
-    IReadOnlyList<StockTransferLineRequest> Lines) : ICommand<CreateStockTransferResponse>;
+    IReadOnlyList<StockTransferLineRequest> Lines,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<CreateStockTransferResponse>;
 
 public sealed record CreateStockTransferResponse(Guid Id, string Number, Guid? CycleId);
 
@@ -46,13 +49,15 @@ internal sealed class CreateStockTransferCommandValidator : AbstractValidator<Cr
         RuleFor(c => c.Notes).MaximumLength(1000);
         RuleFor(c => c.Lines).NotEmpty();
         RuleForEach(c => c.Lines).SetValidator(new StockTransferLineRequestValidator());
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
 internal sealed class CreateStockTransferCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
-    IDocumentNumberGenerator numberGenerator) : ICommandHandler<CreateStockTransferCommand, CreateStockTransferResponse>
+    IDocumentNumberGenerator numberGenerator,
+    IAttachmentService attachments) : ICommandHandler<CreateStockTransferCommand, CreateStockTransferResponse>
 {
     public const string DocumentPrefix = "TRF";
 
@@ -67,12 +72,29 @@ internal sealed class CreateStockTransferCommandHandler(
             return Result.Failure<CreateStockTransferResponse>(draft.Error);
         }
 
+        Result attachable = await attachments.EnsureAttachableAsync(draft.Value.From.BranchId, command.Documents, cancellationToken);
+        if (attachable.IsFailure)
+        {
+            return Result.Failure<CreateStockTransferResponse>(attachable.Error);
+        }
+
         StockTransfer transfer = await draft.Value.CreateAsync(context, numberGenerator, cancellationToken);
 
         Result moved = await StockPosting.PostTransferAsync(context, new StockBalances(context), transfer, cancellationToken);
         if (moved.IsFailure)
         {
             return Result.Failure<CreateStockTransferResponse>(moved.Error);
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            transfer,
+            AttachmentOwner.Of(AttachmentOwnerTypes.StockTransfer, transfer.Id),
+            transfer.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return Result.Failure<CreateStockTransferResponse>(documents.Error);
         }
 
         context.StockTransfers.Add(transfer);

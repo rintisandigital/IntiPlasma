@@ -24,7 +24,8 @@ internal sealed class VendorEndpoints : IEndpoint
         int PaymentTermDays,
         BankAccountRequest BankAccount,
         bool IsActive,
-        decimal? PriceTolerancePercent = null);
+        decimal? PriceTolerancePercent = null,
+        IReadOnlyList<Guid>? Documents = null);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
@@ -83,7 +84,8 @@ internal sealed class VendorEndpoints : IEndpoint
                 request.PaymentTermDays,
                 request.BankAccount,
                 request.IsActive,
-                request.PriceTolerancePercent);
+                request.PriceTolerancePercent,
+                request.Documents);
 
             Result result = await handler.Handle(command, cancellationToken);
 

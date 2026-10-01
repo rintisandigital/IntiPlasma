@@ -3,9 +3,11 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Numbering;
+using Application.Documents;
 using Application.Finance.AutoJournal;
 using Application.Finance.Journals;
 using Application.Production;
+using Domain.Documents.Attachments;
 using Domain.Finance.CashBank;
 using Domain.Finance.JournalMappings;
 using Domain.Finance.Journals;
@@ -27,7 +29,8 @@ public sealed record CreateCashTransactionCommand(
     DateOnly Date,
     string Description,
     string? Reference,
-    IReadOnlyList<CashTransactionLineRequest> Lines) : ICommand<Guid>;
+    IReadOnlyList<CashTransactionLineRequest> Lines,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<Guid>;
 
 public sealed record ApproveCashTransactionCommand(Guid CashTransactionId) : ICommand;
 
@@ -66,6 +69,7 @@ internal sealed class CreateCashTransactionCommandValidator : AbstractValidator<
             line.RuleFor(l => l.Amount).GreaterThan(0);
             line.RuleFor(l => l.Description).MaximumLength(250);
         });
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
@@ -116,7 +120,8 @@ internal static class CashTransactionSupport
 internal sealed class CreateCashTransactionCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
-    IDateTimeProvider dateTimeProvider) : ICommandHandler<CreateCashTransactionCommand, Guid>
+    IDateTimeProvider dateTimeProvider,
+    IAttachmentService attachments) : ICommandHandler<CreateCashTransactionCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateCashTransactionCommand command, CancellationToken cancellationToken)
     {
@@ -168,6 +173,17 @@ internal sealed class CreateCashTransactionCommandHandler(
         if (transaction.IsFailure)
         {
             return Result.Failure<Guid>(transaction.Error);
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            transaction.Value,
+            AttachmentOwner.Of(AttachmentOwnerTypes.CashTransaction, transaction.Value.Id),
+            transaction.Value.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return Result.Failure<Guid>(documents.Error);
         }
 
         context.CashTransactions.Add(transaction.Value);

@@ -1,3 +1,4 @@
+using Domain.Common;
 using SharedKernel;
 
 namespace Domain.Procurement.PurchaseOrders;
@@ -6,7 +7,7 @@ namespace Domain.Procurement.PurchaseOrders;
 /// Purchase order for sapronak (DOC, pakan, OVK) to one vendor. Draft → Approved → (Partially) Received → Closed.
 /// Receipts are recorded against the order lines; an order cannot be over-received.
 /// </summary>
-public sealed class PurchaseOrder : AggregateRoot
+public sealed class PurchaseOrder : AggregateRoot, IHasDocuments
 {
     private readonly List<PurchaseOrderLine> _lines = [];
 
@@ -38,6 +39,16 @@ public sealed class PurchaseOrder : AggregateRoot
     public Money Subtotal => _lines.Aggregate(Money.Zero, (total, line) => total + line.Amount);
 
     public bool CanReceive => Status is PurchaseOrderStatus.Approved or PurchaseOrderStatus.PartiallyReceived;
+
+    /// <summary>
+    /// Lampiran: ids of the attached photos and documents.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    public Result SetDocuments(IEnumerable<Guid>? documents) =>
+        Status == PurchaseOrderStatus.Cancelled
+            ? Result.Failure(DocumentErrors.OwnerCancelled)
+            : DocumentList.Apply(documents, value => Documents = value);
 
     public static Result<PurchaseOrder> Create(
         string number,

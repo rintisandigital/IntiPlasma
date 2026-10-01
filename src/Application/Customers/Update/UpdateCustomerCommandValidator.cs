@@ -1,4 +1,5 @@
 using Application.Common;
+using Application.Documents;
 using FluentValidation;
 
 namespace Application.Customers.Update;
@@ -15,5 +16,6 @@ internal sealed class UpdateCustomerCommandValidator : AbstractValidator<UpdateC
         RuleFor(c => c.Email).MaximumLength(256).EmailAddress().When(c => !string.IsNullOrWhiteSpace(c.Email));
         RuleFor(c => c.PaymentTermDays).InclusiveBetween(0, 365);
         RuleFor(c => c.CreditLimit).GreaterThanOrEqualTo(0);
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }

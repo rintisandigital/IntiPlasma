@@ -1,3 +1,4 @@
+using Domain.Common;
 using SharedKernel;
 
 namespace Domain.Finance.CashBank;
@@ -8,7 +9,7 @@ namespace Domain.Finance.CashBank;
 /// Cash-out follows maker-checker (Draft → Approved by someone else → Posted); cash-in can be posted from Draft.
 /// The number is given when posting.
 /// </summary>
-public sealed class CashTransaction : AggregateRoot
+public sealed class CashTransaction : AggregateRoot, IHasDocuments
 {
     private readonly List<CashTransactionLine> _lines = [];
 
@@ -36,6 +37,16 @@ public sealed class CashTransaction : AggregateRoot
     public DateTime? PostedAtUtc { get; private set; }
     public string? CancellationReason { get; private set; }
     public IReadOnlyCollection<CashTransactionLine> Lines => [.. _lines];
+
+    /// <summary>
+    /// Lampiran: ids of the attached photos and documents.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    public Result SetDocuments(IEnumerable<Guid>? documents) =>
+        Status == CashTransactionStatus.Cancelled
+            ? Result.Failure(DocumentErrors.OwnerCancelled)
+            : DocumentList.Apply(documents, value => Documents = value);
 
     /// <param name="cashAccountId">The chart of accounts account of the cash/bank account; lines cannot use it.</param>
     public static Result<CashTransaction> Create(

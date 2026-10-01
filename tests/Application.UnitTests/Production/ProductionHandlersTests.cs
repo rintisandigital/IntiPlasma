@@ -31,7 +31,7 @@ public sealed class ProductionHandlersTests : BaseHandlerTest
         await using TestDbContext context = CreateDbContext();
         Setup s = await SeedAsync(context);
 
-        Result<int> result = await new StartCycleCommandHandler(context, AllBranches())
+        Result<int> result = await new StartCycleCommandHandler(context, AllBranches(), CreateAttachments(context))
             .Handle(new StartCycleCommand(s.CycleA.Id, ChickIn, [new ChickInLine(s.Doc.Id, 1_000)]), CancellationToken.None);
 
         result.Value.ShouldBe(1_000);
@@ -45,7 +45,7 @@ public sealed class ProductionHandlersTests : BaseHandlerTest
         await using TestDbContext context = CreateDbContext();
         Setup s = await SeedAsync(context);
 
-        Result<int> result = await new StartCycleCommandHandler(context, AllBranches())
+        Result<int> result = await new StartCycleCommandHandler(context, AllBranches(), CreateAttachments(context))
             .Handle(new StartCycleCommand(s.CycleA.Id, ChickIn, [new ChickInLine(s.Doc.Id, 1_001)]), CancellationToken.None);
 
         result.Error.ShouldBe(CycleErrors.InsufficientDoc(1_001, 1_000m));
@@ -57,7 +57,7 @@ public sealed class ProductionHandlersTests : BaseHandlerTest
         await using TestDbContext context = CreateDbContext();
         Setup s = await SeedAsync(context);
         await StartAsync(context, s);
-        var create = new CreateDailyRecordingCommandHandler(context, AllBranches(), Clock());
+        var create = new CreateDailyRecordingCommandHandler(context, AllBranches(), Clock(), CreateAttachments(context));
         var clientId = Guid.CreateVersion7();
 
         // Day 1: 3 dead, 2 SAK (100 kg) feed.
@@ -71,7 +71,7 @@ public sealed class ProductionHandlersTests : BaseHandlerTest
         (await context.ProductionCycles.SingleAsync(c => c.Id == s.CycleA.Id)).TotalMortality.ShouldBe(3);
 
         // Revision: it was actually 5 dead and 1 SAK.
-        Result revised = await new ReviseDailyRecordingCommandHandler(context, AllBranches(), User(), Clock()).Handle(
+        Result revised = await new ReviseDailyRecordingCommandHandler(context, AllBranches(), User(), Clock(), CreateAttachments(context)).Handle(
             new ReviseDailyRecordingCommand(clientId, "koreksi PPL", 5, 0, 45m, null, [new UsageRequest(s.Feed.Id, s.Sak.Id, 1m)]),
             CancellationToken.None);
 
@@ -89,7 +89,7 @@ public sealed class ProductionHandlersTests : BaseHandlerTest
         await using TestDbContext context = CreateDbContext();
         Setup s = await SeedAsync(context);
         await StartAsync(context, s);
-        var create = new CreateDailyRecordingCommandHandler(context, AllBranches(), Clock());
+        var create = new CreateDailyRecordingCommandHandler(context, AllBranches(), Clock(), CreateAttachments(context));
 
         await create.Handle(new CreateDailyRecordingCommand(null, s.CycleA.Id, ChickIn, 1, 0, null, null, []), CancellationToken.None);
         Result<Guid> second = await create.Handle(
@@ -104,7 +104,7 @@ public sealed class ProductionHandlersTests : BaseHandlerTest
         await using TestDbContext context = CreateDbContext();
         Setup s = await SeedAsync(context);
 
-        Result<CreateFeedMutationResponse> result = await new CreateFeedMutationCommandHandler(context, AllBranches(), Numbers())
+        Result<CreateFeedMutationResponse> result = await new CreateFeedMutationCommandHandler(context, AllBranches(), Numbers(), CreateAttachments(context))
             .Handle(
                 new CreateFeedMutationCommand(s.CoopA.Id, s.Central.Id, s.CoopB.Id, ChickIn, "kandang B kekurangan pakan",
                     [new StockTransferLineRequest(s.Feed.Id, s.Sak.Id, 4m)]),
@@ -134,13 +134,13 @@ public sealed class ProductionHandlersTests : BaseHandlerTest
         Setup s = await SeedAsync(context);
         await StartAsync(context, s);
 
-        await new RecordHarvestCommandHandler(context, AllBranches(), Clock())
+        await new RecordHarvestCommandHandler(context, AllBranches(), Clock(), CreateAttachments(context))
             .Handle(new RecordHarvestCommand(s.CycleA.Id, ChickIn.AddDays(35), 1_000, 2_000m, null), CancellationToken.None);
 
         var close = new CloseCycleCommandHandler(context, AllBranches());
         (await close.Handle(new CloseCycleCommand(s.CycleA.Id), CancellationToken.None)).Error.Code.ShouldBe("Cycles.LeftoverStock");
 
-        await new CreateStockReturnCommandHandler(context, AllBranches(), Numbers()).Handle(
+        await new CreateStockReturnCommandHandler(context, AllBranches(), Numbers(), CreateAttachments(context)).Handle(
             new CreateStockReturnCommand(s.CoopA.Id, s.Central.Id, ChickIn.AddDays(35), "sisa pakan", null,
                 [new StockTransferLineRequest(s.Feed.Id, s.Kg.Id, 500m)]),
             CancellationToken.None);
@@ -153,7 +153,7 @@ public sealed class ProductionHandlersTests : BaseHandlerTest
     }
 
     private static async Task StartAsync(TestDbContext context, Setup s) =>
-        await new StartCycleCommandHandler(context, AllBranches())
+        await new StartCycleCommandHandler(context, AllBranches(), CreateAttachments(context))
             .Handle(new StartCycleCommand(s.CycleA.Id, ChickIn, [new ChickInLine(s.Doc.Id, 1_000)]), CancellationToken.None);
 
     private static Task<StockBalance> Balance(TestDbContext context, Warehouse warehouse, Item item) =>

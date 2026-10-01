@@ -1,4 +1,5 @@
 using System.Globalization;
+using Domain.Common;
 using SharedKernel;
 
 namespace Domain.Finance.Payables;
@@ -9,7 +10,7 @@ namespace Domain.Finance.Payables;
 /// the creator) → Paid. Paying registers the allocations on the documents (partial payment allowed, never above the
 /// outstanding) and journals Dr hutang usaha / hutang plasma, Cr kas/bank.
 /// </summary>
-public sealed class PaymentVoucher : AggregateRoot
+public sealed class PaymentVoucher : AggregateRoot, IHasDocuments
 {
     private readonly List<PaymentVoucherAllocation> _allocations = [];
     private readonly List<PaymentVoucherSettlementAllocation> _settlementAllocations = [];
@@ -72,6 +73,16 @@ public sealed class PaymentVoucher : AggregateRoot
     public IReadOnlyList<(Guid DocumentId, Money Amount)> DocumentAmounts => PayeeType == PayeeType.Vendor
         ? [.. _allocations.Select(a => (a.VendorInvoiceId, a.Amount))]
         : [.. _settlementAllocations.Select(a => (a.PlasmaSettlementId, a.Amount))];
+
+    /// <summary>
+    /// Lampiran: ids of the attached photos and documents.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    public Result SetDocuments(IEnumerable<Guid>? documents) =>
+        Status == PaymentVoucherStatus.Cancelled
+            ? Result.Failure(DocumentErrors.OwnerCancelled)
+            : DocumentList.Apply(documents, value => Documents = value);
 
     /// <param name="allocations">Vendor invoices of the vendor, or plasma settlements of the farmer.</param>
     public static Result<PaymentVoucher> Create(

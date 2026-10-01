@@ -30,7 +30,7 @@ public sealed class PayablesHandlersTests : BaseHandlerTest
         await using TestDbContext context = CreateDbContext();
         Setup s = await SeedAsync(context);
 
-        var create = new CreateVendorInvoiceCommandHandler(context, AllBranches(), Clock());
+        var create = new CreateVendorInvoiceCommandHandler(context, AllBranches(), Clock(), CreateAttachments(context));
         var line = new VendorInvoiceLineRequest(s.Receipt.Id, 1, 30m, 435_000m);
 
         Guid invoiceId = (await create.Handle(
@@ -59,7 +59,7 @@ public sealed class PayablesHandlersTests : BaseHandlerTest
         invoice.Total.ShouldBe(new Money(13_050_000m));
         invoice.PriceVariance.ShouldBe(new Money(150_000m));
 
-        Result<CreatePaymentVoucherResponse> voucher = await new CreatePaymentVoucherCommandHandler(context, AllBranches(), Numbers())
+        Result<CreatePaymentVoucherResponse> voucher = await new CreatePaymentVoucherCommandHandler(context, AllBranches(), Numbers(), CreateAttachments(context))
             .Handle(
                 new CreatePaymentVoucherCommand(s.Bank.Id, s.Vendor.Id, Date.AddDays(10), "TRF", null,
                     [new PaymentAllocationRequest(invoiceId, 13_050_000m)]),

@@ -1,6 +1,8 @@
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Documents;
+using Domain.Documents.Attachments;
 using Domain.Finance.Journals;
 using Domain.MasterData.Branches;
 using FluentValidation;
@@ -13,13 +15,15 @@ public sealed record CreateJournalCommand(
     Guid BranchId,
     DateOnly Date,
     string Description,
-    IReadOnlyList<JournalLineRequest> Lines) : ICommand<Guid>;
+    IReadOnlyList<JournalLineRequest> Lines,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<Guid>;
 
 public sealed record UpdateJournalCommand(
     Guid JournalId,
     DateOnly Date,
     string Description,
-    IReadOnlyList<JournalLineRequest> Lines) : ICommand;
+    IReadOnlyList<JournalLineRequest> Lines,
+    IReadOnlyList<Guid>? Documents = null) : ICommand;
 
 public sealed record DeleteJournalCommand(Guid JournalId) : ICommand;
 
@@ -31,6 +35,7 @@ internal sealed class CreateJournalCommandValidator : AbstractValidator<CreateJo
         RuleFor(c => c.Description).NotEmpty().MaximumLength(500);
         RuleFor(c => c.Lines).NotNull();
         RuleForEach(c => c.Lines).SetValidator(new JournalLineRequestValidator());
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
@@ -42,10 +47,14 @@ internal sealed class UpdateJournalCommandValidator : AbstractValidator<UpdateJo
         RuleFor(c => c.Description).NotEmpty().MaximumLength(500);
         RuleFor(c => c.Lines).NotNull();
         RuleForEach(c => c.Lines).SetValidator(new JournalLineRequestValidator());
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
-internal sealed class CreateJournalCommandHandler(IApplicationDbContext context, IBranchAccess branchAccess)
+internal sealed class CreateJournalCommandHandler(
+    IApplicationDbContext context,
+    IBranchAccess branchAccess,
+    IAttachmentService attachments)
     : ICommandHandler<CreateJournalCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateJournalCommand command, CancellationToken cancellationToken)
@@ -75,6 +84,17 @@ internal sealed class CreateJournalCommandHandler(IApplicationDbContext context,
             return Result.Failure<Guid>(journal.Error);
         }
 
+        Result documents = await attachments.ApplyDocumentsAsync(
+            journal.Value,
+            AttachmentOwner.Of(AttachmentOwnerTypes.Journal, journal.Value.Id),
+            journal.Value.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return Result.Failure<Guid>(documents.Error);
+        }
+
         context.JournalEntries.Add(journal.Value);
 
         await context.SaveChangesAsync(cancellationToken);
@@ -83,7 +103,10 @@ internal sealed class CreateJournalCommandHandler(IApplicationDbContext context,
     }
 }
 
-internal sealed class UpdateJournalCommandHandler(IApplicationDbContext context, IBranchAccess branchAccess)
+internal sealed class UpdateJournalCommandHandler(
+    IApplicationDbContext context,
+    IBranchAccess branchAccess,
+    IAttachmentService attachments)
     : ICommandHandler<UpdateJournalCommand>
 {
     public async Task<Result> Handle(UpdateJournalCommand command, CancellationToken cancellationToken)
@@ -108,13 +131,27 @@ internal sealed class UpdateJournalCommandHandler(IApplicationDbContext context,
             return result;
         }
 
+        Result documents = await attachments.ApplyDocumentsAsync(
+            journal.Value,
+            AttachmentOwner.Of(AttachmentOwnerTypes.Journal, journal.Value.Id),
+            journal.Value.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return documents;
+        }
+
         await context.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }
 }
 
-internal sealed class DeleteJournalCommandHandler(IApplicationDbContext context, IBranchAccess branchAccess)
+internal sealed class DeleteJournalCommandHandler(
+    IApplicationDbContext context,
+    IBranchAccess branchAccess,
+    IAttachmentService attachments)
     : ICommandHandler<DeleteJournalCommand>
 {
     public async Task<Result> Handle(DeleteJournalCommand command, CancellationToken cancellationToken)
@@ -129,6 +166,10 @@ internal sealed class DeleteJournalCommandHandler(IApplicationDbContext context,
         {
             return Result.Failure(JournalErrors.NotEditable(command.JournalId));
         }
+
+        // A deleted draft releases its attachments (they become temporary and are purged later).
+        await attachments.SyncLinksAsync(
+            AttachmentOwner.Of(AttachmentOwnerTypes.Journal, journal.Value.Id), journal.Value.BranchId, [], cancellationToken);
 
         context.JournalEntries.Remove(journal.Value);
 

@@ -1,3 +1,4 @@
+using Domain.Common;
 using Domain.Sales.SalesOrders;
 using SharedKernel;
 
@@ -9,7 +10,7 @@ namespace Domain.Sales.DeliveryOrders;
 /// A harvest can only be on one delivery order that is not cancelled (also enforced by a unique index).
 /// Delivered → Invoiced (on a sales invoice); only an uninvoiced delivery can be cancelled.
 /// </summary>
-public sealed class DeliveryOrder : AggregateRoot
+public sealed class DeliveryOrder : AggregateRoot, IHasDocuments
 {
     private readonly List<DeliveryOrderLine> _lines = [];
 
@@ -41,6 +42,16 @@ public sealed class DeliveryOrder : AggregateRoot
     public IReadOnlyCollection<DeliveryOrderLine> Lines => [.. _lines];
 
     public Money Amount => _lines.Aggregate(Money.Zero, (total, line) => total + line.Amount);
+
+    /// <summary>
+    /// Lampiran: ids of the attached photos and documents.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    public Result SetDocuments(IEnumerable<Guid>? documents) =>
+        Status == DeliveryOrderStatus.Cancelled
+            ? Result.Failure(DocumentErrors.OwnerCancelled)
+            : DocumentList.Apply(documents, value => Documents = value);
 
     /// <summary>
     /// Creates the delivery order. Does not change the sales order: the caller registers the delivered birds per

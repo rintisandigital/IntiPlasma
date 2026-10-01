@@ -12,4 +12,5 @@ public sealed record UpdateCustomerCommand(
     string? Email,
     int PaymentTermDays,
     decimal CreditLimit,
-    bool IsActive) : ICommand;
+    bool IsActive,
+    IReadOnlyList<Guid>? Documents = null) : ICommand;

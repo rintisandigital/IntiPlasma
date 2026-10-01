@@ -17,7 +17,8 @@ internal sealed class SalesEndpoints : IEndpoint
         DateOnly OrderDate,
         DateOnly? DeliveryDate,
         string? Notes,
-        IReadOnlyList<SalesOrderLineRequest> Lines);
+        IReadOnlyList<SalesOrderLineRequest> Lines,
+        IReadOnlyList<Guid>? Documents = null);
 
     public sealed record ReasonRequest(string Reason);
 
@@ -110,7 +111,7 @@ internal sealed class SalesEndpoints : IEndpoint
             CancellationToken cancellationToken) =>
         {
             var command = new UpdateSalesOrderCommand(
-                salesOrderId, request.OrderDate, request.DeliveryDate, request.Notes, request.Lines);
+                salesOrderId, request.OrderDate, request.DeliveryDate, request.Notes, request.Lines, request.Documents);
 
             Result result = await handler.Handle(command, cancellationToken);
 

@@ -11,4 +11,5 @@ public sealed record CreateCoopCommand(
     HouseType HouseType,
     string? Address,
     decimal? Latitude,
-    decimal? Longitude) : ICommand<Guid>;
+    decimal? Longitude,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<Guid>;

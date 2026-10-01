@@ -1,13 +1,15 @@
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Documents;
 using Domain.Common;
+using Domain.Documents.Attachments;
 using Domain.MasterData.Vendors;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
 namespace Application.Vendors.Update;
 
-internal sealed class UpdateVendorCommandHandler(IApplicationDbContext context)
+internal sealed class UpdateVendorCommandHandler(IApplicationDbContext context, IAttachmentService attachments)
     : ICommandHandler<UpdateVendorCommand>
 {
     public async Task<Result> Handle(UpdateVendorCommand command, CancellationToken cancellationToken)
@@ -49,6 +51,17 @@ internal sealed class UpdateVendorCommandHandler(IApplicationDbContext context)
             {
                 return tolerance;
             }
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            vendor,
+            AttachmentOwner.Of(AttachmentOwnerTypes.Vendor, vendor.Id),
+            null,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return documents;
         }
 
         await context.SaveChangesAsync(cancellationToken);

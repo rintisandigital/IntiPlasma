@@ -1,3 +1,4 @@
+using Application.Documents;
 using FluentValidation;
 
 namespace Application.Contracts.Update;
@@ -8,5 +9,6 @@ internal sealed class UpdateContractCommandValidator : AbstractValidator<UpdateC
     {
         RuleFor(c => c.ContractId).NotEmpty();
         RuleFor(c => c.Terms).NotNull().SetValidator(new ContractTermsRequestValidator());
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }

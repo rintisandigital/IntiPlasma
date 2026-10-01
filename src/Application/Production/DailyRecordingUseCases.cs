@@ -3,7 +3,9 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Cycles;
+using Application.Documents;
 using Application.Inventory;
+using Domain.Documents.Attachments;
 using Domain.Inventory.Stock;
 using Domain.MasterData.Items;
 using Domain.MasterData.Warehouses;
@@ -27,7 +29,8 @@ public sealed record CreateDailyRecordingCommand(
     int Culling,
     decimal? AverageBodyWeightGram,
     string? Notes,
-    IReadOnlyList<UsageRequest> Usages) : ICommand<Guid>;
+    IReadOnlyList<UsageRequest> Usages,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<Guid>;
 
 /// <summary>
 /// Revisi daily recording: replaces all values; the reason and the previous values are kept in the history.
@@ -40,7 +43,8 @@ public sealed record ReviseDailyRecordingCommand(
     int Culling,
     decimal? AverageBodyWeightGram,
     string? Notes,
-    IReadOnlyList<UsageRequest> Usages) : ICommand;
+    IReadOnlyList<UsageRequest> Usages,
+    IReadOnlyList<Guid>? Documents = null) : ICommand;
 
 internal sealed class UsageRequestValidator : AbstractValidator<UsageRequest>
 {
@@ -63,6 +67,7 @@ internal sealed class CreateDailyRecordingCommandValidator : AbstractValidator<C
         RuleFor(c => c.Notes).MaximumLength(1000);
         RuleFor(c => c.Usages).NotNull();
         RuleForEach(c => c.Usages).SetValidator(new UsageRequestValidator());
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
@@ -78,6 +83,7 @@ internal sealed class ReviseDailyRecordingCommandValidator : AbstractValidator<R
         RuleFor(c => c.Notes).MaximumLength(1000);
         RuleFor(c => c.Usages).NotNull();
         RuleForEach(c => c.Usages).SetValidator(new UsageRequestValidator());
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }
 
@@ -182,7 +188,8 @@ internal static class DailyRecordingSupport
 internal sealed class CreateDailyRecordingCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
-    IDateTimeProvider dateTimeProvider) : ICommandHandler<CreateDailyRecordingCommand, Guid>
+    IDateTimeProvider dateTimeProvider,
+    IAttachmentService attachments) : ICommandHandler<CreateDailyRecordingCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateDailyRecordingCommand command, CancellationToken cancellationToken)
     {
@@ -252,6 +259,17 @@ internal sealed class CreateDailyRecordingCommandHandler(
             return Result.Failure<Guid>(issued.Error);
         }
 
+        Result documents = await attachments.ApplyDocumentsAsync(
+            recording.Value,
+            AttachmentOwner.Of(AttachmentOwnerTypes.DailyRecording, recording.Value.Id),
+            recording.Value.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return Result.Failure<Guid>(documents.Error);
+        }
+
         context.DailyRecordings.Add(recording.Value);
 
         await context.SaveChangesAsync(cancellationToken);
@@ -264,7 +282,8 @@ internal sealed class ReviseDailyRecordingCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
     IUserContext userContext,
-    IDateTimeProvider dateTimeProvider) : ICommandHandler<ReviseDailyRecordingCommand>
+    IDateTimeProvider dateTimeProvider,
+    IAttachmentService attachments) : ICommandHandler<ReviseDailyRecordingCommand>
 {
     public async Task<Result> Handle(ReviseDailyRecordingCommand command, CancellationToken cancellationToken)
     {
@@ -307,6 +326,19 @@ internal sealed class ReviseDailyRecordingCommandHandler(
         if (revised.IsFailure)
         {
             return revised;
+        }
+
+        // The attachments of a revision document the correction; they belong to the new revision entry.
+        Result documents = await attachments.ApplyDocumentsAsync(
+            ids => recording.SetRevisionDocuments(recording.RevisionNumber, ids),
+            () => recording.Revisions.Single(r => r.RevisionNumber == recording.RevisionNumber).Documents,
+            AttachmentOwner.OfRevision(recording.Id, recording.RevisionNumber),
+            recording.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return documents;
         }
 
         Result<Warehouse> warehouse = await InventorySupport.FindCoopWarehouseAsync(context, cycle.Value.CoopId, cancellationToken);

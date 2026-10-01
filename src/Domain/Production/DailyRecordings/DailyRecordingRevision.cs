@@ -1,3 +1,6 @@
+using Domain.Common;
+using SharedKernel;
+
 namespace Domain.Production.DailyRecordings;
 
 /// <summary>
@@ -31,4 +34,12 @@ public sealed class DailyRecordingRevision
     public string PreviousValues { get; private set; }
     public Guid? RevisedBy { get; private set; }
     public DateTime RevisedAtUtc { get; private set; }
+
+    /// <summary>
+    /// Lampiran: evidence of the correction.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    internal Result SetDocuments(IEnumerable<Guid>? documents) =>
+        DocumentList.Apply(documents, value => Documents = value);
 }

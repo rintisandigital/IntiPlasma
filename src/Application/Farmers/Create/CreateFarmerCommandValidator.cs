@@ -1,4 +1,5 @@
 using Application.Common;
+using Application.Documents;
 using FluentValidation;
 
 namespace Application.Farmers.Create;
@@ -16,5 +17,6 @@ internal sealed class CreateFarmerCommandValidator : AbstractValidator<CreateFar
         RuleFor(c => c.BankAccount).NotNull().SetValidator(new BankAccountRequestValidator());
         RuleFor(c => c.Address).MaximumLength(500);
         RuleFor(c => c.Phone).MaximumLength(30);
+        RuleFor(c => c.Documents).ValidDocuments();
     }
 }

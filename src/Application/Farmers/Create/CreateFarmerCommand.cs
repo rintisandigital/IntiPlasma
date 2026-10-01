@@ -13,4 +13,5 @@ public sealed record CreateFarmerCommand(
     TaxIdentityRequest TaxIdentity,
     string? Address,
     string? Phone,
-    BankAccountRequest BankAccount) : ICommand<Guid>;
+    BankAccountRequest BankAccount,
+    IReadOnlyList<Guid>? Documents = null) : ICommand<Guid>;

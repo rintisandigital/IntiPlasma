@@ -1,7 +1,9 @@
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Documents;
 using Domain.Common;
+using Domain.Documents.Attachments;
 using Domain.MasterData.Branches;
 using Domain.MasterData.Farmers;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +11,10 @@ using SharedKernel;
 
 namespace Application.Farmers.Create;
 
-internal sealed class CreateFarmerCommandHandler(IApplicationDbContext context, IBranchAccess branchAccess)
+internal sealed class CreateFarmerCommandHandler(
+    IApplicationDbContext context,
+    IBranchAccess branchAccess,
+    IAttachmentService attachments)
     : ICommandHandler<CreateFarmerCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateFarmerCommand command, CancellationToken cancellationToken)
@@ -56,6 +61,17 @@ internal sealed class CreateFarmerCommandHandler(IApplicationDbContext context, 
         if (await context.Farmers.AnyAsync(f => f.Code == farmer.Value.Code, cancellationToken))
         {
             return Result.Failure<Guid>(FarmerErrors.CodeNotUnique(farmer.Value.Code));
+        }
+
+        Result documents = await attachments.ApplyDocumentsAsync(
+            farmer.Value,
+            AttachmentOwner.Of(AttachmentOwnerTypes.Farmer, farmer.Value.Id),
+            farmer.Value.BranchId,
+            command.Documents,
+            cancellationToken);
+        if (documents.IsFailure)
+        {
+            return Result.Failure<Guid>(documents.Error);
         }
 
         context.Farmers.Add(farmer.Value);

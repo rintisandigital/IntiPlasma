@@ -7,7 +7,7 @@ namespace Domain.MasterData.Coops;
 /// <summary>
 /// Kandang. Belongs to one farmer and hosts many production cycles over time (one at a time).
 /// </summary>
-public sealed class Coop : AggregateRoot
+public sealed class Coop : AggregateRoot, IHasDocuments
 {
     private Coop(Guid id, string code, Guid farmerId, Guid branchId)
         : base(id)
@@ -41,6 +41,14 @@ public sealed class Coop : AggregateRoot
     public decimal? Latitude { get; private set; }
     public decimal? Longitude { get; private set; }
     public bool IsActive { get; private set; }
+
+    /// <summary>
+    /// Lampiran: ids of the attached photos and documents.
+    /// </summary>
+    public Guid[] Documents { get; private set; } = [];
+
+    public Result SetDocuments(IEnumerable<Guid>? documents) =>
+        DocumentList.Apply(documents, value => Documents = value);
 
     public static Result<Coop> Create(
         Farmer farmer,

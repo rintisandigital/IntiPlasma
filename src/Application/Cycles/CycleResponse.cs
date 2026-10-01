@@ -4,6 +4,11 @@ namespace Application.Cycles;
 
 public sealed record CycleResponse
 {
+    /// <summary>
+    /// Lampiran: attachment ids; metadata via <c>GET /attachments?ids=</c>.
+    /// </summary>
+    public Guid[] Documents { get; init; } = [];
+
     public const string Select =
         """
         SELECT pc.id AS Id, pc.number AS Number, pc.status AS Status, pc.branch_id AS BranchId, b.code AS BranchCode,
@@ -16,7 +21,8 @@ public sealed record CycleResponse
                pc.total_mortality AS TotalMortality, pc.total_culling AS TotalCulling, pc.harvested_birds AS HarvestedBirds,
                pc.harvested_weight_kg AS HarvestedWeightKg,
                COALESCE(pc.initial_population, 0) - pc.total_mortality - pc.total_culling - pc.harvested_birds AS CurrentPopulation,
-               pc.closed_date AS ClosedDate
+               pc.closed_date AS ClosedDate,
+               pc.documents AS Documents
         FROM partnership.production_cycles pc
         JOIN master.branches b ON b.id = pc.branch_id
         JOIN master.farmers f ON f.id = pc.farmer_id
