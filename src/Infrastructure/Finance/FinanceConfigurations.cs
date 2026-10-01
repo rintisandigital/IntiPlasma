@@ -19,6 +19,9 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
         builder.HasKey(a => a.Id);
         builder.Property(a => a.Code).HasMaxLength(20);
         builder.Property(a => a.Name).HasMaxLength(150);
+
+        // Existing accounts start as operating; the migration classifies fixed assets, long-term liabilities and equity.
+        builder.Property(a => a.CashFlowCategory).HasDefaultValue(CashFlowCategory.Operating).HasSentinel((CashFlowCategory)0);
         builder.HasIndex(a => a.Code).IsUnique();
         builder.HasOne<Account>().WithMany().HasForeignKey(a => a.ParentId).OnDelete(DeleteBehavior.Restrict);
     }

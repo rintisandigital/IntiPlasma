@@ -7,6 +7,7 @@ using Application.Production;
 using Application.Sales;
 using Application.UnitTests.Abstractions;
 using Domain.Common;
+using Domain.Finance.FiscalPeriods;
 using Domain.Inventory.Stock;
 using Domain.MasterData.Branches;
 using Domain.MasterData.Coops;
@@ -162,6 +163,7 @@ public sealed class CostingHandlersTests : BaseHandlerTest
         context.Coops.Add(coop);
         context.Warehouses.Add(warehouse);
         context.ProductionCycles.Add(cycle);
+        context.FiscalPeriods.AddRange(FiscalPeriod.CreateYear(2026));
         context.StockBalances.Add(docBalance);
         await context.SaveChangesAsync();
 

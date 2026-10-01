@@ -21,6 +21,12 @@ public static class AccountingEvents
     public const string CycleCostAdjustment = "CycleCostAdjustment";
 
     /// <summary>
+    /// Jurnal penutup tahun buku: revenue and expense balances are closed to retained earnings, the credit account
+    /// of the <c>NetIncome</c> component (the journal's lines come from the ledger, not from the mapping).
+    /// </summary>
+    public const string YearEndClosing = "YearEndClosing";
+
+    /// <summary>
     /// Journal source of cash-in/cash-out transactions; their lines name the accounts, so they have no mapping.
     /// </summary>
     public const string CashTransaction = "CashTransaction";
@@ -90,6 +96,10 @@ public static class AccountingEvents
         new(CycleCostAdjustment, "Penyesuaian HPP saat tutup siklus (biaya final − HPP estimasi di invoice)",
         [
             new("CostOfGoodsSold", "Selisih HPP (negatif = HPP estimasi terlalu tinggi)")
+        ]),
+        new(YearEndClosing, "Jurnal penutup tahun buku (saat periode Desember ditutup)",
+        [
+            new("NetIncome", "Laba/rugi tahun berjalan ke Laba Ditahan (akun kredit = Laba Ditahan)")
         ]),
         new(PlasmaPayment, "Pembayaran ke plasma",
         [

@@ -16,7 +16,7 @@ namespace Web.Api.Endpoints.Finance;
 /// </summary>
 internal sealed class FinanceSetupEndpoints : IEndpoint
 {
-    public sealed record UpdateAccountRequest(string Name, bool IsActive);
+    public sealed record UpdateAccountRequest(string Name, bool IsActive, CashFlowCategory? CashFlowCategory = null);
 
     public sealed record UpdateCostCenterRequest(string Name, bool IsActive);
 
@@ -69,7 +69,7 @@ internal sealed class FinanceSetupEndpoints : IEndpoint
             CancellationToken cancellationToken) =>
         {
             Result result = await handler.Handle(
-                new UpdateAccountCommand(accountId, request.Name, request.IsActive), cancellationToken);
+                new UpdateAccountCommand(accountId, request.Name, request.IsActive, request.CashFlowCategory), cancellationToken);
 
             return result.Match(Results.NoContent, CustomResults.Problem);
         })

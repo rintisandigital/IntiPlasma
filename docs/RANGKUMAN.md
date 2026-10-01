@@ -1,7 +1,7 @@
 # Rangkuman Proyek — Aplikasi Peternakan Ayam Broiler Inti-Plasma
 
-> Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4) dan 2026-10-01 (Fase 5–7).
-> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§13. Dokumen ini adalah titik awal untuk melanjutkan Fase 8.
+> Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4) dan 2026-10-01 (Fase 5–8).
+> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§14. Seluruh fase rencana awal (0–8) selesai; lihat §9 untuk backlog berikutnya.
 
 ---
 
@@ -38,6 +38,10 @@
 | 20 | Bagi hasil | % × (penjualan bersih − biaya siklus); **rugi ditanggung inti** |
 | 21 | Harga jaminan ayam | **Per panen (truk)** sesuai BW rata-rata panen |
 | 22 | Approval settlement | **Maker-checker** |
+| 23 | Tutup tahun buku | **Jurnal penutup** saat Desember ditutup (P&L → Laba Ditahan per cabang); buka kembali Desember membalik jurnal itu |
+| 24 | Arus kas | **Metode langsung**, kategori arus kas per akun COA (Operating/Investing/Financing) |
+| 25 | Profitabilitas | **Tanpa alokasi overhead** (margin kontribusi); overhead terlihat per cabang |
+| 26 | Laporan pajak | **Rekap PPN & PPh + ekspor CSV**; XML Coretax menyusul |
 
 ## 3. Arsitektur & Konvensi Kode
 
@@ -128,6 +132,14 @@
 - **Settlement plasma** (`costing/settlements`, schema `costing`): `ISettlementPolicy` per skema (harga kontrak per panen − sapronak @harga kontrak ± insentif; bagi hasil % laba). Ada PPh kontrak dan potongan hutang. Rugi menjadi piutang plasma. Draft (hitung ulang) → approve oleh checker → jurnal + siklus `Settled`.
 - **PV plasma** (`finance/payment-vouchers/plasma`): PV kini generik (`payeeType`, antarmuka `IPayable`) dengan jurnal `PlasmaPayment`. ⚠️ Respons PV berubah (payee*, alokasi `documentType/documentId/...`).
 
+### Fase 8 — Laporan Keuangan, Tutup Buku & Pajak ✅
+- **Laporan** (`finance/reports`): `income-statement`, `balance-sheet` (dengan laba tahun berjalan & tahun lalu yang belum ditutup), `cash-flow` (metode langsung, konsisten dengan saldo kas buku besar), `profitability` (per siklus/kandang/peternak/cabang).
+- **Kategori arus kas** per akun COA (`cashFlowCategory`); migration mengklasifikasikan akun yang ada.
+- **Checklist tutup periode** (`fiscal-periods/{id}/checklist`): pemblokir (jurnal draft, event jurnal otomatis tertunda/gagal) & peringatan (dokumen draft, DO belum ditagih, bank belum direkonsiliasi).
+- **Tutup tahun buku**: menutup Desember memposting jurnal penutup per cabang ke Laba Ditahan (akun kredit mapping `YearEndClosing.NetIncome`); buka kembali Desember membaliknya.
+- **Monitoring event gagal** (`system/failed-events`, retry).
+- **Pajak** (`finance/tax`): rekap PPN keluaran/retur/masukan & PPh dipotong per masa + ekspor CSV.
+
 ## 5. Alur Akuntansi yang Sudah Berjalan
 
 | Transaksi | Jurnal otomatis |
@@ -151,6 +163,7 @@
 | Tutup siklus | Penyesuaian HPP: Dr/Cr HPP — Cr/Dr Ayam Dalam Proses (biaya final − HPP diakui) |
 | Settlement plasma (disetujui) | Dr Beban Kemitraan — Cr Hutang Plasma; Dr Hutang Plasma — Cr Hutang PPh / Cr Piutang Plasma (potongan); rugi: Dr Piutang Plasma — Cr Beban Kemitraan |
 | Pembayaran plasma (PV) | Dr Hutang Plasma — Cr Kas/Bank |
+| Tutup tahun buku (tutup Desember) | Dr pendapatan / Cr beban (nolkan) — selisih ke Laba Ditahan; dibalik bila Desember dibuka kembali |
 
 Semua event di katalog kini sudah dipakai.
 
@@ -172,17 +185,17 @@ Semua event di katalog kini sudah dipakai.
 
 - Setiap fase: domain + unit test invariant → command/query + validator → EF config + migration → endpoint + permission → **verifikasi end-to-end** ke PostgreSQL lokal pada database sementara `intiplasma_verify` (dibuat & dihapus otomatis; database `intiplasma` milik user tidak disentuh).
 - User yang melakukan **commit & migrate** setelah tiap fase.
-- Status test saat ini: **155 test lulus** (103 domain, 34 application, 8 arsitektur, 10 integration).
+- Status test saat ini: **156 test lulus** (104 domain, 34 application, 8 arsitektur, 10 integration).
 - Integration test (Testcontainers) **sudah bisa dijalankan** di mesin dev (container runtime tersedia) — `dotnet test IntiPlasma.slnx`.
-- Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario, Fase 7: 32 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
-- Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`.
+- Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario, Fase 7: 32 skenario, Fase 8: 35 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
+- Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`, `Phase8_ReportingClosing`.
 
 ## 8. Catatan Terbuka / Hutang Teknis
 
 - Tarif & fasilitas pajak (PPN dibebaskan untuk DOC/pakan/ayam hidup, PPh) perlu dikonfirmasi konsultan pajak lalu diinput sebagai TaxCode.
-- Kegagalan jurnal otomatis hanya terlihat di `infrastructure.outbox_messages.error` → perlu layar monitoring di WebApp.
+- Kegagalan jurnal otomatis kini terlihat lewat API `system/failed-events` (+ retry) dan memblokir tutup periode → tinggal layar di WebApp.
 - `IdempotencyFilter` masih in-memory → tambah Redis sebelum scale-out.
-- Belum ada penutupan tahun buku (laba/rugi → laba ditahan) → Fase 8.
+- XML Coretax (e-Faktur & e-Bupot) belum ada; baru rekap + CSV.
 - Satu admin tunggal tidak bisa menyelesaikan jurnal manual (maker-checker) → perlu user kedua.
 - Presisi rasio DPP: `TaxBaseRatio` (10,8) menyimpan 11/12 sebagai 0,91666667 sehingga PPN bisa meleset beberapa sen. **Diputuskan**: PPN 12% DPP nilai lain diinput sebagai tarif 11% dengan rasio 1. Rasio ≠ 1 tetap didukung, tetapi hindari pecahan berulang.
 - Vendor invoice hanya untuk barang ber-PO; hutang non-PO (jasa) & nota debit vendor belum ada (sementara lewat kas keluar).
@@ -193,11 +206,10 @@ Semua event di katalog kini sudah dipakai.
 - Belum ada sub-ledger piutang plasma per peternak: potongan hutang di settlement hanya dibatasi pendapatan − PPh, belum dicek terhadap saldo piutangnya.
 - Siklus lama yang ditutup sebelum Fase 7 tidak punya `ClosingCost`; invoice lama punya `costAmount` 0 (tidak ada penyesuaian HPP untuk siklus tersebut).
 
-## 9. Langkah Berikutnya — Fase 8: Laporan Keuangan & Analitik
+## 9. Langkah Berikutnya — Backlog setelah Fase 8
 
-Rencana (lihat PLAN.md §4 & §5):
-- **Laporan keuangan**: Laba Rugi, Neraca, Arus Kas — per cabang & konsolidasi, per periode.
-- **Analisa profitabilitas** per siklus, per kandang, per peternak, per cabang (penjualan bersih − HPP − beban kemitraan; data dari invoice, `ClosingCost`, settlement).
-- **Tutup periode & tahun buku**: validasi sebelum tutup (outbox tanpa error, draft dokumen, rekonsiliasi bank); penutupan tahun (laba/rugi → Laba Ditahan 3-2101).
-- **Laporan pajak**: rekap PPN masukan/keluaran, bukti potong PPh (vendor & plasma), ekspor e-Faktur/Coretax.
-- Pertimbangkan: alokasi biaya overhead ke siklus, sub-ledger piutang plasma, layar monitoring outbox.
+Seluruh fase rencana awal (0–8) selesai di sisi API. Kandidat berikutnya (urutan bisa disepakati):
+- **Klien**: MVC WebApp Admin Office (keputusan #4) dan mobile app PPL (recording offline sudah siap di API).
+- **Pajak**: ekspor XML Coretax (e-Faktur & e-Bupot) setelah format dikonfirmasi konsultan pajak; input tarif final PPN/PPh.
+- **Akuntansi lanjutan**: hutang non-PO (jasa) & nota debit vendor; transaksi antar cabang (akun antar-cabang); alokasi overhead ke siklus; sub-ledger piutang plasma per peternak; aset tetap & penyusutan.
+- **Operasional/infra**: Redis untuk idempotency & cache (multi-instance), integration test per modul (Testcontainers sudah jalan), observabilitas (Seq/OTel).

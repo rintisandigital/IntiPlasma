@@ -222,6 +222,16 @@ public static class Permissions
     /// </summary>
     public const string SettlementsApprove = "settlements:approve";
 
+    /// <summary>
+    /// Tax recaps (PPN keluaran/masukan, PPh withheld) and their CSV exports.
+    /// </summary>
+    public const string TaxReportsRead = "tax-reports:read";
+
+    /// <summary>
+    /// See failed automatic journal events and put them back in the queue.
+    /// </summary>
+    public const string SystemOutbox = "system:outbox";
+
     public static readonly IReadOnlyList<string> All =
     [
         UsersRead,
@@ -280,7 +290,9 @@ public static class Permissions
         PayablesPay,
         CostingRead,
         SettlementsManage,
-        SettlementsApprove
+        SettlementsApprove,
+        TaxReportsRead,
+        SystemOutbox
     ];
 
     public static bool Exists(string permission) => All.Contains(permission);

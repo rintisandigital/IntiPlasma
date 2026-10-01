@@ -6,6 +6,7 @@ using Application.Production;
 using Application.Sales;
 using Application.UnitTests.Abstractions;
 using Domain.Common;
+using Domain.Finance.FiscalPeriods;
 using Domain.Finance.Accounts;
 using Domain.Finance.CashBank;
 using Domain.Finance.Receivables;
@@ -284,6 +285,7 @@ public sealed class SalesHandlersTests : BaseHandlerTest
         context.Coops.Add(coop);
         context.Warehouses.Add(warehouse);
         context.ProductionCycles.Add(cycle);
+        context.FiscalPeriods.AddRange(FiscalPeriod.CreateYear(2026));
         await context.SaveChangesAsync();
 
         return new Setup(branch.Id, liveBird, customer, bank, cycle, first.Id, second.Id);

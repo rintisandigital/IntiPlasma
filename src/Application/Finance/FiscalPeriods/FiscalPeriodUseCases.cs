@@ -2,6 +2,7 @@ using System.Data.Common;
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Numbering;
 using Dapper;
 using Domain.Finance.FiscalPeriods;
 using Domain.Finance.Journals;
@@ -64,8 +65,14 @@ internal sealed class OpenFiscalYearCommandHandler(IApplicationDbContext context
     }
 }
 
+/// <summary>
+/// Closes a period after the blocking checks of the closing checklist. Closing December also closes the year:
+/// the closing journals (revenue and expenses to retained earnings) are posted in the same transaction.
+/// </summary>
 internal sealed class CloseFiscalPeriodCommandHandler(
     IApplicationDbContext context,
+    IDbConnectionFactory dbConnectionFactory,
+    IDocumentNumberGenerator numberGenerator,
     IUserContext userContext,
     IDateTimeProvider dateTimeProvider) : ICommandHandler<CloseFiscalPeriodCommand>
 {
@@ -100,6 +107,27 @@ internal sealed class CloseFiscalPeriodCommandHandler(
             return Result.Failure(FiscalPeriodErrors.HasUnpostedJournals(unposted));
         }
 
+        // Automatic journals still in (or dead in) the outbox would be missing from the closed period.
+        IReadOnlyList<ClosingCheck> checks = await PeriodClosingChecks.RunAsync(dbConnectionFactory, period, cancellationToken);
+        int autoJournalProblems = checks.Where(c => c.Blocking && c.Code != "UnpostedJournals").Sum(c => c.Count);
+        if (autoJournalProblems > 0)
+        {
+            return Result.Failure(FiscalPeriodErrors.AutoJournalsNotPosted(autoJournalProblems));
+        }
+
+        if (period.Month == 12)
+        {
+            Result<IReadOnlyList<JournalEntry>> closing = await YearEndClosing.CreateClosingJournalsAsync(
+                context, numberGenerator, period, userContext.UserId, dateTimeProvider.UtcNow, cancellationToken);
+
+            if (closing.IsFailure)
+            {
+                return closing;
+            }
+
+            context.JournalEntries.AddRange(closing.Value);
+        }
+
         Result result = period.Close(userContext.UserId, dateTimeProvider.UtcNow);
         if (result.IsFailure)
         {
@@ -112,8 +140,14 @@ internal sealed class CloseFiscalPeriodCommandHandler(
     }
 }
 
-internal sealed class ReopenFiscalPeriodCommandHandler(IApplicationDbContext context)
-    : ICommandHandler<ReopenFiscalPeriodCommand>
+/// <summary>
+/// Reopens the last closed period. Reopening December reverses the year's closing journals.
+/// </summary>
+internal sealed class ReopenFiscalPeriodCommandHandler(
+    IApplicationDbContext context,
+    IDocumentNumberGenerator numberGenerator,
+    IUserContext userContext,
+    IDateTimeProvider dateTimeProvider) : ICommandHandler<ReopenFiscalPeriodCommand>
 {
     public async Task<Result> Handle(ReopenFiscalPeriodCommand command, CancellationToken cancellationToken)
     {
@@ -139,6 +173,19 @@ internal sealed class ReopenFiscalPeriodCommandHandler(IApplicationDbContext con
         if (result.IsFailure)
         {
             return result;
+        }
+
+        if (period.Month == 12)
+        {
+            Result<IReadOnlyList<JournalEntry>> reversals = await YearEndClosing.ReverseClosingJournalsAsync(
+                context, numberGenerator, period, userContext.UserId, dateTimeProvider.UtcNow, cancellationToken);
+
+            if (reversals.IsFailure)
+            {
+                return reversals;
+            }
+
+            context.JournalEntries.AddRange(reversals.Value);
         }
 
         await context.SaveChangesAsync(cancellationToken);

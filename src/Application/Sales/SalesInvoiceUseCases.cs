@@ -5,6 +5,7 @@ using Application.Abstractions.Messaging;
 using Application.Abstractions.Numbering;
 using Application.Costing;
 using Application.Finance.AutoJournal;
+using Application.Finance.Journals;
 using Application.Inventory;
 using Application.Production;
 using Domain.Finance.JournalMappings;
@@ -153,6 +154,15 @@ internal sealed class PostSalesInvoiceCommandHandler(
         if (postable.IsFailure)
         {
             return Result.Failure<string>(postable.Error);
+        }
+
+        // The journal is posted from the outbox; reject a closed period now rather than dead-letter it later.
+        Result<Domain.Finance.FiscalPeriods.FiscalPeriod> period = await JournalSupport.FindPeriodAsync(
+            context, invoice.Value.InvoiceDate, cancellationToken);
+
+        if (period.IsFailure)
+        {
+            return Result.Failure<string>(period.Error);
         }
 
         // Estimated HPP: each cycle's running cost per kg at the moment of posting.

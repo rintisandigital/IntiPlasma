@@ -33,6 +33,8 @@ public sealed record AccountResponse
     public bool IsPostable { get; init; }
 
     public bool IsActive { get; init; }
+
+    public string CashFlowCategory { get; init; }
 }
 
 internal sealed class GetAccountsQueryHandler(IDbConnectionFactory dbConnectionFactory)
@@ -51,7 +53,7 @@ internal sealed class GetAccountsQueryHandler(IDbConnectionFactory dbConnectionF
             )
             SELECT a.id AS Id, a.code AS Code, a.name AS Name, a.type AS Type, a.normal_balance AS NormalBalance,
                    a.parent_id AS ParentId, p.code AS ParentCode, t.level AS Level,
-                   a.is_postable AS IsPostable, a.is_active AS IsActive
+                   a.is_postable AS IsPostable, a.is_active AS IsActive, a.cash_flow_category AS CashFlowCategory
             FROM finance.accounts a
             JOIN tree t ON t.id = a.id
             LEFT JOIN finance.accounts p ON p.id = a.parent_id

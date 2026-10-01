@@ -170,7 +170,7 @@ tests/
 - PlasmaSettlement: pendapatan plasma = nilai ayam @harga kontrak − sapronak @harga kontrak + bonus/insentif − potongan (hutang, denda) → Hutang Plasma → approval → auto journal → pembayaran lewat Payment Voucher.
 - Slip settlement per plasma.
 
-### Fase 8 — Laporan Keuangan & Analitik
+### Fase 8 — Laporan Keuangan & Analitik ✅ (selesai 2026-10-01, lihat §14)
 - Laba Rugi, Neraca, Arus Kas, Analisa Profitabilitas (per siklus, per kandang, per peternak, per cabang).
 - Tutup periode (period closing) + validasi.
 
@@ -543,3 +543,53 @@ Migration: `Phase7_CostingSettlement` (schema baru `costing`; kolom `cost_amount
 - HPP estimasi memakai BW recording terakhir. Bila BW lama tidak diperbarui, estimasi bisa meleset, tetapi selalu dikoreksi penuh saat tutup siklus.
 - Potongan hutang plasma tidak dicek terhadap saldo piutang plasma per peternak (belum ada sub-ledger piutang plasma). Batasnya hanya pendapatan − PPh.
 - Diverifikasi end-to-end ke PostgreSQL lokal (database sementara), **32 skenario lulus**: dua siklus plasma (A untung dengan bonus FCR, PPh 2%, potongan hutang 3,3 jt dari rugi siklus B; B rugi → piutang plasma), HPP estimasi dua invoice (16.918,46/kg dan 17.358,70/kg), penyesuaian HPP 418.231,10 saat tutup, maker-checker settlement, PV plasma, dan neraca saldo seimbang dengan Ayam Dalam Proses, Piutang Plasma, dan Hutang Plasma = 0.
+
+---
+
+## 14. Realisasi Fase 8 — Laporan Keuangan, Tutup Buku & Pajak
+
+Migration: `Phase8_ReportingClosing` (kolom `cash_flow_category` di `finance.accounts`, plus data update: akun `1-2%` → Investing, `2-2%` dan Equity → Financing).
+
+**Keputusan (2026-10-01)**
+| Topik | Keputusan |
+|---|---|
+| Tutup tahun buku | **Jurnal penutup** saat periode Desember ditutup; buka kembali Desember membalik jurnal itu |
+| Arus kas | **Metode langsung**: mutasi kas/bank dikelompokkan menurut kategori arus kas akun lawannya |
+| Overhead di profitabilitas | **Tanpa alokasi**: margin kontribusi per siklus/kandang/peternak; overhead terlihat per cabang |
+| Laporan pajak | **Rekap + ekspor CSV**; XML Coretax menyusul setelah format dikonfirmasi konsultan pajak |
+
+**Laporan keuangan** (`/api/v1/finance/reports`, permission `finance-reports:read`)
+- `income-statement?from=&to=[&branchId=]` — Laba Rugi per akun induk teratas COA (mis. 4 Pendapatan Usaha, 5 HPP, 6 Beban Operasional, 7/8 lain-lain). Ditampilkan per akun, total pendapatan/beban, laba bersih. Jurnal penutup tidak dihitung, sehingga tahun yang sudah ditutup tetap menampilkan hasilnya.
+- `balance-sheet?asOf=[&branchId=]` — Neraca: aset, liabilitas, ekuitas per akun induk, ditambah **laba tahun berjalan** dan **laba tahun lalu yang belum ditutup** (keduanya 0 setelah tutup buku). `isBalanced`.
+- `cash-flow?from=&to=[&branchId=]` — Arus kas metode langsung. Setiap jurnal terposting yang menyentuh akun kas/bank: baris akun lawannya masuk ke kategori arus kas akun tersebut (kredit = kas masuk, debit = kas keluar). Transfer antar kas/bank saling hapus. Kas awal + kenaikan = saldo kas buku besar (`isConsistent`).
+- `profitability?from=&to=&groupBy=Cycle|Coop|Farmer|Branch[&branchId=&farmerId=]` — penjualan (DPP) − nota kredit − HPP (estimasi di invoice + penyesuaian tutup siklus) − beban kemitraan (settlement; rugi plasma bernilai negatif) = margin, margin/kg. Per cabang ditambah laba bersih buku besar dan selisihnya (`overheadAndOther`).
+
+**Kategori arus kas akun** — `Account.CashFlowCategory` (`Operating`/`Investing`/`Financing`). Default: Equity → Financing, lainnya Operating. Seed COA: aset tetap Investing, liabilitas jangka panjang Financing. Bisa diubah lewat `POST/PUT /finance/accounts` (`cashFlowCategory`).
+
+**Tutup periode & tahun buku**
+- `GET /finance/fiscal-periods/{id}/checklist` — `canClose` + daftar cek.
+  - **Pemblokir**: jurnal manual draft/approved di periode, event jurnal otomatis belum diproses, event gagal (*dead letter*).
+  - **Peringatan**: invoice penjualan draft, DO belum ditagih, invoice vendor draft, PV belum dibayar, kas masuk/keluar belum diposting, settlement draft, rekening bank belum direkonsiliasi sampai akhir periode.
+- `close` kini menolak bila ada event jurnal otomatis tertunda atau gagal (`FiscalPeriods.AutoJournalsNotPosted`), selain jurnal belum diposting.
+- **Menutup Desember = tutup tahun buku**: dalam transaksi yang sama dibuat satu **jurnal penutup per cabang** (`YearEndClosing`, nomor `JO/...` bertanggal 31 Des). Semua akun pendapatan & beban tahun itu dinolkan, selisihnya (laba/rugi) ke **Laba Ditahan**, yaitu akun kredit mapping `YearEndClosing.NetIncome` (default 3-2101; diatur di Journal Mappings).
+- **Buka kembali Desember** membalik jurnal penutup (`YearEndClosing.Reversal`). Menutup ulang membuat jurnal penutup baru yang memuat transaksi susulan.
+- Posting invoice penjualan kini juga mengecek periode fiskal terbuka (sebelumnya hanya dicek di outbox).
+
+**Monitoring event gagal** (`/api/v1/system/failed-events`, permission `system:outbox`)
+- `GET` daftar event dead letter (tipe, waktu, percobaan, error). `POST retry {eventId?}` mengembalikan event gagal (satu/semua) ke antrean setelah penyebabnya diperbaiki (mis. mapping jurnal ditambahkan, periode dibuka).
+
+**Laporan pajak** (`/api/v1/finance/tax`, permission `tax-reports:read`)
+- `vat?year=&month=[&branchId=]` — rekap PPN per masa: PPN keluaran (invoice terposting: nomor, tanggal, customer, NPWP/NITKU/PKP, kode pajak, DPP, DPP nilai lain, PPN), retur PPN keluaran (nota kredit), PPN masukan (invoice vendor ber-PPN: nomor internal, nomor invoice vendor, nomor faktur pajak, NPWP vendor, DPP, PPN); `netVat` = keluaran − retur − masukan (+ kurang bayar / − lebih bayar).
+- `withholding?year=&month=` — PPh dipotong per masa dari invoice vendor & settlement plasma (penerima, NPWP/NIK, kode & pasal, DPP, tarif, PPh) + total per kode.
+- Ekspor CSV: `vat/export?year=&month=&section=output|output-returns|input` dan `withholding/export?year=&month=` (UTF-8 BOM, pemisah koma, angka titik desimal, tanggal ISO).
+
+**Permission baru**: `tax-reports:read`, `system:outbox`.
+
+**Catatan**
+- XML Coretax (e-Faktur & e-Bupot) belum dibuat. Perlu skema & aturan pengisian dari konsultan pajak.
+- Laporan per cabang memakai cabang di header jurnal. Transaksi antar cabang belum ada.
+- CSV memakai pemisah koma. Excel ber-locale Indonesia mungkin perlu impor manual (Data → From Text).
+- Diverifikasi end-to-end ke PostgreSQL lokal (database sementara), **35 skenario lulus**, dengan satu tahun buku penuh 2025:
+  - Laba rugi 31.550.000; neraca seimbang (aset 636,1 jt); arus kas operasi +35.275.000 / investasi −200 jt / pendanaan +600 jt, konsisten dengan buku besar.
+  - Profitabilitas per siklus/peternak/cabang; rekap PPN Juni (masukan 825 rb) & Juli (keluaran 4,4 jt); PPh 23 150 rb; ekspor CSV.
+  - Checklist dengan event gagal & jurnal draft sebagai pemblokir; tutup Jan–Des dengan jurnal penutup (Laba Ditahan 31.550.000, akun P&L nol); buka kembali Desember (jurnal dibalik), posting susulan, tutup ulang (Laba Ditahan 31.550.001).

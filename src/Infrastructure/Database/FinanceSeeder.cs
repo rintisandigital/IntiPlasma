@@ -123,6 +123,7 @@ internal static class FinanceSeeder
         (AccountingEvents.PlasmaSettlement, "Deduction", "2-1201", "1-1302"),
         (AccountingEvents.PlasmaSettlement, "PlasmaDeficit", "1-1302", "5-1201"),
         (AccountingEvents.CycleCostAdjustment, "CostOfGoodsSold", "5-1101", "1-1501"),
+        (AccountingEvents.YearEndClosing, "NetIncome", "3-3101", "3-2101"),
         (AccountingEvents.PlasmaPayment, "Paid", "2-1201", "1-1201"),
         (AccountingEvents.StockReturnFromCycle, "FeedReturned", "1-1402", "1-1501"),
         (AccountingEvents.StockReturnFromCycle, "OvkReturned", "1-1403", "1-1501")
@@ -144,6 +145,16 @@ internal static class FinanceSeeder
             {
                 Account account = Account.Create(
                     code, name, type, parent is null ? null : accounts[parent], postable, normal).Value;
+
+                // Fixed assets are investing activities, long-term liabilities financing (equity defaults to financing).
+                if (code.StartsWith("1-2", StringComparison.Ordinal))
+                {
+                    account.SetCashFlowCategory(CashFlowCategory.Investing);
+                }
+                else if (code.StartsWith("2-2", StringComparison.Ordinal))
+                {
+                    account.SetCashFlowCategory(CashFlowCategory.Financing);
+                }
 
                 accounts.Add(code, account);
             }

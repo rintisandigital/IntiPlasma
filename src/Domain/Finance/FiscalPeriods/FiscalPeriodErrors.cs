@@ -39,4 +39,8 @@ public static class FiscalPeriodErrors
     public static Error HasUnpostedJournals(int count) => Error.Problem(
         "FiscalPeriods.HasUnpostedJournals",
         $"The period still has {count} draft or approved journal(s); post or delete them before closing");
+
+    public static Error AutoJournalsNotPosted(int count) => Error.Problem(
+        "FiscalPeriods.AutoJournalsNotPosted",
+        $"{count} automatic journal event(s) are pending or failed; see the closing checklist and retry failed events before closing");
 }

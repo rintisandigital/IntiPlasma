@@ -9,6 +9,18 @@ namespace Domain.UnitTests.Finance;
 public sealed class FinanceSetupTests
 {
     [Fact]
+    public void Account_Should_DefaultCashFlowCategory_FinancingForEquity()
+    {
+        Account.Create("3-1101", "Modal", AccountType.Equity, null, true).Value.CashFlowCategory.ShouldBe(CashFlowCategory.Financing);
+
+        Account truck = Account.Create("1-2401", "Kendaraan", AccountType.Asset, null, true).Value;
+        truck.CashFlowCategory.ShouldBe(CashFlowCategory.Operating);
+
+        truck.SetCashFlowCategory(CashFlowCategory.Investing);
+        truck.CashFlowCategory.ShouldBe(CashFlowCategory.Investing);
+    }
+
+    [Fact]
     public void Account_Should_DeriveNormalBalanceFromType_UnlessOverridden()
     {
         Account header = Account.Create("1-2", "Aset Tetap", AccountType.Asset, null, isPostable: false).Value;

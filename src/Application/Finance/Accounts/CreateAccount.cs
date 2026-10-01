@@ -8,13 +8,15 @@ using SharedKernel;
 namespace Application.Finance.Accounts;
 
 /// <param name="NormalBalance">Only needed for contra accounts; defaults from the account type.</param>
+/// <param name="CashFlowCategory">Cash flow section; defaults to financing for equity, operating otherwise.</param>
 public sealed record CreateAccountCommand(
     string Code,
     string Name,
     AccountType Type,
     Guid? ParentId,
     bool IsPostable,
-    BalanceSide? NormalBalance) : ICommand<Guid>;
+    BalanceSide? NormalBalance,
+    CashFlowCategory? CashFlowCategory = null) : ICommand<Guid>;
 
 internal sealed class CreateAccountCommandValidator : AbstractValidator<CreateAccountCommand>
 {
@@ -24,6 +26,7 @@ internal sealed class CreateAccountCommandValidator : AbstractValidator<CreateAc
         RuleFor(c => c.Name).NotEmpty().MaximumLength(150);
         RuleFor(c => c.Type).IsInEnum();
         RuleFor(c => c.NormalBalance).IsInEnum();
+        RuleFor(c => c.CashFlowCategory).IsInEnum();
     }
 }
 
@@ -48,6 +51,11 @@ internal sealed class CreateAccountCommandHandler(IApplicationDbContext context)
         if (account.IsFailure)
         {
             return Result.Failure<Guid>(account.Error);
+        }
+
+        if (command.CashFlowCategory is not null)
+        {
+            account.Value.SetCashFlowCategory(command.CashFlowCategory.Value);
         }
 
         if (await context.Accounts.AnyAsync(a => a.Code == account.Value.Code, cancellationToken))

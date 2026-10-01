@@ -7,7 +7,7 @@ using SharedKernel;
 
 namespace Application.Finance.Accounts;
 
-public sealed record UpdateAccountCommand(Guid AccountId, string Name, bool IsActive) : ICommand;
+public sealed record UpdateAccountCommand(Guid AccountId, string Name, bool IsActive, CashFlowCategory? CashFlowCategory = null) : ICommand;
 
 internal sealed class UpdateAccountCommandValidator : AbstractValidator<UpdateAccountCommand>
 {
@@ -15,6 +15,7 @@ internal sealed class UpdateAccountCommandValidator : AbstractValidator<UpdateAc
     {
         RuleFor(c => c.AccountId).NotEmpty();
         RuleFor(c => c.Name).NotEmpty().MaximumLength(150);
+        RuleFor(c => c.CashFlowCategory).IsInEnum();
     }
 }
 
@@ -31,6 +32,11 @@ internal sealed class UpdateAccountCommandHandler(IApplicationDbContext context)
         }
 
         account.Update(command.Name, command.IsActive);
+
+        if (command.CashFlowCategory is not null)
+        {
+            account.SetCashFlowCategory(command.CashFlowCategory.Value);
+        }
 
         await context.SaveChangesAsync(cancellationToken);
 

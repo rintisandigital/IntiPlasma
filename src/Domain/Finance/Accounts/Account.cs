@@ -75,15 +75,32 @@ public sealed class Account : AggregateRoot
             type,
             normalBalance ?? DefaultNormalBalance(type),
             parent?.Id,
-            isPostable);
+            isPostable)
+        {
+            CashFlowCategory = DefaultCashFlowCategory(type)
+        };
     }
+
+    /// <summary>
+    /// Cash flow section when this account is the counter account of a cash movement. Defaults to financing for
+    /// equity and operating otherwise; fixed assets (investing) and long-term loans (financing) are set explicitly.
+    /// </summary>
+    public CashFlowCategory CashFlowCategory { get; private set; } = CashFlowCategory.Operating;
 
     public static BalanceSide DefaultNormalBalance(AccountType type) =>
         type is AccountType.Asset or AccountType.Expense ? BalanceSide.Debit : BalanceSide.Credit;
+
+    public static CashFlowCategory DefaultCashFlowCategory(AccountType type) =>
+        type == AccountType.Equity ? CashFlowCategory.Financing : CashFlowCategory.Operating;
 
     public void Update(string name, bool isActive)
     {
         Name = name.Trim();
         IsActive = isActive;
+    }
+
+    public void SetCashFlowCategory(CashFlowCategory category)
+    {
+        CashFlowCategory = category;
     }
 }

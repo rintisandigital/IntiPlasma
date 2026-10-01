@@ -42,4 +42,6 @@ public static class Tags
     public const string Payables = "Finance - Payables";
     public const string CycleCost = "Costing - Cycle Cost (HPP)";
     public const string PlasmaSettlements = "Costing - Plasma Settlements";
+    public const string TaxReports = "Finance - Tax Reports";
+    public const string Monitoring = "System - Monitoring";
 }
