@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Application.Abstractions.Data;
+using Domain.Costing.PlasmaSettlements;
 using Domain.Finance.Accounts;
 using Domain.Finance.CashBank;
 using Domain.Finance.CostCenters;
@@ -121,6 +122,8 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
 
     public DbSet<PaymentVoucher> PaymentVouchers { get; set; }
 
+    public DbSet<PlasmaSettlement> PlasmaSettlements { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>().Navigation(u => u.Roles).HasField("_roles");
@@ -224,6 +227,9 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
             b.Property(c => c.ClosingPerformance).HasConversion(
                 performance => JsonSerializer.Serialize(performance, JsonSerializerOptions.Web),
                 json => JsonSerializer.Deserialize<CyclePerformance>(json, JsonSerializerOptions.Web));
+            b.Property(c => c.ClosingCost).HasConversion(
+                cost => JsonSerializer.Serialize(cost, JsonSerializerOptions.Web),
+                json => JsonSerializer.Deserialize<CycleCostSummary>(json, JsonSerializerOptions.Web));
         });
 
         modelBuilder.Entity<DailyRecording>(b =>
@@ -271,6 +277,7 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
             b.OwnsOne(l => l.VatTaxBase);
             b.OwnsOne(l => l.VatAmount);
             b.OwnsOne(l => l.CreditedAmount);
+            b.OwnsOne(l => l.CostAmount);
         });
 
         modelBuilder.Entity<CustomerReceipt>(b =>
@@ -351,12 +358,36 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
         modelBuilder.Entity<PaymentVoucher>(b =>
         {
             b.Navigation(p => p.Allocations).HasField("_allocations");
+            b.Navigation(p => p.SettlementAllocations).HasField("_settlementAllocations");
+            b.Ignore(p => p.PayeeId);
+            b.Ignore(p => p.DocumentAmounts);
             b.OwnsOne(p => p.Amount);
         });
         modelBuilder.Entity<PaymentVoucherAllocation>(b =>
         {
             b.HasKey(a => new { a.PaymentVoucherId, a.VendorInvoiceId });
             b.OwnsOne(a => a.Amount);
+        });
+        modelBuilder.Entity<PaymentVoucherSettlementAllocation>(b =>
+        {
+            b.HasKey(a => new { a.PaymentVoucherId, a.PlasmaSettlementId });
+            b.OwnsOne(a => a.Amount);
+        });
+
+        modelBuilder.Entity<PlasmaSettlement>(b =>
+        {
+            b.Navigation(s => s.Lines).HasField("_lines");
+            b.OwnsOne(s => s.GrossIncome);
+            b.OwnsOne(s => s.IncomeTaxAmount);
+            b.OwnsOne(s => s.DebtDeduction);
+            b.OwnsOne(s => s.NetPayable);
+            b.OwnsOne(s => s.Deficit);
+            b.OwnsOne(s => s.PaidAmount);
+        });
+        modelBuilder.Entity<PlasmaSettlementLine>(b =>
+        {
+            b.HasKey(l => new { l.PlasmaSettlementId, l.LineNumber });
+            b.OwnsOne(l => l.Amount);
         });
     }
 }

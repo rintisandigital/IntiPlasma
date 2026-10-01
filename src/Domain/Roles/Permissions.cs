@@ -207,6 +207,21 @@ public static class Permissions
     /// </summary>
     public const string PayablesPay = "payables:pay";
 
+    /// <summary>
+    /// Cycle cost (HPP) and plasma settlements (read only).
+    /// </summary>
+    public const string CostingRead = "costing:read";
+
+    /// <summary>
+    /// Calculate, recalculate and cancel draft plasma settlements (maker).
+    /// </summary>
+    public const string SettlementsManage = "settlements:manage";
+
+    /// <summary>
+    /// Approve plasma settlements created by someone else (checker); journals them and locks the cycle.
+    /// </summary>
+    public const string SettlementsApprove = "settlements:approve";
+
     public static readonly IReadOnlyList<string> All =
     [
         UsersRead,
@@ -262,7 +277,10 @@ public static class Permissions
         PayablesManage,
         PayablesApproveVariance,
         PayablesApprove,
-        PayablesPay
+        PayablesPay,
+        CostingRead,
+        SettlementsManage,
+        SettlementsApprove
     ];
 
     public static bool Exists(string permission) => All.Contains(permission);

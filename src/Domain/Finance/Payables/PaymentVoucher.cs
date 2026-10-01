@@ -1,15 +1,18 @@
+using System.Globalization;
 using SharedKernel;
 
 namespace Domain.Finance.Payables;
 
 /// <summary>
-/// Payment voucher (bukti kas/bank keluar) paying posted invoices of one vendor from a cash/bank account.
-/// Maker-checker: Draft → Approved (by someone other than the creator) → Paid. Paying registers the allocations on the
-/// invoices (partial payment allowed, never above the outstanding) and journals Dr hutang usaha / Cr kas/bank.
+/// Payment voucher (bukti kas/bank keluar) paying posted documents of one payee from a cash/bank account: vendor
+/// invoices of a vendor, or plasma settlements of a farmer. Maker-checker: Draft → Approved (by someone other than
+/// the creator) → Paid. Paying registers the allocations on the documents (partial payment allowed, never above the
+/// outstanding) and journals Dr hutang usaha / hutang plasma, Cr kas/bank.
 /// </summary>
 public sealed class PaymentVoucher : AggregateRoot
 {
     private readonly List<PaymentVoucherAllocation> _allocations = [];
+    private readonly List<PaymentVoucherSettlementAllocation> _settlementAllocations = [];
 
     private PaymentVoucher(Guid id)
         : base(id)
@@ -22,7 +25,18 @@ public sealed class PaymentVoucher : AggregateRoot
 
     public string Number { get; private set; }
     public Guid BranchId { get; private set; }
-    public Guid VendorId { get; private set; }
+    public PayeeType PayeeType { get; private set; }
+
+    /// <summary>
+    /// Set when the payee is a vendor.
+    /// </summary>
+    public Guid? VendorId { get; private set; }
+
+    /// <summary>
+    /// Set when the payee is a plasma farmer.
+    /// </summary>
+    public Guid? FarmerId { get; private set; }
+
     public Guid CashBankAccountId { get; private set; }
 
     /// <summary>
@@ -39,19 +53,39 @@ public sealed class PaymentVoucher : AggregateRoot
     public Guid? PaidBy { get; private set; }
     public DateTime? PaidAtUtc { get; private set; }
     public string? CancellationReason { get; private set; }
+
+    /// <summary>
+    /// Vendor invoices paid (payee = vendor).
+    /// </summary>
     public IReadOnlyCollection<PaymentVoucherAllocation> Allocations => [.. _allocations];
 
+    /// <summary>
+    /// Plasma settlements paid (payee = farmer).
+    /// </summary>
+    public IReadOnlyCollection<PaymentVoucherSettlementAllocation> SettlementAllocations => [.. _settlementAllocations];
+
+    public Guid PayeeId => PayeeType == PayeeType.Vendor ? VendorId!.Value : FarmerId!.Value;
+
+    /// <summary>
+    /// The documents paid and their amounts.
+    /// </summary>
+    public IReadOnlyList<(Guid DocumentId, Money Amount)> DocumentAmounts => PayeeType == PayeeType.Vendor
+        ? [.. _allocations.Select(a => (a.VendorInvoiceId, a.Amount))]
+        : [.. _settlementAllocations.Select(a => (a.PlasmaSettlementId, a.Amount))];
+
+    /// <param name="allocations">Vendor invoices of the vendor, or plasma settlements of the farmer.</param>
     public static Result<PaymentVoucher> Create(
         string number,
         Guid branchId,
-        Guid vendorId,
+        PayeeType payeeType,
+        Guid payeeId,
         Guid cashBankAccountId,
         DateOnly paymentDate,
         string? reference,
         string? notes,
-        IReadOnlyList<(VendorInvoice Invoice, Money Amount)> allocations)
+        IReadOnlyList<(IPayable Document, Money Amount)> allocations)
     {
-        Result validation = ValidateAllocations(branchId, vendorId, paymentDate, allocations);
+        Result validation = ValidateAllocations(branchId, payeeId, paymentDate, allocations);
         if (validation.IsFailure)
         {
             return Result.Failure<PaymentVoucher>(validation.Error);
@@ -61,7 +95,9 @@ public sealed class PaymentVoucher : AggregateRoot
         {
             Number = number,
             BranchId = branchId,
-            VendorId = vendorId,
+            PayeeType = payeeType,
+            VendorId = payeeType == PayeeType.Vendor ? payeeId : null,
+            FarmerId = payeeType == PayeeType.Farmer ? payeeId : null,
             CashBankAccountId = cashBankAccountId,
             PaymentDate = paymentDate,
             Reference = reference,
@@ -70,7 +106,15 @@ public sealed class PaymentVoucher : AggregateRoot
             Amount = allocations.Aggregate(new Money(0m), (total, a) => total + a.Amount)
         };
 
-        voucher._allocations.AddRange(allocations.Select(a => new PaymentVoucherAllocation(voucher.Id, a.Invoice.Id, a.Amount)));
+        if (payeeType == PayeeType.Vendor)
+        {
+            voucher._allocations.AddRange(allocations.Select(a => new PaymentVoucherAllocation(voucher.Id, a.Document.Id, a.Amount)));
+        }
+        else
+        {
+            voucher._settlementAllocations.AddRange(
+                allocations.Select(a => new PaymentVoucherSettlementAllocation(voucher.Id, a.Document.Id, a.Amount)));
+        }
 
         return voucher;
     }
@@ -95,28 +139,28 @@ public sealed class PaymentVoucher : AggregateRoot
     }
 
     /// <summary>
-    /// Pays an approved voucher on the actual payment date and registers the payment on each invoice.
+    /// Pays an approved voucher on the actual payment date and registers the payment on each document.
     /// </summary>
-    /// <param name="invoices">The invoices of the allocations (tracked).</param>
-    public Result Pay(DateOnly paymentDate, IReadOnlyList<VendorInvoice> invoices, Guid? userId, DateTime utcNow)
+    /// <param name="documents">The documents of the allocations (tracked).</param>
+    public Result Pay(DateOnly paymentDate, IReadOnlyList<IPayable> documents, Guid? userId, DateTime utcNow)
     {
         if (Status != PaymentVoucherStatus.Approved)
         {
             return Result.Failure(PaymentVoucherErrors.InvalidTransition(Status, PaymentVoucherStatus.Paid));
         }
 
-        List<(VendorInvoice Invoice, Money Amount)> allocations =
-            [.. _allocations.Select(a => (invoices.Single(i => i.Id == a.VendorInvoiceId), a.Amount))];
+        List<(IPayable Document, Money Amount)> allocations =
+            [.. DocumentAmounts.Select(a => (documents.Single(d => d.Id == a.DocumentId), a.Amount))];
 
-        Result validation = ValidateAllocations(BranchId, VendorId, paymentDate, allocations);
+        Result validation = ValidateAllocations(BranchId, PayeeId, paymentDate, allocations);
         if (validation.IsFailure)
         {
             return validation;
         }
 
-        foreach ((VendorInvoice invoice, Money amount) in allocations)
+        foreach ((IPayable document, Money amount) in allocations)
         {
-            invoice.RegisterPayment(amount);
+            document.RegisterPayment(amount);
         }
 
         PaymentDate = paymentDate;
@@ -144,40 +188,40 @@ public sealed class PaymentVoucher : AggregateRoot
 
     private static Result ValidateAllocations(
         Guid branchId,
-        Guid vendorId,
+        Guid payeeId,
         DateOnly paymentDate,
-        IReadOnlyList<(VendorInvoice Invoice, Money Amount)> allocations)
+        IReadOnlyList<(IPayable Document, Money Amount)> allocations)
     {
         if (allocations.Count == 0)
         {
             return Result.Failure(PaymentVoucherErrors.NoAllocations);
         }
 
-        if (allocations.GroupBy(a => a.Invoice.Id).Any(g => g.Count() > 1))
+        if (allocations.GroupBy(a => a.Document.Id).Any(g => g.Count() > 1))
         {
             return Result.Failure(PaymentVoucherErrors.DuplicateInvoice);
         }
 
-        foreach ((VendorInvoice invoice, Money amount) in allocations)
+        foreach ((IPayable document, Money amount) in allocations)
         {
-            if (invoice.BranchId != branchId || invoice.VendorId != vendorId)
+            if (document.BranchId != branchId || document.PayeeId != payeeId)
             {
-                return Result.Failure(PaymentVoucherErrors.InvoiceMismatch(invoice.Id));
+                return Result.Failure(PaymentVoucherErrors.InvoiceMismatch(document.Id));
             }
 
-            if (!invoice.IsPayable)
+            if (!document.IsPayable)
             {
-                return Result.Failure(VendorInvoiceErrors.NotPayable(invoice.Id));
+                return Result.Failure(PaymentVoucherErrors.DocumentNotPayable(document.Id));
             }
 
-            if (amount.IsNegative || amount.IsZero || amount > invoice.Outstanding)
+            if (amount.IsNegative || amount.IsZero || amount > document.Outstanding)
             {
-                return Result.Failure(VendorInvoiceErrors.OverPayment(invoice.Number!, invoice.Outstanding));
+                return Result.Failure(PaymentVoucherErrors.OverPayment(document.Number!, document.Outstanding));
             }
 
-            if (paymentDate < invoice.InvoiceDate)
+            if (paymentDate < document.DocumentDate)
             {
-                return Result.Failure(PaymentVoucherErrors.BeforeInvoiceDate(invoice.Number!));
+                return Result.Failure(PaymentVoucherErrors.BeforeInvoiceDate(document.Number!));
             }
         }
 
@@ -203,6 +247,34 @@ public sealed class PaymentVoucherAllocation
     public Money Amount { get; private set; }
 }
 
+public sealed class PaymentVoucherSettlementAllocation
+{
+    internal PaymentVoucherSettlementAllocation(Guid paymentVoucherId, Guid plasmaSettlementId, Money amount)
+    {
+        PaymentVoucherId = paymentVoucherId;
+        PlasmaSettlementId = plasmaSettlementId;
+        Amount = amount with { };
+    }
+
+    private PaymentVoucherSettlementAllocation()
+    {
+    }
+
+    public Guid PaymentVoucherId { get; private set; }
+    public Guid PlasmaSettlementId { get; private set; }
+    public Money Amount { get; private set; }
+}
+
+public enum PayeeType
+{
+    Vendor = 1,
+
+    /// <summary>
+    /// Peternak plasma (settlement payment).
+    /// </summary>
+    Farmer = 2
+}
+
 public enum PaymentVoucherStatus
 {
     Draft = 1,
@@ -212,3 +284,42 @@ public enum PaymentVoucherStatus
 }
 
 public sealed record PaymentVoucherPaidDomainEvent(Guid PaymentVoucherId) : DomainEvent;
+
+public static class PaymentVoucherErrors
+{
+    public static Error NotFound(Guid paymentVoucherId) => Error.NotFound(
+        "PaymentVouchers.NotFound",
+        $"The payment voucher with the Id = '{paymentVoucherId}' was not found");
+
+    public static Error InvalidTransition(PaymentVoucherStatus from, PaymentVoucherStatus to) => Error.Problem(
+        "PaymentVouchers.InvalidTransition",
+        $"A payment voucher cannot move from {from} to {to}");
+
+    public static Error InvoiceMismatch(Guid documentId) => Error.Problem(
+        "PaymentVouchers.InvoiceMismatch",
+        $"The document with the Id = '{documentId}' belongs to another payee or branch");
+
+    public static Error DocumentNotPayable(Guid documentId) => Error.Problem(
+        "PaymentVouchers.DocumentNotPayable",
+        $"The document with the Id = '{documentId}' is not posted/approved, or has nothing left to pay");
+
+    public static Error OverPayment(string number, Money outstanding) => Error.Problem(
+        "PaymentVouchers.OverPayment",
+        string.Create(CultureInfo.InvariantCulture, $"The payment for {number} must be positive and cannot exceed the outstanding {outstanding}"));
+
+    public static Error BeforeInvoiceDate(string number) => Error.Problem(
+        "PaymentVouchers.BeforeInvoiceDate",
+        $"The payment date cannot be before the date of {number}");
+
+    public static readonly Error SelfApprovalNotAllowed = Error.Problem(
+        "PaymentVouchers.SelfApprovalNotAllowed",
+        "A payment voucher must be approved by someone other than its creator");
+
+    public static readonly Error NoAllocations = Error.Problem(
+        "PaymentVouchers.NoAllocations",
+        "A payment voucher must pay at least one document");
+
+    public static readonly Error DuplicateInvoice = Error.Problem(
+        "PaymentVouchers.DuplicateInvoice",
+        "A document can only appear once on a payment voucher");
+}

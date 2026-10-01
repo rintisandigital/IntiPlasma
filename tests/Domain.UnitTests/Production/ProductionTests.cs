@@ -60,12 +60,13 @@ public sealed class ProductionTests
         cycle.Harvests.Single().AgeDays.ShouldBe(34);
 
         var performance = CyclePerformance.Calculate(100, 5, 0, 60, 126m, 300m, 2.1m, 34m);
-        cycle.Close(performance).Error.ShouldBe(CycleErrors.PopulationRemaining(35));
+        var cost = CycleCostSummary.Calculate(750_000m, 2_600_000m, 50_000m, 95, 201m, 0m);
+        cycle.Close(performance, cost).Error.ShouldBe(CycleErrors.PopulationRemaining(35));
 
         cycle.RecordHarvest(ChickIn.AddDays(35), 36, 1m, null).Error.ShouldBe(CycleErrors.PopulationExceeded(35));
         cycle.RecordHarvest(ChickIn.AddDays(35), 35, 75m, "Truk 2");
 
-        cycle.Close(performance).IsSuccess.ShouldBeTrue();
+        cycle.Close(performance, cost).IsSuccess.ShouldBeTrue();
         cycle.Status.ShouldBe(CycleStatus.Closed);
         cycle.ClosedDate.ShouldBe(ChickIn.AddDays(35));
         cycle.ApplyDepletion(1, 0).IsFailure.ShouldBeTrue();

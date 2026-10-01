@@ -117,12 +117,23 @@ public sealed class SalesInvoice : AggregateRoot
             ? Result.Success()
             : Result.Failure(SalesInvoiceErrors.InvalidTransition(Status, SalesInvoiceStatus.Posted));
 
-    public Result Post(string number, Guid? userId, DateTime utcNow)
+    /// <summary>
+    /// Estimated cost of goods sold of the invoice (sum of the lines).
+    /// </summary>
+    public Money CostAmount => _lines.Aggregate(Money.Zero, (total, line) => total + line.CostAmount);
+
+    /// <param name="costPerKgByCycle">Running cost per kg of every cycle on the invoice (estimated HPP).</param>
+    public Result Post(string number, Guid? userId, DateTime utcNow, IReadOnlyDictionary<Guid, decimal> costPerKgByCycle)
     {
         Result postable = EnsurePostable();
         if (postable.IsFailure)
         {
             return postable;
+        }
+
+        foreach (SalesInvoiceLine line in _lines)
+        {
+            line.SetCost(costPerKgByCycle.GetValueOrDefault(line.CycleId));
         }
 
         Number = number;

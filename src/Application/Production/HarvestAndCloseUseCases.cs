@@ -1,6 +1,7 @@
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Costing;
 using Application.Inventory;
 using Application.Sales;
 using Domain.MasterData.Items;
@@ -118,7 +119,9 @@ internal sealed class CloseCycleCommandHandler(IApplicationDbContext context, IB
             averageWeight,
             averageAge);
 
-        Result closed = cycle.Value.Close(performance);
+        CycleCostSummary cost = await CycleCosting.SummarizeAsync(context, cycle.Value, cancellationToken);
+
+        Result closed = cycle.Value.Close(performance, cost);
         if (closed.IsFailure)
         {
             return Result.Failure<CyclePerformance>(closed.Error);

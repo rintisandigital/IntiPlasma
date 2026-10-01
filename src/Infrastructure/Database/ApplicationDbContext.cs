@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Application.Abstractions.Data;
+using Domain.Costing.PlasmaSettlements;
 using Domain.Finance.Accounts;
 using Domain.Finance.CashBank;
 using Domain.Finance.CostCenters;
@@ -124,6 +125,8 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<VendorInvoice> VendorInvoices { get; set; }
 
     public DbSet<PaymentVoucher> PaymentVouchers { get; set; }
+
+    public DbSet<PlasmaSettlement> PlasmaSettlements { get; set; }
 
     internal DbSet<OutboxMessage> OutboxMessages { get; set; }
 

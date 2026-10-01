@@ -18,6 +18,7 @@ public static class AccountingEvents
     public const string StockReturnFromCycle = "StockReturnFromCycle";
     public const string CustomerAdvanceApplied = "CustomerAdvanceApplied";
     public const string SalesCreditNote = "SalesCreditNote";
+    public const string CycleCostAdjustment = "CycleCostAdjustment";
 
     /// <summary>
     /// Journal source of cash-in/cash-out transactions; their lines name the accounts, so they have no mapping.
@@ -58,7 +59,7 @@ public static class AccountingEvents
         [
             new("LiveBirdSales", "Penjualan ayam hidup (DPP)"),
             new("OutputVat", "PPN keluaran"),
-            new("CostOfGoodsSold", "HPP ayam terjual")
+            new("CostOfGoodsSold", "HPP ayam terjual (estimasi biaya per kg siklus saat posting)")
         ]),
         new(CustomerReceipt, "Penerimaan pembayaran customer",
         [
@@ -83,7 +84,12 @@ public static class AccountingEvents
         [
             new("PlasmaIncome", "Pendapatan plasma (hak plasma)"),
             new("IncomeTaxWithheld", "PPh dipotong dari pendapatan plasma"),
-            new("Deduction", "Potongan hutang/denda plasma")
+            new("Deduction", "Potongan hutang/denda plasma"),
+            new("PlasmaDeficit", "Rugi plasma (hasil negatif) yang menjadi piutang plasma")
+        ]),
+        new(CycleCostAdjustment, "Penyesuaian HPP saat tutup siklus (biaya final − HPP estimasi di invoice)",
+        [
+            new("CostOfGoodsSold", "Selisih HPP (negatif = HPP estimasi terlalu tinggi)")
         ]),
         new(PlasmaPayment, "Pembayaran ke plasma",
         [

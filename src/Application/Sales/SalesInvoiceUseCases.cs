@@ -3,12 +3,14 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Numbering;
+using Application.Costing;
 using Application.Finance.AutoJournal;
 using Application.Inventory;
 using Application.Production;
 using Domain.Finance.JournalMappings;
 using Domain.MasterData.Customers;
 using Domain.MasterData.TaxCodes;
+using Domain.Partnership.Cycles;
 using Domain.Sales.DeliveryOrders;
 using Domain.Sales.SalesInvoices;
 using FluentValidation;
@@ -153,10 +155,22 @@ internal sealed class PostSalesInvoiceCommandHandler(
             return Result.Failure<string>(postable.Error);
         }
 
+        // Estimated HPP: each cycle's running cost per kg at the moment of posting.
+        var cycleIds = invoice.Value.Lines.Select(l => l.CycleId).Distinct().ToList();
+        List<ProductionCycle> cycles = await context.ProductionCycles.AsNoTracking()
+            .Where(c => cycleIds.Contains(c.Id))
+            .ToListAsync(cancellationToken);
+
+        var costPerKg = new Dictionary<Guid, decimal>();
+        foreach (ProductionCycle cycle in cycles)
+        {
+            costPerKg[cycle.Id] = await CycleCosting.CostPerKgAsync(context, cycle, cancellationToken);
+        }
+
         string number = await numberGenerator.NextForBranchAsync(
             context, DocumentPrefix, invoice.Value.BranchId, invoice.Value.InvoiceDate, cancellationToken);
 
-        Result posted = invoice.Value.Post(number, userContext.UserId, dateTimeProvider.UtcNow);
+        Result posted = invoice.Value.Post(number, userContext.UserId, dateTimeProvider.UtcNow, costPerKg);
         if (posted.IsFailure)
         {
             return Result.Failure<string>(posted.Error);
@@ -196,8 +210,8 @@ internal sealed class CancelSalesInvoiceCommandHandler(IApplicationDbContext con
 }
 
 /// <summary>
-/// Journals a posted sales invoice: Dr piutang usaha / Cr penjualan ayam hidup (DPP) and Dr piutang / Cr PPN keluaran.
-/// The cost of the birds sold (HPP) is recognized later from the cycle cost (phase 7), not here.
+/// Journals a posted sales invoice: Dr piutang usaha / Cr penjualan ayam hidup (DPP), Dr piutang / Cr PPN keluaran,
+/// and the estimated cost of the birds sold, Dr HPP / Cr ayam dalam proses (trued up when the cycle closes).
 /// </summary>
 internal sealed class SalesInvoicePostedDomainEventHandler(IApplicationDbContext context, IAutoJournalService autoJournal)
     : IDomainEventHandler<SalesInvoicePostedDomainEvent>
@@ -205,6 +219,7 @@ internal sealed class SalesInvoicePostedDomainEventHandler(IApplicationDbContext
     public async Task Handle(SalesInvoicePostedDomainEvent domainEvent, CancellationToken cancellationToken)
     {
         SalesInvoice invoice = await context.SalesInvoices.AsNoTracking()
+            .Include(i => i.Lines)
             .SingleAsync(i => i.Id == domainEvent.SalesInvoiceId, cancellationToken);
 
         string customer = await context.Customers
@@ -220,7 +235,8 @@ internal sealed class SalesInvoicePostedDomainEventHandler(IApplicationDbContext
             $"Penjualan {invoice.Number} kepada {customer}",
             [
                 new AccountingAmount("LiveBirdSales", invoice.Subtotal),
-                new AccountingAmount("OutputVat", invoice.VatAmount)
+                new AccountingAmount("OutputVat", invoice.VatAmount),
+                new AccountingAmount("CostOfGoodsSold", invoice.CostAmount)
             ]),
             cancellationToken);
     }

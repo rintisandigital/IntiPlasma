@@ -165,7 +165,7 @@ tests/
 - Cash In/Out, Petty Cash, Bank Transfer, Bank Reconciliation, Cash & Bank Ledger.
 - Sisa AR dari Fase 5 (keputusan 2026-10-01): *void* penerimaan customer (jurnal pembalik), uang muka penjualan, nota kredit/retur penjualan.
 
-### Fase 7 — HPP & Settlement Plasma
+### Fase 7 — HPP & Settlement Plasma ✅ (selesai 2026-10-01, lihat §13)
 - CycleCost: akumulasi biaya per siklus (DOC, pakan, OVK, biaya lain, alokasi overhead) → HPP per kg & per ekor; HPP harian (estimasi berjalan).
 - PlasmaSettlement: pendapatan plasma = nilai ayam @harga kontrak − sapronak @harga kontrak + bonus/insentif − potongan (hutang, denda) → Hutang Plasma → approval → auto journal → pembayaran lewat Payment Voucher.
 - Slip settlement per plasma.
@@ -492,3 +492,54 @@ Migration: `Phase6_PayablesCashBank` (tabel baru di schema `finance` dan `sales`
 - PPh atas invoice vendor selalu dijurnal ke akun mapping `IncomeTaxWithheld` (default Hutang PPh 23). PPh 22/4(2) perlu override mapping per cabang atau per akun ke depan.
 - Rate limiter global 100 request/menit per user berlaku (untuk skrip verifikasi dinaikkan lewat env `RateLimiting__Global__PermitLimit`).
 - Diverifikasi end-to-end ke PostgreSQL lokal (database sementara), **70 skenario lulus**, termasuk user checker kedua, CSV rekening koran (pemisah `;`, tanggal campuran, field ber-kutip), rekonsiliasi dua periode dengan cek dalam perjalanan (pencocokan manual karena lewat 3 hari), dan neraca saldo seimbang (GRNI 7,5 jt; Selisih Harga 200 rb; PPN Masukan 2.860.000; Hutang PPh 23 348.000; Hutang Usaha 4.546.000; Uang Muka Penjualan 1.266.000; Retur Penjualan 1 jt; PPN Keluaran 4.334.000; Piutang 0).
+
+---
+
+## 13. Realisasi Fase 7 — HPP & Settlement Plasma
+
+Migration: `Phase7_CostingSettlement` (schema baru `costing`; kolom `cost_amount` di `sales.sales_invoice_lines`, `closing_cost` (jsonb) di `partnership.production_cycles`, `payee_type`/`farmer_id` di `finance.payment_vouchers` dengan `vendor_id` menjadi nullable, tabel `finance.payment_voucher_settlement_allocations`).
+
+**Keputusan (2026-10-01)**
+| Topik | Keputusan |
+|---|---|
+| Pengakuan HPP penjualan | **Per invoice dengan HPP estimasi**, dikoreksi saat tutup siklus |
+| Pembayaran ke plasma | **Payment Voucher diperluas**: penerima vendor **atau** peternak plasma |
+| Hasil settlement negatif (harga kontrak) | Menjadi **piutang plasma** (1-1302), bisa dipotong dari settlement berikutnya |
+| Bagi hasil | Laba siklus = penjualan bersih (DPP − nota kredit) − biaya siklus; plasma dapat %; **rugi ditanggung inti** (bagian plasma 0) |
+| Harga jaminan ayam | **Per panen (truk)** sesuai bobot rata-rata panen itu |
+| Approval settlement | **Maker-checker** |
+
+**HPP siklus** (`GET /api/v1/cycles/{id}/cost`)
+- Biaya siklus = sapronak **terpakai** di kandang dengan harga moving average, diambil dari kartu stok gudang kandang per siklus: DOC ditebar (chick-in), pakan & OVK terpakai (recording, termasuk koreksi revisi). Sisa stok di kandang belum dihitung, karena akan diretur atau dipakai.
+- **HPP/kg berjalan** = biaya terpakai / (kg dipanen + populasi × BW recording terakhir; jika belum pernah ditimbang, pakai rata-rata bobot panen).
+- Respons: rincian per item, DOC/pakan/OVK, total, bobot hidup, HPP/kg & /ekor, HPP yang sudah diakui di invoice, penyesuaian (setelah tutup), pendapatan plasma & total biaya + kemitraan (setelah settlement).
+
+**HPP per invoice (estimasi)**
+- Saat invoice penjualan diposting, setiap baris mendapat `costAmount` = HPP/kg berjalan siklus × kg. Jurnal `SalesInvoice` kini memuat komponen `CostOfGoodsSold`: Dr HPP Ayam Hidup (5-1101) / Cr Ayam Dalam Proses (1-1501).
+
+**Tutup siklus → biaya final & penyesuaian**
+- Saat tutup, `ClosingCost` dibekukan (DOC/pakan/OVK, total, HPP/kg & /ekor, HPP diakui, penyesuaian). Karena sisa sapronak wajib diretur, biaya final = saldo Ayam Dalam Proses siklus.
+- Event baru `CycleCostAdjustment` (komponen `CostOfGoodsSold`): penyesuaian = biaya final − HPP diakui; negatif membalik sisi. Ayam Dalam Proses siklus menjadi **nol**.
+
+**Settlement plasma** (`/api/v1/costing/settlements`)
+- `POST` {cycleId, settlementDate, debtDeduction, notes} → draft bernomor `STL/...` untuk siklus plasma berstatus **Closed** (satu per siklus, kecuali yang dibatalkan). `PUT {id}` menghitung ulang draft. `approve` (checker, `settlements:approve`) → jurnal + siklus **Settled**. `cancel` untuk draft.
+- Kebijakan per skema kontrak (`ISettlementPolicy`, dari *snapshot* kontrak siklus):
+  - **Harga kontrak**: per panen kg × harga jaminan rentang bobot rata-rata panen [min, max) − sapronak terpakai × harga kontrak (setiap item wajib punya harga kontrak) ± insentif/denda.
+  - **Bagi hasil**: % × laba siklus (0 bila rugi) ± insentif/denda.
+  - Insentif/denda kontrak berlaku bila metrik penutupan (FCR, IP, deplesi %, BW rata-rata; `None` = selalu) berada dalam [RangeFrom, RangeTo]; basis per kg / per ekor / lump sum.
+- PPh dari kode PPh kontrak atas pendapatan (hanya bila positif). **Potongan hutang** ≤ pendapatan − PPh. Hasil negatif → `deficit`, tidak ada PPh/pembayaran, status langsung `Paid` setelah disetujui.
+- Jurnal `PlasmaSettlement`: `PlasmaIncome` Dr Beban Kemitraan (5-1201) / Cr Hutang Plasma (2-1201); `IncomeTaxWithheld` Dr Hutang Plasma / Cr Hutang PPh; `Deduction` Dr Hutang Plasma / Cr Piutang Plasma; `PlasmaDeficit` (baru) Dr Piutang Plasma / Cr Beban Kemitraan.
+- Slip settlement = `GET {id}` (baris perhitungan: tipe, uraian, qty, harga, nilai; total, PPh, potongan, netto, terbayar).
+
+**Pembayaran plasma** (`POST /api/v1/finance/payment-vouchers/plasma` {cashBankAccountId, farmerId, paymentDate, reference, notes, allocations: [{plasmaSettlementId, amount}]})
+- Payment Voucher kini punya `payeeType` (`Vendor`/`Farmer`). Approve/pay/cancel tetap di endpoint yang sama. Dokumen yang dibayar memakai antarmuka `IPayable` (VendorInvoice, PlasmaSettlement).
+- Jurnal `PlasmaPayment`: Dr Hutang Plasma / Cr kas/bank PV.
+- ⚠️ Respons PV berubah: tambah `payeeType`, `payeeId`, `payeeCode`, `payeeName`, `farmerId`; `vendorCode`/`vendorName` diganti `payeeCode`/`payeeName`; alokasi kini `{documentType, documentId, number, reference, documentDate, amount}`. Filter daftar PV: `farmerId`. Kode error PV generik: `PaymentVouchers.OverPayment` & `PaymentVouchers.DocumentNotPayable` (sebelumnya `VendorInvoices.*`).
+
+**Permission baru**: `costing:read`, `settlements:manage`, `settlements:approve`.
+
+**Catatan**
+- Biaya siklus belum memuat biaya lain-lain/overhead (listrik, tenaga kerja, penyusutan kandang inti). Kandidat Fase 8 (alokasi overhead via cost center).
+- HPP estimasi memakai BW recording terakhir. Bila BW lama tidak diperbarui, estimasi bisa meleset, tetapi selalu dikoreksi penuh saat tutup siklus.
+- Potongan hutang plasma tidak dicek terhadap saldo piutang plasma per peternak (belum ada sub-ledger piutang plasma). Batasnya hanya pendapatan − PPh.
+- Diverifikasi end-to-end ke PostgreSQL lokal (database sementara), **32 skenario lulus**: dua siklus plasma (A untung dengan bonus FCR, PPh 2%, potongan hutang 3,3 jt dari rugi siklus B; B rugi → piutang plasma), HPP estimasi dua invoice (16.918,46/kg dan 17.358,70/kg), penyesuaian HPP 418.231,10 saat tutup, maker-checker settlement, PV plasma, dan neraca saldo seimbang dengan Ayam Dalam Proses, Piutang Plasma, dan Hutang Plasma = 0.

@@ -14,6 +14,7 @@ public sealed class SalesTests
     private static readonly Guid CustomerId = Guid.NewGuid();
     private static readonly Guid LiveBird = Guid.NewGuid();
     private static readonly DateOnly OrderDate = new(2026, 10, 1);
+    private static readonly Dictionary<Guid, decimal> NoCost = [];
 
     /// <summary>
     /// 2.000 birds, estimated 4.000 kg @ Rp 20.000/kg = Rp 80.000.000.
@@ -242,12 +243,12 @@ public sealed class SalesTests
         delivery.SalesInvoiceId.ShouldBeNull();
 
         SalesInvoice invoice = SalesInvoice.CreateDraft([delivery], OrderDate, 0, null, new Dictionary<Guid, TaxCode>()).Value;
-        invoice.Post("INV/1", Guid.NewGuid(), DateTime.UtcNow).IsSuccess.ShouldBeTrue();
+        invoice.Post("INV/1", Guid.NewGuid(), DateTime.UtcNow, NoCost).IsSuccess.ShouldBeTrue();
 
         invoice.Number.ShouldBe("INV/1");
         invoice.DomainEvents.OfType<SalesInvoicePostedDomainEvent>().ShouldHaveSingleItem();
         invoice.Cancel("batal", [delivery]).Error.Code.ShouldBe("SalesInvoices.InvalidTransition");
-        invoice.Post("INV/2", null, DateTime.UtcNow).Error.Code.ShouldBe("SalesInvoices.InvalidTransition");
+        invoice.Post("INV/2", null, DateTime.UtcNow, NoCost).Error.Code.ShouldBe("SalesInvoices.InvalidTransition");
     }
 
     [Fact]
@@ -258,7 +259,7 @@ public sealed class SalesTests
 
         invoice.RegisterPayment(new Money(1m)).Error.ShouldBe(SalesInvoiceErrors.NotPayable(invoice.Id));
 
-        invoice.Post("INV/1", null, DateTime.UtcNow);
+        invoice.Post("INV/1", null, DateTime.UtcNow, NoCost);
         invoice.RegisterPayment(new Money(15_000_000m)).IsSuccess.ShouldBeTrue();
         invoice.Status.ShouldBe(SalesInvoiceStatus.PartiallyPaid);
         invoice.Outstanding.ShouldBe(new Money(25_000_000m));
@@ -274,7 +275,7 @@ public sealed class SalesTests
     {
         DeliveryOrder delivery = Deliver(ApprovedOrder(), Harvest(1_000, 2_000m));
         SalesInvoice invoice = SalesInvoice.CreateDraft([delivery], OrderDate, 0, null, new Dictionary<Guid, TaxCode>()).Value;
-        invoice.Post("INV/1", null, DateTime.UtcNow);
+        invoice.Post("INV/1", null, DateTime.UtcNow, NoCost);
 
         Receipt(Guid.NewGuid(), OrderDate, [(invoice, new Money(1m))])
             .Error.ShouldBe(CustomerReceiptErrors.InvoiceMismatch(invoice.Id));
@@ -337,7 +338,7 @@ public sealed class SalesTests
         ppn.SetRates([(new DateOnly(2025, 1, 1), 11m, 1m)]);
         DeliveryOrder delivery = Deliver(ApprovedOrder(ppn.Id), Harvest(1_000, 2_000m));
         SalesInvoice invoice = SalesInvoice.CreateDraft([delivery], OrderDate, 0, null, new Dictionary<Guid, TaxCode> { [ppn.Id] = ppn }).Value;
-        invoice.Post("INV/1", null, DateTime.UtcNow);
+        invoice.Post("INV/1", null, DateTime.UtcNow, NoCost);
 
         // DPP 40.000.000 + PPN 4.400.000; credit 1.000.000 of DPP (e.g. susut timbang) with PPN 110.000.
         SalesCreditNote.Create("CN/1", invoice, OrderDate, "susut", [(1, new Money(40_000_001m))])
@@ -358,7 +359,7 @@ public sealed class SalesTests
     {
         DeliveryOrder delivery = Deliver(ApprovedOrder(), Harvest(1_000, 2_000m));
         SalesInvoice invoice = SalesInvoice.CreateDraft([delivery], OrderDate, 0, null, new Dictionary<Guid, TaxCode>()).Value;
-        invoice.Post("INV/1", null, DateTime.UtcNow);
+        invoice.Post("INV/1", null, DateTime.UtcNow, NoCost);
 
         return invoice;
     }

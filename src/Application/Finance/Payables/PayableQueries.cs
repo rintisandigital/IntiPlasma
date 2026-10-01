@@ -33,7 +33,8 @@ public sealed record GetPaymentVouchersQuery(
     Guid? VendorId,
     PaymentVoucherStatus? Status,
     DateOnly? From,
-    DateOnly? To) : IQuery<PagedList<PaymentVoucherResponse>>;
+    DateOnly? To,
+    Guid? FarmerId = null) : IQuery<PagedList<PaymentVoucherResponse>>;
 
 public sealed record GetPaymentVoucherByIdQuery(Guid PaymentVoucherId) : IQuery<PaymentVoucherResponse>;
 
@@ -181,13 +182,16 @@ public sealed record PaymentVoucherResponse
     public const string Select =
         """
         SELECT p.id AS Id, p.number AS Number, p.branch_id AS BranchId, b.code AS BranchCode,
-               p.vendor_id AS VendorId, v.code AS VendorCode, v.name AS VendorName,
+               p.payee_type AS PayeeType, COALESCE(p.vendor_id, p.farmer_id) AS PayeeId,
+               COALESCE(v.code, f.code) AS PayeeCode, COALESCE(v.name, f.name) AS PayeeName,
+               p.vendor_id AS VendorId, p.farmer_id AS FarmerId,
                p.cash_bank_account_id AS CashBankAccountId, cb.code AS CashBankCode, cb.name AS CashBankName,
                p.payment_date AS PaymentDate, p.reference AS Reference, p.notes AS Notes, p.amount AS Amount, p.status AS Status,
                p.approved_at_utc AS ApprovedAtUtc, p.paid_at_utc AS PaidAtUtc, p.cancellation_reason AS CancellationReason
         FROM finance.payment_vouchers p
         JOIN master.branches b ON b.id = p.branch_id
-        JOIN master.vendors v ON v.id = p.vendor_id
+        LEFT JOIN master.vendors v ON v.id = p.vendor_id
+        LEFT JOIN master.farmers f ON f.id = p.farmer_id
         JOIN finance.cash_bank_accounts cb ON cb.id = p.cash_bank_account_id
         """;
 
@@ -199,11 +203,20 @@ public sealed record PaymentVoucherResponse
 
     public string BranchCode { get; init; }
 
-    public Guid VendorId { get; init; }
+    /// <summary>
+    /// "Vendor" or "Farmer" (plasma settlement payment).
+    /// </summary>
+    public string PayeeType { get; init; }
 
-    public string VendorCode { get; init; }
+    public Guid PayeeId { get; init; }
 
-    public string VendorName { get; init; }
+    public string PayeeCode { get; init; }
+
+    public string PayeeName { get; init; }
+
+    public Guid? VendorId { get; init; }
+
+    public Guid? FarmerId { get; init; }
 
     public Guid CashBankAccountId { get; init; }
 
@@ -233,7 +246,15 @@ public sealed record PaymentVoucherResponse
     public IReadOnlyList<PaymentAllocationResponse>? Allocations { get; init; }
 }
 
-public sealed record PaymentAllocationResponse(Guid VendorInvoiceId, string? InvoiceNumber, string VendorInvoiceNumber, DateOnly DueDate, decimal Amount);
+/// <param name="DocumentType">"VendorInvoice" or "PlasmaSettlement".</param>
+/// <param name="Reference">The vendor's invoice number, or the cycle number of a settlement.</param>
+public sealed record PaymentAllocationResponse(
+    string DocumentType,
+    Guid DocumentId,
+    string? Number,
+    string Reference,
+    DateOnly DocumentDate,
+    decimal Amount);
 
 public sealed record PayableLedgerResponse(
     Guid VendorId,
@@ -411,6 +432,7 @@ internal sealed class GetPaymentVouchersQueryHandler(IDbConnectionFactory dbConn
             $"""
             WHERE {PayableSql.Branch("p")}
               AND (@VendorId::uuid IS NULL OR p.vendor_id = @VendorId)
+              AND (@FarmerId::uuid IS NULL OR p.farmer_id = @FarmerId)
               AND (@Status::text IS NULL OR p.status = @Status)
               AND (@From::date IS NULL OR p.payment_date >= @From)
               AND (@To::date IS NULL OR p.payment_date <= @To)
@@ -431,6 +453,7 @@ internal sealed class GetPaymentVouchersQueryHandler(IDbConnectionFactory dbConn
                 scope.BranchIds,
                 query.BranchId,
                 query.VendorId,
+                query.FarmerId,
                 Status = query.Status?.ToString(),
                 query.From,
                 query.To
@@ -451,12 +474,19 @@ internal sealed class GetPaymentVoucherByIdQueryHandler(IDbConnectionFactory dbC
             {PaymentVoucherResponse.Select}
             WHERE p.id = @PaymentVoucherId;
 
-            SELECT a.vendor_invoice_id AS VendorInvoiceId, i.number AS InvoiceNumber, i.vendor_invoice_number AS VendorInvoiceNumber,
-                   i.due_date AS DueDate, a.amount AS Amount
-            FROM finance.payment_voucher_allocations a
-            JOIN finance.vendor_invoices i ON i.id = a.vendor_invoice_id
-            WHERE a.payment_voucher_id = @PaymentVoucherId
-            ORDER BY i.due_date, i.number;
+            SELECT * FROM (
+                SELECT 'VendorInvoice' AS DocumentType, a.vendor_invoice_id AS DocumentId, i.number AS Number,
+                       i.vendor_invoice_number AS Reference, i.invoice_date AS DocumentDate, a.amount AS Amount
+                FROM finance.payment_voucher_allocations a
+                JOIN finance.vendor_invoices i ON i.id = a.vendor_invoice_id
+                WHERE a.payment_voucher_id = @PaymentVoucherId
+                UNION ALL
+                SELECT 'PlasmaSettlement', a.plasma_settlement_id, s.number, c.number, s.settlement_date, a.amount
+                FROM finance.payment_voucher_settlement_allocations a
+                JOIN costing.plasma_settlements s ON s.id = a.plasma_settlement_id
+                JOIN partnership.production_cycles c ON c.id = s.cycle_id
+                WHERE a.payment_voucher_id = @PaymentVoucherId) d
+            ORDER BY d.DocumentDate, d.Number;
             """;
 
         await using SqlMapper.GridReader multi = await connection.QueryMultipleAsync(

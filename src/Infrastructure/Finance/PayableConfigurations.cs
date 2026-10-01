@@ -1,7 +1,9 @@
+using Domain.Costing.PlasmaSettlements;
 using Domain.Finance.CashBank;
 using Domain.Finance.Payables;
 using Domain.Inventory.GoodsReceipts;
 using Domain.MasterData.Branches;
+using Domain.MasterData.Farmers;
 using Domain.MasterData.Items;
 using Domain.MasterData.TaxCodes;
 using Domain.MasterData.Uoms;
@@ -92,9 +94,19 @@ internal sealed class PaymentVoucherConfiguration : IEntityTypeConfiguration<Pay
         builder.HasIndex(p => p.Number).IsUnique();
         builder.HasIndex(p => new { p.BranchId, p.PaymentDate });
         builder.HasIndex(p => new { p.VendorId, p.Status });
+        builder.HasIndex(p => new { p.FarmerId, p.Status });
+
+        // Vouchers created before plasma payments existed pay vendors.
+        builder.Property(p => p.PayeeType).HasDefaultValue(PayeeType.Vendor).HasSentinel((PayeeType)0);
 
         builder.HasOne<Branch>().WithMany().HasForeignKey(p => p.BranchId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Vendor>().WithMany().HasForeignKey(p => p.VendorId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Farmer>().WithMany().HasForeignKey(p => p.FarmerId).OnDelete(DeleteBehavior.Restrict);
+        builder.Ignore(p => p.PayeeId);
+        builder.Ignore(p => p.DocumentAmounts);
+
+        builder.HasMany(p => p.SettlementAllocations).WithOne().HasForeignKey(a => a.PaymentVoucherId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(p => p.SettlementAllocations).HasField("_settlementAllocations").UsePropertyAccessMode(PropertyAccessMode.Field);
         builder.HasOne<CashBankAccount>().WithMany().HasForeignKey(p => p.CashBankAccountId).OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(p => p.Allocations).WithOne().HasForeignKey(a => a.PaymentVoucherId).OnDelete(DeleteBehavior.Cascade);
@@ -112,5 +124,18 @@ internal sealed class PaymentVoucherAllocationConfiguration : IEntityTypeConfigu
         builder.HasIndex(a => a.VendorInvoiceId);
 
         builder.HasOne<VendorInvoice>().WithMany().HasForeignKey(a => a.VendorInvoiceId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class PaymentVoucherSettlementAllocationConfiguration : IEntityTypeConfiguration<PaymentVoucherSettlementAllocation>
+{
+    public void Configure(EntityTypeBuilder<PaymentVoucherSettlementAllocation> builder)
+    {
+        builder.ToTable("payment_voucher_settlement_allocations", Schemas.Finance);
+        builder.HasKey(a => new { a.PaymentVoucherId, a.PlasmaSettlementId });
+        builder.ComplexMoney(a => a.Amount, "amount");
+        builder.HasIndex(a => a.PlasmaSettlementId);
+
+        builder.HasOne<PlasmaSettlement>().WithMany().HasForeignKey(a => a.PlasmaSettlementId).OnDelete(DeleteBehavior.Restrict);
     }
 }

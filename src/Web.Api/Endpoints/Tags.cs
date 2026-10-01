@@ -40,4 +40,6 @@ public static class Tags
     public const string VendorInvoices = "Finance - Vendor Invoices";
     public const string PaymentVouchers = "Finance - Payment Vouchers";
     public const string Payables = "Finance - Payables";
+    public const string CycleCost = "Costing - Cycle Cost (HPP)";
+    public const string PlasmaSettlements = "Costing - Plasma Settlements";
 }

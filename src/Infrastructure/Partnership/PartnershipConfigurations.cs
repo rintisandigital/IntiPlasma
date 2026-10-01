@@ -112,6 +112,12 @@ internal sealed class ProductionCycleConfiguration : IEntityTypeConfiguration<Pr
                 performance => JsonSerializer.Serialize(performance, SnapshotSerializerOptions),
                 json => JsonSerializer.Deserialize<CyclePerformance>(json, SnapshotSerializerOptions));
 
+        builder.Property(c => c.ClosingCost)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                cost => JsonSerializer.Serialize(cost, SnapshotSerializerOptions),
+                json => JsonSerializer.Deserialize<CycleCostSummary>(json, SnapshotSerializerOptions));
+
         builder.HasMany(c => c.Harvests).WithOne().HasForeignKey(h => h.CycleId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(c => c.Harvests).HasField("_harvests").UsePropertyAccessMode(PropertyAccessMode.Field);
 

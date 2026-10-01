@@ -12,7 +12,7 @@ namespace Domain.Finance.Payables;
 /// Posting clears hutang belum ditagih at the receipt value, books the price difference, input VAT and the income tax
 /// withheld, and gives the invoice its number. A price difference above the vendor's tolerance needs an approval reason.
 /// </summary>
-public sealed class VendorInvoice : AggregateRoot
+public sealed class VendorInvoice : AggregateRoot, IPayable
 {
     private readonly List<VendorInvoiceLine> _lines = [];
 
@@ -98,6 +98,10 @@ public sealed class VendorInvoice : AggregateRoot
     public Money Outstanding => Total - PaidAmount;
 
     public bool IsPayable => Status is VendorInvoiceStatus.Posted or VendorInvoiceStatus.PartiallyPaid;
+
+    Guid IPayable.PayeeId => VendorId;
+
+    DateOnly IPayable.DocumentDate => InvoiceDate;
 
     /// <summary>
     /// Creates a draft and registers the billed quantities on the goods receipts (so they cannot be billed twice).

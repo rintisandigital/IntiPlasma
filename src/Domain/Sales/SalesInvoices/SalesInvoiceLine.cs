@@ -71,8 +71,19 @@ public sealed class SalesInvoiceLine
 
     public Money CreditableAmount => Amount - CreditedAmount;
 
+    /// <summary>
+    /// Estimated cost of the birds sold (HPP), set when the invoice is posted: the cycle's running cost per kg ×
+    /// weighed kg. The difference with the final cycle cost is journaled when the cycle closes.
+    /// </summary>
+    public Money CostAmount { get; private set; } = new(0m);
+
     internal void AddCredit(Money amount)
     {
         CreditedAmount += amount;
+    }
+
+    internal void SetCost(decimal costPerKg)
+    {
+        CostAmount = new Money(costPerKg * WeightKg);
     }
 }

@@ -1,3 +1,4 @@
+using Domain.Costing.PlasmaSettlements;
 using Domain.Finance.Accounts;
 using Domain.Finance.CashBank;
 using Domain.Finance.CostCenters;
@@ -85,6 +86,8 @@ public interface IApplicationDbContext
     DbSet<BankReconciliation> BankReconciliations { get; }
     DbSet<VendorInvoice> VendorInvoices { get; }
     DbSet<PaymentVoucher> PaymentVouchers { get; }
+
+    DbSet<PlasmaSettlement> PlasmaSettlements { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

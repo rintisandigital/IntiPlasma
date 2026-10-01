@@ -77,6 +77,11 @@ public sealed class ProductionCycle : AggregateRoot
     /// </summary>
     public CyclePerformance? ClosingPerformance { get; private set; }
 
+    /// <summary>
+    /// Final cost (HPP) frozen when the cycle is closed; null for cycles closed before cost tracking existed.
+    /// </summary>
+    public CycleCostSummary? ClosingCost { get; private set; }
+
     public IReadOnlyCollection<CycleHarvest> Harvests => [.. _harvests];
 
     public int CurrentPopulation => (InitialPopulation ?? 0) - TotalMortality - TotalCulling - HarvestedBirds;
@@ -152,9 +157,9 @@ public sealed class ProductionCycle : AggregateRoot
 
     /// <summary>
     /// Closes a fully harvested cycle. The caller checks that no sapronak is left in the coop warehouse
-    /// and calculates the performance from the recordings.
+    /// and calculates the performance from the recordings and the cost from the stock card.
     /// </summary>
-    public Result Close(CyclePerformance performance)
+    public Result Close(CyclePerformance performance, CycleCostSummary cost)
     {
         if (Status != CycleStatus.Harvesting)
         {
@@ -168,9 +173,25 @@ public sealed class ProductionCycle : AggregateRoot
 
         ClosedDate = _harvests.Max(h => h.Date);
         ClosingPerformance = performance;
+        ClosingCost = cost;
         Status = CycleStatus.Closed;
 
         Raise(new CycleClosedDomainEvent(Id));
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// The plasma settlement of the closed cycle was approved; the cycle is locked.
+    /// </summary>
+    public Result MarkSettled()
+    {
+        if (Status != CycleStatus.Closed)
+        {
+            return Result.Failure(CycleErrors.InvalidTransition(Status, CycleStatus.Settled));
+        }
+
+        Status = CycleStatus.Settled;
 
         return Result.Success();
     }

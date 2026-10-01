@@ -125,12 +125,13 @@ internal sealed class PayableEndpoints : IEndpoint
             Guid? branchId,
             Guid? vendorId,
             PaymentVoucherStatus? status,
+            Guid? farmerId,
             DateOnly? from,
             DateOnly? to,
             IQueryHandler<GetPaymentVouchersQuery, PagedList<PaymentVoucherResponse>> handler,
             CancellationToken cancellationToken) =>
         {
-            var query = new GetPaymentVouchersQuery(new PageRequest(page, pageSize, search), branchId, vendorId, status, from, to);
+            var query = new GetPaymentVouchersQuery(new PageRequest(page, pageSize, search), branchId, vendorId, status, from, to, farmerId);
 
             Result<PagedList<PaymentVoucherResponse>> result = await handler.Handle(query, cancellationToken);
 
@@ -152,6 +153,18 @@ internal sealed class PayableEndpoints : IEndpoint
         group.MapPost("", async (
             CreatePaymentVoucherCommand command,
             ICommandHandler<CreatePaymentVoucherCommand, CreatePaymentVoucherResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<CreatePaymentVoucherResponse> result = await handler.Handle(command, cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.PayablesManage)
+        .WithIdempotency();
+
+        group.MapPost("plasma", async (
+            CreatePlasmaPaymentVoucherCommand command,
+            ICommandHandler<CreatePlasmaPaymentVoucherCommand, CreatePaymentVoucherResponse> handler,
             CancellationToken cancellationToken) =>
         {
             Result<CreatePaymentVoucherResponse> result = await handler.Handle(command, cancellationToken);

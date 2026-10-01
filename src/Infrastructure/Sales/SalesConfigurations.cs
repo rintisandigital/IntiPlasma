@@ -146,6 +146,7 @@ internal sealed class SalesInvoiceLineConfiguration : IEntityTypeConfiguration<S
         builder.ComplexMoney(l => l.VatTaxBase, "vat_tax_base");
         builder.ComplexMoney(l => l.VatAmount, "vat_amount");
         builder.ComplexMoney(l => l.CreditedAmount, "credited_amount");
+        builder.ComplexMoney(l => l.CostAmount, "cost_amount");
         builder.HasIndex(l => l.DeliveryOrderId);
         builder.HasIndex(l => l.CycleId);
 

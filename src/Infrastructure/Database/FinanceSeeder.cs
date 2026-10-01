@@ -121,6 +121,8 @@ internal static class FinanceSeeder
         (AccountingEvents.PlasmaSettlement, "PlasmaIncome", "5-1201", "2-1201"),
         (AccountingEvents.PlasmaSettlement, "IncomeTaxWithheld", "2-1201", "2-1303"),
         (AccountingEvents.PlasmaSettlement, "Deduction", "2-1201", "1-1302"),
+        (AccountingEvents.PlasmaSettlement, "PlasmaDeficit", "1-1302", "5-1201"),
+        (AccountingEvents.CycleCostAdjustment, "CostOfGoodsSold", "5-1101", "1-1501"),
         (AccountingEvents.PlasmaPayment, "Paid", "2-1201", "1-1201"),
         (AccountingEvents.StockReturnFromCycle, "FeedReturned", "1-1402", "1-1501"),
         (AccountingEvents.StockReturnFromCycle, "OvkReturned", "1-1403", "1-1501")

@@ -1,7 +1,7 @@
 # Rangkuman Proyek — Aplikasi Peternakan Ayam Broiler Inti-Plasma
 
-> Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4) dan 2026-10-01 (Fase 5 & 6).
-> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§12. Dokumen ini adalah titik awal untuk melanjutkan Fase 7.
+> Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4) dan 2026-10-01 (Fase 5–7).
+> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§13. Dokumen ini adalah titik awal untuk melanjutkan Fase 8.
 
 ---
 
@@ -32,6 +32,12 @@
 | 14 | Payment Voucher | **Maker-checker**: Draft → Approved (user lain) → Paid |
 | 15 | Kas & bank | **Master Kas/Bank** (Kas / Bank / Kas Kecil per cabang) → tepat satu akun COA |
 | 16 | Rekonsiliasi bank | Rekening koran diinput / diimpor **CSV**, dicocokkan (auto ±3 hari atau manual) dengan mutasi buku |
+| 17 | Pengakuan HPP penjualan | **Per invoice dengan HPP estimasi** (biaya terpakai / bobot hidup), dikoreksi saat tutup siklus (menggantikan #9) |
+| 18 | Pembayaran plasma | Payment Voucher dengan penerima **vendor atau peternak plasma** |
+| 19 | Settlement harga kontrak negatif | Menjadi **piutang plasma**, bisa dipotong dari settlement berikutnya |
+| 20 | Bagi hasil | % × (penjualan bersih − biaya siklus); **rugi ditanggung inti** |
+| 21 | Harga jaminan ayam | **Per panen (truk)** sesuai BW rata-rata panen |
+| 22 | Approval settlement | **Maker-checker** |
 
 ## 3. Arsitektur & Konvensi Kode
 
@@ -116,6 +122,12 @@
 - ⚠️ Body `POST finance/customer-receipts` berubah: `cashBankAccountId` menggantikan `branchId` + `cashAccountId`; tambah `advanceAmount`.
 - Seeder mapping kini juga menambah **komponen** baru ke mapping default yang sudah ada.
 
+### Fase 7 — HPP & Settlement Plasma ✅
+- **HPP siklus** (`cycles/{id}/cost`) dari kartu stok gudang kandang: DOC ditebar + pakan/OVK terpakai pada harga moving average. HPP/kg berjalan = biaya terpakai / (kg dipanen + populasi × BW terakhir).
+- **HPP per invoice**: saat posting, baris invoice mendapat `costAmount` (HPP/kg berjalan × kg) dan dijurnal Dr HPP / Cr Ayam Dalam Proses. **Tutup siklus** membekukan `ClosingCost` dan menjurnal penyesuaian (`CycleCostAdjustment`), sehingga Ayam Dalam Proses siklus = 0.
+- **Settlement plasma** (`costing/settlements`, schema `costing`): `ISettlementPolicy` per skema (harga kontrak per panen − sapronak @harga kontrak ± insentif; bagi hasil % laba). Ada PPh kontrak dan potongan hutang. Rugi menjadi piutang plasma. Draft (hitung ulang) → approve oleh checker → jurnal + siklus `Settled`.
+- **PV plasma** (`finance/payment-vouchers/plasma`): PV kini generik (`payeeType`, antarmuka `IPayable`) dengan jurnal `PlasmaPayment`. ⚠️ Respons PV berubah (payee*, alokasi `documentType/documentId/...`).
+
 ## 5. Alur Akuntansi yang Sudah Berjalan
 
 | Transaksi | Jurnal otomatis |
@@ -135,7 +147,12 @@
 | Kas masuk / keluar | Dr Kas/Bank — Cr akun baris / Dr akun baris — Cr Kas/Bank (tanpa mapping) |
 | Transfer kas/bank | Dr kas/bank tujuan — Cr kas/bank asal (tanpa mapping) |
 
-Sudah ada di katalog tetapi belum dipakai (untuk fase berikut): `PlasmaSettlement`, `PlasmaPayment`, dan komponen `SalesInvoice.CostOfGoodsSold` (HPP, Fase 7).
+| HPP penjualan (per invoice) | Dr HPP Ayam Hidup — Cr Ayam Dalam Proses (HPP/kg estimasi × kg) |
+| Tutup siklus | Penyesuaian HPP: Dr/Cr HPP — Cr/Dr Ayam Dalam Proses (biaya final − HPP diakui) |
+| Settlement plasma (disetujui) | Dr Beban Kemitraan — Cr Hutang Plasma; Dr Hutang Plasma — Cr Hutang PPh / Cr Piutang Plasma (potongan); rugi: Dr Piutang Plasma — Cr Beban Kemitraan |
+| Pembayaran plasma (PV) | Dr Hutang Plasma — Cr Kas/Bank |
+
+Semua event di katalog kini sudah dipakai.
 
 ## 6. Pelajaran & Jebakan Teknis
 
@@ -155,10 +172,10 @@ Sudah ada di katalog tetapi belum dipakai (untuk fase berikut): `PlasmaSettlemen
 
 - Setiap fase: domain + unit test invariant → command/query + validator → EF config + migration → endpoint + permission → **verifikasi end-to-end** ke PostgreSQL lokal pada database sementara `intiplasma_verify` (dibuat & dihapus otomatis; database `intiplasma` milik user tidak disentuh).
 - User yang melakukan **commit & migrate** setelah tiap fase.
-- Status test saat ini: **148 test lulus** (97 domain, 33 application, 8 arsitektur, 10 integration).
+- Status test saat ini: **155 test lulus** (103 domain, 34 application, 8 arsitektur, 10 integration).
 - Integration test (Testcontainers) **sudah bisa dijalankan** di mesin dev (container runtime tersedia) — `dotnet test IntiPlasma.slnx`.
-- Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
-- Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`.
+- Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario, Fase 7: 32 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
+- Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`.
 
 ## 8. Catatan Terbuka / Hutang Teknis
 
@@ -172,12 +189,15 @@ Sudah ada di katalog tetapi belum dipakai (untuk fase berikut): `PlasmaSettlemen
 - Transfer antar cabang belum didukung (perlu akun antar-cabang).
 - PPh vendor selalu ke akun mapping `IncomeTaxWithheld` (default Hutang PPh 23); PPh 22/4(2) perlu override.
 - Exposure credit limit memuat semua penerimaan customer ke memori (uang muka belum diterapkan) — perlu query SQL bila datanya besar.
+- Biaya siklus baru sapronak; biaya lain/overhead (listrik, tenaga kerja, penyusutan kandang inti) belum dialokasikan ke siklus.
+- Belum ada sub-ledger piutang plasma per peternak: potongan hutang di settlement hanya dibatasi pendapatan − PPh, belum dicek terhadap saldo piutangnya.
+- Siklus lama yang ditutup sebelum Fase 7 tidak punya `ClosingCost`; invoice lama punya `costAmount` 0 (tidak ada penyesuaian HPP untuk siklus tersebut).
 
-## 9. Langkah Berikutnya — Fase 7: HPP & Settlement Plasma
+## 9. Langkah Berikutnya — Fase 8: Laporan Keuangan & Analitik
 
 Rencana (lihat PLAN.md §4 & §5):
-- **CycleCost / HPP per siklus**: akumulasi biaya dari Ayam Dalam Proses per siklus (DOC, pakan, OVK dari transfer/penerimaan − retur, biaya lain, alokasi overhead) → HPP per kg & per ekor; estimasi HPP berjalan harian.
-- **Pengakuan HPP penjualan** (keputusan #9): Dr HPP Ayam Hidup — Cr Ayam Dalam Proses, saat tutup siklus (atau per invoice dengan HPP estimasi — perlu keputusan).
-- **PlasmaSettlement** dengan `ISettlementPolicy` per skema kontrak (`PriceContract`: nilai ayam @harga jaminan − sapronak @harga kontrak + bonus/insentif − potongan; `ProfitSharing`: % bagi hasil), PPh atas settlement per kontrak, approval, slip per plasma; siklus → `Settled` (terkunci). Jurnal `PlasmaSettlement`.
-- **Pembayaran plasma**: Payment Voucher saat ini hanya untuk vendor → perlu penerima (payee) peternak plasma + jurnal `PlasmaPayment` (Dr Hutang Plasma — Cr Kas/Bank).
-- Setelah itu: Fase 8 (Laporan Keuangan & pajak, tutup tahun buku).
+- **Laporan keuangan**: Laba Rugi, Neraca, Arus Kas — per cabang & konsolidasi, per periode.
+- **Analisa profitabilitas** per siklus, per kandang, per peternak, per cabang (penjualan bersih − HPP − beban kemitraan; data dari invoice, `ClosingCost`, settlement).
+- **Tutup periode & tahun buku**: validasi sebelum tutup (outbox tanpa error, draft dokumen, rekonsiliasi bank); penutupan tahun (laba/rugi → Laba Ditahan 3-2101).
+- **Laporan pajak**: rekap PPN masukan/keluaran, bukti potong PPh (vendor & plasma), ekspor e-Faktur/Coretax.
+- Pertimbangkan: alokasi biaya overhead ke siklus, sub-ledger piutang plasma, layar monitoring outbox.

@@ -130,11 +130,11 @@ public sealed class PayablesAndCashBankTests
         VendorInvoice invoice = Invoice(Received(), 30m, 430_000m).Value;
         invoice.Post("VI/1", 0m, null, null, DateTime.UtcNow);
 
-        PaymentVoucher.Create("PV/1", BranchId, VendorId, Guid.NewGuid(), Date, null, null, [(invoice, new Money(12_900_001m))])
-            .Error.Code.ShouldBe("VendorInvoices.OverPayment");
+        PaymentVoucher.Create("PV/1", BranchId, PayeeType.Vendor, VendorId, Guid.NewGuid(), Date, null, null, [(invoice, new Money(12_900_001m))])
+            .Error.Code.ShouldBe("PaymentVouchers.OverPayment");
 
         PaymentVoucher voucher = PaymentVoucher.Create(
-            "PV/1", BranchId, VendorId, Guid.NewGuid(), Date, null, null, [(invoice, new Money(10_000_000m))]).Value;
+            "PV/1", BranchId, PayeeType.Vendor, VendorId, Guid.NewGuid(), Date, null, null, [(invoice, new Money(10_000_000m))]).Value;
 
         voucher.Pay(Date, [invoice], null, DateTime.UtcNow).Error
             .ShouldBe(PaymentVoucherErrors.InvalidTransition(PaymentVoucherStatus.Draft, PaymentVoucherStatus.Paid));
