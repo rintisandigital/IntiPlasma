@@ -223,7 +223,7 @@ Semua event di katalog kini sudah dipakai.
 ## 9. Langkah Berikutnya — Backlog setelah Fase 8
 
 Seluruh fase rencana awal (0–8) selesai di sisi API. Kandidat berikutnya (urutan bisa disepakati):
-- **Klien**: MVC WebApp Admin Office (keputusan #4) dan mobile app PPL (recording offline sudah siap di API).
+- **Klien**: MVC WebApp Admin Office (keputusan #4) — rencana di [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (Fase W0–W10; aplikasi langsung via Infrastructure, mainboard + iframe, Akses Menu & Akses Cabang per user, background job di Web.App, ekspor ClosedXML/QuestPDF, UI English) — dan mobile app PPL (recording offline sudah siap di API).
 - **Pajak**: ekspor XML Coretax (e-Faktur & e-Bupot) setelah format dikonfirmasi konsultan pajak; input tarif final PPN/PPh.
 - **Akuntansi lanjutan**: hutang non-PO (jasa) & nota debit vendor; transaksi antar cabang (akun antar-cabang); alokasi overhead ke siklus; sub-ledger piutang plasma per peternak; aset tetap & penyusutan.
 - **Operasional/infra**: Redis untuk idempotency & cache (multi-instance), integration test per modul (Testcontainers sudah jalan), observabilitas (Seq/OTel).

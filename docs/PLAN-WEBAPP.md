@@ -1,0 +1,451 @@
+# Plan Implementasi — MVC WebApp Admin Office (Inti-Plasma)
+
+> Lanjutan dari [PLAN.md](PLAN.md) (Fase 0–9, API) dan [RANGKUMAN.md](RANGKUMAN.md) §9 (backlog: "MVC WebApp Admin Office", keputusan #4).
+> Project: `src/Web.App/Web.App.csproj` (ASP.NET Core MVC, .NET 10, sudah masuk `IntiPlasma.slnx`).
+> Referensi tampilan: `docs/html-template/` (template **Dreams POS**, Bootstrap 5, layout *two-column*).
+> Penomoran fase WebApp memakai prefix **W** (W0, W1, …) agar tidak bentrok dengan fase API.
+
+---
+
+## 1. Keputusan (disepakati 2026-10-02)
+
+| # | Topik | Keputusan |
+|---|-------|-----------|
+| W-1 | Arsitektur | WebApp adalah **aplikasi langsung (in-process)**: mereferensikan `Infrastructure.csproj` (transitif: Application, Domain, SharedKernel) dan memanggil `ICommandHandler`/`IQueryHandler` yang sama dengan Web.Api. **Tidak** lewat HTTP ke Web.Api. |
+| W-2 | Otorisasi WebApp | **RBAC dinamis** per menu: `CanView`, `CanCreate`, `CanEdit`, `CanDelete`, `CanExport`, tersimpan di DB dan diatur admin tanpa deploy ulang. Hak didefinisikan dalam **profil Akses Menu** yang dipilih per user (W-15, §4). |
+| W-3 | Ekspor | **Excel** dengan **ClosedXML**, **PDF** dengan **QuestPDF** (list, laporan, dan cetak dokumen). |
+| W-4 | Aksi persetujuan | **Tidak** ada hak `CanApprove`. Persetujuan nanti memakai **sistem approval terpusat berjenjang** (fase terpisah, §4.8). Sampai itu tersedia, aksi alur kerja ikut `CanEdit` + aturan maker-checker yang sudah ada di domain. |
+| W-5 | Cetak PDF dokumen | Butuh **`CanExport`** (sama dengan ekspor list & laporan). |
+| W-6 | Lisensi QuestPDF | **Community (gratis)**. |
+| W-7 | Akses cabang | **Dinamis** lewat **profil Akses Cabang** yang dipilih per user (W-15, §4.5); berlaku untuk WebApp **dan** Web.Api. |
+| W-8 | Kerangka tampilan | `Views/Main/Index.cshtml` adalah **mainboard** (header + sidebar two-column). Halaman menu tampil di dalam **iframe** `content-frame` sesuai menu yang diklik (§3.10). |
+| W-9 | Background job | Tetap **hosted service**, dijalankan di **Web.App** (outbox & cleanup lampiran). Web.Api **tidak** menjalankan job (`BackgroundJobs:Enabled = false`) — §3.11. |
+| W-10 | Bahasa UI | **English** (label, menu, pesan, validasi, header Excel/PDF). Dokumen plan tetap berbahasa Indonesia. |
+| W-11 | Input recording harian di WebApp | **Ada** (cadangan mobile PPL). |
+| W-12 | Deploy | **Container terpisah** (Web.Api, Web.App), **satu database**, **satu storage** lampiran. |
+| W-13 | Tema | Light, two-column sesuai template, theme switcher template dimatikan, **primary color `#0984E3`** (menggantikan `#FE9F43`). |
+| W-14 | Permission `branches:access-all` | **Dihapus** setelah data dimigrasi ke profil Akses Cabang "All Branches". |
+| W-15 | Model akses | **Per user**: setiap user memilih satu **Akses Menu** dan satu **Akses Cabang**. Keduanya master yang punya layar CRUD sendiri. Sidebar mainboard hanya merender menu yang `CanView` pada Akses Menu user. |
+| W-16 | Format data | Teks UI English, format data **Indonesia**: `1.234.567,89`, `dd/MM/yyyy`, mata uang `Rp`, zona `Asia/Jakarta` (diatur lewat `App:FormatCulture`, default `id-ID`). |
+| W-17 | Dokumen cetak resmi | Mengikuti UI (**English**), dengan **terbilang berbahasa Indonesia** untuk invoice, receipt, PV, dan settlement. |
+| W-18 | Relasi user ↔ profil | Setiap user memakai **satu** Akses Menu & **satu** Akses Cabang; **satu profil Akses Menu bisa dipakai banyak user**, begitu juga **satu profil Akses Cabang** (relasi *many-to-one*: FK `users.menu_access_profile_id` & `users.branch_access_profile_id`). Mengubah profil langsung berlaku untuk semua user pemakainya. Variasi dibuat sebagai profil baru (fitur "Duplicate"). |
+| W-19 | Override akses per user | **Tidak ada** pengecualian per user di luar profil. |
+| W-20 | Role API di form user | Bagian opsional **"API / Mobile access"** di form create/edit user. |
+
+---
+
+## 2. Ringkasan Temuan
+
+### 2.1 Kondisi `src/Web.App` saat ini
+| Bagian | Kondisi |
+|---|---|
+| `Program.cs` | Default MVC: `AddControllersWithViews`, route default `Auth/Index`, belum ada autentikasi, `UseExceptionHandler("/Home/Error")` (controller `Home` tidak ada). |
+| Controller | `AuthController` (Login GET/POST tanpa logika) dan `MainController` (Index, Dashboard, ExampleList, ExampleForm — halaman contoh). |
+| View | `Views/Main/Index.cshtml` = **mainboard** (`Layout = null`): header, sidebar two-column (kolom kiri ikon modul sebagai tab, kolom kanan daftar menu), dan `<iframe name="content-frame">` yang tingginya disesuaikan script saat resize. Link menu memakai `target="content-frame"`; menu masih statis (contoh) dan sebagian menunjuk file `.html` template. `_Layout.cshtml` = layout **halaman di dalam iframe** (CSS/JS + helper toast/antiforgery, tanpa header/sidebar) — sudah sesuai pola. `Login.cshtml` `Layout = null`. Masih ada branding "Dreams POS". |
+| Tema | `#FE9F43` ditulis langsung **784 kali** di `assets/css/style.css` (bukan lewat satu variabel). Mainboard memakai `data-color="magenta"`; `theme-script.js` membaca warna dari `localStorage`. |
+| `wwwroot` | ±84 MB: seluruh `assets/` template (35+ plugin, banyak gambar demo) + `lib/` bawaan MVC → jQuery/Bootstrap ganda. |
+| Referensi project | Belum ada (belum mereferensikan Infrastructure). |
+| Build | `Directory.Build.props` juga berlaku di sini: `AnalysisMode=All`, `TreatWarningsAsErrors`, Sonar. `Web.App.csproj` mengulang `TargetFramework/Nullable/ImplicitUsings` (redundan). |
+
+### 2.2 Dampak memakai Infrastructure langsung
+| Temuan | Dampak & tindakan |
+|---|---|
+| `AddInfrastructure()` mendaftarkan **JWT Bearer sebagai skema default** | Web.App butuh **cookie** → `AddInfrastructure` dipecah (§3.2). |
+| `AddInfrastructure()` mendaftarkan hosted service `OutboxProcessor` & `AttachmentCleanupJob` | Dibuat opsional (`BackgroundJobs:Enabled`): **aktif di Web.App, nonaktif di Web.Api** (W-9, §3.11). |
+| Cache permission/cabang memakai **HybridCache in-memory per proses** (10 menit), diinvalidasi di proses yang menjalankan command | Dengan 2 proses (dan replika), perubahan akses di Web.App tidak terlihat oleh Web.Api sampai cache kedaluwarsa → **invalidasi lintas proses** via PostgreSQL `LISTEN/NOTIFY` (§3.12). |
+| Permission `{module}:{action}` hanya dicek **di endpoint** (`.HasPermission(...)`), bukan di handler | Di Web.App, **RBAC menu menjadi satu-satunya gerbang otorisasi** → setiap action controller wajib diberi atribut akses (dijaga test arsitektur, §6.2). |
+| Branch-scope ditegakkan di **handler** lewat `IBranchAccess` (saat ini: permission `branches:access-all` atau `user_branches`) | Otomatis berlaku di Web.App, asal principal cookie membawa claim `NameIdentifier` = user id. `BranchAccess` diubah membaca profil Akses Cabang (§4.5) — satu titik perubahan, berlaku juga untuk API. |
+| Maker-checker, penomoran dokumen, outbox, audit interceptor, jurnal otomatis | Otomatis berlaku (bagian dari domain, `ApplicationDbContext` & handler). |
+| `Error.Description` di Domain/Application sudah **berbahasa Inggris** | Sesuai W-10: pesan ditampilkan langsung, tanpa katalog terjemahan. |
+| `IdempotencyFilter` ada di Web.Api (endpoint filter) | Web.App membuat proteksi double-submit sendiri (token form, §3.7). |
+| `LocalFileStorage` lampiran | Web.Api & Web.App (termasuk job cleanup) memakai **volume yang sama** (`FileStorage:RootPath`, W-12). |
+| Migration & seeding (`ApplyMigrations`, `DatabaseSeeder`) dipanggil Web.Api (dev) | Web.App **tidak** menjalankan migration. Sinkronisasi katalog menu (idempotent) dijalankan Web.App saat startup (§4.3). |
+| `LoginUserCommand` mengembalikan JWT + refresh token | Web.App butuh use case baru **tanpa token**: `SignInUserCommand` → profil user. |
+| Entity `User` belum punya status aktif/nonaktif | Ditambah `IsActive` + `Deactivate/Activate`. Login API & WebApp sama-sama menolak user nonaktif. |
+| Test arsitektur memeriksa Domain/Application/Infrastructure/Presentation (Web.Api) | Ditambah aturan untuk Web.App (§6.2). |
+
+### 2.3 Use case Application yang belum ada (dibutuhkan WebApp)
+| Kebutuhan | Use case |
+|---|---|
+| Login cookie | `SignInUserCommand` (cek password + `IsActive`) |
+| Profil user login, menu & cabang efektif | `GetCurrentUserQuery`, `GetMyMenuAccessQuery`, `GetEffectiveBranchesQuery` |
+| Manajemen user | `GetUsersQuery`, `GetUserByIdQuery` (diperluas), `CreateUserCommand` (data user + Akses Menu + Akses Cabang + cabang default + role API), `UpdateUserCommand`, `SetUserAccessCommand`, `DeactivateUserCommand`/`ActivateUserCommand`, `ResetUserPasswordCommand`, `ChangeOwnPasswordCommand` |
+| Akses Menu (CRUD) | `GetMenuAccessProfilesQuery`, `GetMenuAccessProfileByIdQuery`, `CreateMenuAccessProfileCommand`, `UpdateMenuAccessProfileCommand` (nama + matriks), `DeleteMenuAccessProfileCommand` |
+| Akses Cabang (CRUD) | `GetBranchAccessProfilesQuery`, `GetBranchAccessProfileByIdQuery`, `CreateBranchAccessProfileCommand`, `UpdateBranchAccessProfileCommand`, `DeleteBranchAccessProfileCommand` |
+| Katalog menu | `SyncMenuCatalogCommand`, `GetMenusQuery`, `UpdateMenuCommand` |
+| Dashboard | `GetDashboardSummaryQuery` (siklus aktif, populasi, piutang/hutang jatuh tempo, stok, event gagal) |
+| Ekspor list tanpa batas `pageSize` 100 | Tidak perlu use case baru: exporter memanggil query list yang sama **halaman per halaman** (§5.1) |
+
+Use case ditempatkan di Application seperti modul lain (satu file per use case) dan **boleh dipakai Web.Api** juga.
+
+---
+
+## 3. Arsitektur
+
+### 3.1 Gambaran
+```
+Browser ──cookie──► Web.App (MVC + background job) ─┐
+Mobile  ──JWT─────► Web.Api ────────────────────────┴──► Application ──► Infrastructure ──► PostgreSQL
+                                                                                              ▲
+                    (kedua proses) ◄──── invalidasi cache lintas proses (LISTEN/NOTIFY) ──────┘
+```
+- Controller **tipis**: bangun command/query → panggil handler → map `Result` ke view/redirect. **Tidak** memakai `ApplicationDbContext`/`IDbConnectionFactory` langsung (dijaga test arsitektur).
+- Satu database, satu set aturan bisnis. Perubahan use case otomatis berlaku untuk API & WebApp.
+
+### 3.2 Pemecahan `Infrastructure.DependencyInjection`
+```csharp
+// Web.Api
+services.AddInfrastructureCore(configuration);      // services, database, storage, IUserContext, IPasswordHasher,
+                                                    // PermissionProvider, IBranchAccess, IMenuAccessProvider,
+                                                    // cache invalidation (publisher + listener), health checks
+services.AddJwtAuthentication(configuration);       // JWT bearer + ITokenProvider + permission policy
+
+// Web.App
+services.AddInfrastructureCore(configuration);      // + cookie auth & policy menu didaftarkan di Web.App
+services.AddBackgroundJobs(configuration);          // OutboxProcessor, AttachmentCleanupJob — hanya bila BackgroundJobs:Enabled
+```
+- Kedua host memanggil `AddApplication()` (handler + decorator); Web.App juga butuh handler domain event untuk outbox.
+- `AddInfrastructure()` lama dihapus (atau menjadi alias `Core + Jwt`) agar job tidak tanpa sengaja ikut jalan di Web.Api.
+
+### 3.3 Autentikasi (cookie)
+- `SignInUserCommand` → principal dengan claim `NameIdentifier` (user id), `Name`, `Email`, + `security_stamp`. Cookie `HttpOnly`, `Secure`, `SameSite=Lax`, sliding 8 jam.
+- `OnValidatePrincipal`: tolak sesi bila user dinonaktifkan atau password direset (cek `security_stamp`, cache singkat).
+- User **tanpa Akses Menu** tidak bisa login ke WebApp (pesan "No menu access assigned"), tetapi tetap bisa memakai API bila punya role.
+- Fitur: login (`returnUrl`), logout, ganti password sendiri, lockout setelah N kali gagal (W10).
+
+### 3.4 RBAC dinamis (detail §4)
+- Atribut `[MenuAccess("sales.orders", MenuRight.Create)]` pada action → policy `menu:sales.orders:Create` (custom `IAuthorizationPolicyProvider` + handler membaca `IMenuAccessProvider`).
+- Tag helper `<a asp-menu="sales.orders" asp-right="Edit">` untuk menyembunyikan tombol. Sidebar mainboard hanya merender menu `CanView`.
+
+### 3.5 Konteks cabang
+- Pemilih cabang di header berisi **cabang efektif** dari Akses Cabang user. Cabang aktif disimpan di cookie terpisah (awalnya = cabang default user) → filter default `branchId` pada list & nilai default form. Profil "semua cabang" mendapat opsi "All branches".
+- Bila Akses Cabang user berubah saat sesi berjalan, cabang aktif yang tidak lagi diizinkan otomatis diganti ke cabang default. Branch-scope sesungguhnya tetap ditegakkan handler.
+
+### 3.6 Pola halaman
+| Jenis | Pola |
+|---|---|
+| List | Server-rendered tabel + filter (search, status, cabang, tanggal) via query string → query handler (`PagedList`). Tombol **Excel** & **PDF** (bila `CanExport`) mengirim filter yang sama. |
+| Detail | Header dokumen + tab (Lines, Journal, Attachments, History). Tombol aksi sesuai **status + hak akses** dari partial `_DocumentActions` (konfirmasi SweetAlert2). Tombol **Print PDF** (QuestPDF) bila `CanExport`. |
+| Form | POST + PRG; validasi server dari `ValidationDecorator` (FluentValidation) dipetakan ke `ModelState` per field; validasi klien ringan (unobtrusive). Baris dinamis (PO, SO, VI, jurnal, kas) dengan JS kecil per halaman. Dropdown pencarian **Tom-Select** ke endpoint lookup Web.App; tanggal **flatpickr**; angka/uang **IMask**. |
+| Aksi state | POST `/sales/orders/{id}/approve` → command → TempData toast → redirect ke detail. |
+| Laporan | Form parameter → tabel; ekspor Excel/PDF. |
+
+### 3.7 Penanganan hasil & error
+- Extension `Result` → UI: `ErrorType.Validation` → `ModelState`; `NotFound` → 404; `Conflict`/`Problem` → pesan di atas form memakai `Error.Description` (English).
+- `DbUpdateConcurrencyException` (`xmin`) → "This record was changed by another user. Please reload." (filter global). Nilai versi disimpan di hidden field form edit.
+- **Proteksi double-submit**: token form (`Guid v7`) dibuat saat GET form create; POST kedua dengan token sama dalam 24 jam di-redirect ke hasil pertama (HybridCache, meniru `IdempotencyFilter`). Untuk use case yang menerima ID dari klien, token yang sama dipakai sebagai ID dokumen.
+- Halaman error 403/404/500 & sesi habis; exception handler + status code pages; Serilog seperti Web.Api.
+
+### 3.8 Struktur folder target
+```
+src/Web.App/
+├─ Program.cs
+├─ Infrastructure/
+│  ├─ Auth/            # cookie setup, CurrentUser, BranchContext
+│  ├─ Authorization/   # MenuAccessAttribute, MenuPolicyProvider, MenuAuthorizationHandler, MenuCatalog
+│  ├─ Results/         # Result → IActionResult/ModelState
+│  ├─ Forms/           # FormToken (double-submit)
+│  ├─ Workflow/        # WorkflowActionAttribute, IWorkflowActionService (§4.8)
+│  └─ Export/          # IExcelExporter (ClosedXML), IPdfExporter (QuestPDF), ExportColumn<T>, PagedExportRunner
+├─ Documents/          # template QuestPDF per dokumen (PO, Invoice, PV, Settlement, …) + komponen header/footer
+├─ Areas/
+│  ├─ Admin/        (users, menu access, branch access, menus, branches, API roles)
+│  ├─ MasterData/   (uom, tax-code, item, warehouse, vendor, customer)
+│  ├─ Partnership/  (farmer, coop, contract, cycle)
+│  ├─ Procurement/  (purchase order)
+│  ├─ Inventory/    (goods receipt, transfer, return, feed mutation, stock)
+│  ├─ Production/   (chick-in, recording, harvest, performance, close)
+│  ├─ Sales/        (SO, DO, invoice, credit note)
+│  ├─ Finance/      (COA, cost center, period, journal, mapping, cash-bank, AR, AP, recon, report, tax)
+│  ├─ Costing/      (cycle cost, settlement)
+│  └─ System/       (failed events)
+├─ Controllers/        # Auth, Main (mainboard + dashboard), Lookup, Attachment, Error
+├─ ViewComponents/     # Sidebar (mainboard), BranchSwitcher, UserMenu, Breadcrumb (halaman iframe)
+├─ TagHelpers/         # menu-right, status-badge, money, date
+├─ wwwroot/
+│  ├─ css/theme.css    # sisa override tema (§3.13)
+│  └─ js/
+│     ├─ mainboard.js  # navigasi iframe, sinkron hash/judul/menu aktif, postMessage (§3.10)
+│     └─ frame.js      # dipakai _Layout: lapor navigasi ke parent, redirect bila dibuka di luar mainboard
+└─ Views/Shared/
+   ├─ _Layout.cshtml        # layout halaman di dalam iframe (tanpa header/sidebar)
+   ├─ _LayoutAuth.cshtml    # login & error tingkat atas (tanpa mainboard)
+   ├─ Mainboard/            # partial header & sidebar untuk Views/Main/Index.cshtml
+   └─ Partials/ (_PageHeader, _FilterBar, _Pagination, _ExportButtons, _Attachments, _StatusBadge, _DocumentActions, _JournalPreview)
+```
+
+### 3.9 Pemetaan halaman template → layar aplikasi
+| Template (`docs/html-template/`) | Dipakai untuk |
+|---|---|
+| `signin.html`, `forgot-password.html`, `error-404.html`, `error-500.html`, `lock-screen.html` | Login, ganti password, halaman error, sesi habis |
+| `layout-two-column.html` / `index.html` (shell) | Mainboard `Views/Main/Index.cshtml` (header, sidebar dua kolom); isi `page-wrapper` diganti iframe |
+| `blank-page.html` | Kerangka halaman di dalam iframe (`_Layout`) |
+| `admin-dashboard.html`, `sales-dashboard.html` | Dashboard |
+| `product-list.html`, `customers.html`, `suppliers.html`, `warehouse.html`, `units.html`, `tax-rates.html` | List master data |
+| `add-product.html`, `edit-product.html`, `form-*.html`, `form-wizard.html` | Form master & transaksi (wizard untuk kontrak, chick-in, dan create user) |
+| `users.html`, `roles-permissions.html`, `permissions.html` | Users, **Menu Access** (matriks checkbox View/Create/Edit/Delete/Export), Branch Access, API Roles |
+| `purchase-list.html`, `purchase-order-report.html`, `purchase-returns.html` | PO, BPB, retur |
+| `stock-transfer.html`, `manage-stocks.html`, `stock-history.html`, `low-stocks.html` | Transfer, saldo stok, kartu stok |
+| `orders.html`, `edit-sales.html`, `invoice.html`, `invoice-details.html`, `sales-returns.html` | SO, DO, invoice, nota kredit |
+| `account-list.html`, `account-statement.html`, `money-transfer.html`, `expense-list.html`, `income.html` | Kas/bank, buku kas, transfer, kas keluar/masuk |
+| `balance-sheet.html`, `trial-balance.html`, `profit-and-loss.html`, `cash-flow.html`, `annual-report.html` | Laporan keuangan |
+| `customer-due-report.html`, `supplier-due-report.html` | Aging piutang / hutang |
+| `tax-reports.html` | Rekap PPN/PPh |
+| `file-manager.html`, `form-fileupload.html` (Dropzone) | Komponen lampiran |
+| `activities.html`, `ui-timeline.html` | Riwayat revisi recording / audit dokumen |
+| `chart-apex.html` / `chart-js.html` | Grafik performa siklus & dashboard |
+
+Halaman yang **tidak dipakai** (POS, chat, call, blog, e-commerce, HRM, dll.) beserta aset & plugin-nya dibuang dari `wwwroot` di W0.
+
+### 3.10 Mainboard & iframe
+**Struktur**
+- `MainController.Index` (cukup login, tanpa `[MenuAccess]`) merender mainboard: header (logo, BranchSwitcher, notifikasi, UserMenu) + sidebar two-column + iframe `content-frame`. Halaman awal iframe = `Main/Dashboard`.
+- Sidebar dibangun dari `menus` aktif + Akses Menu user (**hanya `CanView`**): **level 1** (grup modul: Dashboard, Master Data, Partnership, Procurement, Inventory, Production, Sales, Finance, Costing, Reports, Administration) = ikon tab di kolom kiri; **level 2/3** = `menu-title`/`submenu` di kolom kanan. Grup tanpa satu pun menu `CanView` disembunyikan. Semua link `target="content-frame"`.
+- Semua halaman menu (list, detail, form, laporan) memakai `_Layout` dan **hanya** tampil di dalam iframe. Login, logout, dan halaman error sesi memakai `_LayoutAuth` di jendela utama.
+
+**Navigasi & URL** (`mainboard.js` + `frame.js`)
+- Klik menu → iframe dimuat, URL jendela utama diperbarui ke `/Main#/sales/orders?status=Draft` (`history.pushState`) → bisa di-bookmark, di-refresh, dan tombol Back/Forward berfungsi.
+- Saat mainboard dibuka dengan hash, iframe langsung memuat path tersebut (hanya path internal yang diawali `/`, untuk mencegah open redirect).
+- Setiap halaman iframe mengirim `postMessage({ type: 'navigated', url, title, menuCode })` ke parent (origin dicek) → parent menyinkronkan hash, `document.title`, dan menu aktif. Ini juga berlaku untuk navigasi di dalam iframe (submit form, redirect PRG, link detail).
+- Halaman iframe yang dibuka **langsung** di tab sendiri (`window.top === window.self`) dialihkan ke `/Main#<path>`. Pengecualian: unduhan & pratinjau PDF (`target="_blank"`).
+
+**Sesi & keamanan**
+- Sesi habis saat request di dalam iframe → server mengembalikan halaman kecil yang menjalankan `window.top.location = '/Auth/Login?returnUrl=/Main%23<path>'`. `Login.cshtml` juga memaksa keluar dari frame.
+- Header keamanan: `X-Frame-Options: SAMEORIGIN` + CSP `frame-ancestors 'self'`.
+- Hak akses tetap dicek per halaman (`[MenuAccess]`); sidebar hanya kenyamanan.
+
+**Interaksi parent ↔ iframe**
+- Ganti cabang di header → cookie cabang aktif diperbarui → iframe di-reload.
+- Toast, SweetAlert, modal, dan dropdown berjalan **di dalam iframe**. Pesan global (mis. sesi akan habis) ditampilkan parent.
+- Tinggi iframe mengikuti jendela (script resize yang sudah ada); scroll di dalam iframe. Indikator loading di parent saat iframe berpindah halaman.
+- Logout di UserMenu memakai jendela utama (`target="_top"`).
+
+**Performa**
+- `_Layout` hanya memuat aset inti (Bootstrap, jQuery, ikon, style template, toast, SweetAlert); plugin lain (Tom-Select, flatpickr, IMask, Dropzone, Chart) lewat `@section Scripts` per halaman. Aset statis di-cache (`MapStaticAssets` + fingerprint).
+
+### 3.11 Background job (di Web.App)
+- `AddBackgroundJobs` mendaftarkan `OutboxProcessor` (domain event → handler, termasuk jurnal otomatis & pembuatan gudang kandang) dan `AttachmentCleanupJob` sebagai hosted service **di Web.App**. Job baru nanti (mis. pengingat jatuh tempo, eskalasi approval) juga di sini.
+- Konfigurasi `BackgroundJobs:Enabled`: `true` di Web.App, `false` di Web.Api (perilaku Web.Api berubah — job tidak lagi jalan di sana).
+- Event handler berjalan **tanpa HttpContext** (sama seperti sekarang di dalam Web.Api): `IUserContext.IsAuthenticated = false`, audit memakai perilaku yang sudah ada.
+- Replika Web.App lebih dari satu aman: outbox `FOR UPDATE SKIP LOCKED`; cleanup lampiran memakai advisory lock agar hanya satu replika yang jalan.
+- Health check Web.App menyertakan status job (waktu proses outbox terakhir, jumlah pesan tertunda/gagal).
+- ⚠️ Bila Web.App berhenti, event outbox dari transaksi Web.Api/mobile (mis. jurnal otomatis BPB, gudang kandang) **tertunda** sampai Web.App jalan kembali — tidak hilang, karena tersimpan di `outbox_messages`. Dev: jalankan Web.Api + Web.App bersamaan (multiple startup projects / `docker-compose`), atau set `BackgroundJobs__Enabled=true` di Web.Api bila hanya menjalankan API.
+
+### 3.12 Invalidasi cache lintas proses
+- Command yang mengubah akses (user, Akses Menu, Akses Cabang, menu, role API, status cabang) tetap menghapus cache lokal, lalu mengirim `NOTIFY cache_invalidation, '<tag|key>'` (dalam transaksi yang sama → hanya terkirim bila commit).
+- Setiap proses (Web.Api, Web.App, termasuk replika) menjalankan listener (`LISTEN cache_invalidation`, koneksi khusus dari `NpgsqlDataSource`) yang menghapus key/tag di HybridCache lokal. Bila koneksi listener putus → reconnect + kosongkan tag akses (fail-safe).
+- Hasil: perubahan akses berlaku **tanpa login ulang** di semua aplikasi dalam hitungan detik. Redis tetap opsi bila nanti scale-out besar.
+
+### 3.13 Tema (primary color)
+- Ganti satu kali di `assets/css/style.css`: `#FE9F43` → `#0984E3`, bentuk RGB `254, 159, 67` → `9, 132, 227`, serta shade turunannya (hover/active/light — diinventarisasi dulu dengan `grep`, lalu dipetakan ke shade `#0984E3` yang sepadan).
+- Mainboard memakai `data-color` tetap (bukan `magenta`), `theme-script.js` & theme customizer dihapus (tidak membaca `localStorage`).
+- Sisa override kecil di `wwwroot/css/theme.css` (dimuat setelah `style.css`). Cek logo/ikon SVG yang berwarna oranye.
+
+---
+
+## 4. RBAC Dinamis & Akses Cabang (per user)
+
+### 4.1 Konsep
+```
+User ──1──► Akses Menu  (Menu Access Profile)  ──► baris per menu: CanView/Create/Edit/Delete/Export
+     ──1──► Akses Cabang (Branch Access Profile) ──► All branches | daftar cabang
+     ──n──► Role (permission API, untuk Web.Api/mobile)
+     ──1──► Cabang default (harus termasuk Akses Cabang)
+```
+- **Akses Menu** dan **Akses Cabang** adalah master tersendiri dengan layar CRUD. Satu profil bisa dipakai banyak user (mis. "Finance Staff", "Area Jawa Barat").
+- Saat **create/edit user**, admin memilih satu Akses Menu, satu Akses Cabang, cabang default, dan (opsional) role API.
+- **Role** tetap ada, hanya untuk permission Web.Api/mobile (`{module}:{action}`). WebApp tidak memakai role untuk otorisasi.
+
+### 4.2 Model data (schema `identity`)
+| Tabel | Kolom utama | Keterangan |
+|---|---|---|
+| `menus` | `id`, `code` (unik, mis. `sales.orders`), `parent_id`, `name`, `icon`, `route`, `sort_order`, `is_active`, `supports_create`, `supports_edit`, `supports_delete`, `supports_export` | Menu bertingkat. Flag `supports_*` menentukan checkbox yang tampil di matriks (mis. laporan hanya View + Export). |
+| `menu_access_profiles` | `id`, `name` (unik), `description`, `is_system`, `xmin` | Aggregate **Akses Menu** |
+| `menu_access_profile_items` | `profile_id`, `menu_id`, `can_view`, `can_create`, `can_edit`, `can_delete`, `can_export` | Child (PK `profile_id + menu_id`) |
+| `branch_access_profiles` | `id`, `name` (unik), `description`, `all_branches`, `is_system`, `xmin` | Aggregate **Akses Cabang** |
+| `branch_access_profile_branches` | `profile_id`, `branch_id` | Child |
+| `users` (+kolom) | `is_active`, `menu_access_profile_id` (nullable), `branch_access_profile_id` (nullable), `default_branch_id` (nullable), `security_stamp` | |
+| `user_branches` | — | **Dihapus** setelah migrasi data (§4.6) |
+
+### 4.3 Katalog menu
+- Kode menu terikat ke controller, sehingga **daftar menu didefinisikan di kode** (`MenuCatalog` di Web.App: code, parent, nama default, ikon, route, `supports_*`). Saat startup Web.App menjalankan `SyncMenuCatalogCommand` (idempotent): menambah menu baru, menonaktifkan menu yang hilang dari kode, **tidak menimpa** nama/ikon/urutan/aktif yang sudah diubah admin.
+- Yang dinamis (diatur admin tanpa deploy): profil Akses Menu & Akses Cabang, akses per user, nama tampilan, ikon, urutan, aktif/nonaktif menu.
+
+### 4.4 Akses Menu — aturan & arti hak
+**Invariant domain** (`MenuAccessProfile.SetItems(...)`):
+- Hak apa pun selain `CanView` ⇒ `CanView` wajib `true`.
+- Hak yang tidak didukung menu (`supports_* = false`) ditolak.
+- Nama profil unik.
+- Profil sistem **"Full Access"**: semua hak pada semua menu aktif (dihitung, tidak disimpan per baris), tidak bisa diubah/dihapus. Admin seed memakai profil ini.
+- Profil yang **masih dipakai user tidak bisa dihapus** (409, pesan menyebut jumlah user).
+- Perubahan profil → invalidasi cache semua user pemakainya (tag) + `NOTIFY` (§3.12).
+
+| Hak | Cakupan di WebApp |
+|---|---|
+| `CanView` | Menu tampil di sidebar; buka list & detail; lihat/unduh lampiran |
+| `CanCreate` | Form & aksi create (termasuk unggah lampiran pada dokumen baru) |
+| `CanEdit` | Edit draft, ubah lampiran, aksi alur kerja (approve, post, cancel, void, pay, close, …) **sementara** sampai approval terpusat tersedia (W-4, §4.8) |
+| `CanDelete` | Hapus/nonaktifkan master, hapus draft, hapus lampiran |
+| `CanExport` | Ekspor list & laporan ke Excel / PDF **dan cetak PDF dokumen** |
+
+**Penegakan**: setiap action controller wajib `[MenuAccess(code, right)]` atau `[AllowAnonymous]`/`[AuthenticatedOnly]` eksplisit (dijaga test arsitektur). Lookup Tom-Select & unduh lampiran ikut menu pemiliknya (`CanView`).
+
+### 4.5 Akses Cabang — aturan
+- `all_branches = true` ⇒ semua cabang **aktif**, termasuk cabang yang dibuat kemudian; daftar cabang diabaikan.
+- Selain itu minimal satu cabang; cabang nonaktif tidak termasuk cabang efektif.
+- Profil sistem **"All Branches"** tidak bisa diubah/dihapus. Profil yang masih dipakai user tidak bisa dihapus.
+- **Cabang efektif user** = cabang dari profil Akses Cabang-nya. User tanpa Akses Cabang ⇒ tidak melihat data cabang mana pun (API & WebApp).
+- `default_branch_id` wajib termasuk cabang efektif; bila profil berubah dan default tidak lagi valid → dikosongkan, jatuh ke cabang efektif pertama.
+- `BranchAccess` (Infrastructure) membaca profil ini → **berlaku sama** untuk Web.Api & Web.App.
+
+### 4.6 Migrasi data & perubahan API
+- Profil Akses Cabang "All Branches" dibuat; user yang punya role dengan permission `branches:access-all` → profil ini. Permission `branches:access-all` dihapus dari katalog & dari `role_permissions` (W-14).
+- User lain dengan `user_branches`: satu profil per **kombinasi cabang yang sama** (nama otomatis, mis. "Branches: BDG, JKT"), lalu `user_branches` dihapus.
+- Profil Akses Menu "Full Access" dibuat dan diberikan ke user yang memegang role `Administrator`. User lain belum punya Akses Menu (diatur admin setelah rilis).
+- Web.Api: `PUT users/{id}/branches` ⚠️ **diganti** `PUT users/{id}/access` (`menuAccessProfileId`, `branchAccessProfileId`, `defaultBranchId`); tambah endpoint CRUD `menu-access-profiles` & `branch-access-profiles`, `GET users` (list), aktif/nonaktif & reset password. Perubahan kontrak dicatat di RANGKUMAN saat fase dikerjakan.
+
+### 4.7 Layar (W1)
+| Layar | Isi |
+|---|---|
+| **Menu Access** | List (nama, jumlah user, jumlah menu `CanView`) + create/edit: nama, deskripsi, **matriks** menu bertingkat × View/Create/Edit/Delete/Export (centang per baris, per kolom, per grup; checkbox tidak tampil untuk hak yang tidak didukung menu) + delete. Aksi "Duplicate" untuk membuat profil serupa. |
+| **Branch Access** | List (nama, all branches / jumlah cabang, jumlah user) + create/edit: nama, deskripsi, "All branches" atau pilih cabang + delete. |
+| **Users** | List (filter status, Menu Access, Branch Access) + **create**: email, nama, password awal, **pilih Menu Access**, **pilih Branch Access**, cabang default (difilter dari Branch Access terpilih), role API (opsional). Edit, activate/deactivate, reset password. Detail menampilkan menu & cabang efektif. |
+| **Menus** | Nama tampilan, ikon, urutan, aktif/nonaktif (struktur & kode dari katalog). |
+| **API Roles** | Role + permission API (khusus Web.Api/mobile). |
+| **Branches** | Master cabang (aktif/nonaktif memengaruhi cabang efektif). |
+
+### 4.8 Persiapan approval terpusat (fase terpisah, di luar W0–W10)
+Approval berjenjang akan menjadi modul sendiri (aturan per jenis dokumen/cabang/nilai, level 1..n, inbox persetujuan, delegasi, riwayat; eskalasi dijalankan background job Web.App). Agar tidak perlu bongkar ulang, sejak W0:
+- Semua aksi persetujuan di controller diberi penanda `[WorkflowAction("approve")]` dan dipanggil lewat satu layanan Web.App (`IWorkflowActionService`) — saat ini meneruskan langsung ke command `Approve…`/`Post…` yang ada; nanti dialihkan ke modul approval.
+- Tombol aksi di detail dokumen dirender dari satu partial (`_DocumentActions`), sehingga penggantian ke status "Waiting for approval level n" cukup di satu tempat.
+- Maker-checker di domain tetap berlaku sebagai pengaman minimum.
+
+---
+
+## 5. Ekspor Excel & PDF
+
+### 5.1 Fondasi
+- Paket di `Directory.Packages.props`: `ClosedXML`, `QuestPDF`.
+- `ExportColumn<T>` (header, selector, format: text/number/money/date/percent, lebar) — satu definisi kolom dipakai **Excel & PDF** list.
+- `PagedExportRunner`: menjalankan query list yang sama dengan filter layar, **halaman per halaman** (100 baris) sampai habis, dengan batas `Export:MaxRows` (default 50.000; lebih dari itu diminta mempersempit filter).
+- Nama file: `{menu}_{branch}_{yyyyMMdd-HHmm}.xlsx|pdf`. Setiap ekspor dicatat ke log (user, menu, filter, jumlah baris).
+
+### 5.2 Excel (ClosedXML)
+- Header tebal + freeze pane + autofilter, kolom uang sebagai **angka** (bukan teks) agar bisa dijumlah, format angka & tanggal sesuai W-16. Baris judul: nama laporan, cabang, periode/filter, printed by & at.
+- Laporan berstruktur (Balance Sheet, Income Statement, Cash Flow, General Ledger, Aging, Cycle Cost, Settlement) memakai builder khusus (indentasi akun, subtotal).
+
+### 5.3 PDF (QuestPDF)
+- Komponen bersama: kop (logo, nama perusahaan, cabang), judul & nomor dokumen, footer "Page x of y", printed by/at. Font disematkan (agar sama di Windows & container Linux).
+- **List & laporan**: tabel landscape A4 dari `ExportColumn<T>`.
+- **Cetak dokumen**: PO, Goods Receipt, Transfer/Return, SO, DO (delivery note), Sales Invoice, Credit Note, Customer Receipt, Vendor Invoice, Payment Voucher, Cash In/Out, Journal Voucher, Plasma Settlement, Cycle Closing Summary. Bahasa & "terbilang" mengikuti W-17.
+- Lisensi: `QuestPDF.Settings.License = LicenseType.Community` diset saat startup (W-6). Syarat Community (omzet perusahaan < USD 1 juta/tahun) ditinjau ulang bila skala usaha bertambah.
+- Akses: semua PDF butuh `CanExport` pada menu terkait (W-5).
+
+---
+
+## 6. Cara Kerja, Pengujian & Verifikasi
+
+### 6.1 Alur per fase
+Use case Application/Domain baru dikerjakan & diuji dulu (unit test seperti fase API) → layar Web.App → verifikasi. **User yang commit & migrate.** Migration baru diberi nama `PhaseW{n}_…` (mis. `PhaseW1_AccessControl`).
+
+### 6.2 Test
+- **Domain**: invariant `MenuAccessProfile`, `BranchAccessProfile`, `User.SetAccess` (default branch), `User.Deactivate`.
+- **Application**: CRUD profil (termasuk tolak hapus profil terpakai), create user dengan akses, `SyncMenuCatalogCommand` (tidak menimpa ubahan admin), invalidasi cache saat akses berubah.
+- **Infrastructure** (integration, Testcontainers): `BranchAccess` dari profil (all branches, cabang nonaktif, tanpa profil), listener `LISTEN/NOTIFY`, migrasi data `user_branches` & `branches:access-all`.
+- **Arsitektur** (tambahan): Domain/Application/Infrastructure tidak bergantung pada Web.App; controller Web.App tidak memakai `ApplicationDbContext`/`IDbConnectionFactory`; setiap action controller punya `[MenuAccess]` atau atribut anonim/autentikasi eksplisit; setiap kode di `[MenuAccess]` ada di `MenuCatalog`; Web.Api tidak mendaftarkan hosted service job secara default.
+- **`tests/Web.App.IntegrationTests`**: `WebApplicationFactory` + Testcontainers PostgreSQL — login/logout, user tanpa Akses Menu ditolak, sidebar hanya `CanView`, 403 untuk hak yang tidak dimiliki, ekspor Excel/PDF menghasilkan file valid (dibuka ulang dengan ClosedXML / cek header `%PDF`).
+
+### 6.3 Verifikasi end-to-end
+- Database sementara `intiplasma_verify` (dibuat, di-migrate, dihapus otomatis; DB `intiplasma` tidak disentuh). Web.App (dengan background job) dijalankan dengan `ConnectionStrings__Database` ke DB tersebut; Web.Api ikut bila skenario menguji invalidasi cache lintas proses atau event outbox dari transaksi API.
+- Skenario per fase dengan **Playwright** (Node, interaksi lewat `frameLocator('iframe[name=content-frame]')`): admin (Full Access), user `Checker` (maker-checker), user dengan Akses Menu/Cabang terbatas (menu tersembunyi, tombol hilang, 403, data cabang lain tidak terlihat), ubah profil saat user login (berlaku tanpa login ulang), ekspor Excel/PDF; data dicek via psql.
+- Tanggal data uji ≤ hari ini.
+
+### 6.4 Konvensi kode
+- Controller `sealed`, satu file per controller; view per action di `Areas/{Area}/Views/{Controller}/`.
+- View model terpisah dari command/response Application bila bentuk form berbeda.
+- Teks UI **English**; format angka/tanggal/zona waktu mengikuti W-16.
+
+---
+
+## 7. Tahapan Implementasi
+
+### Fase W0 — Fondasi
+- Rapikan `Web.App.csproj` (hapus properti redundan) + `ProjectReference` ke `Infrastructure.csproj`; build bersih dengan analyzer.
+- Pecah `AddInfrastructure` (§3.2); background job pindah ke Web.App (`BackgroundJobs:Enabled`, advisory lock cleanup, health check job); Web.Api berhenti menjalankan job; seluruh test tetap lulus.
+- **Invalidasi cache lintas proses** (`LISTEN/NOTIFY`, §3.12) untuk cache permission & cabang yang sudah ada.
+- `appsettings`: `ConnectionStrings:Database`, `FileStorage:RootPath` (volume sama), `Serilog`, `Export`.
+- Pangkas `wwwroot` (hapus duplikasi `lib/`/`assets`, plugin & gambar demo), ganti branding, **primary color `#0984E3`** (§3.13), matikan theme customizer.
+- Mainboard (`Views/Main/Index.cshtml`): header & sidebar menjadi partial/view component, `mainboard.js`; `_Layout` (halaman iframe) dirampingkan + `frame.js`; tambah `_LayoutAuth`. `ExampleList`/`ExampleForm` dipakai sebagai acuan partial lalu dihapus.
+- Domain/Application: `User.IsActive` + `security_stamp`, `SignInUserCommand`, `GetCurrentUserQuery`, `ChangeOwnPasswordCommand`; login API ikut menolak user nonaktif. Migration `PhaseW0_UserStatus`.
+- Cookie auth, login/logout/change password, UserMenu (BranchSwitcher sementara memakai akses cabang lama).
+- Mapping `Result` → UI, filter concurrency, token double-submit, `[WorkflowAction]`/`IWorkflowActionService`, halaman error.
+- Partial umum: page header, filter bar, pagination, status badge, money/date, `_DocumentActions`.
+- **Selesai bila**: login admin → dashboard kosong → ganti cabang → change password → logout; user nonaktif tidak bisa login (WebApp & API); jurnal otomatis dari transaksi API tetap terbentuk lewat job di Web.App.
+
+### Fase W1 — Akses Menu, Akses Cabang & Administrasi
+- Domain: `Menu`, `MenuAccessProfile`, `BranchAccessProfile`, `User.SetAccess` (§4.2–4.5). Migration `PhaseW1_AccessControl` (termasuk migrasi data §4.6 dan penghapusan `user_branches` & `branches:access-all`).
+- Application: use case §2.3 (CRUD profil, user, katalog menu); `IMenuAccessProvider` + cache; `BranchAccess` versi profil.
+- Web.Api: `PUT users/{id}/access` (menggantikan `PUT users/{id}/branches`), CRUD profil, `GET users`, aktif/nonaktif, reset password.
+- Web.App: `MenuCatalog` (seluruh menu W1–W9 didefinisikan sekarang), policy provider + handler, `[MenuAccess]`, tag helper, **Sidebar hanya `CanView`**, BranchSwitcher dari Akses Cabang.
+- Layar §4.7: Menu Access, Branch Access, Users (create dengan pilihan Menu Access & Branch Access), Menus, API Roles, Branches.
+- Test arsitektur penegakan `[MenuAccess]`; integration test `BranchAccess` & migrasi data.
+
+### Fase W2 — Ekspor & Master Data
+- Fondasi ekspor (§5): `ExportColumn<T>`, `PagedExportRunner`, Excel & PDF list, komponen kop/footer PDF, partial `_ExportButtons`.
+- Master: UoM, TaxCode (tarif ber-tanggal efektif + rasio DPP), Item (+ konversi satuan), Warehouse, Vendor (toleransi selisih), Customer (NPWP/NITKU, credit limit).
+- Partnership: Farmer, Coop, Contract (wizard skema PriceContract/ProfitSharing, harga jaminan per rentang bobot, bonus/potongan; Draft → Active → Inactive) + PDF kontrak.
+- Komponen **Attachments** (Dropzone → `AttachmentController` → use case attachment; JPEG/PNG/WEBP/PDF ≤ 10 MB, maks 20) + endpoint lookup Tom-Select.
+
+### Fase W3 — Finance Setup
+- COA bertingkat (tree, header vs postable, akun kontra, kategori arus kas), cost center, periode fiskal (buka/tutup + checklist), template jurnal, mapping jurnal otomatis, Master Kas/Bank. Ekspor COA.
+
+### Fase W4 — Pengadaan & Gudang
+- PO (approve/cancel/close, progres penerimaan, **PDF PO**), BPB (**PDF**), transfer stok, retur kandang → induk, mutasi pakan; saldo stok & kartu stok (ekspor Excel/PDF).
+
+### Fase W5 — Produksi
+- Siklus & chick-in (wizard), detail siklus (tab Recording, Harvest, Coop Stock, Performance, Cost, Attachments), **daily recording** (input admin + revisi + timeline, W-11), panen per truk, grafik performa, tutup siklus (+ PDF ringkasan).
+
+### Fase W6 — Penjualan & AR
+- SO (approve, approve-over-limit dengan alasan + tampilan exposure), DO (**PDF delivery note**), Sales Invoice (Draft → post, **PDF invoice**), penerimaan customer (**PDF receipt**), uang muka, void, nota kredit (**PDF**), kartu piutang & aging (ekspor).
+
+### Fase W7 — AP, Kas & Bank
+- Vendor Invoice (3-way match, `post-with-variance`), Payment Voucher vendor & plasma (maker-checker, **PDF PV**), kas masuk/keluar (**PDF**), transfer kas/bank, buku kas/bank, rekonsiliasi bank (impor CSV, tampilan dua kolom, auto/manual match), kartu & aging hutang (ekspor).
+
+### Fase W8 — HPP & Settlement Plasma
+- HPP siklus (rincian & ekspor), settlement (draft & hitung ulang, rincian komponen, approve checker, **PDF settlement**, lanjut PV plasma).
+
+### Fase W9 — Jurnal, Laporan, Tutup Buku, Pajak & Dashboard
+- Jurnal manual (maker-checker, **PDF journal voucher**), daftar jurnal otomatis per dokumen, partial `_JournalPreview` di detail dokumen W4–W8.
+- Laporan: General Ledger, Trial Balance, Income Statement, Balance Sheet, Cash Flow, Profitability — Excel (builder berstruktur) & PDF.
+- Tutup periode & tahun (checklist), rekap pajak PPN/PPh (Excel/PDF + CSV yang sudah ada), monitoring event gagal + retry.
+- `GetDashboardSummaryQuery` + dashboard KPI & grafik.
+
+### Fase W10 — Pengerasan
+- Responsif (tablet), aksesibilitas, bundling/minify aset, security headers (CSP), lockout login, health check, Dockerfile Web.App + `docker-compose` (2 container, satu volume storage), panduan pengguna singkat per modul, log audit ekspor & perubahan akses.
+
+```
+W0 ─► W1 ─► W2 ─► W3 ─┬─► W4 ─► W5 ─► W6 ─► W7 ─► W8 ─► W9 ─► W10
+                      └─ (W3 wajib sebelum W6/W7: kas/bank & periode fiskal)
+```
+
+---
+
+## 8. Daftar Task W0 (siap dikerjakan)
+
+1. `Web.App.csproj`: hapus properti redundan, referensi `Infrastructure.csproj`.
+2. Pecah `AddInfrastructure` → `AddInfrastructureCore` / `AddJwtAuthentication` / `AddBackgroundJobs`; Web.Api memakai Core + Jwt (job nonaktif).
+3. Background job di Web.App: `BackgroundJobs:Enabled`, advisory lock untuk cleanup, health check job, Web.App masuk `docker-compose`; jalankan seluruh test.
+4. Invalidasi cache lintas proses (`NOTIFY` di command akses yang ada + listener di semua host) + integration test.
+5. `Program.cs` Web.App: Serilog, `AddApplication`, `AddInfrastructureCore`, cookie auth, exception handler, status code pages, security headers frame.
+6. Pangkas `wwwroot`, branding, primary color `#0984E3`, matikan theme customizer; mainboard + iframe (§3.10: `mainboard.js`, `frame.js`, hash routing, postMessage, redirect di luar frame, keluar dari frame saat sesi habis); `_Layout` ramping + `_LayoutAuth`; hapus halaman contoh.
+7. Domain `User.IsActive` + `security_stamp` (+ unit test) dan migration `PhaseW0_UserStatus`.
+8. Application: `SignInUserCommand`, `GetCurrentUserQuery`, `ChangeOwnPasswordCommand`; `LoginUserCommand` menolak user nonaktif.
+9. Login/logout/change password, `OnValidatePrincipal`, BranchSwitcher, UserMenu.
+10. `Result` → UI, filter concurrency, token double-submit, `[WorkflowAction]`/`IWorkflowActionService`, partial umum (termasuk `_DocumentActions`), halaman error 403/404/500.
+11. `tests/Web.App.IntegrationTests` (login, logout, user nonaktif) + verifikasi end-to-end (Web.App dengan background job).
+
+---
+
+## 9. Status Keputusan
+
+Seluruh keputusan W-1 s.d. W-20 sudah disepakati (lihat §1). Keputusan baru yang muncul saat implementasi ditambahkan ke tabel §1 dengan nomor lanjutan (W-21, …).
