@@ -10,6 +10,7 @@
     <Project Path="src/Infrastructure/Infrastructure.csproj" />
     <Project Path="src/SharedKernel/SharedKernel.csproj" />
     <Project Path="src/Web.Api/Web.Api.csproj" />
+    <Project Path="src/Web.App/Web.App.csproj" Id="e26f26b0-269d-4600-ae17-dd564df6978e" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Application.UnitTests/Application.UnitTests.csproj" />
