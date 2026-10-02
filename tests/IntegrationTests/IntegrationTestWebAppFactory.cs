@@ -36,6 +36,9 @@ public sealed class IntegrationTestWebAppFactory : WebApplicationFactory<Program
         builder.UseSetting("RateLimiting:Global:PermitLimit", "100000");
         builder.UseSetting("RateLimiting:Authentication:PermitLimit", "100000");
 
+        // Without Web.App the API itself must process the outbox (jobs are off by default in Web.Api).
+        builder.UseSetting("BackgroundJobs:Enabled", "true");
+
         // Uploaded attachments go to a throw-away folder.
         builder.UseSetting("FileStorage:RootPath", Path.Combine(Path.GetTempPath(), $"intiplasma-tests-{Guid.NewGuid():N}"));
     }

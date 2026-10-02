@@ -1,0 +1,13 @@
+@* Title block of a page. Usage: <partial name="Partials/_PageHeader" model="new PageHeaderModel(...)" /> *@
+@model PageHeaderModel
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">@Model.Title</h4>
+            @if (!string.IsNullOrEmpty(Model.Subtitle))
+            {
+                <h6>@Model.Subtitle</h6>
+            }
+        </div>
+    </div>
+</div>

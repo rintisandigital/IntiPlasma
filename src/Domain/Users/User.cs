@@ -14,6 +14,8 @@ public sealed class User : AggregateRoot
         FirstName = firstName;
         LastName = lastName;
         PasswordHash = passwordHash;
+        IsActive = true;
+        SecurityStamp = NewSecurityStamp();
     }
 
     private User()
@@ -24,6 +26,18 @@ public sealed class User : AggregateRoot
     public string FirstName { get; private set; }
     public string LastName { get; private set; }
     public string PasswordHash { get; private set; }
+
+    /// <summary>
+    /// Inactive users can neither sign in to Web.App nor obtain tokens from Web.Api.
+    /// </summary>
+    public bool IsActive { get; private set; }
+
+    /// <summary>
+    /// Changes whenever existing sessions must stop working (password change, deactivation). A cookie session
+    /// carries the stamp it was issued with and is rejected once the stamp no longer matches.
+    /// </summary>
+    public string SecurityStamp { get; private set; }
+
     public IReadOnlyCollection<UserRole> Roles => [.. _roles];
     public IReadOnlyCollection<UserBranch> Branches => [.. _branches];
 
@@ -67,4 +81,25 @@ public sealed class User : AggregateRoot
             _branches.Add(new UserBranch(Id, branchId));
         }
     }
+
+    public void ChangePassword(string passwordHash)
+    {
+        PasswordHash = passwordHash;
+        SecurityStamp = NewSecurityStamp();
+    }
+
+    public void Deactivate()
+    {
+        if (!IsActive)
+        {
+            return;
+        }
+
+        IsActive = false;
+        SecurityStamp = NewSecurityStamp();
+    }
+
+    public void Activate() => IsActive = true;
+
+    private static string NewSecurityStamp() => Guid.NewGuid().ToString("N");
 }

@@ -1,14 +1,14 @@
 using Application.Abstractions.Authorization;
+using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Roles;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Hybrid;
 using SharedKernel;
 
 namespace Application.Roles.Update;
 
-internal sealed class UpdateRoleCommandHandler(IApplicationDbContext context, HybridCache cache)
+internal sealed class UpdateRoleCommandHandler(IApplicationDbContext context, ICacheInvalidator cache)
     : ICommandHandler<UpdateRoleCommand>
 {
     public async Task<Result> Handle(UpdateRoleCommand command, CancellationToken cancellationToken)

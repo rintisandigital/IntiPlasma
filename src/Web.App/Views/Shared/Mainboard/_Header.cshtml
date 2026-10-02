@@ -1,0 +1,45 @@
+@* Mainboard header: logo, mobile menu toggle, branch switcher and user menu. *@
+<div class="header">
+    <div class="main-header">
+
+        <div class="header-left active">
+            <a href="@Url.Action("Index", "Main")" class="logo logo-normal">
+                <img src="~/img/logo.svg" alt="@AppSettings.Value.Name">
+            </a>
+            <a href="@Url.Action("Index", "Main")" class="logo logo-white">
+                <img src="~/img/logo-white.svg" alt="@AppSettings.Value.Name">
+            </a>
+            <a href="@Url.Action("Index", "Main")" class="logo-small">
+                <img src="~/img/logo-small.svg" alt="@AppSettings.Value.Name">
+            </a>
+            <a href="@Url.Action("Index", "Main")" class="logo-small-white">
+                <img src="~/img/logo-small.svg" alt="@AppSettings.Value.Name">
+            </a>
+        </div>
+
+        <a id="mobile_btn" class="mobile_btn" href="#sidebar">
+            <span class="bar-icon">
+                <span></span>
+                <span></span>
+                <span></span>
+            </span>
+        </a>
+
+        <ul class="nav user-menu">
+            <vc:branch-switcher />
+            <vc:user-menu />
+        </ul>
+
+        <div class="dropdown mobile-user-menu">
+            <a href="javascript:void(0);" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fa fa-ellipsis-v"></i>
+            </a>
+            <div class="dropdown-menu dropdown-menu-right">
+                <a class="dropdown-item" href="@Url.Action("ChangePassword", "Account")" target="content-frame">Change Password</a>
+                <form method="post" asp-controller="Auth" asp-action="Logout" target="_top">
+                    <button type="submit" class="dropdown-item btn btn-link">Sign Out</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

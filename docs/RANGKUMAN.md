@@ -1,7 +1,7 @@
 # Rangkuman Proyek — Aplikasi Peternakan Ayam Broiler Inti-Plasma
 
-> Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4), 2026-10-01 (Fase 5–8) dan 2026-10-02 (Fase 9 — lampiran dokumen).
-> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§16. Seluruh fase rencana awal (0–8) dan Fase 9 selesai; lihat §9 untuk backlog berikutnya.
+> Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4), 2026-10-01 (Fase 5–8) dan 2026-10-02 (Fase 9 — lampiran dokumen; Fase W0 — fondasi WebApp).
+> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§16 (API) dan [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (WebApp, realisasi W0 di §10). Fase API 0–9 dan Fase W0 selesai; berikutnya **Fase W1** (Akses Menu, Akses Cabang & administrasi).
 
 ---
 
@@ -151,6 +151,14 @@
 - Pre-check lampiran dipanggil **sebelum** nomor dokumen diambil. Job `AttachmentCleanupJob` menghapus lampiran yatim. Detail respons kini memuat `documents`.
 - Permission baru `attachments:upload|read|delete`. ⚠️ `PUT contracts/{id}` body tetap; lampiran kontrak lewat `PUT contracts/{id}/documents`.
 
+### Fase W0 — Fondasi WebApp ✅ (detail: PLAN-WEBAPP §10)
+- **Web.App = aplikasi langsung** (referensi Infrastructure, memanggil handler yang sama dengan API). `AddInfrastructure` ⚠️ diganti `AddInfrastructureCore` + `AddJwtAuthentication` (API) + `AddBackgroundJobs`.
+- **Background job pindah ke Web.App**: Web.Api `BackgroundJobs:Enabled=false`; cleanup lampiran memakai advisory lock; health check `outbox`.
+- **Invalidasi cache lintas proses** via PostgreSQL `LISTEN/NOTIFY` (`ICacheInvalidator`), sehingga perubahan akses langsung berlaku di Web.Api & Web.App.
+- `User.IsActive` + `SecurityStamp` (migration `PhaseW0_UserStatus`); ⚠️ login & refresh API menolak user nonaktif (`Users.Inactive`); ganti password mencabut refresh token.
+- UI: mainboard + iframe (hash `/#/path`, Back/refresh/deep link), login cookie dengan validasi stamp, ganti password, pemilih cabang, halaman error, tema `#0984E3`, aset 84 → 21 MB, UI English + format id-ID.
+- Pondasi untuk fase berikut: `FormTokenFilter` (double-submit), `DbExceptionFilter` (concurrency), `[WorkflowAction]`, partial umum, `DisplayFormatter`.
+
 ## 5. Alur Akuntansi yang Sudah Berjalan
 
 | Transaksi | Jurnal otomatis |
@@ -193,15 +201,22 @@ Semua event di katalog kini sudah dipakai.
 - Penomoran dokumen (`IDocumentNumberGenerator`) langsung *commit* di luar transaksi EF → semua validasi (termasuk lampiran) harus selesai **sebelum** nomor diambil.
 - Hindari `sed` bernomor baris saat menyunting file yang baru diubah — pernah menimpa baris `HasKey` di `TestDbContext`. Pakai Edit dengan konteks unik.
 - Dokumen yang jurnalnya diposting lewat outbox (VI, PV, kas, void, nota kredit) mengecek **periode fiskal terbuka** saat posting, agar tidak jatuh ke dead letter.
+- **jQuery 4** (bawaan template) menghapus `$.parseJSON/$.trim/$.isFunction/$.isArray` yang masih dipakai jquery-validation-unobtrusive → shim `wwwroot/js/jquery-compat.js` wajib dimuat tepat setelah jQuery.
+- Di .NET 10 kelas `Program` top-level bersifat public: project yang mereferensikan Web.Api **dan** Web.App harus memakai `Web.Api.Program` / `Web.App.Program` secara eksplisit.
+- Browser tidak mengirim fragment (`#…`) ke server: deep link mainboard dibawa ke `ReturnUrl` oleh JavaScript halaman login.
+- FluentValidation `ErrorCode` bukan nama property → error validasi command tampil di validation summary; validasi per field memakai DataAnnotations view model.
+- Folder lampiran relatif terhadap `AppContext.BaseDirectory` (folder `bin`) → di dev Web.App menunjuk `../../../../Web.Api/bin/Debug/net10.0/uploads`; di container keduanya `/app/uploads`.
 
 ## 7. Cara Kerja & Verifikasi
 
 - Setiap fase: domain + unit test invariant → command/query + validator → EF config + migration → endpoint + permission → **verifikasi end-to-end** ke PostgreSQL lokal pada database sementara `intiplasma_verify` (dibuat & dihapus otomatis; database `intiplasma` milik user tidak disentuh).
 - User yang melakukan **commit & migrate** setelah tiap fase.
-- Status test saat ini: **182 test lulus** (120 domain, 41 application, 8 arsitektur, 13 integration).
+- Status test saat ini: **207 test lulus** (124 domain, 48 application, 11 arsitektur, 13 integration Web.Api, 11 integration Web.App).
 - Integration test (Testcontainers) **sudah bisa dijalankan** di mesin dev (container runtime tersedia) — `dotnet test IntiPlasma.slnx`.
 - Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario, Fase 7: 32 skenario, Fase 8: 35 skenario, Fase 9: 79 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
-- Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`, `Phase8_ReportingClosing`, `Phase9_Attachments`.
+- ⚠️ Sejak W0 Web.Api tidak memproses outbox: verifikasi yang hanya menjalankan API perlu `BackgroundJobs__Enabled=true`.
+- Verifikasi WebApp (W0: 49 skenario) memakai **Playwright** (dipasang di scratchpad, bukan di repo) terhadap Web.App :5098 + Web.Api :5099 pada `intiplasma_verify`; interaksi halaman lewat frame `content-frame`.
+- Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`, `Phase8_ReportingClosing`, `Phase9_Attachments`, `PhaseW0_UserStatus`.
 
 ## 8. Catatan Terbuka / Hutang Teknis
 
@@ -218,6 +233,7 @@ Semua event di katalog kini sudah dipakai.
 - Biaya siklus baru sapronak; biaya lain/overhead (listrik, tenaga kerja, penyusutan kandang inti) belum dialokasikan ke siklus.
 - Belum ada sub-ledger piutang plasma per peternak: potongan hutang di settlement hanya dibatasi pendapatan − PPh, belum dicek terhadap saldo piutangnya.
 - Lampiran: storage lokal hanya untuk satu instance (perlu S3/MinIO sebelum scale-out); batas 10 MB & tipe file masih konstanta; belum ada thumbnail/kompresi; `PUT …/documents` pada PV *paid* & PV plasma belum diuji end-to-end.
+- Web.App: key ring Data Protection belum dipersist/dibagi → sesi cookie & token antiforgery tidak valid setelah container di-restart atau antar replika (W10). Bila Web.App mati, event outbox (jurnal otomatis, gudang kandang) tertunda sampai Web.App hidup lagi.
 - Siklus lama yang ditutup sebelum Fase 7 tidak punya `ClosingCost`; invoice lama punya `costAmount` 0 (tidak ada penyesuaian HPP untuk siklus tersebut).
 
 ## 9. Langkah Berikutnya — Backlog setelah Fase 8

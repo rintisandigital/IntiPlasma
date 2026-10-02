@@ -31,6 +31,11 @@ internal sealed class LoginUserCommandHandler(
             return Result.Failure<AccessTokensResponse>(UserErrors.NotFoundByEmail);
         }
 
+        if (!user.IsActive)
+        {
+            return Result.Failure<AccessTokensResponse>(UserErrors.Inactive);
+        }
+
         string accessToken = tokenProvider.Create(user);
         string refreshToken = tokenProvider.GenerateRefreshToken();
 

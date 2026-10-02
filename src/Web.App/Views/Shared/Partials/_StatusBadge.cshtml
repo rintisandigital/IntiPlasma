@@ -1,0 +1,17 @@
+@* Document/master status as a colored badge. Usage: <partial name="Partials/_StatusBadge" model="@order.Status" /> *@
+@model string
+@{
+    string css = Model switch
+    {
+        "Draft" or "Inactive" or "Planned" => "bg-secondary",
+        "Approved" or "Open" or "InProgress" => "bg-info",
+        "Active" or "Posted" or "Paid" or "Received" or "Closed" or "Settled" or "Completed" or "Delivered" => "bg-success",
+        "PartiallyPaid" or "PartiallyReceived" or "PartiallyDelivered" or "Pending" => "bg-warning text-dark",
+        "Cancelled" or "Voided" or "Reversed" or "Rejected" => "bg-danger",
+        _ => "bg-light text-dark"
+    };
+
+    // "PartiallyPaid" -> "Partially Paid"
+    string label = System.Text.RegularExpressions.Regex.Replace(Model ?? string.Empty, "(?<=[a-z])(?=[A-Z])", " ");
+}
+<span class="badge @css">@label</span>

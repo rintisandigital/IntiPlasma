@@ -1,0 +1,78 @@
+@model IReadOnlyList<MenuGroup>
+@{
+    static string PaneId(MenuGroup group) => "menu-" + group.Code.Replace('.', '-');
+
+    void RenderItem(MenuItem item)
+    {
+        if (item.Children.Count > 0)
+        {
+            <li class="submenu">
+                <a href="javascript:void(0);"><span>@item.Title</span><span class="menu-arrow"></span></a>
+                <ul>
+                    @foreach (MenuItem child in item.Children)
+                    {
+                        RenderItem(child);
+                    }
+                </ul>
+            </li>
+        }
+        else
+        {
+            <li><a href="@item.Url" target="content-frame" data-menu-code="@item.Code">@item.Title</a></li>
+        }
+    }
+}
+<div class="two-col-sidebar" id="two-col-sidebar">
+    <div class="sidebar sidebar-twocol">
+        <div class="twocol-mini">
+            <div class="sidebar-left slimscroll">
+                <div class="nav flex-column align-items-center nav-pills" id="sidebar-tabs" role="tablist" aria-orientation="vertical">
+                    @for (int i = 0; i < Model.Count; i++)
+                    {
+                        MenuGroup group = Model[i];
+                        <a href="#" class="nav-link @(i == 0 ? "active" : "")" title="@group.Title"
+                           data-bs-toggle="tab" data-bs-target="#@PaneId(group)" role="tab">
+                            <i class="@group.Icon"></i>
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="sidebar-right">
+            <div class="sidebar-logo">
+                <a href="@Url.Action("Index", "Main")" class="logo logo-normal">
+                    <img src="~/img/logo.svg" alt="@AppSettings.Value.Name">
+                </a>
+                <a href="@Url.Action("Index", "Main")" class="logo logo-white">
+                    <img src="~/img/logo-white.svg" alt="@AppSettings.Value.Name">
+                </a>
+                <a href="@Url.Action("Index", "Main")" class="logo-small">
+                    <img src="~/img/logo-small.svg" alt="@AppSettings.Value.Name">
+                </a>
+                <a href="@Url.Action("Index", "Main")" class="logo-small-white">
+                    <img src="~/img/logo-small.svg" alt="@AppSettings.Value.Name">
+                </a>
+            </div>
+            <div class="sidebar-scroll">
+                <div class="tab-content" id="v-pills-tabContent">
+                    @for (int i = 0; i < Model.Count; i++)
+                    {
+                        MenuGroup group = Model[i];
+                        <div class="tab-pane fade @(i == 0 ? "show active" : "")" id="@PaneId(group)" role="tabpanel">
+                            <ul>
+                                @foreach (MenuSection menuSection in group.Sections)
+                                {
+                                    <li class="menu-title"><span>@menuSection.Title</span></li>
+                                    @foreach (MenuItem item in menuSection.Items)
+                                    {
+                                        RenderItem(item);
+                                    }
+                                }
+                            </ul>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

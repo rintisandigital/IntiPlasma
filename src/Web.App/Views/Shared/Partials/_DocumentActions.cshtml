@@ -1,0 +1,25 @@
+@* Action buttons of a document detail page (approve, post, cancel, …). The controller decides which actions
+   apply from the document status and the user's rights; workflow actions go through IWorkflowActionService
+   (PLAN-WEBAPP §4.8). Usage: <partial name="Partials/_DocumentActions" model="actions" /> *@
+@model IReadOnlyList<DocumentAction>
+@if (Model.Count > 0)
+{
+    <div class="d-flex flex-wrap gap-2">
+        @foreach (DocumentAction action in Model)
+        {
+            if (action.Post)
+            {
+                <form method="post" action="@action.Url" data-confirm="@action.Confirm">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn @action.Style">
+                        <i class="@action.Icon me-1"></i>@action.Label
+                    </button>
+                </form>
+            }
+            else
+            {
+                <a href="@action.Url" class="btn @action.Style"><i class="@action.Icon me-1"></i>@action.Label</a>
+            }
+        }
+    </div>
+}

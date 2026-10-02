@@ -1,12 +1,15 @@
-﻿using System.Text;
+using System.Text;
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Authorization;
+using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
 using Application.Abstractions.Numbering;
 using Application.Abstractions.Storage;
 using Dapper;
 using Infrastructure.Authentication;
 using Infrastructure.Authorization;
+using Infrastructure.BackgroundJobs;
+using Infrastructure.Caching;
 using Infrastructure.Database;
 using Infrastructure.Database.Interceptors;
 using Infrastructure.Documents;
@@ -28,15 +31,76 @@ namespace Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(
+    /// <summary>
+    /// Everything every host needs: database, storage, current user, branch access and cache invalidation.
+    /// Authentication schemes and background jobs are added by the host (see <see cref="AddJwtAuthentication"/>
+    /// and <see cref="AddBackgroundJobs"/>).
+    /// </summary>
+    public static IServiceCollection AddInfrastructureCore(
         this IServiceCollection services,
         IConfiguration configuration) =>
         services
             .AddServices()
             .AddDatabase(configuration)
             .AddHealthChecks(configuration)
-            .AddAuthenticationInternal(configuration)
-            .AddAuthorizationInternal();
+            .AddCurrentUser()
+            .AddAccessControl()
+            .AddCacheInvalidation();
+
+    /// <summary>
+    /// JWT bearer authentication and <c>{module}:{action}</c> permission policies (Web.Api).
+    /// </summary>
+    public static IServiceCollection AddJwtAuthentication(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(o =>
+            {
+                o.RequireHttpsMetadata = false;
+                o.TokenValidationParameters = new TokenValidationParameters
+                {
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Secret"]!)),
+                    ValidIssuer = configuration["Jwt:Issuer"],
+                    ValidAudience = configuration["Jwt:Audience"],
+                    ClockSkew = TimeSpan.Zero
+                };
+            });
+
+        services.AddAuthorization();
+
+        services.AddTransient<IAuthorizationHandler, PermissionAuthorizationHandler>();
+
+        services.AddTransient<IAuthorizationPolicyProvider, PermissionAuthorizationPolicyProvider>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Outbox processor and attachment cleanup, registered only when <c>BackgroundJobs:Enabled</c> is true
+    /// (Web.App by default; Web.Api only when it runs without Web.App).
+    /// </summary>
+    public static IServiceCollection AddBackgroundJobs(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        BackgroundJobsOptions options = configuration.GetSection(BackgroundJobsOptions.SectionName)
+            .Get<BackgroundJobsOptions>() ?? new BackgroundJobsOptions();
+
+        if (!options.Enabled)
+        {
+            return services;
+        }
+
+        services.AddOptions<OutboxOptions>().Bind(configuration.GetSection(OutboxOptions.SectionName));
+        services.AddHostedService<OutboxProcessor>();
+
+        services.AddHostedService<AttachmentCleanupJob>();
+
+        services.AddHealthChecks().AddCheck<OutboxHealthCheck>("outbox");
+
+        return services;
+    }
 
     private static IServiceCollection AddServices(this IServiceCollection services)
     {
@@ -80,12 +144,8 @@ public static class DependencyInjection
 
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
 
-        services.AddOptions<OutboxOptions>().Bind(configuration.GetSection(OutboxOptions.SectionName));
-        services.AddHostedService<OutboxProcessor>();
-
         services.AddOptions<FileStorageOptions>().Bind(configuration.GetSection(FileStorageOptions.SectionName));
         services.AddSingleton<IFileStorage, LocalFileStorage>();
-        services.AddHostedService<AttachmentCleanupJob>();
 
         return services;
     }
@@ -99,42 +159,32 @@ public static class DependencyInjection
         return services;
     }
 
-    private static IServiceCollection AddAuthenticationInternal(
-        this IServiceCollection services,
-        IConfiguration configuration)
+    private static IServiceCollection AddCurrentUser(this IServiceCollection services)
     {
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(o =>
-            {
-                o.RequireHttpsMetadata = false;
-                o.TokenValidationParameters = new TokenValidationParameters
-                {
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Secret"]!)),
-                    ValidIssuer = configuration["Jwt:Issuer"],
-                    ValidAudience = configuration["Jwt:Audience"],
-                    ClockSkew = TimeSpan.Zero
-                };
-            });
-
         services.AddHttpContextAccessor();
         services.AddScoped<IUserContext, UserContext>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
+
+        // Needed by the token use cases (login/refresh) that every host registers via AddApplication.
         services.AddSingleton<ITokenProvider, TokenProvider>();
 
         return services;
     }
 
-    private static IServiceCollection AddAuthorizationInternal(this IServiceCollection services)
+    private static IServiceCollection AddAccessControl(this IServiceCollection services)
     {
-        services.AddAuthorization();
-
         services.AddScoped<PermissionProvider>();
 
         services.AddScoped<IBranchAccess, BranchAccess>();
 
-        services.AddTransient<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        return services;
+    }
 
-        services.AddTransient<IAuthorizationPolicyProvider, PermissionAuthorizationPolicyProvider>();
+    private static IServiceCollection AddCacheInvalidation(this IServiceCollection services)
+    {
+        services.AddSingleton<ICacheInvalidator, PostgresCacheInvalidator>();
+
+        services.AddHostedService<CacheInvalidationListener>();
 
         return services;
     }

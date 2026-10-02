@@ -1,0 +1,47 @@
+@* Pager under a list. Usage: <partial name="Partials/_Pagination" model="PaginationModel.From(list)" /> *@
+@model PaginationModel
+@{
+    string PageUrl(int pageNumber)
+    {
+        var query = ViewContext.HttpContext.Request.Query
+            .Where(q => q.Key != "page")
+            .SelectMany(q => q.Value.Select(v => $"{Uri.EscapeDataString(q.Key)}={Uri.EscapeDataString(v ?? string.Empty)}"))
+            .Append($"page={pageNumber}");
+
+        return $"{ViewContext.HttpContext.Request.PathBase}{ViewContext.HttpContext.Request.Path}?{string.Join('&', query)}";
+    }
+
+    int first = Math.Max(1, Model.Page - 2);
+    int last = Math.Min(Model.TotalPages, Model.Page + 2);
+}
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 px-3 py-2">
+    <span class="text-muted fs-13">
+        @if (Model.TotalCount == 0)
+        {
+            <text>No records</text>
+        }
+        else
+        {
+            <text>Showing @Fmt.Number(Model.FirstItem, 0)–@Fmt.Number(Model.LastItem, 0) of @Fmt.Number(Model.TotalCount, 0)</text>
+        }
+    </span>
+    @if (Model.TotalPages > 1)
+    {
+        <nav aria-label="Pagination">
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
+                    <a class="page-link" href="@PageUrl(Model.Page - 1)" aria-label="Previous"><i class="ti ti-chevron-left"></i></a>
+                </li>
+                @for (int pageNumber = first; pageNumber <= last; pageNumber++)
+                {
+                    <li class="page-item @(pageNumber == Model.Page ? "active" : "")">
+                        <a class="page-link" href="@PageUrl(pageNumber)">@pageNumber</a>
+                    </li>
+                }
+                <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : "")">
+                    <a class="page-link" href="@PageUrl(Model.Page + 1)" aria-label="Next"><i class="ti ti-chevron-right"></i></a>
+                </li>
+            </ul>
+        </nav>
+    }
+</div>

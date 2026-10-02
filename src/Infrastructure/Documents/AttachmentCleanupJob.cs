@@ -1,4 +1,5 @@
 using Application.Abstractions.Storage;
+using Dapper;
 using Domain.Documents.Attachments;
 using Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
@@ -6,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Npgsql;
 using SharedKernel;
 
 namespace Infrastructure.Documents;
@@ -16,11 +18,17 @@ namespace Infrastructure.Documents;
 /// </summary>
 internal sealed partial class AttachmentCleanupJob(
     IServiceScopeFactory scopeFactory,
+    NpgsqlDataSource dataSource,
     IFileStorage fileStorage,
     IDateTimeProvider dateTimeProvider,
     IOptions<FileStorageOptions> options,
     ILogger<AttachmentCleanupJob> logger) : BackgroundService
 {
+    /// <summary>
+    /// Transaction-level advisory lock: with several Web.App replicas only one purges at a time.
+    /// </summary>
+    private const long AdvisoryLockKey = 0x4950_434C_4541_4E; // "IPCLEAN"
+
     private readonly FileStorageOptions _options = options.Value;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -31,7 +39,7 @@ internal sealed partial class AttachmentCleanupJob(
         {
             try
             {
-                int purged = await PurgeAsync(stoppingToken);
+                int purged = await PurgeExclusiveAsync(stoppingToken);
                 if (purged > 0)
                 {
                     LogPurged(logger, purged);
@@ -43,6 +51,21 @@ internal sealed partial class AttachmentCleanupJob(
             }
         }
         while (await timer.WaitForNextTickAsync(stoppingToken));
+    }
+
+    private async Task<int> PurgeExclusiveAsync(CancellationToken cancellationToken)
+    {
+        await using NpgsqlConnection lockConnection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlTransaction lockTransaction = await lockConnection.BeginTransactionAsync(cancellationToken);
+
+        bool acquired = await lockConnection.ExecuteScalarAsync<bool>(new CommandDefinition(
+            "SELECT pg_try_advisory_xact_lock(@Key)",
+            new { Key = AdvisoryLockKey },
+            lockTransaction,
+            cancellationToken: cancellationToken));
+
+        // Another replica is purging; the lock is released when lockTransaction ends.
+        return acquired ? await PurgeAsync(cancellationToken) : 0;
     }
 
     internal async Task<int> PurgeAsync(CancellationToken cancellationToken)

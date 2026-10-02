@@ -1,0 +1,22 @@
+@model Web.App.Models.Error.ErrorViewModel
+@{
+    Layout = "_LayoutAuth";
+    ViewData["Title"] = Model.Title;
+    ViewData["BodyClass"] = "error-page";
+}
+<div class="main-wrapper">
+    <div class="error-box text-center py-5">
+        <div class="error-img mb-4">
+            <img src="@Model.Image" class="img-fluid" alt="@Model.Title">
+        </div>
+        <h3 class="h2 mb-3">@Model.StatusCode — @Model.Title</h3>
+        <p class="text-muted mb-4">@Model.Message</p>
+        <a href="@Url.Action("Index", "Main")" target="_top" class="btn btn-primary">
+            <i class="ti ti-home me-1"></i>Back to Dashboard
+        </a>
+        @if (Model.StatusCode >= 500)
+        {
+            <p class="text-muted fs-12 mt-4 mb-0">Request id: <code>@Model.RequestId</code></p>
+        }
+    </div>
+</div>

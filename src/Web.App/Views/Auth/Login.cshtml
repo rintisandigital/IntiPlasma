@@ -1,103 +1,89 @@
-﻿@{
-    Layout = null;
+@model Web.App.Models.Auth.LoginViewModel
+@{
+    Layout = "_LayoutAuth";
+    ViewData["Title"] = "Sign In";
+    string mainboardUrl = Url.Action("Index", "Main")!;
+    string loginUrl = Url.Action("Login", "Auth")!;
 }
-<!DOCTYPE html>
-<html lang="en">
+@section HeadScripts {
+    <script>
+        // A session that expired inside the content iframe lands here in the frame: sign in on the whole window
+        // and come back to the same page afterwards (PLAN-WEBAPP §3.10).
+        (function () {
+            if (window.top === window.self) { return; }
+            var returnUrl = new URLSearchParams(window.location.search).get('ReturnUrl') || '';
+            var target = '@mainboardUrl' + (returnUrl ? '#' + returnUrl : '');
+            window.top.location.href = '@loginUrl' + '?ReturnUrl=' + encodeURIComponent(target);
+        })();
+    </script>
+}
+<div class="main-wrapper">
+    <div class="account-content">
+        <div class="login-wrapper bg-img">
+            <div class="login-content authent-content">
+                <form asp-action="Login" asp-controller="Auth" method="post" id="login-form" novalidate>
+                    <input type="hidden" asp-for="ReturnUrl" />
+                    <div class="login-userset">
+                        <div class="login-logo logo-normal">
+                            <img src="~/img/logo.svg" alt="@AppSettings.Value.Name">
+                        </div>
+                        <div class="login-logo logo-white">
+                            <img src="~/img/logo-white.svg" alt="@AppSettings.Value.Name">
+                        </div>
+                        <div class="login-userheading">
+                            <h3>Sign In</h3>
+                            <h4 class="fs-16">Sign in to the @AppSettings.Value.Name admin office with your email and password.</h4>
+                        </div>
 
-<head>
-    <base href="~/">
-    
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Dreams POS is a powerful Bootstrap based Inventory Management Admin Template designed for businesses, offering seamless invoicing, project tracking, and estimates.">
-    <meta name="keywords" content="inventory management, admin dashboard, bootstrap template, invoicing, estimates, business management, responsive admin, POS system">
-    <meta name="author" content="Dreams Technologies">
-    <meta name="robots" content="index, follow">
-    <title>Dreams POS - Inventory Management & Admin Dashboard Template</title>
+                        <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
 
-    <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="assets/img/apple-touch-icon.png">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
-    <link rel="stylesheet" href="assets/plugins/tabler-icons/tabler-icons.min.css">
-    <link rel="stylesheet" href="assets/css/style.css">
-
-</head>
-<body class="account-page">
-
-    <div id="global-loader">
-        <div class="whirly-loader"> </div>
-    </div>
-
-    <!-- Main Wrapper -->
-    <div class="main-wrapper">
-        <div class="account-content">
-            <div class="login-wrapper bg-img">
-                <div class="login-content authent-content">
-                    <form action="@Url.Action("Login", "Auth")" method="post">
-                        <div class="login-userset">
-                            <div class="login-logo logo-normal">
-                                <img src="assets/img/logo.svg" alt="img">
+                        <div class="mb-3">
+                            <label asp-for="Email" class="form-label">Email <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input asp-for="Email" type="email" autocomplete="username" autofocus class="form-control border-end-0">
+                                <span class="input-group-text border-start-0">
+                                    <i class="ti ti-mail"></i>
+                                </span>
                             </div>
-                            <a href="index.html" class="login-logo logo-white">
-                                <img src="assets/img/logo-white.svg" alt="Img">
-                            </a>
-                            <div class="login-userheading">
-                                <h3>Sign In</h3>
-                                <h4 class="fs-16">Access the Dreamspos panel using your email and passcode.</h4>
+                            <span asp-validation-for="Email" class="text-danger fs-13"></span>
+                        </div>
+                        <div class="mb-3">
+                            <label asp-for="Password" class="form-label">Password <span class="text-danger">*</span></label>
+                            <div class="pass-group">
+                                <input asp-for="Password" autocomplete="current-password" class="pass-input form-control">
+                                <span class="ti toggle-password ti-eye-off text-gray-9"></span>
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label">Email <span class="text-danger"> *</span></label>
-                                <div class="input-group">
-                                    <input type="text" value="" class="form-control border-end-0">
-                                    <span class="input-group-text border-start-0">
-                                        <i class="ti ti-mail"></i>
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Password <span class="text-danger"> *</span></label>
-                                <div class="pass-group">
-                                    <input type="password" class="pass-input form-control">
-                                    <span class="ti toggle-password ti-eye-off text-gray-9"></span>
-                                </div>
-                            </div>
-                            <div class="form-login authentication-check">
-                                <div class="row">
-                                    <div class="col-12 d-flex align-items-center justify-content-between">
-                                        <div class="custom-control custom-checkbox">
-                                            <label class="checkboxs ps-4 mb-0 pb-0 line-height-1 fs-16 text-gray-6">
-                                                <input type="checkbox" class="form-control">
-                                                <span class="checkmarks"></span>Remember me
-                                            </label>
-                                        </div>
-                                        <div class="text-end">
-                                            <a class="text-orange fs-16 fw-medium" href="forgot-password.html">Forgot Password?</a>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="form-login">
-                                <button type="submit" class="btn btn-primary w-100">Sign In</button>
-                            </div>
-                            
-                            <div class="my-4 d-flex justify-content-center align-items-center copyright-text">
-                                <p>Copyright &copy; @DateTime.Now.Year PT. Rintisan Digital Indopiranti</p>
+                            <span asp-validation-for="Password" class="text-danger fs-13"></span>
+                        </div>
+                        <div class="form-login authentication-check">
+                            <div class="custom-control custom-checkbox">
+                                <label class="checkboxs ps-4 mb-0 pb-0 line-height-1 fs-16 text-gray-6">
+                                    <input name="RememberMe" type="checkbox" value="true" class="form-control" @(Model.RememberMe == true ? "checked" : "")>
+                                    <span class="checkmarks"></span>Remember me
+                                </label>
                             </div>
                         </div>
-                    </form>
-                </div>
+                        <div class="form-login">
+                            <button type="submit" class="btn btn-primary w-100">Sign In</button>
+                        </div>
+
+                        <div class="my-4 d-flex justify-content-center align-items-center copyright-text">
+                            <p>Copyright &copy; @DateTime.Now.Year @AppSettings.Value.CompanyName</p>
+                        </div>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
-    <!-- /Main Wrapper -->
-    
-    <script src="assets/js/feather.min.js"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/js/script.js"></script>
-
-</body>
-
-</html>
+</div>
+@section Scripts {
+    <script>
+        // /Main#/some/page opened while signed out: the browser keeps the hash on the redirect to this page;
+        // carry it into the return URL so the user lands on that page after signing in.
+        (function () {
+            var field = document.getElementById('ReturnUrl');
+            if (!window.location.hash || !field || field.value.indexOf('#') >= 0) { return; }
+            field.value = (field.value || '@mainboardUrl') + window.location.hash;
+        })();
+    </script>
+}

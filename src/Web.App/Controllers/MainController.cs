@@ -1,30 +1,23 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
+using Web.App.Infrastructure.Auth;
 
 namespace Web.App.Controllers;
 
-public class MainController : Controller
+/// <summary>
+/// The mainboard (header + sidebar + content iframe) and the dashboard shown in the iframe.
+/// </summary>
+public sealed class MainController(IBranchContext branchContext) : AppController
 {
     [HttpGet]
-    public IActionResult Index()
-    {
-        return View();
-    }
+    public IActionResult Index() => View();
 
     [HttpGet]
-    public IActionResult ExampleList()
-    {
-        return View();
-    }
+    public IActionResult Dashboard() => View();
 
-    [HttpGet]
-    public IActionResult Dashboard()
-    {
-        return View();
-    }
-
-    [HttpGet]
-    public IActionResult ExampleForm()
-    {
-        return View();
-    }
+    /// <summary>
+    /// Selects the branch used as the default filter (AJAX from the header; empty = all branches).
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> SwitchBranch(Guid? branchId, CancellationToken cancellationToken) =>
+        await branchContext.SelectAsync(branchId, cancellationToken) ? NoContent() : Forbid();
 }

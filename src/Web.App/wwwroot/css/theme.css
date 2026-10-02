@@ -1,0 +1,102 @@
+/* Inti-Plasma overrides on top of the template stylesheet (assets/css/style.css). Primary color: #0984E3. */
+
+:root {
+    --ip-primary: #0984E3;
+    --ip-primary-dark: #0768B2;
+    --ip-primary-soft: #E7F2FC;
+}
+
+/* ---- Mainboard -------------------------------------------------------------------------------------- */
+
+.mainboard .page-wrapper {
+    position: relative;
+}
+
+.mainboard .content-frame {
+    display: block;
+    width: 100%;
+    border: none;
+    background: transparent;
+}
+
+/* Loader shown while the content iframe navigates. */
+.mainboard .frame-loader {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 120px;
+    background: rgba(255, 255, 255, 0.55);
+    z-index: 5;
+}
+
+.mainboard .frame-loader.show {
+    display: flex;
+}
+
+.mainboard .header .branch-switcher .nav-link {
+    gap: 6px;
+    font-weight: 600;
+    color: #092C4C;
+}
+
+.mainboard .header .branch-switcher .dropdown-menu {
+    max-height: 360px;
+    overflow-y: auto;
+}
+
+.mainboard .header .branch-switcher .dropdown-item.active,
+.mainboard .header .branch-switcher .dropdown-item:active {
+    background-color: var(--ip-primary-soft);
+    color: var(--ip-primary);
+}
+
+.avatar-initials {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: var(--ip-primary);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+}
+
+.avatar-initials.avatar-lg {
+    width: 44px;
+    height: 44px;
+    font-size: 16px;
+}
+
+/* ---- Pages inside the content iframe --------------------------------------------------------------- */
+
+body.frame-page {
+    background-color: #F7F7F7;
+    overflow-y: auto;
+}
+
+body.frame-page .frame-content {
+    padding: 20px 24px 32px;
+}
+
+body.frame-page .page-header {
+    margin-bottom: 20px;
+}
+
+/* ---- Authentication & error pages ------------------------------------------------------------------ */
+
+.account-page .login-logo img {
+    max-height: 40px;
+}
+
+.error-box img {
+    max-width: 360px;
+}
+
+.btn-link.dropdown-item {
+    text-align: left;
+}

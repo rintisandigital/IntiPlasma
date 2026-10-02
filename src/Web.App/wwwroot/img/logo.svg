@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="168" height="40" viewBox="0 0 168 40" role="img" aria-label="Inti-Plasma">
+  <rect x="0" y="2" width="36" height="36" rx="9" fill="#0984E3"/>
+  <path d="M11 11h4v18h-4zM19 11h6.5a6 6 0 0 1 0 12H23v6h-4zm4 4v4h2.5a2 2 0 0 0 0-4z" fill="#ffffff"/>
+  <text x="46" y="27" font-family="Nunito, 'Segoe UI', Arial, sans-serif" font-size="19" font-weight="700" fill="#092C4C">Inti-Plasma</text>
+</svg>

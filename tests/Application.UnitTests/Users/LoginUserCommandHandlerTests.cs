@@ -94,9 +94,41 @@ public sealed class LoginUserCommandHandlerTests : BaseHandlerTest
         refreshToken.ExpiresOnUtc.ShouldBeGreaterThan(dateTimeProvider.UtcNow);
     }
 
-    private static async Task SeedUserAsync(TestDbContext context)
+    [Fact]
+    public async Task Handle_Should_ReturnFailure_WhenUserIsInactive()
     {
-        context.Users.Add(User.Create(Email, "Test", "User", "hash"));
+        // Arrange
+        await using TestDbContext context = CreateDbContext();
+        await SeedUserAsync(context, active: false);
+
+        IPasswordHasher passwordHasher = Substitute.For<IPasswordHasher>();
+        passwordHasher.Verify(Arg.Any<string>(), Arg.Any<string>()).Returns(true);
+
+        var handler = new LoginUserCommandHandler(
+            context,
+            passwordHasher,
+            Substitute.For<ITokenProvider>(),
+            Substitute.For<IDateTimeProvider>());
+
+        // Act
+        Result<AccessTokensResponse> result = await handler.Handle(
+            new LoginUserCommand(Email, Password),
+            CancellationToken.None);
+
+        // Assert
+        result.Error.ShouldBe(UserErrors.Inactive);
+        (await context.RefreshTokens.AnyAsync()).ShouldBeFalse();
+    }
+
+    private static async Task SeedUserAsync(TestDbContext context, bool active = true)
+    {
+        var user = User.Create(Email, "Test", "User", "hash");
+        if (!active)
+        {
+            user.Deactivate();
+        }
+
+        context.Users.Add(user);
 
         await context.SaveChangesAsync();
     }

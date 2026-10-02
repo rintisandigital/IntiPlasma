@@ -10,4 +10,9 @@ public static class PermissionCacheKeys
     public static string ForUser(Guid userId) => $"permissions:user:{userId}";
 
     public static string BranchesForUser(Guid userId) => $"branches:user:{userId}";
+
+    /// <summary>
+    /// Cookie session data (active flag + security stamp) re-validated by Web.App.
+    /// </summary>
+    public static string SessionForUser(Guid userId) => $"session:user:{userId}";
 }

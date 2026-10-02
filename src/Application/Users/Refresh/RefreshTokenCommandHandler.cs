@@ -23,6 +23,11 @@ internal sealed class RefreshTokenCommandHandler(
             return Result.Failure<AccessTokensResponse>(UserErrors.InvalidRefreshToken);
         }
 
+        if (!refreshToken.User.IsActive)
+        {
+            return Result.Failure<AccessTokensResponse>(UserErrors.Inactive);
+        }
+
         string accessToken = tokenProvider.Create(refreshToken.User);
         string newRefreshToken = tokenProvider.GenerateRefreshToken();
 

@@ -1,0 +1,10 @@
+# Web.App-specific analyzer exceptions (PLAN-WEBAPP §7, W0). Inherits the repository .editorconfig.
+
+[*.cs]
+
+# CA1054/CA1055/CA1056 (URI parameters/returns/properties should be System.Uri):
+# MVC works with app-relative paths ("/Main#/sales/orders", returnUrl) as strings — Url.IsLocalUrl, Redirect,
+# LinkGenerator and Razor all take and return strings, and these paths are not absolute URIs.
+dotnet_diagnostic.CA1054.severity = none
+dotnet_diagnostic.CA1055.severity = none
+dotnet_diagnostic.CA1056.severity = none

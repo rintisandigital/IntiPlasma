@@ -11,6 +11,18 @@ services:
     volumes:
       - ./.containers/uploads:/app/uploads
 
+  # Admin office (MVC). Runs the background jobs (outbox, attachment cleanup) and shares the uploads volume.
+  web-app:
+    image: ${DOCKER_REGISTRY-}webapp
+    container_name: web-app
+    build:
+      context: .
+      dockerfile: src/Web.App/Dockerfile
+    ports:
+      - 5002:8080
+    volumes:
+      - ./.containers/uploads:/app/uploads
+
   postgres:
     image: postgres:17
     container_name: postgres

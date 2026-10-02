@@ -5356,6 +5356,10 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("first_name");
 
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -5374,6 +5378,12 @@ namespace Infrastructure.Database.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("password_hash");
+
+                    b.Property<string>("SecurityStamp")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("security_stamp");
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()

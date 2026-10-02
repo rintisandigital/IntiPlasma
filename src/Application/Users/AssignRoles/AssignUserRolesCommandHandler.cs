@@ -1,15 +1,15 @@
 using Application.Abstractions.Authorization;
+using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Roles;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Hybrid;
 using SharedKernel;
 
 namespace Application.Users.AssignRoles;
 
-internal sealed class AssignUserRolesCommandHandler(IApplicationDbContext context, HybridCache cache)
+internal sealed class AssignUserRolesCommandHandler(IApplicationDbContext context, ICacheInvalidator cache)
     : ICommandHandler<AssignUserRolesCommand>
 {
     public async Task<Result> Handle(AssignUserRolesCommand command, CancellationToken cancellationToken)

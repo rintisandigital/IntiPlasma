@@ -1,15 +1,15 @@
 using Application.Abstractions.Authorization;
+using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.MasterData.Branches;
 using Domain.Users;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Hybrid;
 using SharedKernel;
 
 namespace Application.Users.AssignBranches;
 
-internal sealed class AssignUserBranchesCommandHandler(IApplicationDbContext context, HybridCache cache)
+internal sealed class AssignUserBranchesCommandHandler(IApplicationDbContext context, ICacheInvalidator cache)
     : ICommandHandler<AssignUserBranchesCommand>
 {
     public async Task<Result> Handle(AssignUserBranchesCommand command, CancellationToken cancellationToken)

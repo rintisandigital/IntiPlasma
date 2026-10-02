@@ -1,0 +1,34 @@
+@* Top-level pages without the mainboard: sign-in and error pages. They also render correctly inside the iframe. *@
+@{
+    string appName = AppSettings.Value.Name;
+    string? title = ViewData["Title"] as string;
+}
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-color="primary">
+<head>
+    <base href="~/">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@(string.IsNullOrEmpty(title) ? appName : $"{title} - {appName}")</title>
+
+    @await RenderSectionAsync("HeadScripts", required: false)
+
+    <link rel="icon" type="image/svg+xml" href="~/img/logo-small.svg">
+    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
+    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
+    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="assets/plugins/tabler-icons/tabler-icons.min.css">
+    <link rel="stylesheet" href="assets/css/style.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/css/theme.css" asp-append-version="true">
+</head>
+<body class="@(ViewData["BodyClass"] ?? "account-page")">
+
+    @RenderBody()
+
+    <script src="assets/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/js/feather.min.js"></script>
+    <script src="assets/js/script.js" asp-append-version="true"></script>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,26 @@
+@model UserMenuModel
+<li class="nav-item dropdown has-arrow main-drop profile-nav">
+    <a href="javascript:void(0);" class="nav-link userset" data-bs-toggle="dropdown" title="@Model.DisplayName">
+        <span class="user-info p-0">
+            <span class="avatar-initials">@Model.Initials</span>
+        </span>
+    </a>
+    <div class="dropdown-menu menu-drop-user">
+        <div class="profileset d-flex align-items-center">
+            <span class="avatar-initials avatar-lg me-2">@Model.Initials</span>
+            <div>
+                <h6 class="fw-medium">@Model.DisplayName</h6>
+                <p>@Model.Email</p>
+            </div>
+        </div>
+        <a class="dropdown-item" href="@Url.Action("ChangePassword", "Account")" target="content-frame">
+            <i class="ti ti-lock me-2"></i>Change Password
+        </a>
+        <hr class="my-2">
+        <form method="post" asp-controller="Auth" asp-action="Logout" target="_top">
+            <button type="submit" class="dropdown-item logout btn btn-link">
+                <i class="ti ti-logout me-2"></i>Sign Out
+            </button>
+        </form>
+    </div>
+</li>

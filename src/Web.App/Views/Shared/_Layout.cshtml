@@ -1,172 +1,50 @@
-﻿@using System.Security.Claims
-@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
-
-@functions {
-    public string? GetAntiXsrfRequestToken => Xsrf.GetAndStoreTokens(Context).RequestToken;
-    public string? GetAntiXsrfRequestTokenForm => Xsrf.GetAndStoreTokens(Context).FormFieldName;
-    public string? GetAntiXsrfRequestTokenHeader => Xsrf.GetAndStoreTokens(Context).HeaderName;
-}
-
+@* Layout of every page shown inside the mainboard's content iframe (no header/sidebar). PLAN-WEBAPP §3.10. *@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
-    var errorMsg = TempData["error"] as string;
-    var successMsg = TempData["success"] as string;
+    string appName = AppSettings.Value.Name;
+    string? title = ViewData["Title"] as string;
+    string? success = TempData[AppController.SuccessKey] as string;
+    string? error = TempData[AppController.ErrorKey] as string;
 }
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light" data-color="primary" data-mainboard-url="@Url.Action("Index", "Main")">
 <head>
     <base href="~/">
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - PT. Rintisan Digital Indopiranti</title>
+    <title>@(string.IsNullOrEmpty(title) ? appName : $"{title} - {appName}")</title>
 
-    <script type="importmap"></script>
-    <link rel="stylesheet" href="Web.App.styles.css" asp-append-version="true" />
+    <script src="~/js/frame.js" asp-append-version="true"></script>
 
-    <link rel="shortcut icon" type="image/x-icon" href="assets/img/favicon.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="assets/img/apple-touch-icon.png">
+    <link rel="icon" type="image/svg+xml" href="~/img/logo-small.svg">
     <link rel="stylesheet" href="assets/css/bootstrap.min.css">
     <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
     <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="assets/plugins/tabler-icons/tabler-icons.min.css">
-
-    <link rel="stylesheet" href="assets/css/animate.css">
-    <link rel="stylesheet" href="assets/css/feather.css">
-    <link rel="stylesheet" href="assets/plugins/quill/quill.snow.css">
-    <link rel="stylesheet" href="assets/css/dataTables.bootstrap5.min.css">
-
     <link rel="stylesheet" href="assets/plugins/sweetalert2/sweetalert2.min.css">
-    <link rel="stylesheet" href="assets/plugins/dragula/dragula.min.css">
     <link rel="stylesheet" href="assets/plugins/jquery.toast/jquery.toast.min.css">
-    <link rel="stylesheet" href="assets/plugins/iCheck/all.css">
-    <link rel="stylesheet" href="assets/plugins/select2/select2.css">
-
-    <link rel="stylesheet" href="assets/plugins/flatpickr/flatpickr.min.css">
-    <link rel="stylesheet" href="assets/css/style.css">
-
-    @* icon *@
-    <link rel="stylesheet" href="assets/plugins/icons/themify/themify.css">
-    <link rel="stylesheet" href="assets/plugins/simpleline/simple-line-icons.css">
+    <link rel="stylesheet" href="assets/css/style.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/css/theme.css" asp-append-version="true">
 
     @await RenderSectionAsync("Styles", required: false)
 </head>
-<body>
+<body class="frame-page" data-menu="@ViewData["Menu"]" data-csrf-token="@Antiforgery.GetAndStoreTokens(Context).RequestToken">
 
-    @RenderBody()
-    
+    <div id="page-notice" hidden data-success="@success" data-error="@error"></div>
+
+    <div class="frame-content">
+        @RenderBody()
+    </div>
+
     <script src="assets/plugins/jquery/jquery-4.0.0.min.js"></script>
+    <script src="~/js/jquery-compat.js" asp-append-version="true"></script>
     <script src="assets/js/bootstrap.bundle.min.js"></script>
     <script src="assets/js/feather.min.js"></script>
-    <script src="assets/js/datatable.js"></script>
-    <script src="assets/plugins/quill/quill.min.js"></script>
-    <script src="assets/plugins/tom-select/js/tom-select.complete.min.js"></script>
     <script src="assets/plugins/sweetalert2/sweetalert2.min.js"></script>
-    <script src="assets/plugins/dragula/dragula.min.js"></script>
-    <script src="assets/plugins/dropzone/dropzone-min.js"></script>
-    <script src="assets/plugins/imask/js/imask.min.js"></script>
     <script src="assets/plugins/jquery.toast/jquery.toast.min.js"></script>
-    <script src="assets/plugins/iCheck/icheck.min.js"></script>
-    <script src="assets/plugins/select2/select2.min.js"></script>
+    <script src="assets/js/script.js" asp-append-version="true"></script>
+    <script src="~/js/app.js" asp-append-version="true"></script>
 
-    <script src="assets/plugins/chartjs/chart.min.js"></script>
-
-    <script src="assets/js/script.js"></script>
-    <script>
-        jQuery.ajaxSetup({
-            headers: {
-                '@GetAntiXsrfRequestTokenHeader': "@GetAntiXsrfRequestToken"
-            }
-        });
-
-        function toastSuccess(message)
-        {
-            $.toast({
-                heading: 'Success',
-                text: message,
-                showHideTransition: 'slide',
-                icon: 'success',
-                bgColor: "#27ae60",
-                loaderBg: "#1abc9c",
-                position: 'bottom-right',
-                hideAfter: 7000
-            });
-        }
-
-        function toastError(message)
-        {
-            $.toast({
-                heading: 'Error',
-                text: message,
-                showHideTransition: 'slide',
-                icon: 'error',
-                bgColor: "#c0392b",
-                loaderBg: "#1abc9c",
-                position: 'bottom-right',
-                hideAfter: 7000
-            });
-        }
-
-        $(document).ready(function () {
-            $(document).on("keypress", ".NumberOnly", function (e) {
-                let val = $(this).val();
-                let key = e.key;
-
-                let allows = ["-", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
-                if(!allows.includes(e.key))
-                    return false;
-
-                if(key == "-")
-                {
-                    if(val != "")
-                        return false;
-
-                    if(val.indexOf("-") > -1)
-                        return false;
-                }
-                return true;
-            });
-
-            $(document).on("keypress", ".DecimalOnly", function (e) {
-                let val = $(this).val();
-                let key = e.key;
-                let allows = ["-", ".", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
-                if (!allows.includes(key))
-                    return false;
-
-                if(key == "-")
-                {
-                    if(val != "")
-                        return false;
-
-                    if(val.indexOf("-") > -1)
-                        return false;
-                }
-
-                if(key == ".")
-                {
-                    if(val == "" || val == "-")
-                        return false;
-
-                    if(val.indexOf(".") > -1)
-                        return false;
-                }
-                return true;
-            });
-        });
-    </script>
-    
-    @if (!string.IsNullOrEmpty(errorMsg))
-    {
-        <script>
-            toastError("@errorMsg");
-        </script>
-    }
-
-    @if (!string.IsNullOrEmpty(successMsg))
-    {
-        <script>
-                toastSuccess("@successMsg");
-        </script>
-    }
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

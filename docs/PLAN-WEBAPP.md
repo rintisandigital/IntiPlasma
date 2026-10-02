@@ -369,7 +369,7 @@ Use case Application/Domain baru dikerjakan & diuji dulu (unit test seperti fase
 
 ## 7. Tahapan Implementasi
 
-### Fase W0 — Fondasi
+### Fase W0 — Fondasi ✅ (selesai 2026-10-02, realisasi §10)
 - Rapikan `Web.App.csproj` (hapus properti redundan) + `ProjectReference` ke `Infrastructure.csproj`; build bersih dengan analyzer.
 - Pecah `AddInfrastructure` (§3.2); background job pindah ke Web.App (`BackgroundJobs:Enabled`, advisory lock cleanup, health check job); Web.Api berhenti menjalankan job; seluruh test tetap lulus.
 - **Invalidasi cache lintas proses** (`LISTEN/NOTIFY`, §3.12) untuk cache permission & cabang yang sudah ada.
@@ -430,7 +430,7 @@ W0 ─► W1 ─► W2 ─► W3 ─┬─► W4 ─► W5 ─► W6 ─► W7 �
 
 ---
 
-## 8. Daftar Task W0 (siap dikerjakan)
+## 8. Daftar Task W0 ✅ (semua selesai, lihat §10)
 
 1. `Web.App.csproj`: hapus properti redundan, referensi `Infrastructure.csproj`.
 2. Pecah `AddInfrastructure` → `AddInfrastructureCore` / `AddJwtAuthentication` / `AddBackgroundJobs`; Web.Api memakai Core + Jwt (job nonaktif).
@@ -449,3 +449,42 @@ W0 ─► W1 ─► W2 ─► W3 ─┬─► W4 ─► W5 ─► W6 ─► W7 �
 ## 9. Status Keputusan
 
 Seluruh keputusan W-1 s.d. W-20 sudah disepakati (lihat §1). Keputusan baru yang muncul saat implementasi ditambahkan ke tabel §1 dengan nomor lanjutan (W-21, …).
+
+---
+
+## 10. Realisasi Fase W0 — Fondasi (2026-10-02)
+
+### 10.1 Backend (Domain / Application / Infrastructure / Web.Api)
+| Area | Realisasi |
+|---|---|
+| `User` | `IsActive` + `SecurityStamp` (32 char), `ChangePassword`, `Deactivate` (idempotent, memperbarui stamp), `Activate`. Error baru: `Users.InvalidCredentials`, `Users.Inactive`, `Users.InvalidCurrentPassword`. Migration **`PhaseW0_UserStatus`** (user lama tetap aktif, masing-masing mendapat stamp acak). |
+| Use case baru | `SignInUserCommand` (tanpa token; email salah & password salah memberi error yang sama), `GetUserSessionQuery` (aktif + stamp, untuk validasi cookie), `GetCurrentUserQuery` (profil + cabang efektif aktif, urut kode), `ChangeOwnPasswordCommand` (verifikasi password lama, stamp baru, **refresh token API dicabut**). |
+| Login/refresh API | ⚠️ `POST users/login` & `users/refresh-token` kini menolak user nonaktif (400 `Users.Inactive`). |
+| `AddInfrastructure` | ⚠️ Dihapus, diganti `AddInfrastructureCore` (DB, storage, user context, akses cabang, invalidasi cache, `ITokenProvider`) + `AddJwtAuthentication` (JWT + policy permission, khusus Web.Api) + `AddBackgroundJobs` (outbox + cleanup + health check `outbox`, hanya bila `BackgroundJobs:Enabled`). |
+| Background job | Web.Api: `BackgroundJobs:Enabled=false` (appsettings). Web.App: `true`. Cleanup lampiran memakai `pg_try_advisory_xact_lock` (aman untuk banyak replika). Integration test Web.Api menyalakan job lewat setting. |
+| Invalidasi cache | Abstraksi `ICacheInvalidator` (Application) → `PostgresCacheInvalidator`: hapus lokal + `pg_notify('cache_invalidation', 'key:…'/'tag:…')`. `CacheInvalidationListener` (hosted service di semua host) `LISTEN` + hapus lokal; saat (re)connect membuang tag `permissions`. Handler `AssignUserRoles`, `AssignUserBranches`, `UpdateRole` kini memakai `ICacheInvalidator`. |
+
+### 10.2 Web.App
+| Area | Realisasi |
+|---|---|
+| Proyek | `Web.App.csproj` ramping + referensi Infrastructure; `.editorconfig` lokal menonaktifkan CA1054/CA1055/CA1056 (URL MVC berupa path string) dengan alasan tertulis. `Program.cs`: Serilog, `AddApplication` + `AddInfrastructureCore` + `AddBackgroundJobs` + `AddWebApp`, exception handler, status code pages `/Error/{code}`, security headers, request localization, `/health` (termasuk `outbox`). |
+| Aset | `wwwroot` 84 MB → 21 MB: plugin tersisa apexchart, chartjs, dropzone, flatpickr, fontawesome, imask, jquery, jquery.toast, simplebar, sweetalert2, tabler-icons, tom-select; `lib/` tinggal jquery-validation(+unobtrusive). Aset yang dibuang dapat disalin lagi dari `docs/html-template/assets`. Logo baru `img/logo*.svg`. |
+| Tema | `#FE9F43` → `#0984E3` di `style.css` (termasuk `rgba(254,159,67,…)`, shade hover `rgb(7,104,178)`/`rgb(6,96,165)`, soft `#FFF6EE` → `#E7F2FC`); `data-color="primary"` tetap; `theme-script.js` & customizer dihapus; override di `css/theme.css`. |
+| Mainboard | `Main/Index` = header (logo, BranchSwitcher, UserMenu) + `SidebarViewComponent` (dari `IMainboardMenuProvider`; W0 menu statis Dashboard & My Account) + iframe `content-frame`. `mainboard.js`: hash mirror (`replaceState`), title & menu aktif dari `postMessage`, guard path internal, loader, tinggi iframe, switch cabang (fetch + reload iframe). `frame.js`: redirect ke `/#path` bila dibuka langsung, lapor navigasi ke parent. |
+| Layout | `_Layout` (halaman iframe: aset inti, toast via `data-*` bukan inline script, `app.js`), `_LayoutAuth` (login & error), `js/jquery-compat.js` (shim `$.parseJSON/$.trim/$.isFunction/$.isArray` yang dihapus jQuery 4 tetapi dipakai jquery-validation-unobtrusive). |
+| Auth | Cookie `ip.auth` (HttpOnly, SameSite=Lax, sliding 8 jam, Remember me), `AppCookieEvents.ValidatePrincipal` (aktif + stamp, cache 5 menit bertag `permissions`), AJAX → 401/403. Login di iframe → keluar ke jendela utama dengan `ReturnUrl=/#<path>`; deep link `/Main#/x` dipertahankan melewati login. Ganti password menerbitkan ulang cookie sesi saat ini; sesi lain keluar. |
+| Cabang | `IBranchContext` (cookie `ip.branch`; seleksi basi jatuh ke cabang pertama; "All branches" hanya untuk akses semua cabang). `POST Main/SwitchBranch` → 204/403. |
+| Infrastruktur UI | `AppController` (toast `success`/`error`), `ResultExtensions` (error use case → validation summary), `DbExceptionFilter` (concurrency & unique violation → pesan + redirect balik / 409 AJAX), `FormTokenFilter` + `<form-token />` (double-submit 24 jam), `[WorkflowAction]` + `IWorkflowActionService` (langsung, siap dialihkan ke approval terpusat), `DisplayFormatter` (`Fmt`: angka/uang/tanggal id-ID, Asia/Jakarta). Partial: `_PageHeader`, `_FilterBar`, `_Pagination`, `_StatusBadge`, `_DocumentActions`. |
+| Halaman | Login, Dashboard (placeholder), Change Password, Error 403/404/500. |
+| Deploy | `src/Web.App/Dockerfile`, service `web-app` di `docker-compose` (port 5002, volume `./.containers/uploads` bersama Web.Api). Dev: `FileStorage:RootPath` Web.App menunjuk folder `uploads` milik Web.Api. |
+
+### 10.3 Pengujian & verifikasi
+- **Test: 207 lulus** — Domain 124 (+4), Application 48 (+7), Arsitektur 11 (+3: lapisan dalam tidak bergantung Web.App, Web.App tidak bergantung Web.Api, controller tanpa akses data langsung), Integration Web.Api 13, **Web.App.IntegrationTests 11 (baru)**: login/logout, password salah, user nonaktif, sesi berakhir saat dinonaktifkan, AJAX 401, header frame, halaman 404, `FormTokenFilter` (3 skenario).
+- **End-to-end 49/49** (Playwright + fetch + psql, Web.App :5098 + Web.Api :5099, DB `intiplasma_verify` dibuat & dihapus): outbox diproses Web.App saat job Web.Api mati, hash/title/menu aktif mengikuti iframe, Back browser, refresh dengan hash, redirect halaman langsung, guard hash eksternal, 404 di iframe, branch switcher (admin vs staf, 403 di luar akses), ganti password (salah, mismatch klien, sukses, sesi lain keluar, refresh token API dicabut), **invalidasi cache lintas proses** (role diubah lewat Web.Api → sesi user nonaktif di Web.App langsung berakhir), user nonaktif ditolak Web.App & Web.Api, sesi habis di iframe → login jendela utama → kembali ke halaman semula, logout.
+
+### 10.4 Catatan & penyesuaian
+- ⚠️ Skrip verifikasi API lama (Fase 5–9) yang hanya menjalankan Web.Api perlu `BackgroundJobs__Enabled=true`, karena jurnal otomatis/outbox tidak lagi diproses Web.Api secara default.
+- Error validasi FluentValidation dari command tidak membawa nama property (`ErrorCode` validator), sehingga tampil di validation summary; validasi per field memakai DataAnnotations view model. Kontrak error API tidak diubah.
+- Route default `Main/Index` = `/`, jadi URL mainboard berbentuk `/#/path` (bukan `/Main#/path`); keduanya berfungsi.
+- `Program` hasil top-level statements di .NET 10 bersifat public → test arsitektur memakai `typeof(Web.Api.Program)` / `typeof(Web.App.Program)` secara eksplisit.
+- Belum ada: menu dari DB & `[MenuAccess]` (W1), notifikasi header, lockout login (W10), Data Protection key ring bersama untuk banyak replika Web.App (W10).

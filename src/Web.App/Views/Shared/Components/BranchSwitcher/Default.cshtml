@@ -1,0 +1,31 @@
+@model BranchSwitcherModel
+@if (Model.Branches.Count == 0 && !Model.AllBranchesAllowed)
+{
+    <li class="nav-item nav-item-box me-2">
+        <span class="badge bg-warning text-dark" title="Ask your administrator for branch access">No branch access</span>
+    </li>
+}
+else
+{
+    <li class="nav-item dropdown has-arrow nav-item-box branch-switcher me-2" data-switch-url="@Url.Action("SwitchBranch", "Main")">
+        <a class="nav-link dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown" href="javascript:void(0);" title="Active branch">
+            <i class="ti ti-building-store"></i>
+            <span class="active-branch-name">@(Model.Active?.Name ?? "All branches")</span>
+        </a>
+        <div class="dropdown-menu dropdown-menu-end">
+            <h6 class="dropdown-header">Active branch</h6>
+            @if (Model.AllBranchesAllowed)
+            {
+                <a href="javascript:void(0);" class="dropdown-item @(Model.Active is null ? "active" : "")"
+                   data-branch-id="" data-branch-name="All branches">All branches</a>
+            }
+            @foreach (Application.Users.GetCurrent.CurrentUserBranch branch in Model.Branches)
+            {
+                <a href="javascript:void(0);" class="dropdown-item @(Model.Active?.Id == branch.Id ? "active" : "")"
+                   data-branch-id="@branch.Id" data-branch-name="@branch.Name">
+                    <span class="fw-semibold">@branch.Code</span> — @branch.Name
+                </a>
+            }
+        </div>
+    </li>
+}

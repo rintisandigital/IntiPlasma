@@ -20,6 +20,18 @@ public static class UserErrors
         "Users.EmailNotUnique",
         "The provided email is not unique");
 
+    public static readonly Error InvalidCredentials = Error.Problem(
+        "Users.InvalidCredentials",
+        "The email or password is incorrect");
+
+    public static readonly Error Inactive = Error.Problem(
+        "Users.Inactive",
+        "The user account is inactive");
+
+    public static readonly Error InvalidCurrentPassword = Error.Problem(
+        "Users.InvalidCurrentPassword",
+        "The current password is incorrect");
+
     public static readonly Error InvalidRefreshToken = Error.Problem(
         "Users.InvalidRefreshToken",
         "The provided refresh token is invalid or has expired");

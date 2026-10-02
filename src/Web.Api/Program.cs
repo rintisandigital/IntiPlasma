@@ -16,7 +16,9 @@ builder.Services.AddSwaggerGenWithAuth();
 builder.Services
     .AddApplication()
     .AddPresentation()
-    .AddInfrastructure(builder.Configuration);
+    .AddInfrastructureCore(builder.Configuration)
+    .AddJwtAuthentication(builder.Configuration)
+    .AddBackgroundJobs(builder.Configuration);
 
 builder.Services.AddObservability(builder.Configuration, builder.Environment.ApplicationName);
 
