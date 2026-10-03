@@ -11,7 +11,7 @@ else
 {
     <li class="nav-item dropdown has-arrow main-drop select-store-dropdown branch-switcher"
         data-switch-url="@Url.Action("SwitchBranch", "Main")">
-        <a href="javascript:void(0);" class="dropdown-toggle nav-link select-store" data-bs-toggle="dropdown" title="Active branch">
+        <a href="#" role="button" class="dropdown-toggle nav-link select-store" data-bs-toggle="dropdown" title="Active branch">
             <span class="user-info">
                 <span class="user-detail">
                     <span class="user-name">
@@ -23,14 +23,14 @@ else
         <div class="dropdown-menu dropdown-menu-right">
             @if (Model.AllBranchesAllowed)
             {
-                <a href="javascript:void(0);" class="dropdown-item @(Model.Active is null ? "active" : "")"
+                <a href="#" role="button" class="dropdown-item @(Model.Active is null ? "active" : "")"
                    data-branch-id="" data-branch-name="All Branches">
                     <i class="ti ti-building-store"></i>&nbsp; All Branches
                 </a>
             }
             @foreach (Application.Users.GetCurrent.CurrentUserBranch branch in Model.Branches)
             {
-                <a href="javascript:void(0);" class="dropdown-item @(Model.Active?.Id == branch.Id ? "active" : "")"
+                <a href="#" role="button" class="dropdown-item @(Model.Active?.Id == branch.Id ? "active" : "")"
                    data-branch-id="@branch.Id" data-branch-name="@branch.Name" title="@branch.Code">
                     <i class="ti ti-building-store"></i>&nbsp; @branch.Name
                 </a>

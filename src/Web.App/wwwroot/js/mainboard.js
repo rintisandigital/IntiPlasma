@@ -96,6 +96,73 @@
         }
     }
 
+
+    /*
+     * Session warning (W10): every page reports when the sign-in cookie expires; five minutes before that a modal
+     * offers to stay signed in (a request that renews the sliding cookie). Once expired, go to the sign-in page and
+     * come back to the current page afterwards.
+     */
+    var sessionWarningMs = 5 * 60 * 1000;
+    var sessionTimers = [];
+
+    function returnUrl() {
+        var path = pathFromHash();
+        return '/' + (path ? '#' + path : '');
+    }
+
+    function scheduleSession(expires) {
+        var expiresAt = parseInt(expires, 10);
+        if (!expiresAt) {
+            return;
+        }
+
+        sessionTimers.forEach(clearTimeout);
+        sessionTimers = [];
+
+        var remaining = expiresAt - Date.now();
+        var modalElement = document.getElementById('session-modal');
+
+        sessionTimers.push(setTimeout(function () {
+            var label = document.getElementById('session-expires-at');
+            if (label) {
+                label.textContent = new Date(expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+            if (modalElement && window.bootstrap) {
+                bootstrap.Modal.getOrCreateInstance(modalElement).show();
+            }
+        }, Math.max(remaining - sessionWarningMs, 0)));
+
+        sessionTimers.push(setTimeout(function () {
+            window.location.href = body.getAttribute('data-login-url') + '?ReturnUrl=' + encodeURIComponent(returnUrl());
+        }, Math.max(remaining, 0)));
+    }
+
+    var keepAlive = document.getElementById('session-keep-alive');
+    if (keepAlive) {
+        keepAlive.addEventListener('click', function () {
+            fetch(body.getAttribute('data-keep-alive-url'), {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': body.getAttribute('data-csrf-token')
+                }
+            }).then(function (response) {
+                if (!response.ok) {
+                    throw new Error('Session ended');
+                }
+                return response.json();
+            }).then(function (data) {
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('session-modal')).hide();
+                scheduleSession(data.expires);
+            }).catch(function () {
+                window.location.href = body.getAttribute('data-login-url') + '?ReturnUrl=' + encodeURIComponent(returnUrl());
+            });
+        });
+    }
+
+    scheduleSession(body.getAttribute('data-session-expires'));
+
     window.addEventListener('message', function (event) {
         if (event.origin !== origin || event.source !== frame.contentWindow) {
             return;
@@ -110,6 +177,7 @@
         history.replaceState(null, '', '#' + message.url);
         document.title = message.title ? message.title : appTitle;
         activateMenu(message.url, message.menuCode);
+        scheduleSession(message.sessionExpires);
     });
 
     /* A manually edited hash (or a bookmark opened in the same tab) loads that page. */
@@ -126,6 +194,28 @@
         var link = event.target.closest('a[target="content-frame"]');
         if (link && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
             showLoader();
+            closeMobileSidebar();
+        }
+    });
+
+    /* Tablet/phone: the sidebar slides over the page (template script.js); close it once a page is chosen. */
+    function closeMobileSidebar() {
+        var overlay = document.querySelector('.sidebar-overlay.opened');
+        if (overlay) {
+            overlay.click();
+        }
+    }
+
+    /* The template's menu toggle is a link to #sidebar: keep that out of the hash route. */
+    var mobileButton = document.getElementById('mobile_btn');
+    if (mobileButton) {
+        mobileButton.addEventListener('click', function (event) { event.preventDefault(); });
+    }
+
+    /* Placeholder links (dropdown toggles, sidebar group headers) must not touch the hash route. */
+    document.addEventListener('click', function (event) {
+        if (event.target.closest('a[href="#"]')) {
+            event.preventDefault();
         }
     });
 

@@ -13,7 +13,7 @@
             <div class="col-md-6">
                 <label class="form-label" for="vendor-select">Vendor <span class="text-danger">*</span></label>
                 <select id="vendor-select" name="vendorId" class="form-select" data-lookup="@Url.Action("Vendors", "Lookup", new { area = "" })"
-                        onchange="if (this.value) { this.form.submit(); }">
+                        data-autosubmit="value">
                     <option value="">Search vendor…</option>
                     @if (Model.VendorId is not null)
                     {
@@ -23,7 +23,7 @@
             </div>
             <div class="col-md-4">
                 <label class="form-label" for="branch-select">Branch <span class="text-danger">*</span></label>
-                <select id="branch-select" name="branchId" class="form-select" asp-items="Model.Branches" onchange="this.form.submit()"></select>
+                <select id="branch-select" name="branchId" class="form-select" asp-items="Model.Branches" data-autosubmit></select>
             </div>
         </form>
     </div>

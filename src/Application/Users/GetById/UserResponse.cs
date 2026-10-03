@@ -12,6 +12,16 @@ public sealed record UserResponse
 
     public bool IsActive { get; init; }
 
+    /// <summary>
+    /// Wrong passwords since the last successful sign-in or lockout.
+    /// </summary>
+    public int AccessFailedCount { get; init; }
+
+    /// <summary>
+    /// Set while the account is locked out after too many wrong passwords (may lie in the past).
+    /// </summary>
+    public DateTime? LockoutEndUtc { get; init; }
+
     public Guid? MenuAccessProfileId { get; init; }
 
     public string? MenuAccessProfileName { get; init; }

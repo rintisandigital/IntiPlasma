@@ -37,7 +37,7 @@
                     {
                         <input type="hidden" asp-for="CustomerLabel" id="customer-label" />
                         <select asp-for="CustomerId" class="form-select" data-lookup="@Url.Action("Customers", "Lookup", new { area = "" })"
-                                onchange="document.getElementById('customer-label').value = this.selectedOptions[0] ? this.selectedOptions[0].text : ''">
+                                data-copy-label="#customer-label">
                             <option value="">Search customer…</option>
                             @if (Model.CustomerId is not null)
                             {

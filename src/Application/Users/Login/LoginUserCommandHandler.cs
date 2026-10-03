@@ -2,38 +2,32 @@ using Application.Abstractions.Authentication;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Users;
-using Microsoft.EntityFrameworkCore;
 using SharedKernel;
 
 namespace Application.Users.Login;
 
 internal sealed class LoginUserCommandHandler(
     IApplicationDbContext context,
-    IPasswordHasher passwordHasher,
+    CredentialVerifier credentials,
     ITokenProvider tokenProvider,
     IDateTimeProvider dateTimeProvider) : ICommandHandler<LoginUserCommand, AccessTokensResponse>
 {
     public async Task<Result<AccessTokensResponse>> Handle(LoginUserCommand command, CancellationToken cancellationToken)
     {
-        User? user = await context.Users
-            .AsNoTracking()
-            .SingleOrDefaultAsync(u => u.Email == command.Email, cancellationToken);
+        Result<User> verified = await credentials.VerifyAsync(command.Email, command.Password, cancellationToken);
 
-        if (user is null)
+        if (verified.IsFailure)
         {
-            return Result.Failure<AccessTokensResponse>(UserErrors.NotFoundByEmail);
+            // The API contract keeps reporting an unknown email and a wrong password as NotFoundByEmail.
+            return Result.Failure<AccessTokensResponse>(
+                verified.Error == UserErrors.InvalidCredentials ? UserErrors.NotFoundByEmail : verified.Error);
         }
 
-        bool verified = passwordHasher.Verify(command.Password, user.PasswordHash);
-
-        if (!verified)
-        {
-            return Result.Failure<AccessTokensResponse>(UserErrors.NotFoundByEmail);
-        }
+        User user = verified.Value;
 
         if (!user.IsActive)
         {
-            return Result.Failure<AccessTokensResponse>(UserErrors.Inactive);
+            return await credentials.RejectAsync<AccessTokensResponse>(user, UserErrors.Inactive, cancellationToken);
         }
 
         string accessToken = tokenProvider.Create(user);
@@ -46,7 +40,8 @@ internal sealed class LoginUserCommandHandler(
 
         context.RefreshTokens.Add(refreshTokenEntity);
 
-        await context.SaveChangesAsync(cancellationToken);
+        // Saves the refresh token together with the sign-in audit entry.
+        await credentials.SucceedAsync(user, cancellationToken);
 
         return new AccessTokensResponse(accessToken, refreshToken);
     }

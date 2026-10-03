@@ -33,6 +33,9 @@ public sealed class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifeti
         builder.UseSetting("Seed:Admin:Email", AdminEmail);
         builder.UseSetting("Seed:Admin:Password", AdminPassword);
         builder.UseSetting("BackgroundJobs:Enabled", "false");
+        // The test server speaks plain HTTP and every test signs in from the same (unknown) address.
+        builder.UseSetting("Security:SecureCookies", "false");
+        builder.UseSetting("Security:LoginPermitPerMinute", "100000");
         builder.UseSetting("FileStorage:RootPath", Path.Combine(Path.GetTempPath(), $"intiplasma-webapp-tests-{Guid.NewGuid():N}"));
     }
 

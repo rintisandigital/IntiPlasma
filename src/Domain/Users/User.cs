@@ -52,6 +52,16 @@ public sealed class User : AggregateRoot
     /// </summary>
     public Guid? DefaultBranchId { get; private set; }
 
+    /// <summary>
+    /// Consecutive wrong passwords since the last successful sign-in or lockout (W10, Web.App and Web.Api).
+    /// </summary>
+    public int AccessFailedCount { get; private set; }
+
+    /// <summary>
+    /// Sign-in is refused until this moment after too many wrong passwords.
+    /// </summary>
+    public DateTime? LockoutEndUtc { get; private set; }
+
     public IReadOnlyCollection<UserRole> Roles => [.. _roles];
 
     public static User Create(string email, string firstName, string lastName, string passwordHash)
@@ -101,6 +111,39 @@ public sealed class User : AggregateRoot
     {
         PasswordHash = passwordHash;
         SecurityStamp = NewSecurityStamp();
+        Unlock();
+    }
+
+    public bool IsLockedOut(DateTime utcNow) => LockoutEndUtc > utcNow;
+
+    /// <summary>
+    /// Counts a wrong password. Reaching <paramref name="maxFailedAttempts"/> locks the account for
+    /// <paramref name="lockoutDuration"/> and starts a new count; returns whether this attempt locked it.
+    /// </summary>
+    public bool RegisterFailedSignIn(DateTime utcNow, int maxFailedAttempts, TimeSpan lockoutDuration)
+    {
+        AccessFailedCount++;
+
+        if (AccessFailedCount < maxFailedAttempts)
+        {
+            return false;
+        }
+
+        AccessFailedCount = 0;
+        LockoutEndUtc = utcNow.Add(lockoutDuration);
+
+        return true;
+    }
+
+    public void RegisterSuccessfulSignIn() => Unlock();
+
+    /// <summary>
+    /// Lifts a lockout (administrator action, password reset, activation) and forgets earlier wrong passwords.
+    /// </summary>
+    public void Unlock()
+    {
+        AccessFailedCount = 0;
+        LockoutEndUtc = null;
     }
 
     public void Deactivate()
@@ -114,7 +157,11 @@ public sealed class User : AggregateRoot
         SecurityStamp = NewSecurityStamp();
     }
 
-    public void Activate() => IsActive = true;
+    public void Activate()
+    {
+        IsActive = true;
+        Unlock();
+    }
 
     private static string NewSecurityStamp() => Guid.NewGuid().ToString("N");
 }

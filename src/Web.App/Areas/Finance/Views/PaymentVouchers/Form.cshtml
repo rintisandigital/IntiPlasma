@@ -16,7 +16,7 @@
             <input type="hidden" name="payeeType" value="@Model.PayeeType">
             <div class="col-md-8">
                 <label class="form-label" for="payee-select">@(Model.IsPlasma ? "Plasma farmer" : "Vendor") <span class="text-danger">*</span></label>
-                <select id="payee-select" name="payeeId" class="form-select" data-lookup="@lookup" onchange="if (this.value) { this.form.submit(); }">
+                <select id="payee-select" name="payeeId" class="form-select" data-lookup="@lookup" data-autosubmit="value">
                     <option value="">@(Model.IsPlasma ? "Search plasma farmer…" : "Search vendor…")</option>
                     @if (Model.PayeeId is not null)
                     {

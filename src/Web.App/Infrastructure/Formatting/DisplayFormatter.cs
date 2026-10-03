@@ -42,6 +42,14 @@ public sealed class DisplayFormatter
     /// <summary>Today in the configured time zone.</summary>
     public DateOnly Today() => DateOnly.FromDateTime(LocalNow());
 
+    /// <summary>The UTC moment the given local day (configured time zone) starts.</summary>
+    public DateTime StartOfDayUtc(DateOnly localDate) =>
+        TimeZoneInfo.ConvertTimeToUtc(localDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified), _timeZone);
+
+    /// <summary>A UTC timestamp in the configured time zone.</summary>
+    public DateTime ToLocal(DateTime utcValue) =>
+        TimeZoneInfo.ConvertTimeFromUtc(System.DateTime.SpecifyKind(utcValue, DateTimeKind.Utc), _timeZone);
+
     /// <summary>A UTC timestamp shown in the configured time zone: dd/MM/yyyy HH:mm.</summary>
     public string DateTime(DateTime utcValue) =>
         TimeZoneInfo.ConvertTimeFromUtc(System.DateTime.SpecifyKind(utcValue, DateTimeKind.Utc), _timeZone)

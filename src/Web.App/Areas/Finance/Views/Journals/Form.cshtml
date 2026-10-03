@@ -17,7 +17,7 @@
                 <input type="hidden" name="branchId" value="@Model.BranchId" />
                 <div class="col-md-6">
                     <label class="form-label" for="template-select">Start from a template</label>
-                    <select id="template-select" name="templateId" class="form-select" asp-items="Model.Templates" onchange="this.form.submit()">
+                    <select id="template-select" name="templateId" class="form-select" asp-items="Model.Templates" data-autosubmit>
                         <option value="">— none —</option>
                     </select>
                 </div>

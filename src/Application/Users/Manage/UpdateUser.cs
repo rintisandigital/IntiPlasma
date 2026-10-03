@@ -1,3 +1,4 @@
+using Application.Abstractions.Auditing;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Domain.Users;
@@ -7,7 +8,10 @@ using SharedKernel;
 
 namespace Application.Users.Manage;
 
-public sealed record UpdateUserCommand(Guid UserId, string FirstName, string LastName) : ICommand;
+public sealed record UpdateUserCommand(Guid UserId, string FirstName, string LastName) : ICommand, IAuditedCommand
+{
+    string IAuditedCommand.AuditEntityType => "User";
+}
 
 internal sealed class UpdateUserCommandValidator : AbstractValidator<UpdateUserCommand>
 {

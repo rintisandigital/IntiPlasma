@@ -73,7 +73,13 @@
                             <td>@(user.MenuAccessProfileName ?? "—")</td>
                             <td>@(user.BranchAccessProfileName ?? "—")</td>
                             <td class="text-muted">@(user.Roles ?? "—")</td>
-                            <td><partial name="Partials/_StatusBadge" model='user.IsActive ? "Active" : "Inactive"' /></td>
+                            <td>
+                                <partial name="Partials/_StatusBadge" model='user.IsActive ? "Active" : "Inactive"' />
+                                @if (user.LockoutEndUtc > DateTime.UtcNow)
+                                {
+                                    <span class="badge bg-danger ms-1" title="Locked until @Fmt.DateTime(user.LockoutEndUtc.Value)">Locked</span>
+                                }
+                            </td>
                             <td class="text-end">
                                 <a asp-action="Details" asp-route-id="@user.Id" class="btn btn-sm btn-light" title="View"><i class="ti ti-eye"></i></a>
                             </td>

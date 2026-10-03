@@ -32,7 +32,10 @@ public sealed class UserIndexViewModel
     public IReadOnlyList<SelectListItem> BranchProfiles { get; init; } = [];
 }
 
-public sealed record UserDetailsViewModel(UserResponse User, bool IsCurrentUser);
+public sealed record UserDetailsViewModel(UserResponse User, bool IsCurrentUser)
+{
+    public bool IsLockedOut => User.LockoutEndUtc > DateTime.UtcNow;
+}
 
 public sealed class UserCreateViewModel : IUserAccessForm
 {

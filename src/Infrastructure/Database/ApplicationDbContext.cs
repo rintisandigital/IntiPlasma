@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Application.Abstractions.Data;
 using Domain.Access;
+using Domain.Auditing;
 using Domain.Costing.PlasmaSettlements;
 using Domain.Documents.Attachments;
 using Domain.Finance.Accounts;
@@ -36,6 +37,7 @@ using Domain.Sales.SalesInvoices;
 using Domain.Sales.SalesOrders;
 using Domain.Users;
 using Infrastructure.Numbering;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Infrastructure.Outbox;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -46,7 +48,7 @@ namespace Infrastructure.Database;
 // Domain events are not dispatched here: InsertOutboxMessagesInterceptor stores them in the outbox
 // in the same transaction, and OutboxProcessor publishes them afterwards (at-least-once delivery).
 public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
-    : DbContext(options), IApplicationDbContext
+    : DbContext(options), IApplicationDbContext, IDataProtectionKeyContext
 {
     internal const string ConcurrencyTokenProperty = "Version";
 
@@ -61,6 +63,11 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<Role> Roles { get; set; }
 
     public DbSet<DeletedUser> DeletedUsers { get; set; }
+
+    public DbSet<AuditLog> AuditLogs { get; set; }
+
+    // Web.App cookie, antiforgery and branch-selection keys, shared by every replica and restart (W10).
+    public DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
 
     public DbSet<Menu> Menus { get; set; }
 

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Application.Abstractions.Data;
 using Domain.Access;
+using Domain.Auditing;
 using Domain.Costing.PlasmaSettlements;
 using Domain.Documents.Attachments;
 using Domain.Finance.Accounts;
@@ -55,6 +56,8 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
     public DbSet<Role> Roles { get; set; }
 
     public DbSet<DeletedUser> DeletedUsers { get; set; }
+
+    public DbSet<AuditLog> AuditLogs { get; set; }
 
     public DbSet<Menu> Menus { get; set; }
 

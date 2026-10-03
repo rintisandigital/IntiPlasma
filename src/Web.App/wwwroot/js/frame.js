@@ -22,7 +22,8 @@
             type: 'navigated',
             url: path,
             title: document.title,
-            menuCode: body ? body.getAttribute('data-menu') : null
+            menuCode: body ? body.getAttribute('data-menu') : null,
+            sessionExpires: body ? body.getAttribute('data-session-expires') : null
         }, window.location.origin);
     }
 

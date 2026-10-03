@@ -1,7 +1,6 @@
 using Application;
-using HealthChecks.UI.Client;
 using Infrastructure;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Infrastructure.Health;
 using Serilog;
 using Web.App;
 using Web.App.Infrastructure.Web;
@@ -18,6 +17,14 @@ builder.Services
 
 WebApplication app = builder.Build();
 
+SecurityOptions security = app.Services.GetRequiredService<SecurityOptions>();
+
+if (security.TrustForwardedHeaders)
+{
+    // First, so the scheme (HTTPS), client IP (rate limiter, audit) and HSTS see the original request.
+    app.UseForwardedHeaders();
+}
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
@@ -26,7 +33,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseStatusCodePagesWithReExecute("/Error/{0}");
 
-app.UseSecurityHeaders();
+app.UseSecurityHeaders(security);
 
 app.UseHttpsRedirection();
 
@@ -36,16 +43,17 @@ app.UseSerilogRequestLogging();
 
 app.UseRouting();
 
+app.UseRateLimiter();
+
 app.UseAuthentication();
 
 app.UseAuthorization();
 
 app.MapStaticAssets();
 
-app.MapHealthChecks("health", new HealthCheckOptions
-{
-    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-});
+app.MapCspReports();
+
+app.MapAppHealthChecks();
 
 app.MapControllerRoute(
     name: "areas",

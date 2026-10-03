@@ -1,3 +1,4 @@
+using Application.Abstractions.Auditing;
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
@@ -13,7 +14,10 @@ namespace Application.Users.Manage;
 /// Deletes a user (W-22) after copying it to the backup table <c>identity.user_old</c> in the same transaction.
 /// Roles and refresh tokens go with the user (cascade); documents keep the user id in their audit columns.
 /// </summary>
-public sealed record DeleteUserCommand(Guid UserId, string? Reason) : ICommand;
+public sealed record DeleteUserCommand(Guid UserId, string? Reason) : ICommand, IAuditedCommand
+{
+    string IAuditedCommand.AuditEntityType => "User";
+}
 
 internal sealed class DeleteUserCommandValidator : AbstractValidator<DeleteUserCommand>
 {

@@ -16,12 +16,12 @@
 <ul class="table-top-head" asp-menu="@Model" asp-right="Export">
     <li>
         <a href="@Url("xlsx")" target="_blank" data-bs-toggle="tooltip" data-bs-placement="top" title="Export to Excel">
-            <img src="assets/img/icons/excel.svg" alt="Excel">
+            <img src="~/assets/img/icons/excel.svg" asp-append-version="true" alt="Excel">
         </a>
     </li>
     <li>
         <a href="@Url("pdf")" target="_blank" data-bs-toggle="tooltip" data-bs-placement="top" title="Export to PDF">
-            <img src="assets/img/icons/pdf.svg" alt="PDF">
+            <img src="~/assets/img/icons/pdf.svg" asp-append-version="true" alt="PDF">
         </a>
     </li>
 </ul>

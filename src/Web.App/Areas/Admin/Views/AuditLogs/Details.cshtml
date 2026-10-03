@@ -1,0 +1,71 @@
+@model Application.Auditing.AuditLogListItem
+@{
+    ViewData["Title"] = "Audit Entry";
+    ViewData["Menu"] = MenuCodes.AdminAuditLogs;
+
+    string? details = null;
+    if (!string.IsNullOrEmpty(Model.Details))
+    {
+        using System.Text.Json.JsonDocument document = System.Text.Json.JsonDocument.Parse(Model.Details);
+        details = System.Text.Json.JsonSerializer.Serialize(document.RootElement, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+    }
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">@Model.Summary</h4>
+            <h6>@Fmt.DateTime(Model.OccurredAtUtc)</h6>
+        </div>
+    </div>
+    <div class="page-btn">
+        <a asp-action="Index" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Entry</h5></div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Category</dt>
+                    <dd class="col-sm-8">@Model.Category</dd>
+                    <dt class="col-sm-4">Action</dt>
+                    <dd class="col-sm-8">@Model.Action</dd>
+                    <dt class="col-sm-4">User</dt>
+                    <dd class="col-sm-8">
+                        @if (Model.UserId is Guid userId)
+                        {
+                            <a asp-controller="Users" asp-action="Details" asp-route-id="@userId">@(Model.UserEmail ?? userId.ToString())</a>
+                        }
+                        else
+                        {
+                            @(Model.UserEmail ?? "—")
+                        }
+                    </dd>
+                    <dt class="col-sm-4">Record</dt>
+                    <dd class="col-sm-8">@(Model.EntityType ?? "—") <span class="text-muted small d-block">@Model.EntityId</span></dd>
+                    <dt class="col-sm-4">IP address</dt>
+                    <dd class="col-sm-8">@(Model.IpAddress ?? "—")</dd>
+                    <dt class="col-sm-4">Application</dt>
+                    <dd class="col-sm-8">@Model.Source</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Details</h5></div>
+            <div class="card-body">
+                @if (details is null)
+                {
+                    <p class="text-muted mb-0">No details.</p>
+                }
+                else
+                {
+                    <pre class="mb-0 small bg-light p-3 rounded audit-details">@details</pre>
+                }
+            </div>
+        </div>
+    </div>
+</div>

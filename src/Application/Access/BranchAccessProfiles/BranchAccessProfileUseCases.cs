@@ -1,3 +1,4 @@
+using Application.Abstractions.Auditing;
 using System.Data.Common;
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Caching;
@@ -148,16 +149,25 @@ public sealed record CreateBranchAccessProfileCommand(
     string Name,
     string? Description,
     bool AllBranches,
-    IReadOnlyList<Guid> BranchIds) : ICommand<Guid>;
+    IReadOnlyList<Guid> BranchIds) : ICommand<Guid>, IAuditedCommand
+{
+    string IAuditedCommand.AuditEntityType => "BranchAccessProfile";
+}
 
 public sealed record UpdateBranchAccessProfileCommand(
     Guid ProfileId,
     string Name,
     string? Description,
     bool AllBranches,
-    IReadOnlyList<Guid> BranchIds) : ICommand;
+    IReadOnlyList<Guid> BranchIds) : ICommand, IAuditedCommand
+{
+    string IAuditedCommand.AuditEntityType => "BranchAccessProfile";
+}
 
-public sealed record DeleteBranchAccessProfileCommand(Guid ProfileId) : ICommand;
+public sealed record DeleteBranchAccessProfileCommand(Guid ProfileId) : ICommand, IAuditedCommand
+{
+    string IAuditedCommand.AuditEntityType => "BranchAccessProfile";
+}
 
 internal sealed class CreateBranchAccessProfileCommandValidator : AbstractValidator<CreateBranchAccessProfileCommand>
 {

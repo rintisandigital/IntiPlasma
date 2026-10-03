@@ -420,7 +420,7 @@ Use case Application/Domain baru dikerjakan & diuji dulu (unit test seperti fase
 - Tutup periode & tahun (checklist), rekap pajak PPN/PPh (Excel/PDF + CSV yang sudah ada), monitoring event gagal + retry.
 - `GetDashboardSummaryQuery` + dashboard KPI & grafik.
 
-### Fase W10 — Pengerasan
+### Fase W10 — Pengerasan ✅ (selesai 2026-10-04; rencana §23, realisasi §24)
 - Responsif (tablet), aksesibilitas, bundling/minify aset, security headers (CSP), lockout login, health check, Dockerfile Web.App + `docker-compose` (2 container, satu volume storage), panduan pengguna singkat per modul, log audit ekspor & perubahan akses.
 
 ```
@@ -1055,3 +1055,148 @@ Tidak ada perubahan Domain/Application/Web.Api dan **tidak ada migration baru**;
 - Skrip W9 membuka tahun fiskal sebelumnya; karena penutupan periode berurutan, jalankan W3 sebelum W9 pada DB verifikasi yang sama.
 - Kartu Journal pada dokumen yang jurnalnya diproses outbox bisa kosong beberapa detik setelah posting (ditampilkan "No journal yet").
 - Laporan memakai respons query yang sudah ada; batas jumlah baris laporan belum diterapkan (GL satu akun, TB per akun — ukuran wajar).
+
+---
+
+## 23. Rencana Fase W10 — Pengerasan
+
+> Disusun 2026-10-04 dari inventaris kode setelah W9. Keputusan §23.10 disepakati user 2026-10-04.
+
+### 23.1 Ruang lingkup & hasil akhir
+Tidak ada fitur bisnis baru. Hasil akhir: Web.App siap dijalankan sebagai container produksi (bersama Web.Api, satu DB, satu volume), tahan terhadap brute force login & XSS dasar, sesi tetap valid setelah restart/antar replika, bisa dipakai di tablet, punya jejak audit ekspor & perubahan akses, dan punya panduan pengguna.
+
+### 23.2 Temuan (kondisi saat ini)
+| Area | Kondisi | Dampak |
+|---|---|---|
+| Security headers | `SecurityHeaders.cs`: `X-Frame-Options`, `nosniff`, `Referrer-Policy`, CSP **hanya** `frame-ancestors 'self'`. HSTS hanya di non-Development. Cookie `SecurePolicy = SameAsRequest`. | CSP belum membatasi script/style/koneksi. |
+| Inline script | **21 view** berisi blok `<script>` inline (Login, Dashboard, Report, form dinamis: Journals, PO, SO, VI, PV, kas, kontrak, …), **16** handler `onchange=`/`onclick=`, **7** `href="javascript:void(0)"` (header, sidebar, branch switcher, user menu, menu search), **58** atribut `style=`. | CSP `script-src 'self'` langsung mematahkan halaman tersebut → perlu nonce + pemindahan handler. |
+| Lockout login | Tidak ada (`User` tanpa hitungan gagal; `SignInUserCommand` & `LoginUserCommand` tidak membatasi). Web.App tanpa rate limiter (Web.Api punya global 100/menit/user). | Brute force password tidak tertahan. |
+| Data Protection | Tidak dikonfigurasi → key ring per container, hilang saat restart. | Cookie sesi, antiforgery, dan `ip.branch` invalid setelah restart / antar replika (hutang W0). |
+| Health check | `/health` (Npgsql + `outbox` bila job aktif), detail JSON anonim. | Belum ada pemisahan liveness/readiness; detail internal terbuka; storage & listener `LISTEN/NOTIFY` tidak dicek. |
+| Docker | `src/Web.App/Dockerfile` (template VS, `EXPOSE 8081` tidak dipakai). `docker-compose.yml`: service `web-app` tanpa connection string, `depends_on`, healthcheck; override memakai `ASPNETCORE_ENVIRONMENT=Development`. | Compose belum siap produksi. Font QuestPDF, ICU (`id-ID`), dan tzdata (`Asia/Jakarta`) di image Linux belum diverifikasi. |
+| Aset | `wwwroot` 21 MB. `assets/css/style.css` **1,4 MB tidak diminify**; link `assets/...` relatif tanpa `~/` → tidak ter-fingerprint (`asp-append-version` hanya sebagian). `MapStaticAssets` sudah aktif. | Muatan awal besar, cache tidak optimal setelah deploy. |
+| Responsif | Belum pernah diuji di lebar tablet (768–1024 px): sidebar two-column, tabel lebar, form baris dinamis, matriks Menu Access. | — |
+| Aksesibilitas | Belum diaudit. Catatan awal: kontras `#0984E3` di atas putih ±3,9:1 (di bawah AA 4,5:1 untuk teks kecil); tombol ikon tanpa `aria-label`; iframe perlu `title`. | — |
+| Audit | Ekspor hanya dicatat ke log Serilog (`ExportService.LogExport`). Perubahan akses (user, profil Akses Menu/Cabang, role API, menu, cabang) hanya meninggalkan `modified_at/by`. Login tidak dicatat. | Tidak ada jejak "siapa mengubah apa" yang bisa dibuka admin. |
+| Lain-lain | Peringatan "sesi akan habis" di parent (§3.10) & notifikasi header belum ada. Login DEBUG mengisi kredensial admin otomatis (hanya build Debug — aman di image Release). | — |
+
+### 23.3 Keamanan HTTP & CSP
+- **CSP berbasis nonce**: middleware membuat nonce per request, tag helper menambahkan `nonce` ke blok `<script>` inline. Kebijakan:
+  `default-src 'self'; script-src 'self' 'nonce-…'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-src 'self' blob:; frame-ancestors 'self'; form-action 'self'; base-uri 'self'; object-src 'none'`.
+  `style-src 'unsafe-inline'` dipertahankan (atribut `style=`, SweetAlert2/Tom-Select/ApexCharts menyuntik style). Pratinjau lampiran PDF dicek terhadap `frame-src`.
+- **Pemindahan handler inline**: `onchange="this.form.submit()"` → `data-autosubmit` (varian "hanya bila ada nilai"), salin label opsi → `data-copy-label="#id"`, tombol "Use it" settlement → `data-fill-target`; ditangani sekali di `app.js`. `href="javascript:void(0)"` → `href="#"` + `role="button"`.
+- **Report-Only** dulu (pelanggaran dikirim ke `/csp-report` → Serilog), lalu enforce. Integration test memastikan header & nonce; E2E menangkap `securitypolicyviolation` = 0 di semua halaman menu.
+- Header tambahan: `Permissions-Policy` (kamera/mikrofon/geolokasi mati), `Cross-Origin-Opener-Policy: same-origin`; HSTS tetap non-Development. Cookie `ip.auth`/`ip.branch`/antiforgery: `SecurePolicy = Always` di luar Development.
+- **Forwarded headers** (`X-Forwarded-For/Proto`) untuk deploy di belakang reverse proxy — dibutuhkan juga oleh rate limiter & IP di audit.
+
+### 23.4 Lockout login & rate limit
+- **Domain `User`**: `AccessFailedCount`, `LockoutEndUtc`; `RegisterFailedSignIn(now, maxAttempts, lockoutDuration)`, `RegisterSuccessfulSignIn()`, `IsLockedOut(now)`, `Unlock()`. Reset password oleh admin & `Activate` ikut membuka kunci.
+- `SignInUserCommand` (Web.App) **dan** `LoginUserCommand` (Web.Api) memakai aturan yang sama: terkunci → error baru `Users.LockedOut` ("Account is locked. Try again in N minutes."); password salah menaikkan hitungan; email tak dikenal tetap `Users.InvalidCredentials`.
+- Opsi `Security:Lockout` (`MaxFailedAttempts` 5, `LockoutMinutes` 15), dipakai kedua host.
+- Layar **Users**: badge "Locked until …" dan aksi **Unlock** (hak Edit).
+- **Rate limiter Web.App**: `POST /Auth/Login` dibatasi per IP (10/menit) → 429 dengan halaman ramah.
+- Migration **`PhaseW10_Hardening`** (kolom user + tabel §23.5 & §23.6).
+
+### 23.5 Data Protection bersama
+- `AddDataProtection().SetApplicationName("IntiPlasma.WebApp").PersistKeysToDbContext<…>()` dengan tabel `infrastructure.data_protection_keys` (paket `Microsoft.AspNetCore.DataProtection.EntityFrameworkCore`) → semua replika & restart memakai key ring yang sama; sesuai W-12 (satu DB, tanpa volume tambahan).
+- Key tidak terenkripsi at-rest secara default — dicatat di panduan deploy (opsi `ProtectKeysWithCertificate`).
+- Verifikasi: login → restart Web.App → sesi & form (antiforgery) tetap valid.
+
+### 23.6 Log audit (ekspor, perubahan akses, login)
+- Tabel `infrastructure.audit_logs`: `id` (Guid v7), `occurred_at_utc`, `user_id`, `user_email`, `category` (`Access`/`Export`/`SignIn`), `action`, `entity_type`, `entity_id`, `summary` (English), `details` (`jsonb`: nilai lama/baru atau filter ekspor), `ip_address`, `source` (`WebApp`/`WebApi`).
+- Abstraksi `IAuditLog` (Application), ditulis **dalam transaksi yang sama** oleh handler perubahan akses: create/update/delete/activate/deactivate/reset password/unlock user, set akses user, CRUD Akses Menu (ringkasan diff matriks) & Akses Cabang, role API & permission, ubah menu, status cabang. Karena handler dipakai bersama, perubahan lewat Web.Api ikut tercatat.
+- Ekspor (Excel/PDF/CSV/cetak dokumen) dicatat `ExportService` (menu, judul, format, jumlah baris, filter).
+- Login: sukses, gagal, terkunci (Web.App & Web.Api).
+- Layar **Administration → Audit Log** (`admin.audit-logs`, View/Export): filter tanggal, kategori, user, cari; detail JSON; ekspor Excel/PDF. Tanpa edit/hapus.
+
+### 23.7 Health check & operasional
+- `/health/live` (tanpa dependensi) dan `/health/ready` (PostgreSQL, storage lampiran bisa ditulis, listener `cache_invalidation` tersambung, `outbox` di Web.App). Detail JSON hanya untuk jaringan internal; publik cukup status singkat. Berlaku untuk kedua host.
+- **Docker**: Dockerfile Web.App & Web.Api dirapikan (port 8080, `USER $APP_UID`, `HEALTHCHECK`, tzdata/ICU diverifikasi, font QuestPDF tersedia); `docker-compose.yml` lengkap: `postgres` (healthcheck) → `web-api` & `web-app` (`depends_on: service_healthy`, connection string & secret dari `.env`, `BackgroundJobs__Enabled` true/false, volume `uploads` bersama, `restart: unless-stopped`); `.env.example`; override Development tetap untuk Visual Studio.
+- **Migration produksi**: tetap manual oleh user, didokumentasikan dengan *EF migration bundle*. Web.App tidak menjalankan migration.
+- **Peringatan sesi**: mainboard menampilkan modal "Your session will expire in 5 minutes" + *Stay signed in* (ping ringan yang memperpanjang cookie sliding).
+- `docs/DEPLOY.md`: variabel lingkungan, volume, reverse proxy/TLS, backup DB & uploads, urutan upgrade (backup → migrate → deploy Web.Api & Web.App).
+
+### 23.8 Aset, responsif & aksesibilitas
+- **Aset**: semua link `assets/...` diubah ke `~/assets/...` agar ter-fingerprint `MapStaticAssets` (cache immutable + brotli). `style.css` diminify (`style.min.css` hasil generate, sumber tetap disimpan). Tanpa bundler runtime. Ukuran transfer diukur sebelum/sesudah.
+- **Responsif (tablet 768–1024 px)**: sidebar collapse & tertutup otomatis setelah klik menu; tabel list `.table-responsive`; filter bar & tombol aksi membungkus; form baris dinamis bisa digulir horizontal; matriks Menu Access dengan header lengket. Ponsel bukan target (ada mobile app PPL), cukup tidak rusak.
+- **Aksesibilitas (WCAG 2.1 AA dasar)**: audit **axe-core** lewat Playwright di halaman utama tiap modul, target 0 pelanggaran *critical/serious*; perbaikan umum: `lang="en"`, `title` iframe, `aria-label` tombol ikon, label terhubung ke input (termasuk Tom-Select & baris dinamis), fokus terlihat, pesan validasi `aria-live`, kontras teks/link primer.
+
+### 23.9 Panduan pengguna
+- `docs/user-guide/` — satu Markdown per modul (Login & navigasi, Administration, Master Data & Partnership, Procurement & Inventory, Production, Sales & AR, AP/Kas/Bank, Costing & Settlement, Journals/Reports/Closing): alur langkah demi langkah, arti status, maker-checker, hak menu yang dibutuhkan, screenshot dari E2E.
+
+### 23.10 Keputusan (disepakati 2026-10-04)
+| # | Topik | Usulan |
+|---|-------|--------|
+| 1 | CSP | Nonce untuk `<script>` inline; handler `on*`/`javascript:` dipindah ke `app.js`; `style-src 'unsafe-inline'` diterima. Report-Only dulu, enforce setelah E2E bersih. |
+| 2 | Lockout | 5 kali gagal → terkunci 15 menit; berlaku Web.App **dan** Web.Api (⚠️ perilaku login mobile berubah); admin bisa Unlock; pesan "Account is locked" (risiko enumerasi email diterima — aplikasi internal). |
+| 3 | Rate limit login Web.App | 10 percobaan/menit per IP. |
+| 4 | Data Protection | Key ring di **PostgreSQL**, bukan volume file. |
+| 5 | Log audit | Tabel `infrastructure.audit_logs` + layar Audit Log (View/Export); cakupan: perubahan akses, ekspor/cetak, login. Tanpa retensi otomatis dulu. |
+| 6 | Bundling | Tanpa paket bundler; minify `style.css` + fingerprint semua aset. |
+| 7 | Target perangkat | Desktop + **tablet**; ponsel tidak ditargetkan. |
+| 8 | Aksesibilitas & warna | Audit axe-core, 0 critical/serious; warna **teks/link** primer digelapkan (mis. `#0770C2`) bila gagal AA, tombol tetap `#0984E3`. |
+| 9 | Panduan pengguna | Markdown di `docs/user-guide/`, **Bahasa Indonesia** (nama tombol/menu tetap English seperti UI), tanpa halaman Help di aplikasi. |
+| 10 | Migration produksi | Tetap manual oleh user; didokumentasikan di `docs/DEPLOY.md`. |
+| 11 | Di luar W10 | Notifikasi header, approval terpusat (§4.8), Redis/scale-out, S3/MinIO, observabilitas lanjutan, hutang teknis domain (RANGKUMAN §8). |
+
+### 23.11 Urutan task
+1. **Domain/Application**: lockout di `User` (+ unit test), `SignIn`/`Login` memakai lockout, `UnlockUserCommand`; `IAuditLog` + penulisan di handler akses & login; `GetAuditLogsQuery`.
+2. **Infrastructure**: EF config `audit_logs` & `data_protection_keys`, opsi `Security:Lockout`, health check storage & listener; migration **`PhaseW10_Hardening`**.
+3. **Web.App keamanan**: Data Protection, CSP nonce + tag helper, pemindahan handler inline (21 view, 16 handler, 7 link), header tambahan, forwarded headers, cookie Secure, rate limiter login, peringatan sesi.
+4. **Web.App layar**: Users (Locked + Unlock), **Audit Log**, ekspor tercatat ke audit.
+5. **Aset & UI**: path `~/assets`, minify `style.css`, responsif tablet, perbaikan aksesibilitas.
+6. **Deploy**: Dockerfile, `docker-compose.yml` + `.env.example`, health `/live` & `/ready`, uji `docker compose up` (login, PDF dengan font, zona waktu, upload ke volume bersama, outbox di Web.App).
+7. **Pengujian**: unit (lockout), application (audit, unlock), integration Web.App (CSP & nonce, lockout + 429, audit log & layar, unlock, health, Data Protection di DB), integration Web.Api (login terkunci).
+8. **E2E**: W10 (CSP tanpa pelanggaran di semua menu, lockout & unlock, audit log, viewport tablet + screenshot, axe-core, restart Web.App tanpa logout) + **regresi penuh W0–W9**.
+9. `docs/user-guide/`, `docs/DEPLOY.md`, realisasi §24, RANGKUMAN.
+
+### 23.12 Risiko & catatan teknis
+- CSP paling rawan regresi: plugin template (`script.js`, feather, ApexCharts, Chart.js, SweetAlert2) bisa memakai `eval`/inline handler — Report-Only + tangkap pelanggaran di E2E sebelum enforce.
+- Lockout di Web.Api mengubah perilaku login mobile (dicatat ⚠️ di RANGKUMAN); hitungan gagal di DB sehingga konsisten antar proses.
+- Audit dalam transaksi yang sama menambah satu insert per command akses (volume kecil); audit ekspor ditulis setelah file berhasil dibuat.
+- Minify `style.css` diverifikasi visual (screenshot sebelum/sesudah).
+- Image Linux: pastikan `Asia/Jakarta`, culture `id-ID` (ICU, bukan invariant mode) dan font PDF tersedia — diuji di `docker compose`, bukan hanya Windows.
+
+---
+
+## 24. Realisasi Fase W10 — Pengerasan (2026-10-04)
+
+Migration baru **`PhaseW10_Hardening`**: kolom `identity.users.access_failed_count` & `lockout_end_utc`, tabel `infrastructure.audit_logs` dan `infrastructure.data_protection_keys`.
+
+### 24.1 Domain, Application, Infrastructure
+| Area | Realisasi |
+|---|---|
+| Lockout | `User.RegisterFailedSignIn/RegisterSuccessfulSignIn/IsLockedOut/Unlock`; `ChangePassword` (reset & ganti sendiri) dan `Activate` membuka kunci. `CredentialVerifier` (Application) dipakai **`SignInUserCommand` (Web.App) dan `LoginUserCommand` (Web.Api)**: email tak dikenal & password salah tetap pesan yang sama (API tetap `Users.NotFoundByEmail`), terkunci → `Users.LockedOut` (sisa menit). Opsi `Security:Lockout` (5 kali / 15 menit). `UnlockUserCommand` + ⚠️ endpoint baru `POST users/{id}/unlock`. `GetUsers`/`GetUserById` memuat `lockoutEndUtc` (& `accessFailedCount`). |
+| Audit trail | Entity `AuditLog` (Domain/Auditing, kategori Access/Export/SignIn), `IAuditTrail` + `AuditTrail` (Infrastructure: user dari claim cookie/JWT, IP, `source` = Web.App/Web.Api, detail JSON dengan properti `*password*` disamarkan `***`). **`AuditDecorator`** (decorator command terdalam) mencatat command bertanda `IAuditedCommand` yang sukses — 22 command akses (user, profil Akses Menu/Cabang, menu, API role, cabang, unlock), baik dari Web.App maupun Web.Api. Penyimpanan audit memakai `SaveChanges` tersendiri setelah command sukses (bukan transaksi yang sama — penyesuaian dari §23.6; command gagal tidak dicatat). Login sukses/gagal/terkunci/ditolak dicatat `CredentialVerifier`. `RecordExportCommand`, `GetAuditLogsQuery`, `GetAuditLogByIdQuery`. |
+| Data Protection | `ApplicationDbContext` = `IDataProtectionKeyContext`; `AddSharedDataProtection("IntiPlasma.WebApp")`. Paket `Microsoft.AspNetCore.DataProtection.EntityFrameworkCore` + pin `System.Security.Cryptography.Xml` 10.0.12 (advisory NU1903 pada 10.0.9). |
+| Health | `MapAppHealthChecks` (kedua host): `/health/live` (tanpa cek), `/health/ready`, `/health` (detail JSON hanya untuk IP loopback/privat). Cek baru `storage` (folder lampiran bisa ditulis) & `cache-invalidation` (listener `LISTEN` tersambung, Degraded bila putus). |
+| Web.Api | `Database:SeedOnStartup` untuk instalasi produksi pertama (seed idempotent di luar Development). |
+
+### 24.2 Web.App
+| Area | Realisasi |
+|---|---|
+| CSP | Nonce hex per request + `ScriptNonceTagHelper` (semua `<script>`); kebijakan `default-src 'self'; script-src 'self' 'nonce-…'; style-src 'self' 'unsafe-inline'; img/font data:/blob:; frame-src 'self' blob:; frame-ancestors/form-action/base-uri 'self'; object-src 'none'; report-uri /csp-report` **hanya untuk respons HTML** (file PDF/Excel tetap `frame-ancestors 'self'` agar pratinjau PDF tidak terganggu). `Security:CspReportOnly` untuk diagnosa; laporan pelanggaran dicatat log `Web.App.Csp`. 16 handler `onchange/onclick` → `data-autosubmit`, `data-copy-label`, `data-fill-target` (`app.js`); 7 `javascript:void(0)` → `href="#"` + `role="button"` (dicegah navigasi di `app.js`/`mainboard.js`). Header `Permissions-Policy`, `Cross-Origin-Opener-Policy`. |
+| Font | ⚠️ Template meng-`@import` Google Fonts (Nunito, Poppins) — diblokir CSP & butuh internet. **Nunito di-host sendiri** (`assets/fonts/nunito`, woff2 variabel latin + latin-ext, SIL OFL), Poppins tidak dipakai → dihapus. |
+| Cookie & proxy | `Security:SecureCookies` (default true; Development & test false) untuk cookie sesi + antiforgery; `Security:TrustForwardedHeaders` → `UseForwardedHeaders` (X-Forwarded-For/Proto). |
+| Rate limit | Policy `login` pada `POST /Auth/Login`: `Security:LoginPermitPerMinute` (10) per IP, fixed window → 429 + halaman "Too many attempts". |
+| Users | Badge **Locked** (list & detail, *Locked until …*), jumlah *Failed sign-ins*, aksi **Unlock** (Edit), tombol **Audit Log** per user. |
+| Audit Log | Menu baru `admin.audit-logs` (View/Export): filter cari/kategori/tanggal (WIB)/user, detail JSON terformat, ekspor Excel/PDF. Ekspor & cetak dokumen dicatat lewat `ExportAuditFilter` (result filter global; `ExportService` menandai ekspor, filter menulis setelah file terkirim — semua pemanggil lama tidak berubah). |
+| Sesi | Setiap halaman membawa `data-session-expires` (memperhitungkan sliding renewal); mainboard menampilkan modal 5 menit sebelum habis, **Stay signed in** → `POST /Main/KeepAlive`; saat habis → login dengan `ReturnUrl` halaman saat ini. |
+| Aset | Semua `assets/...` → `~/assets/...` + `asp-append-version` (fingerprint `MapStaticAssets`). `style.min.css` hasil lightningcss (1,43 → 1,18 MB; gzip 153 → 139 KB) — dirender identik dengan `style.css` (perbandingan screenshot piksel 4 halaman). Regenerasi: `npx lightningcss-cli --minify --error-recovery style.css -o style.min.css`. |
+| Tablet | ⚠️ Template menyembunyikan sidebar two-column di < 992 px sehingga menu **tidak bisa dibuka** di tablet; kini sidebar slide-in lewat tombol ☰ (CSS `theme.css`), tombol tidak mengubah hash, sidebar menutup setelah memilih menu. Tidak ada scroll horizontal halaman di 768 & 1024 px. |
+| Aksesibilitas | axe-core (WCAG 2.1 A/AA) pada 18 halaman + login: 364 node critical/serious → 0 (kecuali tombol primer, lihat catatan). Warna teks AA di `theme.css`: primer teks/link `#0770C2`, muted `#646B72`, danger `#C82333`, badge success `#157347`; link sidebar & judul menu; `aria-label` modul sidebar, tombol menu/akun, filter cabang/cari; nama aksesibel otomatis (`app.js`) untuk input baris tabel ("Quantity — line 2"), select filter, dan input Tom-Select. |
+| Deploy | Dockerfile kedua host: port 8080, non-root, folder `/app/uploads` milik user app, `HEALTHCHECK` via bash `/dev/tcp` ke `/health/live` (image tanpa curl). `docker-compose.yml`: postgres dengan healthcheck → web-api/web-app (`depends_on: service_healthy`, `env_file: .env` opsional, connection string dari `POSTGRES_*`, named volume `uploads`, `restart: unless-stopped`). `.env.example`, `.env` di-ignore git & image. `docs/DEPLOY.md`, `docs/user-guide/` (9 modul + README, Bahasa Indonesia, screenshot). |
+
+### 24.3 Pengujian & verifikasi
+- **Test: 412 lulus** — Domain 146 (+3), Application 68 (+8: lockout sign-in/login, audit decorator, unlock), Arsitektur 14, Integration Web.Api 19 (+1 lockout & unlock API), Integration Web.App 165 (+12 `HardeningTests`: CSP & nonce per request, file tanpa CSP halaman, tanpa handler inline, lockout → Locked → Unlock → audit, rate limit 429, audit akses dengan password disamarkan + layar & ekspor, audit ekspor, 403 tanpa hak, health, key Data Protection di DB, keep-alive).
+- **E2E W10 53/53** (Playwright, Web.App :5098 + Web.Api :5099, DB `intiplasma_verify` di-migrate dengan *migration bundle*): 55 menu + 12 form tanpa pelanggaran CSP & 200, perilaku `data-*`, lockout 5× → pesan terkunci → badge → Unlock → login, audit (urutan event, aktor, masking, list/detail/ekspor), modal sesi & redirect saat habis, tablet portrait/landscape, axe, CSS minify identik, health. **Restart 7/7**: form yang dibuka sebelum restart tetap bisa disimpan (antiforgery) & sesi tetap, key ring tidak bertambah, rate limit 3/menit → 429.
+- **Container 20/20** (Podman + docker-compose v2, image dari Dockerfile, DB di-migrate bundle, `Database__SeedOnStartup`): non-root, tzdata/WIB, format id-ID, PDF (font tersemat) & Excel di Linux, upload Web.App terlihat di container Web.Api (volume bersama), audit dari kedua sumber, key DP di DB, HEALTHCHECK *healthy*.
+- **Regresi** (satu DB baru, urutan header → W0 → W2 … W9): header 15/15, W0 49/49 (ekspektasi warna avatar diperbarui ke `#0770C2`), W2 40/40, W3 48/48, W4 51/51, W5 42/42, W6 42/42, W7 61/62 (artefak urutan skrip yang sama seperti W9: badge Variance tersaring cabang aktif dari W0), W8 44/44, W9 44/44.
+
+### 24.4 Catatan
+- ⚠️ **Login API**: 5 kali salah password mengunci akun 15 menit (juga untuk mobile); respons `400` dengan `Users.LockedOut`. Hitungan bersama Web.App & Web.Api.
+- ⚠️ Tombol primer (`btn-primary`, putih di atas `#0984E3`, rasio 3,87) **tetap** sesuai keputusan §23.10 #8 — satu-satunya temuan axe yang dikecualikan.
+- Avatar inisial & badge primer kini `#0770C2` (skrip E2E W0 diperbarui).
+- Migration bundle butuh variabel `ConnectionStrings__Database` saat dijalankan (host Web.Api dibangun untuk membuat DbContext); argumen `--connection` saja tidak cukup.
+- Podman rootless: `docker compose build` (buildkit) gagal → build image dengan `podman build --format docker`, lalu `compose up --no-build`. Docker Desktop tidak terdampak.
+- Audit tanpa retensi otomatis; tabel bisa tumbuh — rencanakan arsip/purge bila perlu.

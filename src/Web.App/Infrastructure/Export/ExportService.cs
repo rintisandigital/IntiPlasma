@@ -11,7 +11,7 @@ namespace Web.App.Infrastructure.Export;
 
 /// <summary>
 /// Builds export files for the screens: title block (company, active branch, printed by/at), Excel or PDF,
-/// file name <c>{name}_{branch}_{yyyyMMdd-HHmm}.{ext}</c>, and an audit log line per export (PLAN-WEBAPP §5).
+/// file name <c>{name}_{branch}_{yyyyMMdd-HHmm}.{ext}</c>, and an audit trail entry per export (PLAN-WEBAPP §5, §23.6).
 /// </summary>
 public sealed partial class ExportService(
     IOptions<AppOptions> appOptions,
@@ -56,7 +56,7 @@ public sealed partial class ExportService(
             ? ExcelExporter.Export(header, columns, rows)
             : pdfExporter.Export(header, columns, rows);
 
-        Log(header, format, rows.Count);
+        Log(header, format, rows.Count, isDocument: false);
 
         return File(header, format, content);
     }
@@ -73,7 +73,7 @@ public sealed partial class ExportService(
             ? ReportExporter.Excel(header, report)
             : reportExporter.Pdf(header, report);
 
-        Log(header, format, report.Tables.Sum(t => t.Rows.Count));
+        Log(header, format, report.Tables.Sum(t => t.Rows.Count), isDocument: false);
 
         return File(header, format, content);
     }
@@ -96,7 +96,8 @@ public sealed partial class ExportService(
             count++;
         }
 
-        LogExport(logger, httpContextAccessor.HttpContext?.User.GetDisplayName() ?? string.Empty, title, ExportFileFormat.Excel, count, "csv");
+        LogExport(logger, httpContextAccessor.HttpContext?.User.GetDisplayName() ?? string.Empty, title, "Csv", count, fileName);
+        PendingExport.Track(httpContextAccessor.HttpContext, new PendingExport(title, "Csv", count, [fileName], null, IsDocument: false));
 
         byte[] content = [.. System.Text.Encoding.UTF8.GetPreamble(), .. System.Text.Encoding.UTF8.GetBytes(builder.ToString())];
         return new FileContentResult(content, "text/csv") { FileDownloadName = fileName };
@@ -129,7 +130,7 @@ public sealed partial class ExportService(
             page.Content().Element(content);
         })).GeneratePdf();
 
-        Log(header, ExportFileFormat.Pdf, 1);
+        Log(header, ExportFileFormat.Pdf, 1, isDocument: true);
 
         return File(header, ExportFileFormat.Pdf, pdf);
     }
@@ -146,9 +147,16 @@ public sealed partial class ExportService(
         };
     }
 
-    private void Log(ExportHeader header, ExportFileFormat format, int rows) =>
-        LogExport(logger, header.PrintedBy, header.Title, format, rows, string.Join("; ", header.Filters));
+    private void Log(ExportHeader header, ExportFileFormat format, int rows, bool isDocument)
+    {
+        LogExport(logger, header.PrintedBy, header.Title, format.ToString(), rows, string.Join("; ", header.Filters));
+
+        // Written to the audit trail by ExportAuditFilter once the file has been sent.
+        PendingExport.Track(
+            httpContextAccessor.HttpContext,
+            new PendingExport(header.Title, format == ExportFileFormat.Pdf ? "PDF" : format.ToString(), rows, header.Filters, header.BranchName, isDocument));
+    }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Export by {User}: {Title} as {Format}, {Rows} rows, filters: {Filters}")]
-    private static partial void LogExport(ILogger logger, string user, string title, ExportFileFormat format, int rows, string filters);
+    private static partial void LogExport(ILogger logger, string user, string title, string format, int rows, string filters);
 }

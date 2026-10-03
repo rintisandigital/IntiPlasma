@@ -6,7 +6,7 @@
             <div class="col-md-8">
                 <label class="form-label" for="cycle-picker">Cycle</label>
                 <select id="cycle-picker" name="cycleId" class="form-select" data-lookup="@Url.Action("RecordableCycles", "Lookup", new { area = "" })"
-                        onchange="if (this.value) { this.form.submit(); }">
+                        data-autosubmit="value">
                     <option value="">Search an active cycle (number, coop)…</option>
                     @if (Model.Cycle is not null)
                     {

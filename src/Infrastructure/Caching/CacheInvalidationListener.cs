@@ -15,6 +15,7 @@ namespace Infrastructure.Caching;
 internal sealed partial class CacheInvalidationListener(
     NpgsqlDataSource dataSource,
     HybridCache cache,
+    CacheInvalidationStatus status,
     ILogger<CacheInvalidationListener> logger) : BackgroundService
 {
     private static readonly TimeSpan ReconnectDelay = TimeSpan.FromSeconds(5);
@@ -35,6 +36,7 @@ internal sealed partial class CacheInvalidationListener(
             }
             catch (Exception ex)
             {
+                status.Listening = false;
                 LogListenerFailed(logger, ex);
 
                 await Task.Delay(ReconnectDelay, stoppingToken);
@@ -55,6 +57,8 @@ internal sealed partial class CacheInvalidationListener(
 
         // Notifications sent while this process was not listening are lost: drop every access-related entry.
         await cache.RemoveByTagAsync(PermissionCacheKeys.Tag, stoppingToken);
+
+        status.Listening = true;
 
         while (!stoppingToken.IsCancellationRequested)
         {

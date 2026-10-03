@@ -30,15 +30,18 @@ public sealed partial class AuthenticationTests(WebAppFactory factory)
         HttpResponseMessage response = await client.GetAsync(new Uri("/Auth/Login", UriKind.Relative));
 
         response.Headers.GetValues("X-Frame-Options").ShouldContain("SAMEORIGIN");
-        response.Headers.GetValues("Content-Security-Policy").ShouldContain("frame-ancestors 'self'");
+        response.Headers.GetValues("Content-Security-Policy").ShouldContain(policy => policy.Contains("frame-ancestors 'self'"));
     }
 
     [Fact]
     public async Task Login_Should_ShowError_WhenPasswordIsWrong()
     {
+        // Not the administrator: wrong passwords count towards the lockout of the account.
+        string email = UniqueEmail();
+        await factory.CreateUserAsync(email, "Password123");
         HttpClient client = CreateClient();
 
-        HttpResponseMessage response = await PostLoginAsync(client, WebAppFactory.AdminEmail, "wrong-password");
+        HttpResponseMessage response = await PostLoginAsync(client, email, "wrong-password");
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await response.Content.ReadAsStringAsync()).ShouldContain(UserErrors.InvalidCredentials.Description);

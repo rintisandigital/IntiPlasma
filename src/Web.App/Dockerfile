@@ -1,14 +1,18 @@
-# See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
+# Web.App (admin office, MVC) — also runs the background jobs (outbox, attachment cleanup). PLAN-WEBAPP §23.7.
+# The stage names are the ones Visual Studio expects (fast mode uses "base").
 
-# This stage is used when running from VS in fast mode (Default for Debug configuration)
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
-USER $APP_UID
 WORKDIR /app
+# Shared attachment volume, writable by the non-root app user (a new named volume copies this ownership).
+RUN mkdir -p /app/uploads && chown "$APP_UID" /app/uploads
+USER $APP_UID
+ENV ASPNETCORE_HTTP_PORTS=8080 \
+    FileStorage__RootPath=/app/uploads
 EXPOSE 8080
-EXPOSE 8081
+# No curl in the image: probe the liveness endpoint with bash's /dev/tcp.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health/live HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -q ' 200 ' <&3"]
 
-
-# This stage is used to build the service project
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
@@ -22,14 +26,12 @@ COPY ["src/SharedKernel/SharedKernel.csproj", "src/SharedKernel/"]
 RUN dotnet restore "./src/Web.App/Web.App.csproj"
 COPY . .
 WORKDIR "/src/src/Web.App"
-RUN dotnet build "./Web.App.csproj" -c $BUILD_CONFIGURATION -o /app/build
+RUN dotnet build "./Web.App.csproj" -c $BUILD_CONFIGURATION -o /app/build --no-restore
 
-# This stage is used to publish the service project to be copied to the final stage
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./Web.App.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "./Web.App.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false --no-restore
 
-# This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .

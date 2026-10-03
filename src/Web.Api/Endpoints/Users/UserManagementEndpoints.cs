@@ -91,6 +91,17 @@ internal sealed class UserManagementEndpoints : IEndpoint
         })
         .HasPermission(Permissions.UsersManage);
 
+        group.MapPost("{userId:guid}/unlock", async (
+            Guid userId,
+            ICommandHandler<UnlockUserCommand> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result result = await handler.Handle(new UnlockUserCommand(userId), cancellationToken);
+
+            return result.Match(Results.NoContent, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.UsersManage);
+
         group.MapPost("{userId:guid}/reset-password", async (
             Guid userId,
             ResetPasswordRequest request,

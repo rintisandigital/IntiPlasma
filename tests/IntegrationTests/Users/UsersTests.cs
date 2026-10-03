@@ -47,6 +47,32 @@ public sealed class UsersTests(IntegrationTestWebAppFactory factory) : BaseInteg
     }
 
     [Fact]
+    public async Task Login_Should_LockOut_AfterFiveWrongPasswords_UntilAdminUnlocks()
+    {
+        // Arrange
+        string email = UniqueEmail();
+        Guid userId = await RegisterUserAsync(email);
+
+        // Act
+        for (int attempt = 1; attempt <= 5; attempt++)
+        {
+            await HttpClient.PostAsJsonAsync("users/login", new { email, password = "WrongPassword1" });
+        }
+
+        HttpResponseMessage locked = await HttpClient.PostAsJsonAsync("users/login", new { email, password = Password });
+
+        // Assert
+        locked.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await locked.Content.ReadAsStringAsync()).ShouldContain("Users.LockedOut");
+
+        await AuthenticateAsAdminAsync();
+        (await HttpClient.PostAsync($"users/{userId}/unlock", null)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        AccessTokens tokens = await LoginAsync(email);
+        tokens.AccessToken.ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
     public async Task RefreshToken_Should_ReturnNewTokens()
     {
         // Arrange

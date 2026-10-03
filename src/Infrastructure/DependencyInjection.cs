@@ -1,11 +1,14 @@
 using System.Text;
+using Application.Abstractions.Auditing;
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
 using Application.Abstractions.Numbering;
 using Application.Abstractions.Storage;
+using Application.Users;
 using Dapper;
+using Infrastructure.Auditing;
 using Infrastructure.Authentication;
 using Infrastructure.Authorization;
 using Infrastructure.BackgroundJobs;
@@ -14,15 +17,18 @@ using Infrastructure.Database;
 using Infrastructure.Database.Interceptors;
 using Infrastructure.Documents;
 using Infrastructure.DomainEvents;
+using Infrastructure.Health;
 using Infrastructure.Numbering;
 using Infrastructure.Outbox;
 using Infrastructure.Time;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using SharedKernel;
@@ -44,6 +50,7 @@ public static class DependencyInjection
             .AddDatabase(configuration)
             .AddHealthChecks(configuration)
             .AddCurrentUser()
+            .AddLockout(configuration)
             .AddAccessControl()
             .AddCacheInvalidation();
 
@@ -154,7 +161,9 @@ public static class DependencyInjection
     {
         services
             .AddHealthChecks()
-            .AddNpgSql(configuration.GetConnectionString("Database")!);
+            .AddNpgSql(configuration.GetConnectionString("Database")!)
+            .AddCheck<FileStorageHealthCheck>("storage")
+            .AddCheck<CacheInvalidationHealthCheck>("cache-invalidation");
 
         return services;
     }
@@ -167,6 +176,30 @@ public static class DependencyInjection
 
         // Needed by the token use cases (login/refresh) that every host registers via AddApplication.
         services.AddSingleton<ITokenProvider, TokenProvider>();
+
+        services.AddScoped<IAuditTrail, AuditTrail>();
+
+        return services;
+    }
+
+    private static IServiceCollection AddLockout(this IServiceCollection services, IConfiguration configuration)
+    {
+        // Same lockout rules for the Web.App sign-in and the Web.Api login (W10).
+        services.AddOptions<LockoutOptions>().Bind(configuration.GetSection(LockoutOptions.SectionName));
+        services.AddTransient(sp => sp.GetRequiredService<IOptions<LockoutOptions>>().Value);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Data Protection keys (cookies, antiforgery tokens) stored in PostgreSQL, so sessions survive restarts and
+    /// work across replicas of the host (W10).
+    /// </summary>
+    public static IServiceCollection AddSharedDataProtection(this IServiceCollection services, string applicationName)
+    {
+        services.AddDataProtection()
+            .SetApplicationName(applicationName)
+            .PersistKeysToDbContext<ApplicationDbContext>();
 
         return services;
     }
@@ -185,6 +218,7 @@ public static class DependencyInjection
     private static IServiceCollection AddCacheInvalidation(this IServiceCollection services)
     {
         services.AddSingleton<ICacheInvalidator, PostgresCacheInvalidator>();
+        services.AddSingleton<CacheInvalidationStatus>();
 
         services.AddHostedService<CacheInvalidationListener>();
 

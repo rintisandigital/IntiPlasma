@@ -1,3 +1,4 @@
+using Application.Abstractions.Auditing;
 using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
@@ -16,7 +17,10 @@ public sealed record SetUserAccessCommand(
     Guid UserId,
     Guid? MenuAccessProfileId,
     Guid? BranchAccessProfileId,
-    Guid? DefaultBranchId) : ICommand;
+    Guid? DefaultBranchId) : ICommand, IAuditedCommand
+{
+    string IAuditedCommand.AuditEntityType => "User";
+}
 
 internal sealed class SetUserAccessCommandValidator : AbstractValidator<SetUserAccessCommand>
 {

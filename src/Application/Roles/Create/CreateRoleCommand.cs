@@ -1,6 +1,10 @@
+using Application.Abstractions.Auditing;
 using Application.Abstractions.Messaging;
 
 namespace Application.Roles.Create;
 
 public sealed record CreateRoleCommand(string Name, string? Description, IReadOnlyList<string> Permissions)
-    : ICommand<Guid>;
+    : ICommand<Guid>, IAuditedCommand
+{
+    string IAuditedCommand.AuditEntityType => "Role";
+}

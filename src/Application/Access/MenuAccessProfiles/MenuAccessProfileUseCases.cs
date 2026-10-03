@@ -1,3 +1,4 @@
+using Application.Abstractions.Auditing;
 using System.Data.Common;
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Caching;
@@ -205,17 +206,29 @@ internal sealed class GetMenuAccessProfileByIdQueryHandler(IDbConnectionFactory 
 // ---- Commands --------------------------------------------------------------------------------------------
 
 public sealed record CreateMenuAccessProfileCommand(string Name, string? Description, IReadOnlyList<MenuAccessGrant> Grants)
-    : ICommand<Guid>;
+    : ICommand<Guid>, IAuditedCommand
+{
+    string IAuditedCommand.AuditEntityType => "MenuAccessProfile";
+}
 
 public sealed record UpdateMenuAccessProfileCommand(
     Guid ProfileId,
     string Name,
     string? Description,
-    IReadOnlyList<MenuAccessGrant> Grants) : ICommand;
+    IReadOnlyList<MenuAccessGrant> Grants) : ICommand, IAuditedCommand
+{
+    string IAuditedCommand.AuditEntityType => "MenuAccessProfile";
+}
 
-public sealed record DuplicateMenuAccessProfileCommand(Guid ProfileId, string Name) : ICommand<Guid>;
+public sealed record DuplicateMenuAccessProfileCommand(Guid ProfileId, string Name) : ICommand<Guid>, IAuditedCommand
+{
+    string IAuditedCommand.AuditEntityType => "MenuAccessProfile";
+}
 
-public sealed record DeleteMenuAccessProfileCommand(Guid ProfileId) : ICommand;
+public sealed record DeleteMenuAccessProfileCommand(Guid ProfileId) : ICommand, IAuditedCommand
+{
+    string IAuditedCommand.AuditEntityType => "MenuAccessProfile";
+}
 
 internal sealed class CreateMenuAccessProfileCommandValidator : AbstractValidator<CreateMenuAccessProfileCommand>
 {

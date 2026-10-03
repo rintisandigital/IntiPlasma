@@ -61,6 +61,7 @@ public static class MenuCodes
     public const string ReportsProfitability = "reports.profitability";
     public const string ReportsTax = "reports.tax";
     public const string AdminFailedEvents = "admin.failed-events";
+    public const string AdminAuditLogs = "admin.audit-logs";
 }
 
 /// <summary>
@@ -163,6 +164,7 @@ public static class MenuCatalog
         Page("admin", MenuCodes.AdminApiRoles, "API Roles", "/Admin/ApiRoles", CreateEditExport, true);
         Page("admin", MenuCodes.AdminBranches, "Branches", "/Admin/Branches", CreateEditExport, true);
         Page("admin", MenuCodes.AdminFailedEvents, "Failed Events", "/Admin/FailedEvents", MenuRights.Edit, true);
+        Page("admin", MenuCodes.AdminAuditLogs, "Audit Log", "/Admin/AuditLogs", MenuRights.Export, true);
 
         return menus;
     }

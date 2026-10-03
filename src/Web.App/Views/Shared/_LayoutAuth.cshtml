@@ -14,20 +14,20 @@
     @await RenderSectionAsync("HeadScripts", required: false)
 
     <link rel="icon" type="image/svg+xml" href="~/img/logo-small.svg">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
-    <link rel="stylesheet" href="assets/plugins/tabler-icons/tabler-icons.min.css">
-    <link rel="stylesheet" href="assets/css/style.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/assets/css/bootstrap.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/assets/plugins/fontawesome/css/fontawesome.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/assets/plugins/fontawesome/css/all.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/assets/plugins/tabler-icons/tabler-icons.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/assets/css/style.min.css" asp-append-version="true">
     <link rel="stylesheet" href="~/css/theme.css" asp-append-version="true">
 </head>
 <body class="@(ViewData["BodyClass"] ?? "account-page")">
 
     @RenderBody()
 
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/js/feather.min.js"></script>
-    <script src="assets/js/script.js" asp-append-version="true"></script>
+    <script src="~/assets/js/bootstrap.bundle.min.js" asp-append-version="true"></script>
+    <script src="~/assets/js/feather.min.js" asp-append-version="true"></script>
+    <script src="~/assets/js/script.js" asp-append-version="true"></script>
 
     @await RenderSectionAsync("Scripts", required: false)
 </body>

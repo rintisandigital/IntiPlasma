@@ -1,8 +1,7 @@
 using System.Reflection;
 using Application;
-using HealthChecks.UI.Client;
 using Infrastructure;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Infrastructure.Health;
 using Serilog;
 using Web.Api;
 using Web.Api.Extensions;
@@ -39,11 +38,14 @@ if (app.Environment.IsDevelopment())
 
     await app.SeedDatabaseAsync();
 }
-
-app.MapHealthChecks("health", new HealthCheckOptions
+else if (app.Configuration.GetValue<bool>("Database:SeedOnStartup"))
 {
-    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-});
+    // First production install (docs/DEPLOY.md): after the migrations were applied, add the system profiles, units,
+    // chart of accounts and the Seed:Admin user. Idempotent; turn it off again afterwards.
+    await app.SeedDatabaseAsync();
+}
+
+app.MapAppHealthChecks();
 
 app.UseRequestContextLogging();
 

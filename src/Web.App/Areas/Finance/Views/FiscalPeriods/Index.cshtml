@@ -13,7 +13,7 @@
         <form method="get" class="d-flex gap-2 align-items-end">
             <div>
                 <label class="form-label mb-1" for="year">Year</label>
-                <select id="year" name="year" class="form-select" onchange="this.form.submit()">
+                <select id="year" name="year" class="form-select" data-autosubmit>
                     @foreach (int year in Model.Years)
                     {
                         <option value="@year" selected="@(year == Model.Year)">@year</option>

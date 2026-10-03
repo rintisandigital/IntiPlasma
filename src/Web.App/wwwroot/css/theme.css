@@ -4,6 +4,75 @@
     --ip-primary: #0984E3;
     --ip-primary-dark: #0768B2;
     --ip-primary-soft: #E7F2FC;
+    /* Text colours that meet WCAG AA (4.5:1) on white, #F7F7F7 and the soft primary background (W10). */
+    --ip-primary-text: #0770C2;
+    --ip-muted-text: #646B72;
+    --ip-danger-text: #C82333;
+    --ip-success-strong: #157347;
+}
+
+/* ---- Font (self-hosted Nunito, SIL OFL 1.1 — assets/fonts/nunito/OFL.txt) ---------------------------- */
+
+@font-face {
+    font-family: "Nunito";
+    font-style: normal;
+    font-weight: 200 1000;
+    font-display: swap;
+    src: url("../assets/fonts/nunito/nunito-latin-ext.woff2") format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF,
+        U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: "Nunito";
+    font-style: normal;
+    font-weight: 200 1000;
+    font-display: swap;
+    src: url("../assets/fonts/nunito/nunito-latin.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+        U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ---- Contrast (W10, PLAN-WEBAPP §23.8): text and links darker than the template; primary buttons keep #0984E3 */
+
+.text-primary,
+.btn-link {
+    color: var(--ip-primary-text) !important;
+}
+
+.btn-outline-primary:not(:hover):not(:active):not(.active) {
+    color: var(--ip-primary-text) !important;
+}
+
+.text-muted,
+.form-text {
+    color: var(--ip-muted-text) !important;
+}
+
+.text-danger {
+    color: var(--ip-danger-text) !important;
+}
+
+.badge.bg-primary,
+.avatar-initials {
+    background-color: var(--ip-primary-text) !important;
+}
+
+.badge.bg-success {
+    background-color: var(--ip-success-strong) !important;
+}
+
+.badge.bg-danger {
+    background-color: var(--ip-danger-text) !important;
+}
+
+#two-col-sidebar .tab-pane a:not(.active):not(:hover),
+#two-col-sidebar .tab-pane .menu-title span {
+    color: var(--ip-muted-text);
+}
+
+#two-col-sidebar .tab-pane a.active {
+    color: var(--ip-primary-text);
 }
 
 /* ---- Mainboard -------------------------------------------------------------------------------------- */
@@ -117,4 +186,27 @@ body.frame-page .page-header {
     position: absolute;
     width: 0;
     opacity: 0;
+}
+
+/* Tablet/phone (W10): the template hides the two-column sidebar below 992px. Show it as the slide-in menu that the
+   header toggle opens (.slide-nav), below the header so the close button stays reachable. */
+@media (max-width: 991.96px) {
+    [data-layout=twocolumn] #two-col-sidebar {
+        display: block;
+    }
+
+    [data-layout=twocolumn] .sidebar-twocol.sidebar {
+        top: 60px;
+        width: 252px;
+        margin-left: -260px;
+    }
+
+    [data-layout=twocolumn] .slide-nav .sidebar-twocol.sidebar {
+        margin-left: 0;
+    }
+}
+
+/* The attachment drop zone is a <label>; the template colours label spans red (required markers). */
+.attachment-drop span {
+    color: var(--ip-muted-text) !important;
 }

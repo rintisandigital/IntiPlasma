@@ -1,4 +1,5 @@
-﻿using SharedKernel;
+﻿using System.Globalization;
+using SharedKernel;
 
 namespace Domain.Users;
 
@@ -27,6 +28,12 @@ public static class UserErrors
     public static readonly Error Inactive = Error.Problem(
         "Users.Inactive",
         "The user account is inactive");
+
+    public static Error LockedOut(int minutes) => Error.Problem(
+        "Users.LockedOut",
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"The account is locked after too many failed sign-in attempts. Try again in {minutes} minute(s)."));
 
     public static readonly Error InvalidCurrentPassword = Error.Problem(
         "Users.InvalidCurrentPassword",

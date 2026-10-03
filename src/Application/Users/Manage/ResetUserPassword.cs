@@ -1,3 +1,4 @@
+using Application.Abstractions.Auditing;
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
@@ -13,7 +14,10 @@ namespace Application.Users.Manage;
 /// The administrator sets a new password (no forced change on next sign-in, W-21). Existing sessions and API
 /// refresh tokens of the user stop working.
 /// </summary>
-public sealed record ResetUserPasswordCommand(Guid UserId, string NewPassword) : ICommand;
+public sealed record ResetUserPasswordCommand(Guid UserId, string NewPassword) : ICommand, IAuditedCommand
+{
+    string IAuditedCommand.AuditEntityType => "User";
+}
 
 internal sealed class ResetUserPasswordCommandValidator : AbstractValidator<ResetUserPasswordCommand>
 {

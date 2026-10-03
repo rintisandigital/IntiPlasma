@@ -17,18 +17,18 @@
     <script src="~/js/frame.js" asp-append-version="true"></script>
 
     <link rel="icon" type="image/svg+xml" href="~/img/logo-small.svg">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
-    <link rel="stylesheet" href="assets/plugins/tabler-icons/tabler-icons.min.css">
-    <link rel="stylesheet" href="assets/plugins/sweetalert2/sweetalert2.min.css">
-    <link rel="stylesheet" href="assets/plugins/jquery.toast/jquery.toast.min.css">
-    <link rel="stylesheet" href="assets/css/style.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/assets/css/bootstrap.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/assets/plugins/fontawesome/css/fontawesome.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/assets/plugins/fontawesome/css/all.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/assets/plugins/tabler-icons/tabler-icons.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/assets/plugins/sweetalert2/sweetalert2.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/assets/plugins/jquery.toast/jquery.toast.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/assets/css/style.min.css" asp-append-version="true">
     <link rel="stylesheet" href="~/css/theme.css" asp-append-version="true">
 
     @await RenderSectionAsync("Styles", required: false)
 </head>
-<body class="frame-page" data-menu="@ViewData["Menu"]" data-csrf-token="@Antiforgery.GetAndStoreTokens(Context).RequestToken">
+<body class="frame-page" data-menu="@ViewData["Menu"]" data-session-expires="@SessionExpiry.ForScript(Context)" data-csrf-token="@Antiforgery.GetAndStoreTokens(Context).RequestToken">
 
     <div id="page-notice" hidden data-success="@success" data-error="@error"></div>
 
@@ -36,14 +36,14 @@
         @RenderBody()
     </div>
 
-    <script src="assets/plugins/jquery/jquery-4.0.0.min.js"></script>
+    <script src="~/assets/plugins/jquery/jquery-4.0.0.min.js" asp-append-version="true"></script>
     <script src="~/js/jquery-compat.js" asp-append-version="true"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/js/feather.min.js"></script>
-    <script src="assets/plugins/sweetalert2/sweetalert2.min.js"></script>
-    <script src="assets/plugins/jquery.toast/jquery.toast.min.js"></script>
-    <script src="assets/js/script.js" asp-append-version="true"></script>
-    <script src="assets/plugins/tom-select/js/tom-select.complete.min.js"></script>
+    <script src="~/assets/js/bootstrap.bundle.min.js" asp-append-version="true"></script>
+    <script src="~/assets/js/feather.min.js" asp-append-version="true"></script>
+    <script src="~/assets/plugins/sweetalert2/sweetalert2.min.js" asp-append-version="true"></script>
+    <script src="~/assets/plugins/jquery.toast/jquery.toast.min.js" asp-append-version="true"></script>
+    <script src="~/assets/js/script.js" asp-append-version="true"></script>
+    <script src="~/assets/plugins/tom-select/js/tom-select.complete.min.js" asp-append-version="true"></script>
     <script src="~/js/app.js" asp-append-version="true"></script>
     <script src="~/js/lookup.js" asp-append-version="true"></script>
     <script src="~/js/collection.js" asp-append-version="true"></script>

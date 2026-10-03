@@ -14,18 +14,21 @@
     <title>@appName</title>
 
     <link rel="icon" type="image/svg+xml" href="~/img/logo-small.svg">
-    <link rel="stylesheet" href="assets/css/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/fontawesome.min.css">
-    <link rel="stylesheet" href="assets/plugins/fontawesome/css/all.min.css">
-    <link rel="stylesheet" href="assets/plugins/tabler-icons/tabler-icons.min.css">
-    <link rel="stylesheet" href="assets/plugins/simplebar/simplebar.min.css">
-    <link rel="stylesheet" href="assets/css/style.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/assets/css/bootstrap.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/assets/plugins/fontawesome/css/fontawesome.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/assets/plugins/fontawesome/css/all.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/assets/plugins/tabler-icons/tabler-icons.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/assets/plugins/simplebar/simplebar.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/assets/css/style.min.css" asp-append-version="true">
     <link rel="stylesheet" href="~/css/theme.css" asp-append-version="true">
 </head>
 <body class="mainboard"
       data-app-title="@appName"
       data-home-url="@Url.Action("Dashboard", "Main")"
-      data-csrf-token="@Antiforgery.GetAndStoreTokens(Context).RequestToken">
+      data-csrf-token="@Antiforgery.GetAndStoreTokens(Context).RequestToken"
+      data-session-expires="@SessionExpiry.ForScript(Context)"
+      data-keep-alive-url="@Url.Action("KeepAlive", "Main")"
+      data-login-url="@Url.Action("Login", "Auth")">
 
     <div id="global-loader">
         <div class="whirly-loader"></div>
@@ -47,12 +50,28 @@
         </div>
     </div>
 
-    <script src="assets/plugins/jquery/jquery-4.0.0.min.js"></script>
+    <div class="modal fade" id="session-modal" tabindex="-1" aria-labelledby="session-modal-title" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="session-modal-title">Your session is about to expire</h5>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">You will be signed out at <strong id="session-expires-at"></strong> because of inactivity. Unsaved changes will be lost.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="session-keep-alive">Stay signed in</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="~/assets/plugins/jquery/jquery-4.0.0.min.js" asp-append-version="true"></script>
     <script src="~/js/jquery-compat.js" asp-append-version="true"></script>
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/js/feather.min.js"></script>
-    <script src="assets/plugins/simplebar/simplebar.min.js"></script>
-    <script src="assets/js/script.js" asp-append-version="true"></script>
+    <script src="~/assets/js/bootstrap.bundle.min.js" asp-append-version="true"></script>
+    <script src="~/assets/js/feather.min.js" asp-append-version="true"></script>
+    <script src="~/assets/plugins/simplebar/simplebar.min.js" asp-append-version="true"></script>
+    <script src="~/assets/js/script.js" asp-append-version="true"></script>
     <script src="~/js/mainboard.js" asp-append-version="true"></script>
 </body>
 </html>

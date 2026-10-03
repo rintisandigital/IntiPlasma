@@ -7,7 +7,7 @@
         if (item.Children.Count > 0)
         {
             <li class="submenu">
-                <a href="javascript:void(0);"><span>@item.Title</span><span class="menu-arrow"></span></a>
+                <a href="#" role="button"><span>@item.Title</span><span class="menu-arrow"></span></a>
                 <ul>
                     @foreach (MenuItem child in item.Children)
                     {
@@ -30,7 +30,7 @@
                     @for (int i = 0; i < Model.Count; i++)
                     {
                         MenuGroup group = Model[i];
-                        <a href="#" class="nav-link @(i == 0 ? "active" : "")" title="@group.Title"
+                        <a href="#" class="nav-link @(i == 0 ? "active" : "")" title="@group.Title" aria-label="@group.Title"
                            data-bs-toggle="tab" data-bs-target="#@PaneId(group)" role="tab">
                             <i class="@group.Icon"></i>
                         </a>

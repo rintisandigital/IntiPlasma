@@ -3,6 +3,7 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Storage;
 using Application.Documents;
+using Application.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
@@ -46,6 +47,31 @@ public abstract class BaseHandlerTest
 
         return new AttachmentService(
             context, storage ?? new InMemoryFileStorage(), branchAccess, user, clock, NullLogger<AttachmentService>.Instance);
+    }
+
+    /// <summary>
+    /// The real credential check with a password hasher that accepts (or rejects) every password and a fixed clock.
+    /// Audit entries go to <paramref name="context"/>.
+    /// </summary>
+    internal static CredentialVerifier CreateCredentialVerifier(
+        TestDbContext context,
+        bool verifies,
+        DateTime utcNow,
+        int maxFailedAttempts = 5,
+        int lockoutMinutes = 15)
+    {
+        IPasswordHasher hasher = Substitute.For<IPasswordHasher>();
+        hasher.Verify(Arg.Any<string>(), Arg.Any<string>()).Returns(verifies);
+
+        IDateTimeProvider clock = Substitute.For<IDateTimeProvider>();
+        clock.UtcNow.Returns(utcNow);
+
+        return new CredentialVerifier(
+            context,
+            hasher,
+            clock,
+            new LockoutOptions { MaxFailedAttempts = maxFailedAttempts, LockoutMinutes = lockoutMinutes },
+            new TestAuditTrail(context));
     }
 
     protected static HybridCache CreateCache()

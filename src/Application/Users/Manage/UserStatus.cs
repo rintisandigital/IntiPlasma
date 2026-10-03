@@ -1,3 +1,4 @@
+using Application.Abstractions.Auditing;
 using Application.Abstractions.Authentication;
 using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
@@ -11,9 +12,15 @@ namespace Application.Users.Manage;
 /// <summary>
 /// Deactivates a user: sessions end immediately and API tokens can no longer be obtained or refreshed.
 /// </summary>
-public sealed record DeactivateUserCommand(Guid UserId) : ICommand;
+public sealed record DeactivateUserCommand(Guid UserId) : ICommand, IAuditedCommand
+{
+    string IAuditedCommand.AuditEntityType => "User";
+}
 
-public sealed record ActivateUserCommand(Guid UserId) : ICommand;
+public sealed record ActivateUserCommand(Guid UserId) : ICommand, IAuditedCommand
+{
+    string IAuditedCommand.AuditEntityType => "User";
+}
 
 internal sealed class DeactivateUserCommandHandler(
     IApplicationDbContext context,
@@ -72,6 +79,33 @@ internal sealed class ActivateUserCommandHandler(IApplicationDbContext context, 
         await context.SaveChangesAsync(cancellationToken);
 
         await UserAccessRules.InvalidateAsync(cache, user.Id, cancellationToken);
+
+        return Result.Success();
+    }
+}
+
+/// <summary>
+/// Lifts a lockout after too many wrong passwords before it expires (W10).
+/// </summary>
+public sealed record UnlockUserCommand(Guid UserId) : ICommand, IAuditedCommand
+{
+    string IAuditedCommand.AuditEntityType => "User";
+}
+
+internal sealed class UnlockUserCommandHandler(IApplicationDbContext context) : ICommandHandler<UnlockUserCommand>
+{
+    public async Task<Result> Handle(UnlockUserCommand command, CancellationToken cancellationToken)
+    {
+        User? user = await context.Users.SingleOrDefaultAsync(u => u.Id == command.UserId, cancellationToken);
+
+        if (user is null)
+        {
+            return Result.Failure(UserErrors.NotFound(command.UserId));
+        }
+
+        user.Unlock();
+
+        await context.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

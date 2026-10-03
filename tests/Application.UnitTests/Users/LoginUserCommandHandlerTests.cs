@@ -18,11 +18,7 @@ public sealed class LoginUserCommandHandlerTests : BaseHandlerTest
     {
         // Arrange
         await using TestDbContext context = CreateDbContext();
-        var handler = new LoginUserCommandHandler(
-            context,
-            Substitute.For<IPasswordHasher>(),
-            Substitute.For<ITokenProvider>(),
-            Substitute.For<IDateTimeProvider>());
+        LoginUserCommandHandler handler = Handler(context, verifies: true);
 
         // Act
         Result<AccessTokensResponse> result = await handler.Handle(
@@ -40,15 +36,7 @@ public sealed class LoginUserCommandHandlerTests : BaseHandlerTest
         // Arrange
         await using TestDbContext context = CreateDbContext();
         await SeedUserAsync(context);
-
-        IPasswordHasher passwordHasher = Substitute.For<IPasswordHasher>();
-        passwordHasher.Verify(Arg.Any<string>(), Arg.Any<string>()).Returns(false);
-
-        var handler = new LoginUserCommandHandler(
-            context,
-            passwordHasher,
-            Substitute.For<ITokenProvider>(),
-            Substitute.For<IDateTimeProvider>());
+        LoginUserCommandHandler handler = Handler(context, verifies: false);
 
         // Act
         Result<AccessTokensResponse> result = await handler.Handle(
@@ -61,23 +49,37 @@ public sealed class LoginUserCommandHandlerTests : BaseHandlerTest
     }
 
     [Fact]
+    public async Task Handle_Should_ReturnLockedOut_AfterMaxFailedAttempts()
+    {
+        // Arrange
+        await using TestDbContext context = CreateDbContext();
+        await SeedUserAsync(context);
+        LoginUserCommandHandler wrong = Handler(context, verifies: false);
+
+        // Act
+        for (int attempt = 1; attempt < 3; attempt++)
+        {
+            await wrong.Handle(new LoginUserCommand(Email, Password), CancellationToken.None);
+        }
+
+        Result<AccessTokensResponse> locking = await wrong.Handle(
+            new LoginUserCommand(Email, Password), CancellationToken.None);
+        Result<AccessTokensResponse> correctWhileLocked = await Handler(context, verifies: true).Handle(
+            new LoginUserCommand(Email, Password), CancellationToken.None);
+
+        // Assert
+        locking.Error.Code.ShouldBe("Users.LockedOut");
+        correctWhileLocked.Error.Code.ShouldBe("Users.LockedOut");
+        (await context.RefreshTokens.AnyAsync()).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Handle_Should_ReturnTokensAndPersistRefreshToken_WhenCredentialsAreValid()
     {
         // Arrange
         await using TestDbContext context = CreateDbContext();
         await SeedUserAsync(context);
-
-        IPasswordHasher passwordHasher = Substitute.For<IPasswordHasher>();
-        passwordHasher.Verify(Arg.Any<string>(), Arg.Any<string>()).Returns(true);
-
-        ITokenProvider tokenProvider = Substitute.For<ITokenProvider>();
-        tokenProvider.Create(Arg.Any<User>()).Returns("access-token");
-        tokenProvider.GenerateRefreshToken().Returns("refresh-token");
-
-        IDateTimeProvider dateTimeProvider = Substitute.For<IDateTimeProvider>();
-        dateTimeProvider.UtcNow.Returns(DateTime.UtcNow);
-
-        var handler = new LoginUserCommandHandler(context, passwordHasher, tokenProvider, dateTimeProvider);
+        LoginUserCommandHandler handler = Handler(context, verifies: true);
 
         // Act
         Result<AccessTokensResponse> result = await handler.Handle(
@@ -91,7 +93,8 @@ public sealed class LoginUserCommandHandlerTests : BaseHandlerTest
 
         RefreshToken refreshToken = await context.RefreshTokens.SingleAsync();
         refreshToken.Token.ShouldBe("refresh-token");
-        refreshToken.ExpiresOnUtc.ShouldBeGreaterThan(dateTimeProvider.UtcNow);
+        refreshToken.ExpiresOnUtc.ShouldBeGreaterThan(DateTime.UtcNow);
+        (await context.AuditLogs.SingleAsync()).Action.ShouldBe(CredentialVerifier.SignedIn);
     }
 
     [Fact]
@@ -100,15 +103,7 @@ public sealed class LoginUserCommandHandlerTests : BaseHandlerTest
         // Arrange
         await using TestDbContext context = CreateDbContext();
         await SeedUserAsync(context, active: false);
-
-        IPasswordHasher passwordHasher = Substitute.For<IPasswordHasher>();
-        passwordHasher.Verify(Arg.Any<string>(), Arg.Any<string>()).Returns(true);
-
-        var handler = new LoginUserCommandHandler(
-            context,
-            passwordHasher,
-            Substitute.For<ITokenProvider>(),
-            Substitute.For<IDateTimeProvider>());
+        LoginUserCommandHandler handler = Handler(context, verifies: true);
 
         // Act
         Result<AccessTokensResponse> result = await handler.Handle(
@@ -118,6 +113,22 @@ public sealed class LoginUserCommandHandlerTests : BaseHandlerTest
         // Assert
         result.Error.ShouldBe(UserErrors.Inactive);
         (await context.RefreshTokens.AnyAsync()).ShouldBeFalse();
+    }
+
+    private static LoginUserCommandHandler Handler(TestDbContext context, bool verifies)
+    {
+        ITokenProvider tokenProvider = Substitute.For<ITokenProvider>();
+        tokenProvider.Create(Arg.Any<User>()).Returns("access-token");
+        tokenProvider.GenerateRefreshToken().Returns("refresh-token");
+
+        IDateTimeProvider dateTimeProvider = Substitute.For<IDateTimeProvider>();
+        dateTimeProvider.UtcNow.Returns(_ => DateTime.UtcNow);
+
+        return new LoginUserCommandHandler(
+            context,
+            CreateCredentialVerifier(context, verifies, DateTime.UtcNow, maxFailedAttempts: 3, lockoutMinutes: 15),
+            tokenProvider,
+            dateTimeProvider);
     }
 
     private static async Task SeedUserAsync(TestDbContext context, bool active = true)

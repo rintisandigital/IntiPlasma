@@ -1,7 +1,7 @@
 # Rangkuman Proyek — Aplikasi Peternakan Ayam Broiler Inti-Plasma
 
-> Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4), 2026-10-01 (Fase 5–8), 2026-10-02 (Fase 9 — lampiran dokumen; Fase W0 — fondasi WebApp), 2026-10-03 (Fase W1–W8) dan 2026-10-04 (Fase W9).
-> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§16 (API) dan [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (WebApp, realisasi W0 di §10, W1 di §12, W2 di §13, W3 di §14, W4 di §15, W5 di §16, W6 di §17, W7 di §18, W8 di §20, W9 di §22). Fase API 0–9 dan W0–W9 selesai; berikutnya **Fase W10** (Pengerasan).
+> Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4), 2026-10-01 (Fase 5–8), 2026-10-02 (Fase 9 — lampiran dokumen; Fase W0 — fondasi WebApp), 2026-10-03 (Fase W1–W8) dan 2026-10-04 (Fase W9–W10).
+> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§16 (API) dan [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (WebApp, realisasi W0 di §10, W1 di §12, W2 di §13, W3 di §14, W4 di §15, W5 di §16, W6 di §17, W7 di §18, W8 di §20, W9 di §22, W10 di §24). Fase API 0–9 dan **W0–W10 selesai** (rencana awal WebApp tuntas); berikutnya dipilih dari backlog §9.
 
 ---
 
@@ -210,6 +210,14 @@
 - **Failed Events** (retry) + tautan dari checklist tutup periode; **Dashboard** KPI, daftar menunggu tindakan, grafik 6 bulan (`GetDashboardSummaryQuery`). Semua menu katalog kini dirilis. Tidak ada migration baru.
 - ⚠️ Perbaikan: definisi dead letter (event yang masih di-retry tidak lagi dihitung gagal).
 
+### Fase W10 — Pengerasan ✅ (detail: PLAN-WEBAPP §23–§24)
+- **Lockout login** 5 kali / 15 menit di Web.App **dan** Web.Api (⚠️ `POST users/login` → `Users.LockedOut`; endpoint baru `POST users/{id}/unlock`), badge Locked + **Unlock** di Users; rate limit `POST /Auth/Login` 10/menit/IP.
+- **Audit Log** (`infrastructure.audit_logs`, menu Administration → Audit Log): perubahan akses (decorator `IAuditedCommand`, web & API), ekspor/cetak (`ExportAuditFilter`), login; password disamarkan.
+- **CSP ketat** dengan nonce (handler inline dipindah ke `app.js`), header keamanan tambahan, cookie Secure (`Security:SecureCookies`), forwarded headers; **Data Protection** key ring di PostgreSQL (sesi bertahan restart/replika).
+- Health `/health/live`, `/health/ready`, `/health` (+ cek storage & listener); Dockerfile non-root + HEALTHCHECK, `docker-compose.yml` siap produksi + `.env.example`, `Database:SeedOnStartup` untuk instalasi pertama, `docs/DEPLOY.md`.
+- UI: font Nunito di-host sendiri (template memanggil Google Fonts), `style.min.css`, aset ber-fingerprint, **sidebar tablet diperbaiki** (sebelumnya tidak bisa dibuka < 992 px), kontras AA & nama aksesibel (axe 0 critical/serious kecuali tombol primer), peringatan sesi habis. Panduan pengguna `docs/user-guide/`.
+- Migration **`PhaseW10_Hardening`**.
+
 ## 5. Alur Akuntansi yang Sudah Berjalan
 
 | Transaksi | Jurnal otomatis |
@@ -266,17 +274,24 @@ Semua event di katalog kini sudah dipakai.
 - Route di `MenuCatalog` harus sama persis dengan nama controller area (mis. `/Sales/SalesOrders`, bukan `/Sales/Orders`) — sidebar tidak divalidasi saat build; test `Admin_Should_OpenEveryReleasedMenu` menjaganya.
 - Skrip E2E harus memakai **tanggal lokal** (`toLocaleDateString('sv-SE')`), bukan `toISOString()` (UTC): antara 00.00–07.00 WIB tanggal UTC masih kemarin sehingga dokumen "hari ini" tampak bertanggal salah.
 - Outbox menyimpan `error` pada setiap percobaan yang gagal; baru menjadi dead letter setelah `MaxAttempts` (processed_on_utc diisi). Query "gagal" wajib memakai keduanya.
+- **CSP (W10)**: jangan menulis `onclick=`/`onchange=`/`href="javascript:…"` di view — pakai `data-autosubmit`, `data-copy-label`, `data-fill-target` atau script per halaman; blok `<script>` inline otomatis diberi nonce oleh tag helper. Sumber eksternal (CDN, Google Fonts) diblokir.
+- Nonce CSP memakai hex: base64 berisi `+` yang di-encode Razor menjadi `&#x2B;` di atribut.
+- `style.min.css` dihasilkan dari `style.css` (lightningcss) — ubah tema di `css/theme.css`; bila `style.css` diubah, regenerasi file min.
+- Perubahan view/aset Web.App butuh **build ulang** (tanpa runtime compilation; manifest static assets dibuat saat build).
+- Parameter Dapper bernilai null tanpa tipe (`@X IS NULL`) → `42P08 could not determine data type`: pakai `CAST(@X AS timestamptz/uuid/text)`.
+- Integration test Web.App: wrong-password memakai user baru (bukan admin) karena lockout; factory men-set `Security:SecureCookies=false` dan batas rate limit tinggi.
+- Migration bundle (`efbundle`) butuh env `ConnectionStrings__Database` agar host Web.Api bisa dibangun.
 
 ## 7. Cara Kerja & Verifikasi
 
 - Setiap fase: domain + unit test invariant → command/query + validator → EF config + migration → endpoint + permission → **verifikasi end-to-end** ke PostgreSQL lokal pada database sementara `intiplasma_verify` (dibuat & dihapus otomatis; database `intiplasma` milik user tidak disentuh).
 - User yang melakukan **commit & migrate** setelah tiap fase.
-- Status test saat ini: **388 test lulus** (143 domain, 60 application, 14 arsitektur, 18 integration Web.Api, 153 integration Web.App).
+- Status test saat ini: **412 test lulus** (146 domain, 68 application, 14 arsitektur, 19 integration Web.Api, 165 integration Web.App).
 - Integration test (Testcontainers) **sudah bisa dijalankan** di mesin dev (container runtime tersedia) — `dotnet test IntiPlasma.slnx`.
 - Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario, Fase 7: 32 skenario, Fase 8: 35 skenario, Fase 9: 79 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
 - ⚠️ Sejak W0 Web.Api tidak memproses outbox: verifikasi yang hanya menjalankan API perlu `BackgroundJobs__Enabled=true`.
-- Verifikasi WebApp (W0: 49 skenario, W1: 36 skenario, W2: 40 skenario, W3: 48 skenario, W4: 51 skenario, W5: 42 skenario, W6: 42 skenario, W7: 62 skenario, W8: 44 skenario, W9: 44 skenario + regresi W0–W8) memakai **Playwright** (dipasang di scratchpad, bukan di repo) terhadap Web.App :5098 + Web.Api :5099 pada `intiplasma_verify`; interaksi halaman lewat frame `content-frame`.
-- Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`, `Phase8_ReportingClosing`, `Phase9_Attachments`, `PhaseW0_UserStatus`, `PhaseW1_AccessControl`.
+- Verifikasi WebApp (W0: 49 skenario, W1: 36 skenario, W2: 40 skenario, W3: 48 skenario, W4: 51 skenario, W5: 42 skenario, W6: 42 skenario, W7: 62 skenario, W8: 44 skenario, W9: 44 skenario, W10: 53 + 7 restart/rate-limit + 20 container + regresi W0–W9) memakai **Playwright** (dipasang di scratchpad, bukan di repo) terhadap Web.App :5098 + Web.Api :5099 pada `intiplasma_verify`; interaksi halaman lewat frame `content-frame`.
+- Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`, `Phase8_ReportingClosing`, `Phase9_Attachments`, `PhaseW0_UserStatus`, `PhaseW1_AccessControl`, `PhaseW10_Hardening`.
 
 ## 8. Catatan Terbuka / Hutang Teknis
 
@@ -294,7 +309,8 @@ Semua event di katalog kini sudah dipakai.
 - Belum ada sub-ledger piutang plasma per peternak: potongan hutang di settlement hanya dibatasi pendapatan − PPh. Sejak W8 form settlement menampilkan saldo hutang plasma **dari data settlement** (rugi − potongan, `GetFarmerPlasmaDebtQuery`) sebagai informasi; hutang/pelunasan dari sumber lain belum tercatat.
 - Settlement plasma yang sudah Approved belum bisa dibatalkan/direverse (koreksi lewat jurnal manual).
 - Lampiran: storage lokal hanya untuk satu instance (perlu S3/MinIO sebelum scale-out); batas 10 MB & tipe file masih konstanta; belum ada thumbnail/kompresi; `PUT …/documents` pada PV *paid* & PV plasma belum diuji end-to-end.
-- Web.App: key ring Data Protection belum dipersist/dibagi → sesi cookie & token antiforgery tidak valid setelah container di-restart atau antar replika (W10). Bila Web.App mati, event outbox (jurnal otomatis, gudang kandang) tertunda sampai Web.App hidup lagi.
+- Bila Web.App mati, event outbox (jurnal otomatis, gudang kandang) tertunda sampai Web.App hidup lagi. (Key ring Data Protection sudah di PostgreSQL sejak W10.)
+- Audit log tanpa retensi/purge otomatis. Tombol primer `#0984E3` belum memenuhi kontras AA (keputusan W10).
 - Siklus lama yang ditutup sebelum Fase 7 tidak punya `ClosingCost`; invoice lama punya `costAmount` 0 (tidak ada penyesuaian HPP untuk siklus tersebut).
 - BPB, transfer & retur bisa diposting walau tahun fiskal belum dibuka; jurnal otomatisnya menjadi dead letter (`FiscalPeriods.NotFoundForDate`) dan memblokir tutup periode → buka tahun fiskal dulu. Pertimbangkan validasi periode saat posting dokumen gudang (seperti VI/PV).
 

@@ -238,6 +238,14 @@ public sealed class UsersController(AdminLookups lookups) : AppController
 
     [HttpPost]
     [MenuAccess(MenuCode, MenuRights.Edit)]
+    public async Task<IActionResult> Unlock(
+        Guid id,
+        [FromServices] ICommandHandler<UnlockUserCommand> handler,
+        CancellationToken cancellationToken) =>
+        DetailsAfter(id, await handler.Handle(new UnlockUserCommand(id), cancellationToken), "The user has been unlocked.");
+
+    [HttpPost]
+    [MenuAccess(MenuCode, MenuRights.Edit)]
     public async Task<IActionResult> ResetPassword(
         Guid id,
         ResetPasswordInput input,

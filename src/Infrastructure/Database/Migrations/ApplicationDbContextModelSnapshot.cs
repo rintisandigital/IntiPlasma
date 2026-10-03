@@ -300,6 +300,83 @@ namespace Infrastructure.Database.Migrations
                     b.ToTable("menu_access_profiles", "identity");
                 });
 
+            modelBuilder.Entity("Domain.Auditing.AuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("action");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("category");
+
+                    b.Property<string>("Details")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("details");
+
+                    b.Property<Guid?>("EntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("ip_address");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at_utc");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("summary");
+
+                    b.Property<string>("UserEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("user_email");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_audit_logs");
+
+                    b.HasIndex("OccurredAtUtc")
+                        .IsDescending()
+                        .HasDatabaseName("ix_audit_logs_occurred_at_utc");
+
+                    b.HasIndex("EntityType", "EntityId")
+                        .HasDatabaseName("ix_audit_logs_entity_type_entity_id");
+
+                    b.HasIndex("UserId", "OccurredAtUtc")
+                        .HasDatabaseName("ix_audit_logs_user_id_occurred_at_utc");
+
+                    b.ToTable("audit_logs", "infrastructure");
+                });
+
             modelBuilder.Entity("Domain.Costing.PlasmaSettlements.PlasmaSettlement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5712,6 +5789,10 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<int>("AccessFailedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("access_failed_count");
+
                     b.Property<Guid?>("BranchAccessProfileId")
                         .HasColumnType("uuid")
                         .HasColumnName("branch_access_profile_id");
@@ -5749,6 +5830,10 @@ namespace Infrastructure.Database.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("last_name");
+
+                    b.Property<DateTime?>("LockoutEndUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lockout_end_utc");
 
                     b.Property<Guid?>("MenuAccessProfileId")
                         .HasColumnType("uuid")
@@ -5876,6 +5961,29 @@ namespace Infrastructure.Database.Migrations
                         .HasFilter("processed_on_utc IS NULL");
 
                     b.ToTable("outbox_messages", "infrastructure");
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("FriendlyName")
+                        .HasColumnType("text")
+                        .HasColumnName("friendly_name");
+
+                    b.Property<string>("Xml")
+                        .HasColumnType("text")
+                        .HasColumnName("xml");
+
+                    b.HasKey("Id")
+                        .HasName("pk_data_protection_keys");
+
+                    b.ToTable("data_protection_keys", "infrastructure");
                 });
 
             modelBuilder.Entity("Domain.Access.BranchAccessProfileBranch", b =>

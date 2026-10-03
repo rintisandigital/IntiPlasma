@@ -27,6 +27,11 @@ public sealed record UserListItem
 
     public bool IsActive { get; init; }
 
+    /// <summary>
+    /// Set while the account is locked out after too many wrong passwords (may lie in the past).
+    /// </summary>
+    public DateTime? LockoutEndUtc { get; init; }
+
     public string? MenuAccessProfileName { get; init; }
 
     public string? BranchAccessProfileName { get; init; }
@@ -59,7 +64,7 @@ internal sealed class GetUsersQueryHandler(IDbConnectionFactory dbConnectionFact
             $"SELECT COUNT(*) FROM identity.users u {Filter}",
             $"""
             SELECT u.id AS Id, u.email AS Email, u.first_name AS FirstName, u.last_name AS LastName,
-                   u.is_active AS IsActive, u.created_at_utc AS CreatedAtUtc,
+                   u.is_active AS IsActive, u.lockout_end_utc AS LockoutEndUtc, u.created_at_utc AS CreatedAtUtc,
                    mp.name AS MenuAccessProfileName, bp.name AS BranchAccessProfileName,
                    (SELECT string_agg(r.name, ', ' ORDER BY r.name)
                     FROM identity.user_roles ur JOIN identity.roles r ON r.id = ur.role_id

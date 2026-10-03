@@ -39,6 +39,14 @@ public sealed class MainController(IBranchContext branchContext) : AppController
     }
 
     /// <summary>
+    /// "Stay signed in" of the session warning: any authenticated request renews the sliding cookie; returns the
+    /// new expiry (Unix milliseconds).
+    /// </summary>
+    [HttpPost]
+    public IActionResult KeepAlive() =>
+        Json(new { expires = SessionExpiry.Get(HttpContext)?.ToUnixTimeMilliseconds() });
+
+    /// <summary>
     /// Selects the branch used as the default filter (AJAX from the header; empty = all branches).
     /// </summary>
     [HttpPost]

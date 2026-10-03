@@ -1,3 +1,4 @@
+using Application.Abstractions.Auditing;
 using System.Data.Common;
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Caching;
@@ -54,7 +55,10 @@ public sealed record MenuResponse
     public bool SupportsExport { get; init; }
 }
 
-public sealed record UpdateMenuCommand(Guid MenuId, string Name, string? Icon, int SortOrder, bool IsActive) : ICommand;
+public sealed record UpdateMenuCommand(Guid MenuId, string Name, string? Icon, int SortOrder, bool IsActive) : ICommand, IAuditedCommand
+{
+    string IAuditedCommand.AuditEntityType => "Menu";
+}
 
 internal sealed class SyncMenuCatalogCommandValidator : AbstractValidator<SyncMenuCatalogCommand>
 {

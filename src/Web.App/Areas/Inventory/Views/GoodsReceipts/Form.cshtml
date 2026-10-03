@@ -12,7 +12,7 @@
             <div class="col-md-8">
                 <label class="form-label" for="po-select">Purchase order <span class="text-danger">*</span></label>
                 <select id="po-select" name="purchaseOrderId" class="form-select" data-lookup="@Url.Action("ReceivablePurchaseOrders", "Lookup", new { area = "" })"
-                        onchange="if (this.value) { this.form.submit(); }">
+                        data-autosubmit="value">
                     <option value="">Search an approved purchase order…</option>
                     @if (order is not null)
                     {

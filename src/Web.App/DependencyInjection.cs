@@ -1,5 +1,8 @@
 using System.Globalization;
+using System.Threading.RateLimiting;
+using Infrastructure;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,6 +23,13 @@ public static class DependencyInjection
 {
     public const string AntiforgeryHeaderName = "X-CSRF-TOKEN";
 
+    public const string LoginRateLimitPolicy = "login";
+
+    /// <summary>
+    /// Sliding lifetime of the sign-in cookie.
+    /// </summary>
+    public static readonly TimeSpan SessionLifetime = TimeSpan.FromHours(8);
+
     public static IServiceCollection AddWebApp(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddOptions<AppOptions>().Bind(configuration.GetSection(AppOptions.SectionName));
@@ -32,11 +42,40 @@ public static class DependencyInjection
             options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
             options.Filters.Add<DbExceptionFilter>();
             options.Filters.Add<FormTokenFilter>();
+            options.Filters.Add<ExportAuditFilter>();
         });
 
-        services.AddAntiforgery(options => options.HeaderName = AntiforgeryHeaderName);
+        SecurityOptions security = configuration.GetSection(SecurityOptions.SectionName).Get<SecurityOptions>()
+            ?? new SecurityOptions();
+        services.AddSingleton(security);
 
-        services.AddCookieAuthentication();
+        CookieSecurePolicy securePolicy = security.SecureCookies
+            ? CookieSecurePolicy.Always
+            : CookieSecurePolicy.SameAsRequest;
+
+        services.AddAntiforgery(options =>
+        {
+            options.HeaderName = AntiforgeryHeaderName;
+            options.Cookie.SecurePolicy = securePolicy;
+        });
+
+        services.AddCookieAuthentication(securePolicy);
+
+        // Keys for the cookies above live in PostgreSQL: sessions survive restarts and work across replicas (W10).
+        services.AddSharedDataProtection("IntiPlasma.WebApp");
+
+        services.AddLoginRateLimiter(security);
+
+        if (security.TrustForwardedHeaders)
+        {
+            services.Configure<ForwardedHeadersOptions>(options =>
+            {
+                options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+                // The proxy is the container network's gateway, not a fixed address.
+                options.KnownIPNetworks.Clear();
+                options.KnownProxies.Clear();
+            });
+        }
 
         services.AddAppLocalization();
 
@@ -61,7 +100,26 @@ public static class DependencyInjection
         return services;
     }
 
-    private static void AddCookieAuthentication(this IServiceCollection services)
+    /// <summary>
+    /// <c>POST /Auth/Login</c> is limited per client IP address (on top of the account lockout), W10.
+    /// </summary>
+    private static void AddLoginRateLimiter(this IServiceCollection services, SecurityOptions security)
+    {
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.AddPolicy(LoginRateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = Math.Max(1, security.LoginPermitPerMinute),
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0
+                }));
+        });
+    }
+
+    private static void AddCookieAuthentication(this IServiceCollection services, CookieSecurePolicy securePolicy)
     {
         services.AddScoped<AppCookieEvents>();
 
@@ -71,8 +129,8 @@ public static class DependencyInjection
                 options.Cookie.Name = "ip.auth";
                 options.Cookie.HttpOnly = true;
                 options.Cookie.SameSite = SameSiteMode.Lax;
-                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-                options.ExpireTimeSpan = TimeSpan.FromHours(8);
+                options.Cookie.SecurePolicy = securePolicy;
+                options.ExpireTimeSpan = SessionLifetime;
                 options.SlidingExpiration = true;
                 options.LoginPath = "/Auth/Login";
                 options.LogoutPath = "/Auth/Logout";

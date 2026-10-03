@@ -1,4 +1,5 @@
 using Domain.Access;
+using Domain.Auditing;
 using Domain.Costing.PlasmaSettlements;
 using Domain.Documents.Attachments;
 using Domain.Finance.Accounts;
@@ -47,6 +48,7 @@ public interface IApplicationDbContext
     DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<Role> Roles { get; }
     DbSet<DeletedUser> DeletedUsers { get; }
+    DbSet<AuditLog> AuditLogs { get; }
     DbSet<Menu> Menus { get; }
     DbSet<MenuAccessProfile> MenuAccessProfiles { get; }
     DbSet<BranchAccessProfile> BranchAccessProfiles { get; }

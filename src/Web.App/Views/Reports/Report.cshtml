@@ -36,8 +36,8 @@
     @if (canExport && Model.Report is not null)
     {
         <ul class="table-top-head">
-            <li><a href="@ExportUrl("xlsx")" target="_blank" title="Export to Excel" id="export-xlsx"><img src="assets/img/icons/excel.svg" alt="Excel"></a></li>
-            <li><a href="@ExportUrl("pdf")" target="_blank" title="Export to PDF" id="export-pdf"><img src="assets/img/icons/pdf.svg" alt="PDF"></a></li>
+            <li><a href="@ExportUrl("xlsx")" target="_blank" title="Export to Excel" id="export-xlsx"><img src="~/assets/img/icons/excel.svg" asp-append-version="true" alt="Excel"></a></li>
+            <li><a href="@ExportUrl("pdf")" target="_blank" title="Export to PDF" id="export-pdf"><img src="~/assets/img/icons/pdf.svg" asp-append-version="true" alt="PDF"></a></li>
         </ul>
     }
 </div>

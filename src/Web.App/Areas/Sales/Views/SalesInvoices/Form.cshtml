@@ -11,7 +11,7 @@
             <div class="col-md-8">
                 <label class="form-label" for="customer-select">Customer <span class="text-danger">*</span></label>
                 <select id="customer-select" name="customerId" class="form-select" data-lookup="@Url.Action("Customers", "Lookup", new { area = "" })"
-                        onchange="if (this.value) { this.form.submit(); }">
+                        data-autosubmit="value">
                     <option value="">Search customer…</option>
                     @if (Model.CustomerId is not null)
                     {

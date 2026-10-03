@@ -18,6 +18,7 @@ internal sealed class GetUserByIdQueryHandler(IDbConnectionFactory dbConnectionF
             """
             SELECT u.id AS Id, u.email AS Email, u.first_name AS FirstName, u.last_name AS LastName,
                    u.is_active AS IsActive, u.created_at_utc AS CreatedAtUtc,
+                   u.access_failed_count AS AccessFailedCount, u.lockout_end_utc AS LockoutEndUtc,
                    u.menu_access_profile_id AS MenuAccessProfileId, mp.name AS MenuAccessProfileName,
                    u.branch_access_profile_id AS BranchAccessProfileId, bp.name AS BranchAccessProfileName,
                    COALESCE(bp.all_branches, false) AS AllBranches,

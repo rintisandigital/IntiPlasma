@@ -1,0 +1,99 @@
+@model AuditLogIndexViewModel
+@{
+    ViewData["Title"] = "Audit Log";
+    ViewData["Menu"] = MenuCodes.AdminAuditLogs;
+    AuditLogFilter filter = Model.Filter;
+    string[] categories = ["Access", "Export", "SignIn"];
+
+    static string CategoryBadge(string category) => category switch
+    {
+        "Access" => "bg-primary",
+        "Export" => "bg-info",
+        _ => "bg-secondary"
+    };
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Audit Log", "Access changes, exports and sign-ins from the web app and the API; entries cannot be changed", MenuCodes.AdminAuditLogs, null)' />
+
+<div class="card">
+    <div class="card-header">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label for="search" class="visually-hidden">Search</label>
+                <input type="search" id="search" name="search" value="@filter.Search" class="form-control" placeholder="Search summary, action, user, record">
+            </div>
+            <div class="col-md-2">
+                <label for="category" class="visually-hidden">Category</label>
+                <select id="category" name="category" class="form-select">
+                    <option value="">All categories</option>
+                    @foreach (string category in categories)
+                    {
+                        <option value="@category" selected="@(filter.Category == category)">@(category == "SignIn" ? "Sign-in" : category)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="from" class="visually-hidden">From date</label>
+                <input type="date" id="from" name="from" value="@filter.From?.ToString("yyyy-MM-dd")" class="form-control" title="From date">
+            </div>
+            <div class="col-md-2">
+                <label for="to" class="visually-hidden">To date</label>
+                <input type="date" id="to" name="to" value="@filter.To?.ToString("yyyy-MM-dd")" class="form-control" title="To date">
+            </div>
+            @if (filter.UserId is not null)
+            {
+                <input type="hidden" name="userId" value="@filter.UserId">
+            }
+            <div class="col-md-3 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-primary"><i class="ti ti-filter me-1"></i>Filter</button>
+                <a asp-action="Index" class="btn btn-light">Reset</a>
+            </div>
+        </form>
+        @if (filter.UserId is not null)
+        {
+            <div class="mt-2 small text-muted">
+                <i class="ti ti-user me-1"></i>Only entries of one user.
+                <a asp-action="Index" asp-route-search="@filter.Search" asp-route-category="@filter.Category">Show all users</a>
+            </div>
+        }
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Time</th>
+                        <th>Category</th>
+                        <th>User</th>
+                        <th>Summary</th>
+                        <th class="d-none d-lg-table-cell">IP address</th>
+                        <th class="d-none d-lg-table-cell">Application</th>
+                        <th class="text-end"><span class="visually-hidden">Actions</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Auditing.AuditLogListItem entry in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="text-nowrap">@Fmt.DateTime(entry.OccurredAtUtc)</td>
+                            <td><span class="badge @CategoryBadge(entry.Category)">@(entry.Category == "SignIn" ? "Sign-in" : entry.Category)</span></td>
+                            <td>@(entry.UserEmail ?? "—")</td>
+                            <td>@entry.Summary</td>
+                            <td class="d-none d-lg-table-cell text-muted">@entry.IpAddress</td>
+                            <td class="d-none d-lg-table-cell text-muted">@entry.Source</td>
+                            <td class="text-end">
+                                <a asp-action="Details" asp-route-id="@entry.Id" class="btn btn-sm btn-light" title="Details" aria-label="Details">
+                                    <i class="ti ti-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="7" class="text-center text-muted py-4">No audit entries found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="Partials/_Pagination" model="PaginationModel.From(Model.Rows)" />
+    </div>
+</div>

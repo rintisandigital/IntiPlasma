@@ -1,6 +1,10 @@
-﻿using Application.Abstractions.Messaging;
+﻿using Application.Abstractions.Auditing;
+using Application.Abstractions.Messaging;
 
 namespace Application.Users.Register;
 
 public sealed record RegisterUserCommand(string Email, string FirstName, string LastName, string Password)
-    : ICommand<Guid>;
+    : ICommand<Guid>, IAuditedCommand
+{
+    string IAuditedCommand.AuditEntityType => "User";
+}

@@ -23,6 +23,10 @@ public static class DependencyInjection
                 .AsImplementedInterfaces()
                 .WithScopedLifetime());
 
+        // Innermost: audit only what the handler actually changed (after validation passed).
+        services.Decorate(typeof(ICommandHandler<,>), typeof(AuditDecorator.CommandHandler<,>));
+        services.Decorate(typeof(ICommandHandler<>), typeof(AuditDecorator.CommandBaseHandler<>));
+
         services.Decorate(typeof(ICommandHandler<,>), typeof(ValidationDecorator.CommandHandler<,>));
         services.Decorate(typeof(ICommandHandler<>), typeof(ValidationDecorator.CommandBaseHandler<>));
 
@@ -39,6 +43,7 @@ public static class DependencyInjection
 
         services.AddScoped<IAutoJournalService, AutoJournalService>();
         services.AddScoped<IAttachmentService, AttachmentService>();
+        services.AddScoped<Users.CredentialVerifier>();
 
         return services;
     }

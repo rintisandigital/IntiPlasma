@@ -5,10 +5,10 @@
 }
 <form method="get" class="row g-2 align-items-end">
     <div class="col-md-3">
-        <input type="search" name="search" value="@Model.Search" class="form-control" placeholder="@Model.Placeholder">
+        <input type="search" name="search" value="@Model.Search" class="form-control" placeholder="@Model.Placeholder" aria-label="Search">
     </div>
     <div class="col-md-2">
-        <select name="branch" class="form-select" asp-items="Model.BranchOptions"></select>
+        <select name="branch" class="form-select" asp-items="Model.BranchOptions" aria-label="Branch"></select>
     </div>
     @if (Model.StatusOptions is not null)
     {

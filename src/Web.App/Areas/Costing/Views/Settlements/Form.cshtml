@@ -16,7 +16,7 @@
                 <div class="col-md-8">
                     <label class="form-label" for="cycle-select">Closed plasma cycle <span class="text-danger">*</span></label>
                     <select id="cycle-select" name="cycleId" class="form-select" data-lookup="@Url.Action("SettleableCycles", "Lookup", new { area = "" })"
-                            onchange="if (this.value) { this.form.submit(); }">
+                            data-autosubmit="value">
                         <option value="">Search cycle, coop or farmer…</option>
                         @if (cycle is not null)
                         {
@@ -65,7 +65,7 @@
                                 (losses @Fmt.Money(debt.Deficits) − deducted @Fmt.Money(debt.Deducted)).
                                 @if (debt.Balance > 0)
                                 {
-                                    <a href="#" class="ms-1" onclick="document.getElementById('DebtDeduction').value = '@debt.Balance.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)'; return false;">Use it</a>
+                                    <a href="#" class="ms-1" data-fill-target="#DebtDeduction" data-fill-value="@debt.Balance.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)">Use it</a>
                                 }
                             </div>
                         }
