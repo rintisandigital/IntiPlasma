@@ -1,4 +1,48 @@
 @model BranchSwitcherModel
+
+<li class="nav-item nav-searchinputs">
+	<div class="top-nav-search">
+		<a href="javascript:void(0);" class="responsive-search">
+			<i class="fa fa-search"></i>
+		</a>
+		<form action="#" class="dropdown">
+			<div class="searchinputs input-group dropdown-toggle" id="dropdownMenuClickable" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+				<input type="text" placeholder="Search">
+				<div class="search-addon">
+					<span><i class="ti ti-search"></i></span>
+				</div>
+				<span class="input-group-text">
+					<kbd class="d-flex align-items-center"><img src="assets/img/icons/command.svg" alt="img" class="me-1">K</kbd>
+				</span>
+			</div>
+			<div class="dropdown-menu search-dropdown" aria-labelledby="dropdownMenuClickable">
+				<div class="search-info">
+					<h6><span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-search feather-16"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></span>Recent Searches
+					</h6>
+					<ul class="search-tags">
+						<li><a href="javascript:void(0);">Products</a></li>
+						<li><a href="javascript:void(0);">Sales</a></li>
+						<li><a href="javascript:void(0);">Applications</a></li>
+					</ul>
+				</div>
+				<div class="search-info">
+					<h6><span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-help-circle feather-16"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></span>Help</h6>
+					<p>How to Change Product Volume from 0 to 200 on Inventory management</p>
+					<p>Change Product Name</p>
+				</div>
+				<div class="search-info">
+					<h6><span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-user feather-16"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span>Customers</h6>
+					<ul class="customers">
+						<li><a href="javascript:void(0);">Aron Varu<img src="assets/img/profiles/avator1.jpg" alt="Img" class="img-fluid"></a></li>
+						<li><a href="javascript:void(0);">Jonita<img src="assets/img/profiles/avatar-01.jpg" alt="Img" class="img-fluid"></a></li>
+						<li><a href="javascript:void(0);">Aaron<img src="assets/img/profiles/avatar-10.jpg" alt="Img" class="img-fluid"></a></li>
+					</ul>
+				</div>
+			</div>
+		</form>
+	</div>
+</li>
+
 @if (Model.Branches.Count == 0 && !Model.AllBranchesAllowed)
 {
     <li class="nav-item nav-item-box me-2">
@@ -7,25 +51,34 @@
 }
 else
 {
-    <li class="nav-item dropdown has-arrow nav-item-box branch-switcher me-2" data-switch-url="@Url.Action("SwitchBranch", "Main")">
-        <a class="nav-link dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown" href="javascript:void(0);" title="Active branch">
-            <i class="ti ti-building-store"></i>
-            <span class="active-branch-name">@(Model.Active?.Name ?? "All branches")</span>
-        </a>
-        <div class="dropdown-menu dropdown-menu-end">
-            <h6 class="dropdown-header">Active branch</h6>
-            @if (Model.AllBranchesAllowed)
+   
+    <li class="nav-item dropdown has-arrow main-drop select-store-dropdown">
+		<a href="javascript:void(0);" class="dropdown-toggle nav-link select-store"
+			data-bs-toggle="dropdown">
+			<span class="user-info">
+				
+				<span class="user-detail">
+					<span class="user-name">
+                        <i class="ti ti-building-store"></i>&nbsp; @(Model.Active?.Name ?? "All Branches")
+                    </span>
+				</span>
+			</span>
+		</a>
+		<div class="dropdown-menu dropdown-menu-right">
+			@if (Model.AllBranchesAllowed)
+			{
+				<a href="javascript:void(0);" class="dropdown-item @(Model.Active is null ? "active" : "")" data-branch-id="" data-branch-name="All branches">
+					<i class="ti ti-building-store"></i>&nbsp; @(Model.Active?.Name ?? "All Branches")
+				</a>
+			}
+
+			@foreach (Application.Users.GetCurrent.CurrentUserBranch branch in Model.Branches)
             {
-                <a href="javascript:void(0);" class="dropdown-item @(Model.Active is null ? "active" : "")"
-                   data-branch-id="" data-branch-name="All branches">All branches</a>
-            }
-            @foreach (Application.Users.GetCurrent.CurrentUserBranch branch in Model.Branches)
-            {
-                <a href="javascript:void(0);" class="dropdown-item @(Model.Active?.Id == branch.Id ? "active" : "")"
-                   data-branch-id="@branch.Id" data-branch-name="@branch.Name">
-                    <span class="fw-semibold">@branch.Code</span> — @branch.Name
-                </a>
-            }
-        </div>
-    </li>
+                <a href="javascript:void(0);" class="dropdown-item @(Model.Active?.Id == branch.Id ? "active" : "")" data-branch-id="@branch.Id" data-branch-name="@branch.Name">
+					<i class="ti ti-building-store"></i>&nbsp; @branch.Name
+				</a>
+			}
+			
+		</div>
+	</li>
 }
