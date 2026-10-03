@@ -1,0 +1,112 @@
+@model StockCardViewModel
+@{
+    ViewData["Title"] = "Stock Card";
+    ViewData["Menu"] = MenuCodes.InventoryStock;
+    Application.Inventory.StockCardResponse? card = Model.Card;
+    bool canExport = await Rights.CanAsync(MenuCodes.InventoryStock, MenuRights.Export);
+    string from = Model.From.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+    string to = Model.To.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Stock Card</h4>
+            <h6>Movements of one item in one warehouse, with running balance</h6>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="Index" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Stock Balance</a>
+        @if (card is not null && canExport)
+        {
+            <a asp-action="CardExport" asp-route-format="xlsx" asp-route-warehouseId="@Model.WarehouseId" asp-route-itemId="@Model.ItemId"
+               asp-route-from="@from" asp-route-to="@to" target="_blank" class="btn btn-outline-success"><i class="ti ti-file-spreadsheet me-1"></i>Excel</a>
+            <a asp-action="CardExport" asp-route-format="pdf" asp-route-warehouseId="@Model.WarehouseId" asp-route-itemId="@Model.ItemId"
+               asp-route-from="@from" asp-route-to="@to" target="_blank" class="btn btn-outline-danger"><i class="ti ti-file-type-pdf me-1"></i>PDF</a>
+        }
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label" for="warehouseId">Warehouse</label>
+                <select id="warehouseId" name="warehouseId" class="form-select" asp-items="Model.Warehouses" required>
+                    <option value="">—</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="itemId">Item</label>
+                <select id="itemId" name="itemId" class="form-select" data-lookup="@Url.Action("Items", "Lookup", new { area = "" })" required>
+                    <option value="">Search item…</option>
+                    @if (Model.ItemId is not null)
+                    {
+                        <option value="@Model.ItemId" selected>@Model.ItemLabel</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-1">
+                <label class="form-label" for="from">From</label>
+                <input id="from" type="date" name="from" value="@from" class="form-control">
+            </div>
+            <div class="col-md-1">
+                <label class="form-label" for="to">To</label>
+                <input id="to" type="date" name="to" value="@to" class="form-control">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100"><i class="ti ti-search me-1"></i>Show</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (card is not null)
+{
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title mb-0">@Model.ItemLabel · @Model.WarehouseLabel</h5>
+            <span class="text-muted fs-13">@Fmt.Date(card.From) – @Fmt.Date(card.To) · quantities in @Model.BaseUomCode</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="thead-light">
+                        <tr><th>Date</th><th>Movement</th><th>Document</th><th>Cycle</th><th class="text-end">Quantity</th><th class="text-end">Unit cost</th><th class="text-end">Value</th><th class="text-end">Balance qty</th><th class="text-end">Balance value</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr class="table-light fw-semibold">
+                            <td>@Fmt.Date(card.From)</td><td colspan="6">Opening balance</td>
+                            <td class="text-end">@Fmt.Number(card.OpeningQuantity, 3)</td><td class="text-end">@Fmt.Money(card.OpeningValue)</td>
+                        </tr>
+                        @foreach (Application.Inventory.StockCardLine line in card.Lines)
+                        {
+                            <tr>
+                                <td>@Fmt.Date(line.Date)</td>
+                                <td>@EnumOptions.Label(line.Type)</td>
+                                <td>@line.SourceNumber</td>
+                                <td>@(line.CycleNumber ?? "—")</td>
+                                <td class="text-end @(line.Quantity < 0 ? "text-danger" : "text-success")">@Fmt.Number(line.Quantity, 3)</td>
+                                <td class="text-end">@Fmt.Money(line.UnitCost)</td>
+                                <td class="text-end">@Fmt.Money(line.Value)</td>
+                                <td class="text-end">@Fmt.Number(line.BalanceQuantity, 3)</td>
+                                <td class="text-end">@Fmt.Money(line.BalanceValue)</td>
+                            </tr>
+                        }
+                        @if (card.Lines.Count == 0)
+                        {
+                            <tr><td colspan="9" class="text-center text-muted py-3">No movement in this period.</td></tr>
+                        }
+                        <tr class="table-light fw-semibold">
+                            <td>@Fmt.Date(card.To)</td><td colspan="6">Closing balance</td>
+                            <td class="text-end">@Fmt.Number(card.ClosingQuantity, 3)</td><td class="text-end">@Fmt.Money(card.ClosingValue)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="alert alert-light border">Choose a warehouse and an item to show the stock card.</div>
+}

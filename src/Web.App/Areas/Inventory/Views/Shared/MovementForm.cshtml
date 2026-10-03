@@ -1,0 +1,178 @@
+@model StockMovementFormViewModel
+@{
+    (string title, string subtitle, string menu, string action, string saveText) = Model.Kind switch
+    {
+        StockMovementKind.Return => ("New Stock Return", "Leftover feed/OVK from a coop back to a central warehouse of the same branch",
+            MenuCodes.InventoryStockReturns, "Create", "Post Return"),
+        StockMovementKind.FeedMutation => ("Feed Mutation", "Feed between coops: posted as a return to the central warehouse plus a transfer to the other coop",
+            MenuCodes.InventoryFeedMutations, "Index", "Post Mutation"),
+        _ => ("New Stock Transfer", "From a central warehouse to another warehouse of the same branch; to a coop it is charged to the running cycle",
+            MenuCodes.InventoryStockTransfers, "Create", "Post Transfer")
+    };
+    ViewData["Title"] = title;
+    ViewData["Menu"] = menu;
+    // Source warehouse type and which list the destination is filtered from (same branch, by type).
+    string fromType = Model.Kind == StockMovementKind.Transfer ? "Central" : "Coop";
+    string toTypes = Model.Kind switch { StockMovementKind.Transfer => "Central,Coop", StockMovementKind.Return => "Central", _ => "Coop" };
+    bool needsReason = Model.Kind != StockMovementKind.Transfer;
+    string itemLookup = Url.Action("StockItems", "Lookup", new { area = "" })!;
+    string unitsUrl = Url.Action("ItemUnits", "Lookup", new { area = "" })!;
+}
+<partial name="Partials/_PageHeader" model="new PageHeaderModel(title, subtitle)" />
+
+<form asp-action="@action" method="post">
+    <form-token />
+    <fieldset disabled="@(!Model.CanSave)">
+        <div class="card">
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label asp-for="FromWarehouseId" class="form-label">From @(fromType == "Coop" ? "coop warehouse" : "central warehouse")</label> <span class="text-danger">*</span>
+                        <select asp-for="FromWarehouseId" id="FromWarehouseId" class="form-select movement-from">
+                            <option value="">—</option>
+                            @foreach (WarehouseOption warehouse in Model.Warehouses.Where(w => w.Type == fromType))
+                            {
+                                <option value="@warehouse.Id" data-branch="@warehouse.BranchId" selected="@(warehouse.Id == Model.FromWarehouseId)">@warehouse.Label</option>
+                            }
+                        </select>
+                        <span asp-validation-for="FromWarehouseId" class="text-danger fs-13"></span>
+                    </div>
+                    @if (Model.Kind == StockMovementKind.FeedMutation)
+                    {
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="ViaWarehouseId" class="form-label"></label> <span class="text-danger">*</span>
+                            <select asp-for="ViaWarehouseId" class="form-select movement-to" data-types="Central">
+                                <option value="">—</option>
+                                @foreach (WarehouseOption warehouse in Model.Warehouses.Where(w => w.Type == "Central"))
+                                {
+                                    <option value="@warehouse.Id" data-branch="@warehouse.BranchId" data-type="@warehouse.Type" selected="@(warehouse.Id == Model.ViaWarehouseId)">@warehouse.Label</option>
+                                }
+                            </select>
+                            <span asp-validation-for="ViaWarehouseId" class="text-danger fs-13"></span>
+                        </div>
+                    }
+                    <div class="col-md-4 mb-3">
+                        <label asp-for="ToWarehouseId" class="form-label"></label> <span class="text-danger">*</span>
+                        <select asp-for="ToWarehouseId" class="form-select movement-to" data-types="@toTypes">
+                            <option value="">—</option>
+                            @foreach (WarehouseOption warehouse in Model.Warehouses.Where(w => toTypes.Contains(w.Type, StringComparison.Ordinal)).OrderBy(w => w.Type).ThenBy(w => w.Label))
+                            {
+                                <option value="@warehouse.Id" data-branch="@warehouse.BranchId" data-type="@warehouse.Type" selected="@(warehouse.Id == Model.ToWarehouseId)">@warehouse.Label</option>
+                            }
+                        </select>
+                        <span asp-validation-for="ToWarehouseId" class="text-danger fs-13"></span>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label asp-for="Date" class="form-label"></label> <span class="text-danger">*</span>
+                        <input asp-for="Date" type="date" class="form-control">
+                        <span asp-validation-for="Date" class="text-danger fs-13"></span>
+                    </div>
+                    @if (needsReason)
+                    {
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="Reason" class="form-label"></label> <span class="text-danger">*</span>
+                            <input asp-for="Reason" class="form-control">
+                            <span asp-validation-for="Reason" class="text-danger fs-13"></span>
+                        </div>
+                    }
+                    @if (Model.Kind != StockMovementKind.FeedMutation)
+                    {
+                        <div class="col-12 mb-3">
+                            <label asp-for="Notes" class="form-label"></label>
+                            <textarea asp-for="Notes" rows="2" class="form-control"></textarea>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h5 class="card-title mb-0">Items</h5>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-collection-add="Lines"><i class="ti ti-plus me-1"></i>Add item</button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table mb-0" data-collection="Lines">
+                        <thead class="thead-light"><tr><th style="width: 50%">Item (stock of the source warehouse)</th><th style="width: 22%">Unit</th><th>Quantity</th><th></th></tr></thead>
+                        <tbody>
+                            <tr class="collection-empty"><td colspan="4" class="text-center text-muted py-3">No item yet.</td></tr>
+                            @for (int i = 0; i < Model.Lines.Count; i++)
+                            {
+                                StockLineInput line = Model.Lines[i];
+                                <tr class="collection-row">
+                                    <td>
+                                        <select name="Lines[@i].ItemId" class="form-select line-item" data-lookup="@itemLookup" data-lookup-depends="warehouseId:#FromWarehouseId"
+                                                data-units-url="@unitsUrl" required>
+                                            @if (line.ItemId is not null)
+                                            {
+                                                <option value="@line.ItemId" selected>@(line.ItemLabel ?? line.ItemId.ToString())</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="">Search item…</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select name="Lines[@i].UomId" class="form-select line-uom" required>
+                                            @foreach (SelectListItem unit in line.Units)
+                                            {
+                                                <option value="@unit.Value" selected="@unit.Selected">@unit.Text</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td><input type="number" name="Lines[@i].Quantity" value="@line.Quantity" step="0.001" min="0.001" class="form-control text-end" required></td>
+                                    <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </fieldset>
+
+    <div class="card">
+        <div class="card-header"><h5 class="card-title mb-0">Attachments</h5></div>
+        <div class="card-body"><partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, Model.CanSave)" /></div>
+    </div>
+
+    <partial name="Partials/_FormButtons" model='new FormButtonsModel(Model.CanSave, Url.Action("Index")!, saveText)' />
+</form>
+
+<template data-collection-template="Lines">
+    <tr class="collection-row">
+        <td>
+            <select name="Lines[__i__].ItemId" class="form-select line-item" data-lookup="@itemLookup" data-lookup-depends="warehouseId:#FromWarehouseId"
+                    data-units-url="@unitsUrl" required>
+                <option value="">Search item…</option>
+            </select>
+        </td>
+        <td><select name="Lines[__i__].UomId" class="form-select line-uom" required></select></td>
+        <td><input type="number" name="Lines[__i__].Quantity" step="0.001" min="0.001" class="form-control text-end" required></td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+    </tr>
+</template>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            // Destinations: same branch as the source, never the source itself.
+            var from = document.getElementById('FromWarehouseId');
+            function filter() {
+                var branch = from.selectedOptions[0] ? from.selectedOptions[0].dataset.branch : null;
+                document.querySelectorAll('select.movement-to').forEach(function (select) {
+                    select.querySelectorAll('option[data-branch]').forEach(function (option) {
+                        option.hidden = !branch || option.dataset.branch !== branch || option.value === from.value;
+                        if (option.hidden && option.selected) { select.value = ''; }
+                    });
+                });
+            }
+            from.addEventListener('change', filter);
+            filter();
+        })();
+    </script>
+}

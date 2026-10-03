@@ -54,6 +54,8 @@ public static class DependencyInjection
         services.AddSingleton<PdfListExporter>();
         services.AddScoped<ExportService>();
         services.AddScoped<PageSupport>();
+        services.AddScoped<ItemOptions>();
+        services.AddScoped<Areas.Inventory.InventoryOptions>();
 
         return services;
     }

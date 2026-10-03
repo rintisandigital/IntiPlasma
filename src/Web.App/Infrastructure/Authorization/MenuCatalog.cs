@@ -29,6 +29,12 @@ public static class MenuCodes
     public const string FinanceJournalTemplates = "finance.journal-templates";
     public const string FinanceJournalMappings = "finance.journal-mappings";
     public const string FinanceCashBankAccounts = "finance.cash-bank-accounts";
+    public const string ProcurementPurchaseOrders = "procurement.purchase-orders";
+    public const string InventoryGoodsReceipts = "inventory.goods-receipts";
+    public const string InventoryStockTransfers = "inventory.stock-transfers";
+    public const string InventoryStockReturns = "inventory.stock-returns";
+    public const string InventoryFeedMutations = "inventory.feed-mutations";
+    public const string InventoryStock = "inventory.stock";
 }
 
 /// <summary>
@@ -73,14 +79,14 @@ public static class MenuCatalog
         Page("partnership", "partnership.contracts", "Contracts", "/Partnership/Contracts", CreateEditExport, true);
 
         Group("procurement", "Procurement", "ti ti-shopping-cart", 40);
-        Page("procurement", "procurement.purchase-orders", "Purchase Orders", "/Procurement/PurchaseOrders", Crud, false);
+        Page("procurement", "procurement.purchase-orders", "Purchase Orders", "/Procurement/PurchaseOrders", CreateEditExport, true);
 
         Group("inventory", "Inventory", "ti ti-building-warehouse", 50);
-        Page("inventory", "inventory.goods-receipts", "Goods Receipts", "/Inventory/GoodsReceipts", CreateExport, false);
-        Page("inventory", "inventory.stock-transfers", "Stock Transfers", "/Inventory/StockTransfers", CreateExport, false);
-        Page("inventory", "inventory.stock-returns", "Stock Returns", "/Inventory/StockReturns", CreateExport, false);
-        Page("inventory", "inventory.feed-mutations", "Feed Mutations", "/Inventory/FeedMutations", CreateExport, false);
-        Page("inventory", "inventory.stock", "Stock Balance & Card", "/Inventory/Stock", MenuRights.Export, false);
+        Page("inventory", "inventory.goods-receipts", "Goods Receipts", "/Inventory/GoodsReceipts", CreateExport, true);
+        Page("inventory", "inventory.stock-transfers", "Stock Transfers", "/Inventory/StockTransfers", CreateExport, true);
+        Page("inventory", "inventory.stock-returns", "Stock Returns", "/Inventory/StockReturns", CreateExport, true);
+        Page("inventory", "inventory.feed-mutations", "Feed Mutations", "/Inventory/FeedMutations", CreateExport, true);
+        Page("inventory", "inventory.stock", "Stock Balance & Card", "/Inventory/Stock", MenuRights.Export, true);
 
         Group("production", "Production", "ti ti-egg", 60);
         Page("production", "production.cycles", "Cycles & Chick-in", "/Production/Cycles", CreateEditExport, false);

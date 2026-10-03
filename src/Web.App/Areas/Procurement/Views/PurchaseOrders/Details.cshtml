@@ -1,0 +1,141 @@
+@model PurchaseOrderDetailsViewModel
+@{
+    Application.Procurement.PurchaseOrderResponse order = Model.Order;
+    ViewData["Title"] = $"PO {order.Number}";
+    ViewData["Menu"] = MenuCodes.ProcurementPurchaseOrders;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">PO @order.Number <partial name="Partials/_StatusBadge" model="order.Status" /></h4>
+            <h6>@order.VendorName · @order.BranchCode</h6>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="Index" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+        @if (Model.CanPrint)
+        {
+            <a asp-action="Print" asp-route-id="@order.Id" target="_blank" class="btn btn-outline-danger"><i class="ti ti-file-type-pdf me-1"></i>Print PDF</a>
+        }
+        @if (Model.CanEdit && Model.IsDraft)
+        {
+            <a asp-action="Edit" asp-route-id="@order.Id" class="btn btn-outline-primary"><i class="ti ti-edit me-1"></i>Edit</a>
+            <form asp-action="Approve" asp-route-id="@order.Id" method="post" data-confirm="Approve PO @order.Number? Goods can then be received against it.">
+                <button type="submit" class="btn btn-success"><i class="ti ti-check me-1"></i>Approve</button>
+            </form>
+        }
+        @if (Model.CanReceive && Model.IsReceivable)
+        {
+            <a asp-area="Inventory" asp-controller="GoodsReceipts" asp-action="Create" asp-route-purchaseOrderId="@order.Id" class="btn btn-primary">
+                <i class="ti ti-truck-delivery me-1"></i>Receive Goods
+            </a>
+        }
+        @if (Model.CanEdit && Model.CanBeClosed)
+        {
+            <form asp-action="Close" asp-route-id="@order.Id" method="post" data-confirm="Close PO @order.Number? The remaining quantity will no longer be expected.">
+                <button type="submit" class="btn btn-outline-secondary"><i class="ti ti-lock me-1"></i>Close</button>
+            </form>
+        }
+        @if (Model.CanEdit && Model.CanBeCancelled)
+        {
+            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancel-modal"><i class="ti ti-ban me-1"></i>Cancel PO</button>
+        }
+    </div>
+</div>
+
+@if (order.Status == "Cancelled" && !string.IsNullOrWhiteSpace(order.CancellationReason))
+{
+    <div class="alert alert-danger">Cancelled: @order.CancellationReason</div>
+}
+
+<div class="card">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3 mb-2"><div class="text-muted fs-13">Order date</div><div class="fw-semibold">@Fmt.Date(order.OrderDate)</div></div>
+            <div class="col-md-3 mb-2"><div class="text-muted fs-13">Expected delivery</div><div class="fw-semibold">@(order.ExpectedDate is { } expected ? Fmt.Date(expected) : "—")</div></div>
+            <div class="col-md-3 mb-2"><div class="text-muted fs-13">Vendor</div><div class="fw-semibold">@order.VendorCode — @order.VendorName</div></div>
+            <div class="col-md-3 mb-2"><div class="text-muted fs-13">Approved at</div><div class="fw-semibold">@(order.ApprovedAtUtc is { } approved ? Fmt.DateTime(approved) : "—")</div></div>
+            @if (!string.IsNullOrWhiteSpace(order.Notes))
+            {
+                <div class="col-12"><div class="text-muted fs-13">Notes</div><div style="white-space: pre-line">@order.Notes</div></div>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h5 class="card-title mb-0">Items</h5></div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead class="thead-light">
+                    <tr><th>#</th><th>Item</th><th class="text-end">Ordered</th><th class="text-end">Received</th><th style="width: 14%">Progress</th><th class="text-end">Unit price</th><th>VAT</th><th class="text-end">Amount</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Procurement.PurchaseOrderLineResponse line in order.Lines ?? [])
+                    {
+                        decimal progress = line.Quantity == 0 ? 0 : Math.Min(100, line.QuantityReceived / line.Quantity * 100);
+                        <tr>
+                            <td>@line.LineNumber</td>
+                            <td>@line.ItemCode — @line.ItemName</td>
+                            <td class="text-end text-nowrap">@Fmt.Number(line.Quantity, 3) @line.UomCode</td>
+                            <td class="text-end text-nowrap">@Fmt.Number(line.QuantityReceived, 3)</td>
+                            <td>
+                                <div class="progress" style="height: 6px" title="Outstanding @Fmt.Number(line.OutstandingQuantity, 3) @line.UomCode">
+                                    <div class="progress-bar @(progress >= 100 ? "bg-success" : "")" style="width: @progress.ToString("0", System.Globalization.CultureInfo.InvariantCulture)%"></div>
+                                </div>
+                            </td>
+                            <td class="text-end text-nowrap">@Fmt.Money(line.UnitPrice)</td>
+                            <td>@Model.LineTaxCodes.GetValueOrDefault(line.LineNumber, "—")</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(line.Amount)</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr><th colspan="7" class="text-end">Subtotal</th><th class="text-end text-nowrap">@Fmt.Money(order.Subtotal)</th></tr>
+                    <tr><th colspan="7" class="text-end fw-normal">VAT (estimate)</th><th class="text-end text-nowrap fw-normal">@Fmt.Money(Model.Vat)</th></tr>
+                    <tr><th colspan="7" class="text-end">Total</th><th class="text-end text-nowrap">@Fmt.Money(Model.Total)</th></tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h5 class="card-title mb-0">Attachments</h5></div>
+    <div class="card-body">
+        @if (Model.CanEdit && order.Status != "Cancelled")
+        {
+            <form asp-action="Documents" asp-route-id="@order.Id" method="post">
+                <partial name="Partials/_Attachments" model='new AttachmentsModel(Model.Attachments, true, "documents")' />
+                <button type="submit" class="btn btn-sm btn-primary mt-2"><i class="ti ti-device-floppy me-1"></i>Save attachments</button>
+            </form>
+        }
+        else
+        {
+            <partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, false)" />
+        }
+    </div>
+</div>
+
+@if (Model.CanEdit && Model.CanBeCancelled)
+{
+    <div class="modal fade" id="cancel-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form asp-action="Cancel" asp-route-id="@order.Id" method="post" class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Cancel PO @order.Number</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <label for="cancel-reason" class="form-label">Reason <span class="text-danger">*</span></label>
+                    <textarea id="cancel-reason" name="reason" rows="3" maxlength="500" class="form-control" required></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Back</button>
+                    <button type="submit" class="btn btn-danger">Cancel PO</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}

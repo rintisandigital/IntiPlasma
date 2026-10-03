@@ -1,0 +1,84 @@
+@model InventoryDocumentViewModel
+@{
+    Application.Inventory.InventoryDocumentResponse document = Model.Document;
+    ViewData["Title"] = $"{Model.Title} {document.Number}";
+    ViewData["Menu"] = ViewContext.RouteData.Values["controller"] switch
+    {
+        "GoodsReceipts" => MenuCodes.InventoryGoodsReceipts,
+        "StockReturns" => MenuCodes.InventoryStockReturns,
+        _ => MenuCodes.InventoryStockTransfers
+    };
+    bool isReceipt = Model.Title == "Goods Receipt";
+    bool isReturn = Model.Title == "Stock Return";
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">@Model.Title @document.Number <span class="badge bg-success">Posted</span></h4>
+            <h6>@Fmt.Date(document.Date) · @document.BranchCode</h6>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="Index" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+        @if (Model.CanPrint)
+        {
+            <a asp-action="Print" asp-route-id="@document.Id" target="_blank" class="btn btn-outline-danger"><i class="ti ti-file-type-pdf me-1"></i>Print PDF</a>
+        }
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3 mb-2"><div class="text-muted fs-13">@Model.ReferenceLabel</div><div class="fw-semibold">@document.Reference</div></div>
+            @if (isReceipt)
+            {
+                <div class="col-md-3 mb-2"><div class="text-muted fs-13">Vendor</div><div class="fw-semibold">@document.Party</div></div>
+            }
+            <div class="col-md-3 mb-2"><div class="text-muted fs-13">@(isReceipt ? "Receiving warehouse" : "To warehouse")</div><div class="fw-semibold">@document.WarehouseCode</div></div>
+            <div class="col-md-3 mb-2"><div class="text-muted fs-13">Cycle</div><div class="fw-semibold">@(document.CycleNumber ?? "—")</div></div>
+            @if (isReturn)
+            {
+                <div class="col-md-3 mb-2"><div class="text-muted fs-13">Reason</div><div class="fw-semibold">@document.Party</div></div>
+            }
+            @if (!string.IsNullOrWhiteSpace(document.Notes))
+            {
+                <div class="col-12"><div class="text-muted fs-13">Notes</div><div style="white-space: pre-line">@document.Notes</div></div>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h5 class="card-title mb-0">Items</h5></div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead class="thead-light">
+                    <tr><th>#</th><th>Item</th><th class="text-end">Quantity</th><th class="text-end">Base quantity</th><th class="text-end">Unit cost</th><th class="text-end">Value</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Inventory.InventoryDocumentLineResponse line in document.Lines ?? [])
+                    {
+                        <tr>
+                            <td>@line.LineNumber</td>
+                            <td>@line.ItemCode — @line.ItemName</td>
+                            <td class="text-end text-nowrap">@Fmt.Number(line.Quantity, 3) @line.UomCode</td>
+                            <td class="text-end text-nowrap">@Fmt.Number(line.BaseQuantity, 3) @line.BaseUomCode</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(line.UnitCost)</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(line.Value)</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr><th colspan="5" class="text-end">Total</th><th class="text-end text-nowrap">@Fmt.Money(document.TotalValue)</th></tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h5 class="card-title mb-0">Attachments</h5></div>
+    <div class="card-body"><partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, false)" /></div>
+</div>

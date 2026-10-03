@@ -1,0 +1,186 @@
+@model PurchaseOrderFormViewModel
+@{
+    ViewData["Title"] = Model.IsNew ? "New Purchase Order" : $"Purchase Order {Model.Number}";
+    ViewData["Menu"] = MenuCodes.ProcurementPurchaseOrders;
+    string itemLookup = Url.Action("PurchasableItems", "Lookup", new { area = "" })!;
+    string unitsUrl = Url.Action("ItemUnits", "Lookup", new { area = "" })!;
+    string cancelUrl = Model.IsNew ? Url.Action("Index")! : Url.Action("Details", new { id = Model.Id })!;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel(Model.IsNew ? "New Purchase Order" : $"Purchase Order {Model.Number}", "Saved as a draft; approve it from the order page so goods can be received")' />
+
+<form asp-action="@(Model.IsNew ? "Create" : "Edit")" method="post" id="po-form">
+    @if (Model.IsNew)
+    {
+        <form-token />
+    }
+    else
+    {
+        <input type="hidden" asp-for="Id" />
+        <input type="hidden" asp-for="Number" />
+        <input type="hidden" asp-for="BranchId" />
+        <input type="hidden" asp-for="VendorId" />
+        <input type="hidden" asp-for="VendorLabel" />
+    }
+    <div class="card">
+        <div class="card-body">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label asp-for="BranchId" class="form-label"></label> <span class="text-danger">*</span>
+                    <select asp-for="BranchId" class="form-select" asp-items="Model.Branches" disabled="@(!Model.IsNew)">
+                        <option value="">—</option>
+                    </select>
+                    <span asp-validation-for="BranchId" class="text-danger fs-13"></span>
+                </div>
+                <div class="col-md-5 mb-3">
+                    <label asp-for="VendorId" class="form-label"></label> <span class="text-danger">*</span>
+                    @if (Model.IsNew)
+                    {
+                        <input type="hidden" asp-for="VendorLabel" id="vendor-label" />
+                        <select asp-for="VendorId" class="form-select" data-lookup="@Url.Action("Vendors", "Lookup", new { area = "" })"
+                                onchange="document.getElementById('vendor-label').value = this.selectedOptions[0] ? this.selectedOptions[0].text : ''">
+                            <option value="">Search vendor…</option>
+                            @if (Model.VendorId is not null)
+                            {
+                                <option value="@Model.VendorId" selected>@Model.VendorLabel</option>
+                            }
+                        </select>
+                        <span asp-validation-for="VendorId" class="text-danger fs-13"></span>
+                    }
+                    else
+                    {
+                        <input class="form-control" value="@Model.VendorLabel" disabled>
+                    }
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label asp-for="OrderDate" class="form-label"></label> <span class="text-danger">*</span>
+                    <input asp-for="OrderDate" type="date" class="form-control">
+                    <span asp-validation-for="OrderDate" class="text-danger fs-13"></span>
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label asp-for="ExpectedDate" class="form-label"></label>
+                    <input asp-for="ExpectedDate" type="date" class="form-control">
+                </div>
+                <div class="col-12 mb-3">
+                    <label asp-for="Notes" class="form-label"></label>
+                    <textarea asp-for="Notes" rows="2" class="form-control"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <h5 class="card-title mb-0">Items</h5>
+            <button type="button" class="btn btn-sm btn-outline-primary" data-collection-add="Lines"><i class="ti ti-plus me-1"></i>Add item</button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table mb-0" data-collection="Lines" id="po-lines">
+                    <thead class="thead-light">
+                        <tr><th style="width: 32%">Item (DOC, feed, OVK)</th><th style="width: 14%">Unit</th><th style="width: 11%">Quantity</th><th style="width: 14%">Unit price (Rp)</th><th style="width: 13%">VAT</th><th class="text-end">Amount</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        <tr class="collection-empty"><td colspan="7" class="text-center text-muted py-3">No item yet.</td></tr>
+                        @for (int i = 0; i < Model.Lines.Count; i++)
+                        {
+                            PurchaseOrderLineFormInput line = Model.Lines[i];
+                            <tr class="collection-row">
+                                <td>
+                                    <select name="Lines[@i].ItemId" class="form-select line-item" data-lookup="@itemLookup" data-units-url="@unitsUrl" required>
+                                        @if (line.ItemId is not null)
+                                        {
+                                            <option value="@line.ItemId" selected>@(line.ItemLabel ?? line.ItemId.ToString())</option>
+                                        }
+                                        else
+                                        {
+                                            <option value="">Search item…</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="Lines[@i].UomId" class="form-select line-uom" required>
+                                        @foreach (SelectListItem unit in line.Units)
+                                        {
+                                            <option value="@unit.Value" selected="@unit.Selected">@unit.Text</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td><input type="number" name="Lines[@i].Quantity" value="@line.Quantity?.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture)" step="0.001" min="0.001" class="form-control text-end line-qty" required></td>
+                                <td><input type="number" name="Lines[@i].UnitPrice" value="@line.UnitPrice?.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" step="0.01" min="0.01" class="form-control text-end line-price" required></td>
+                                <td>
+                                    <select name="Lines[@i].TaxCodeId" class="form-select line-tax">
+                                        <option value="">No VAT</option>
+                                        @foreach (SelectListItem vat in Model.VatCodes)
+                                        {
+                                            <option value="@vat.Value" selected="@(vat.Value == line.TaxCodeId?.ToString())">@vat.Text</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td class="text-end text-nowrap line-amount">—</td>
+                                <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr><th colspan="5" class="text-end">Subtotal (excl. VAT)</th><th class="text-end text-nowrap" id="po-subtotal">—</th><th></th></tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h5 class="card-title mb-0">Attachments</h5></div>
+        <div class="card-body"><partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, true)" /></div>
+    </div>
+
+    <partial name="Partials/_FormButtons" model='new FormButtonsModel(true, cancelUrl, "Save Draft")' />
+</form>
+
+<template data-collection-template="Lines">
+    <tr class="collection-row">
+        <td>
+            <select name="Lines[__i__].ItemId" class="form-select line-item" data-lookup="@itemLookup" data-units-url="@unitsUrl" required>
+                <option value="">Search item…</option>
+            </select>
+        </td>
+        <td><select name="Lines[__i__].UomId" class="form-select line-uom" required></select></td>
+        <td><input type="number" name="Lines[__i__].Quantity" step="0.001" min="0.001" class="form-control text-end line-qty" required></td>
+        <td><input type="number" name="Lines[__i__].UnitPrice" step="0.01" min="0.01" class="form-control text-end line-price" required></td>
+        <td>
+            <select name="Lines[__i__].TaxCodeId" class="form-select line-tax">
+                <option value="">No VAT</option>
+                @foreach (SelectListItem vat in Model.VatCodes)
+                {
+                    <option value="@vat.Value">@vat.Text</option>
+                }
+            </select>
+        </td>
+        <td class="text-end text-nowrap line-amount">—</td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+    </tr>
+</template>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            // Line amount = quantity × unit price; subtotal of all lines (display only, the server recalculates).
+            var table = document.getElementById('po-lines');
+            var money = new Intl.NumberFormat('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            function recalc() {
+                var subtotal = 0;
+                table.querySelectorAll('tr.collection-row').forEach(function (row) {
+                    var amount = (parseFloat(row.querySelector('.line-qty').value) || 0) * (parseFloat(row.querySelector('.line-price').value) || 0);
+                    subtotal += amount;
+                    row.querySelector('.line-amount').textContent = amount ? 'Rp ' + money.format(amount) : '—';
+                });
+                document.getElementById('po-subtotal').textContent = 'Rp ' + money.format(subtotal);
+            }
+            table.addEventListener('input', recalc);
+            table.addEventListener('click', function () { setTimeout(recalc, 0); });
+            recalc();
+        })();
+    </script>
+}

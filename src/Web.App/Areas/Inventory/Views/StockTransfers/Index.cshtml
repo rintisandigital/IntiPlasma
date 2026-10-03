@@ -1,0 +1,10 @@
+@model ListViewModel<Application.Inventory.InventoryDocumentResponse>
+@{
+    ViewData["Title"] = "Stock Transfers";
+    ViewData["Menu"] = MenuCodes.InventoryStockTransfers;
+    ViewData["Subtitle"] = "Stock moved out of central warehouses (to coops: charged to the running cycle)";
+    ViewData["AddText"] = "New Transfer";
+    ViewData["ReferenceTitle"] = "From";
+
+}
+<partial name="_DocumentIndex" model="Model" />

@@ -1,0 +1,118 @@
+@model GoodsReceiptFormViewModel
+@{
+    ViewData["Title"] = "New Goods Receipt";
+    ViewData["Menu"] = MenuCodes.InventoryGoodsReceipts;
+    Application.Procurement.PurchaseOrderResponse? order = Model.Order;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel("New Goods Receipt", "Stock enters the warehouse at the order price; the receipt cannot be changed once posted")' />
+
+<div class="card">
+    <div class="card-body">
+        <form method="get" asp-action="Create" class="row g-2 align-items-end">
+            <div class="col-md-8">
+                <label class="form-label" for="po-select">Purchase order <span class="text-danger">*</span></label>
+                <select id="po-select" name="purchaseOrderId" class="form-select" data-lookup="@Url.Action("ReceivablePurchaseOrders", "Lookup", new { area = "" })"
+                        onchange="if (this.value) { this.form.submit(); }">
+                    <option value="">Search an approved purchase order…</option>
+                    @if (order is not null)
+                    {
+                        <option value="@order.Id" selected>@order.Number — @order.VendorName (@order.BranchCode)</option>
+                    }
+                </select>
+                <div class="form-text">Only approved or partially received orders can be received.</div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (order is not null)
+{
+    <form asp-action="Create" method="post">
+        <form-token />
+        <input type="hidden" asp-for="PurchaseOrderId" />
+        <div class="card">
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                <div class="row">
+                    <div class="col-md-5 mb-3">
+                        <label asp-for="WarehouseId" class="form-label"></label> <span class="text-danger">*</span>
+                        <select asp-for="WarehouseId" class="form-select">
+                            <option value="">—</option>
+                            @foreach (WarehouseOption warehouse in Model.Warehouses.OrderBy(w => w.Type).ThenBy(w => w.Label))
+                            {
+                                <option value="@warehouse.Id" selected="@(warehouse.Id == Model.WarehouseId)">@warehouse.Label</option>
+                            }
+                        </select>
+                        <div class="form-text">Receiving straight into a coop warehouse charges its running cycle.</div>
+                        <span asp-validation-for="WarehouseId" class="text-danger fs-13"></span>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label asp-for="ReceiptDate" class="form-label"></label> <span class="text-danger">*</span>
+                        <input asp-for="ReceiptDate" type="date" class="form-control">
+                        <span asp-validation-for="ReceiptDate" class="text-danger fs-13"></span>
+                    </div>
+                    <div class="col-md-5 mb-3">
+                        <label asp-for="DeliveryNoteNumber" class="form-label"></label>
+                        <input asp-for="DeliveryNoteNumber" class="form-control">
+                    </div>
+                    <div class="col-12 mb-3">
+                        <label asp-for="Notes" class="form-label"></label>
+                        <textarea asp-for="Notes" rows="2" class="form-control"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Items of @order.Number</h5></div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead class="thead-light">
+                            <tr><th>#</th><th>Item</th><th class="text-end">Ordered</th><th class="text-end">Received</th><th class="text-end">Outstanding</th><th style="width: 18%">Receive now</th></tr>
+                        </thead>
+                        <tbody>
+                            @{ int index = 0; }
+                            @foreach (Application.Procurement.PurchaseOrderLineResponse line in (order.Lines ?? []).Where(l => l.OutstandingQuantity > 0))
+                            {
+                                GoodsReceiptLineInput? input = Model.Lines.FirstOrDefault(l => l.PurchaseOrderLineNumber == line.LineNumber);
+                                <tr>
+                                    <td>@line.LineNumber</td>
+                                    <td>@line.ItemCode — @line.ItemName</td>
+                                    <td class="text-end text-nowrap">@Fmt.Number(line.Quantity, 3) @line.UomCode</td>
+                                    <td class="text-end text-nowrap">@Fmt.Number(line.QuantityReceived, 3)</td>
+                                    <td class="text-end text-nowrap">@Fmt.Number(line.OutstandingQuantity, 3)</td>
+                                    <td>
+                                        <input type="hidden" name="Lines[@index].PurchaseOrderLineNumber" value="@line.LineNumber">
+                                        <div class="input-group">
+                                            <input type="number" name="Lines[@index].Quantity" value="@input?.Quantity" step="0.001" min="0"
+                                                   max="@line.OutstandingQuantity.ToString(System.Globalization.CultureInfo.InvariantCulture)" class="form-control text-end">
+                                            <span class="input-group-text">@line.UomCode</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                index++;
+                            }
+                            @if (index == 0)
+                            {
+                                <tr><td colspan="6" class="text-center text-muted py-3">Nothing outstanding on this order.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-muted fs-13 px-3 py-2 mb-0">Leave a quantity empty or 0 for items not delivered in this shipment.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Attachments (delivery note, photos)</h5></div>
+            <div class="card-body"><partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, true)" /></div>
+        </div>
+
+        <partial name="Partials/_FormButtons" model='new FormButtonsModel(true, Url.Action("Index")!, "Post Receipt")' />
+    </form>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

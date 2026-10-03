@@ -399,7 +399,7 @@ Use case Application/Domain baru dikerjakan & diuji dulu (unit test seperti fase
 ### Fase W3 — Finance Setup ✅ (selesai 2026-10-03, realisasi §14)
 - COA bertingkat (tree, header vs postable, akun kontra, kategori arus kas), cost center, periode fiskal (buka/tutup + checklist), template jurnal, mapping jurnal otomatis, Master Kas/Bank. Ekspor COA.
 
-### Fase W4 — Pengadaan & Gudang
+### Fase W4 — Pengadaan & Gudang ✅ (selesai 2026-10-03, realisasi §15)
 - PO (approve/cancel/close, progres penerimaan, **PDF PO**), BPB (**PDF**), transfer stok, retur kandang → induk, mutasi pakan; saldo stok & kartu stok (ekspor Excel/PDF).
 
 ### Fase W5 — Produksi
@@ -745,3 +745,37 @@ Tidak ada perubahan Domain/Application/Web.Api dan **tidak ada migration baru** 
 - **Test: 300 lulus** — Domain 143, Application 60, Arsitektur 14, Integration Web.Api 18, Integration Web.App 65 (+18): 12 halaman finance terbuka, sidebar finance (menu belum rilis tersembunyi), COA seed + ekspor, cost center dibuat lalu dinonaktifkan, **master dinonaktifkan saat switch mati (regresi bug W2)**, buka tahun fiskal + checklist, lookup akun hanya akun postable.
 - **End-to-end W3 48/48** (Playwright, DB `intiplasma_verify` baru lalu di-drop): sidebar; tree COA; filter induk per tipe; akun header & anak via "+", akun kontra, kode duplikat ditolak, edit (nama/arus kas/nonaktif) + filter status; cost center create & nonaktif; buka tahun 2026, checklist English, tutup Januari → tombol di list (Close… Februari, Reopen Januari) → buka kembali; template (hanya debit ditolak, 3 baris, label akun & cost center saat edit, hapus baris); mapping (semua event ter-seed, edit default, override cabang dari default, komponen setengah terisi ditolak, komponen kosong tidak dipetakan, override ganda ditolak, ganti event memuat komponen); kas/bank (akun buku sendiri, saldo Rp 0,00, akun buku yang sama ditolak, edit + nonaktif); 7 ekspor; tanpa error JS.
 - **Regresi**: E2E W2 40/40, W0 49/49, header 15/15.
+
+---
+
+## 15. Realisasi Fase W4 — Pengadaan & Gudang (2026-10-03)
+
+Tidak ada perubahan Domain/Application/Web.Api dan **tidak ada migration baru** — layar memakai use case Fase 3.
+
+### 15.1 Layar
+| Halaman | Realisasi |
+|---|---|
+| **Purchase Orders** (`Areas/Procurement`) | List (filter cabang/status/cari), form (cabang, vendor via lookup, tanggal, baris dinamis: item sapronak via lookup → **satuan otomatis** (dasar + konversi), qty, harga, kode PPN; jumlah & subtotal dihitung di browser), detail (progres penerimaan per baris, subtotal + **PPN estimasi** dari kode PPN pada tanggal order, total), aksi **Approve / Close / Cancel (modal alasan)** via `[WorkflowAction]`, **Receive Goods** (ke form BPB), kelola lampiran (selain Cancelled), **PDF PO**. Edit hanya Draft. |
+| **Goods Receipts** | List (cabang, rentang tanggal, cari), form: pilih PO (lookup PO Approved/Partially received, atau dari tombol di PO) → baris outstanding terisi otomatis (kosong/0 = tidak diterima, `max` = outstanding), gudang penerima (gudang cabang PO; gudang kandang membebani siklus), no. surat jalan vendor, lampiran. Detail + **PDF BPB**. |
+| **Stock Transfers** | Dari gudang pusat → gudang lain di cabang yang sama (tujuan difilter di browser, bukan gudang asal); item via lookup **stok gudang asal** (label "on hand"), satuan otomatis. Ke kandang dibebankan ke siklus berjalan. Detail + PDF. |
+| **Stock Returns** | Gudang kandang → gudang pusat cabang yang sama, alasan wajib. Detail + PDF. |
+| **Feed Mutations** | Halaman = form (kandang → via gudang pusat → kandang lain), alasan wajib; hasilnya retur + transfer (tampil di Stock Returns & Stock Transfers). |
+| **Stock Balance & Card** | Saldo per gudang/item (cabang, gudang, kategori, cari, tampilkan saldo nol), tautan ke **kartu stok** (gudang + item + periode: saldo awal, mutasi dengan saldo berjalan, saldo akhir); ekspor saldo & kartu stok Excel/PDF. |
+
+- Hak menu: Purchase Orders **Create/Edit/Export** (Approve, Close, Cancel = Edit — tidak ada CanApprove, approval terpusat menyusul); dokumen gudang **Create/Export** (dokumen ter-posting tidak bisa diubah; lampiran hanya saat dibuat); Stock = View/Export.
+- PDF dokumen gudang memakai satu komponen `InventoryDocumentPdf` (BPB, transfer, retur). Terbilang tidak dipakai (W-17 hanya untuk invoice/receipt/PV/settlement).
+
+### 15.2 Komponen baru
+- Lookup: `/Lookup/Vendors`, `/Lookup/PurchasableItems` (DOC/pakan/OVK aktif), `/Lookup/ItemUnits?itemId=` (satuan dasar + konversi + kode pajak default), `/Lookup/StockItems?warehouseId=` (item bersaldo + qty on hand), `/Lookup/ReceivablePurchaseOrders`.
+- `lookup.js`: `data-lookup-depends="warehouseId:#FromWarehouseId"` (nilai field lain ikut di query; ganti sumber → pilihan dikosongkan).
+- `item-units.js`: `select.line-item` → isi `select.line-uom` (dan `select.line-tax` default) di baris yang sama.
+- `ItemOptions` & `InventoryOptions` (scoped): label item & satuan untuk form yang dirender ulang, daftar gudang per cabang.
+- ⚠️ **`validation-setup.js`** (dimuat `_ValidationScriptsPartial`): aturan `step` jquery-validation diganti — sebelumnya nilai dengan desimal lebih banyak dari step (mis. `20.000000` dari kolom numeric(18,6)) ditolak **tanpa pesan**, sehingga form edit PO tidak bisa disimpan. Berlaku untuk semua form.
+
+### 15.3 Pengujian & verifikasi
+- **Test: 313 lulus** — Domain 143, Application 60, Arsitektur 14, Integration Web.Api 18, Integration Web.App 78 (+13): 11 halaman W4 terbuka; alur PO (dibuat lewat halaman master) → approve → BPB sebagian → saldo stok → lookup stok → transfer → kartu stok → close PO → PDF PO & BPB → ekspor kartu stok; cancel PO (tanpa alasan ditolak).
+- **End-to-end W4 51/51** (Playwright; siklus kandang direncanakan lewat Web.Api karena layar produksi baru W5): setup master + buka tahun fiskal; PO (satuan mengikuti item, subtotal berjalan, edit draft, approve, Edit hilang, PDF); BPB dari tombol PO (outstanding terisi, gudang cabang PO, PDF), BPB kedua via lookup PO (over-receipt diblok), close PO; transfer ke kandang (tujuan difilter, lookup "on hand", dibebankan ke siklus, PDF), transfer melebihi stok ditolak; retur (tujuan gudang pusat, alasan wajib); mutasi pakan (target kandang lain); saldo & kartu stok + ekspor; cancel PO via modal; 5 ekspor list; **jurnal otomatis BPB/transfer/retur terposting tanpa dead letter**; tanpa error JS.
+- **Regresi**: E2E W3 48/48, W2 40/40, W0 49/49, header 15/15.
+
+### 15.4 Catatan
+- ⚠️ BPB/transfer/retur tetap bisa diposting walau **tahun fiskal belum dibuka**; jurnal otomatisnya lalu gagal (dead letter `FiscalPeriods.NotFoundForDate`) dan memblokir tutup periode. Buka tahun fiskal (W3) sebelum transaksi gudang. Layar dead letter/retry menyusul di W9.
