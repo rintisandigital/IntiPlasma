@@ -8,6 +8,8 @@ using Application.Coops.Get;
 using Application.Coops.GetById;
 using Application.Cycles;
 using Application.Cycles.Get;
+using Application.Customers;
+using Application.Customers.Get;
 using Application.Farmers;
 using Application.Finance.Accounts;
 using Application.Farmers.Get;
@@ -16,6 +18,7 @@ using Application.Inventory;
 using Application.Items.Get;
 using Application.Items.GetById;
 using Application.Procurement;
+using Application.Sales;
 using Application.Vendors;
 using Application.Vendors.Get;
 using Domain.Finance.Accounts;
@@ -24,6 +27,7 @@ using Domain.Partnership.Contracts;
 using Domain.Partnership.Cycles;
 using Domain.MasterData.Items;
 using Domain.Procurement.PurchaseOrders;
+using Domain.Sales.SalesOrders;
 using Microsoft.AspNetCore.Mvc;
 using SharedKernel;
 using Web.App.Infrastructure.Authorization;
@@ -266,6 +270,45 @@ public sealed class LookupController : AppController
             .OrderBy(c => c.CoopCode)
             .Take(MaxResults)
             .Select(c => new LookupItem(c.Id, CycleLabel(c))));
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Customers(
+        string? q,
+        [FromServices] IQueryHandler<GetCustomersQuery, PagedList<CustomerResponse>> query,
+        CancellationToken cancellationToken)
+    {
+        Result<PagedList<CustomerResponse>> result = await query.Handle(new GetCustomersQuery(new PageRequest(1, MaxResults, q)), cancellationToken);
+
+        return Json(result.IsFailure
+            ? []
+            : result.Value.Items.Where(c => c.IsActive).Select(c => new LookupItem(c.Id, $"{c.Code} — {c.Name}")));
+    }
+
+    /// <summary>
+    /// Approved or partially delivered sales orders (birds can still be delivered).
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> DeliverableSalesOrders(
+        string? q,
+        [FromServices] IQueryHandler<GetSalesOrdersQuery, PagedList<SalesOrderResponse>> query,
+        CancellationToken cancellationToken)
+    {
+        var orders = new List<SalesOrderResponse>();
+        foreach (SalesOrderStatus status in new[] { SalesOrderStatus.Approved, SalesOrderStatus.PartiallyDelivered })
+        {
+            Result<PagedList<SalesOrderResponse>> result = await query.Handle(
+                new GetSalesOrdersQuery(new PageRequest(1, MaxResults, q), null, null, status, null, null), cancellationToken);
+            if (result.IsSuccess)
+            {
+                orders.AddRange(result.Value.Items);
+            }
+        }
+
+        return Json(orders
+            .OrderByDescending(o => o.OrderDate)
+            .Take(MaxResults)
+            .Select(o => new LookupItem(o.Id, $"{o.Number} — {o.CustomerName} ({o.BranchCode}, {o.Birds - o.DeliveredBirds:#,##0} birds open)")));
     }
 
     public static string CycleLabel(CycleResponse cycle)

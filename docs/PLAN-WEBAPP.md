@@ -405,7 +405,7 @@ Use case Application/Domain baru dikerjakan & diuji dulu (unit test seperti fase
 ### Fase W5 — Produksi ✅ (selesai 2026-10-03, realisasi §16)
 - Siklus & chick-in (wizard), detail siklus (tab Recording, Harvest, Coop Stock, Performance, Cost, Attachments), **daily recording** (input admin + revisi + timeline, W-11), panen per truk, grafik performa, tutup siklus (+ PDF ringkasan).
 
-### Fase W6 — Penjualan & AR
+### Fase W6 — Penjualan & AR ✅ (selesai 2026-10-03, realisasi §17)
 - SO (approve, approve-over-limit dengan alasan + tampilan exposure), DO (**PDF delivery note**), Sales Invoice (Draft → post, **PDF invoice**), penerimaan customer (**PDF receipt**), uang muka, void, nota kredit (**PDF**), kartu piutang & aging (ekspor).
 
 ### Fase W7 — AP, Kas & Bank
@@ -801,3 +801,29 @@ Tidak ada perubahan Domain/Application/Web.Api dan **tidak ada migration baru** 
 - **Test: 318 lulus** — Domain 143, Application 60, Arsitektur 14, Integration Web.Api 18, Integration Web.App 83 (+5): halaman produksi terbuka; alur plan → coop hilang dari lookup → DOC (BPB langsung ke gudang kandang) + pakan (gudang pusat → transfer) → chick-in → recording + revisi (history, total mati terkoreksi) → panen (Harvesting) → close ditolak saat populasi tersisa → grafik performa & biaya berjalan → PDF ringkasan → ekspor; plan kedua → cancel dengan alasan.
 - **End-to-end W5 42/42**: setup + buka tahun fiskal; coop plasma tanpa kontrak ditolak, coop inti tanpa tawaran kontrak; plan (langkah 1, coop tak bisa direncanakan lagi); PO, BPB DOC ke kandang, pakan ke kandang ditolak → gudang pusat → transfer; langkah 2; chick-in terisi otomatis → Active 1.000 ekor; 3 recording harian (tanggal default berurutan, stok pakan berkurang), tanggal ganda ditolak; revisi (tanpa alasan ditolak, history, total & stok terkoreksi); 2 truk panen (rata-rata langsung, melebihi populasi ditolak); close ditolak (sisa pakan); **penjualan lewat Web.Api** (SO → 2 DO per panen → invoice diposting, layar W6 belum ada) + retur sisa pakan → **close berhasil**, biaya final, aksi hilang, 2 grafik ter-render, PDF ringkasan penutupan; cancel siklus terencana; 3 ekspor; outbox tanpa dead letter; tanpa error JS.
 - **Regresi**: E2E W4 51/51, W3 48/48, W2 40/40, W0 49/49, header 15/15.
+
+---
+
+## 17. Realisasi Fase W6 — Penjualan & AR (2026-10-03)
+
+Tidak ada migration baru. Satu tambahan Application: **`GetCustomerCreditQuery`** (limit, exposure, sisa kredit customer — memakai perhitungan yang sama dengan approval SO) untuk tampilan exposure.
+
+### 17.1 Layar (`Areas/Sales`)
+| Halaman | Realisasi |
+|---|---|
+| **Sales Orders** | List (cabang/status/tanggal/cari) + ekspor; form (cabang, customer & item ayam hidup via lookup, ekor, estimasi kg, harga/kg, kode PPN, total estimasi langsung); detail dengan **panel kredit customer** (limit, exposure order/invoice lain, tersedia, order ini). Approve dalam limit; bila ditolak (`CreditLimitExceeded`) pesan exposure tampil dan **Approve over limit** dengan alasan wajib (tercatat di order, badge "Over limit" di list). Close (sebagian terkirim), Cancel (modal alasan), New Delivery, lampiran. |
+| **Delivery Orders** | Pilih SO (lookup SO Approved/Partially delivered) → panen yang belum dikirim di cabang SO (centang + baris SO), kendaraan, sopir; detail + **PDF delivery note (surat jalan)**, Create Invoice, Cancel (sebelum ditagih). |
+| **Sales Invoices** | Pilih customer → DO terkirim yang belum ditagih (dicentang) → draft; detail (baris dengan PPN, subtotal/PPN/total/dibayar/kredit/outstanding), **Post** (nomor, piutang & HPP estimasi dijurnal), Cancel draft, **PDF invoice dengan terbilang**, Credit Note, Receive Payment. |
+| **Credit Notes** | Dari invoice terposting: pengurangan per baris (PPN ikut dikoreksi), langsung terposting; list + **PDF dengan terbilang**. |
+| **Customer Receipts** | Pilih customer → invoice terbuka (aging per hari ini) dengan alokasi per invoice (tombol "Full"), akun kas/bank, referensi, **uang muka**, total langsung; detail (alokasi, uang muka diterapkan/sisa), **Apply advance** ke invoice terbuka, **Void** (modal tanggal + alasan; disembunyikan bila uang muka sudah diterapkan — aturan domain), **PDF receipt dengan terbilang**. |
+| **Receivable Ledger & Aging** | Tab **Aging** (per tanggal, cabang, customer opsional; bucket current/1–30/31–60/61–90/>90 per customer & invoice) dan **Customer ledger** (saldo awal, invoice/receipt/void/uang muka/nota kredit dengan saldo berjalan, saldo akhir); ekspor Excel/PDF keduanya. |
+
+- Hak menu: SO/DO/Invoice/Receipt **Create/Edit/Export** (Edit = approve, approve over limit, close, cancel, post, apply advance, void), Credit Notes **Create/Export**, Receivables **Export**.
+- ⚠️ **Credit override**: di API memakai permission khusus `SalesCreditOverride`; di WebApp (tidak ada CanApprove) cukup hak **Edit** Sales Orders + alasan wajib. Bila perlu dibatasi lebih ketat, tunggu approval terpusat.
+- **Terbilang** (`Infrastructure/Formatting/Terbilang.cs`): Rupiah dalam bahasa Indonesia sampai triliun + sen (W-17), dipakai invoice, nota kredit, receipt.
+- Lookup baru: `/Lookup/Customers`, `/Lookup/DeliverableSalesOrders`; item ayam hidup memakai `/Lookup/Items?category=LiveBird`. Partial `_SalesFilter`, `_ReasonModal`.
+
+### 17.2 Pengujian & verifikasi
+- **Test: 346 lulus** — Domain 143, Application 60, Arsitektur 14, Integration Web.Api 18, Integration Web.App 111 (+28): 16 kasus terbilang; 11 halaman penjualan terbuka; alur panen → SO ditolak limit → approve over limit → DO → invoice draft → post (total 4 jt) → nota kredit (outstanding 3,9 jt) → receipt 3 jt + uang muka 0,5 jt (Partially paid) → apply advance (outstanding 0,4 jt) → ledger & aging → 4 PDF + ekspor aging → void ditolak untuk receipt dengan uang muka terpakai → receipt kedua (Paid) → void (outstanding kembali 0,4 jt).
+- **End-to-end W6 42/42**: setup + siklus dipanen (100 ekor / 200 kg); SO (total estimasi langsung), panel kredit, approve ditolak → approve over limit (alasan, badge); DO (tanpa centang ditolak, panen tampil, SO Delivered, PDF); invoice (DO terpilih otomatis, draft → post bernomor, PDF); nota kredit (outstanding 3,9 jt, PDF); receipt (alokasi otomatis, total langsung, uang muka, PDF), apply advance, void tersembunyi, receipt kedua "Full" → Paid → void → terbuka lagi; aging & ledger (Credit Note, Receipt Void, saldo akhir 400.000) + ekspor; cancel SO draft; **siklus ditutup setelah panennya terjual lewat UI**; 5 ekspor list; jurnal otomatis tanpa dead letter; tanpa error JS.
+- **Regresi**: E2E W5 42/42, W4 51/51, W3 48/48, W2 40/40, W0 49/49, header 15/15.

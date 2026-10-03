@@ -1,0 +1,79 @@
+@model SalesInvoiceFormViewModel
+@{
+    ViewData["Title"] = "New Sales Invoice";
+    ViewData["Menu"] = MenuCodes.SalesInvoices;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel("New Sales Invoice", "Bills delivered, not yet invoiced delivery orders of one customer; saved as a draft")' />
+
+<div class="card">
+    <div class="card-body">
+        <form method="get" asp-action="Create" class="row g-2 align-items-end">
+            <div class="col-md-8">
+                <label class="form-label" for="customer-select">Customer <span class="text-danger">*</span></label>
+                <select id="customer-select" name="customerId" class="form-select" data-lookup="@Url.Action("Customers", "Lookup", new { area = "" })"
+                        onchange="if (this.value) { this.form.submit(); }">
+                    <option value="">Search customer…</option>
+                    @if (Model.CustomerId is not null)
+                    {
+                        <option value="@Model.CustomerId" selected>@Model.CustomerLabel</option>
+                    }
+                </select>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (Model.CustomerId is not null)
+{
+    <form asp-action="Create" method="post">
+        <form-token />
+        <input type="hidden" asp-for="CustomerId" />
+        <input type="hidden" asp-for="CustomerLabel" />
+        <div class="card">
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="InvoiceDate" class="form-label"></label> <span class="text-danger">*</span>
+                        <input asp-for="InvoiceDate" type="date" class="form-control">
+                    </div>
+                    <div class="col-md-9 mb-3">
+                        <label asp-for="Notes" class="form-label"></label>
+                        <input asp-for="Notes" class="form-control">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Delivery orders to bill</h5></div>
+            <div class="card-body p-0">
+                <table class="table mb-0">
+                    <thead class="thead-light"><tr><th style="width: 3rem"></th><th>DO</th><th>Date</th><th>Sales order</th><th>Branch</th><th class="text-end">Birds</th><th class="text-end">kg</th><th class="text-end">Amount</th></tr></thead>
+                    <tbody>
+                        @foreach (Application.Sales.DeliveryOrderResponse delivery in Model.Deliveries)
+                        {
+                            <tr>
+                                <td><input class="form-check-input" type="checkbox" name="DeliveryOrderIds" value="@delivery.Id" checked="@Model.DeliveryOrderIds.Contains(delivery.Id)" aria-label="Bill"></td>
+                                <td class="fw-semibold">@delivery.Number</td>
+                                <td>@Fmt.Date(delivery.DeliveryDate)</td>
+                                <td>@delivery.SalesOrderNumber</td>
+                                <td>@delivery.BranchCode</td>
+                                <td class="text-end">@Fmt.Number(delivery.Birds)</td>
+                                <td class="text-end">@Fmt.Number(delivery.WeightKg, 2)</td>
+                                <td class="text-end text-nowrap">@Fmt.Money(delivery.Amount)</td>
+                            </tr>
+                        }
+                        @if (Model.Deliveries.Count == 0)
+                        {
+                            <tr><td colspan="8" class="text-center text-muted py-3">No delivered, uninvoiced delivery order for this customer.</td></tr>
+                        }
+                    </tbody>
+                </table>
+                <p class="text-muted fs-13 px-3 py-2 mb-0">All delivery orders of one invoice must belong to the same branch. VAT follows the VAT codes of the sales order lines.</p>
+            </div>
+        </div>
+
+        <partial name="Partials/_FormButtons" model='new FormButtonsModel(true, Url.Action("Index")!, "Create Draft")' />
+    </form>
+}

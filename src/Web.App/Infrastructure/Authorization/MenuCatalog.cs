@@ -38,6 +38,12 @@ public static class MenuCodes
     public const string ProductionCycles = "production.cycles";
     public const string ProductionRecordings = "production.recordings";
     public const string ProductionHarvests = "production.harvests";
+    public const string SalesOrders = "sales.orders";
+    public const string SalesDeliveries = "sales.deliveries";
+    public const string SalesInvoices = "sales.invoices";
+    public const string SalesCreditNotes = "sales.credit-notes";
+    public const string SalesReceipts = "sales.receipts";
+    public const string SalesReceivables = "sales.receivables";
 }
 
 /// <summary>
@@ -97,12 +103,12 @@ public static class MenuCatalog
         Page("production", "production.harvests", "Harvests", "/Production/Harvests", CreateEditExport, true);
 
         Group("sales", "Sales", "ti ti-receipt", 70);
-        Page("sales", "sales.orders", "Sales Orders", "/Sales/Orders", Crud, false);
-        Page("sales", "sales.deliveries", "Delivery Orders", "/Sales/Deliveries", CreateEditExport, false);
-        Page("sales", "sales.invoices", "Sales Invoices", "/Sales/Invoices", Crud, false);
-        Page("sales", "sales.credit-notes", "Credit Notes", "/Sales/CreditNotes", CreateEditExport, false);
-        Page("sales", "sales.receipts", "Customer Receipts", "/Sales/Receipts", CreateEditExport, false);
-        Page("sales", "sales.receivables", "Receivable Ledger & Aging", "/Sales/Receivables", MenuRights.Export, false);
+        Page("sales", "sales.orders", "Sales Orders", "/Sales/Orders", CreateEditExport, true);
+        Page("sales", "sales.deliveries", "Delivery Orders", "/Sales/Deliveries", CreateEditExport, true);
+        Page("sales", "sales.invoices", "Sales Invoices", "/Sales/Invoices", CreateEditExport, true);
+        Page("sales", "sales.credit-notes", "Credit Notes", "/Sales/CreditNotes", CreateExport, true);
+        Page("sales", "sales.receipts", "Customer Receipts", "/Sales/Receipts", CreateEditExport, true);
+        Page("sales", "sales.receivables", "Receivable Ledger & Aging", "/Sales/Receivables", MenuRights.Export, true);
 
         Group("finance", "Finance", "ti ti-building-bank", 80);
         Page("finance", "finance.accounts", "Chart of Accounts", "/Finance/Accounts", CreateEditExport, true);

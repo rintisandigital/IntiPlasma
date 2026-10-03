@@ -1,0 +1,26 @@
+@* Modal asking the reason of a cancel/void action; posts "reason" (and "date" when WithDate) to the action URL. *@
+@model ReasonModalModel
+<div class="modal fade" id="@Model.Id" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form action="@Model.Action" method="post" class="modal-content">
+            @Html.AntiForgeryToken()
+            <div class="modal-header">
+                <h5 class="modal-title">@Model.Title</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if (Model.WithDate)
+                {
+                    <label for="@Model.Id-date" class="form-label">Date <span class="text-danger">*</span></label>
+                    <input id="@Model.Id-date" name="date" type="date" value="@Fmt.Today().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" class="form-control mb-3" required>
+                }
+                <label for="@Model.Id-reason" class="form-label">Reason <span class="text-danger">*</span></label>
+                <textarea id="@Model.Id-reason" name="reason" rows="3" maxlength="500" class="form-control" required></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Back</button>
+                <button type="submit" class="btn btn-danger">@Model.SubmitText</button>
+            </div>
+        </form>
+    </div>
+</div>

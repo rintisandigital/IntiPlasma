@@ -1,0 +1,65 @@
+@model CreditNoteFormViewModel
+@{
+    Application.Sales.SalesInvoiceResponse invoice = Model.Invoice!;
+    ViewData["Title"] = $"Credit Note for {invoice.Number}";
+    ViewData["Menu"] = MenuCodes.SalesCreditNotes;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel($"Credit Note — Invoice {invoice.Number}", $"{invoice.CustomerName} · outstanding {Fmt.Money(invoice.Outstanding)}; VAT is corrected with each line")' />
+
+<form asp-action="Create" method="post">
+    <form-token />
+    <input type="hidden" asp-for="SalesInvoiceId" />
+    <div class="card">
+        <div class="card-body">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label asp-for="Date" class="form-label"></label> <span class="text-danger">*</span>
+                    <input asp-for="Date" type="date" class="form-control">
+                </div>
+                <div class="col-md-9 mb-3">
+                    <label asp-for="Reason" class="form-label"></label> <span class="text-danger">*</span>
+                    <input asp-for="Reason" class="form-control" placeholder="e.g. weight correction at the customer's scale">
+                    <span asp-validation-for="Reason" class="text-danger fs-13"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h5 class="card-title mb-0">Reduction per invoice line (excl. VAT)</h5></div>
+        <div class="card-body p-0">
+            <table class="table mb-0">
+                <thead class="thead-light"><tr><th>#</th><th>DO</th><th>Item</th><th class="text-end">kg</th><th class="text-end">Price/kg</th><th class="text-end">Amount</th><th>VAT</th><th style="width: 20%">Reduction</th></tr></thead>
+                <tbody>
+                    @{ int index = 0; }
+                    @foreach (Application.Sales.SalesInvoiceLineResponse line in invoice.Lines ?? [])
+                    {
+                        CreditLineInput? input = Model.Lines.FirstOrDefault(l => l.InvoiceLineNumber == line.LineNumber);
+                        <tr>
+                            <td>@line.LineNumber</td>
+                            <td>@line.DeliveryOrderNumber</td>
+                            <td>@line.ItemCode</td>
+                            <td class="text-end">@Fmt.Number(line.WeightKg, 2)</td>
+                            <td class="text-end">@Fmt.Money(line.PricePerKg)</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(line.Amount)</td>
+                            <td>@(line.TaxCode ?? "—")</td>
+                            <td>
+                                <input type="hidden" name="Lines[@index].InvoiceLineNumber" value="@line.LineNumber">
+                                <input type="number" name="Lines[@index].Amount" value="@input?.Amount?.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                                       min="0" step="0.01" max="@line.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture)" class="form-control text-end">
+                            </td>
+                        </tr>
+                        index++;
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <partial name="Partials/_FormButtons" model='new FormButtonsModel(true, Url.Action("Details", "SalesInvoices", new { id = invoice.Id })!, "Post Credit Note")' />
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

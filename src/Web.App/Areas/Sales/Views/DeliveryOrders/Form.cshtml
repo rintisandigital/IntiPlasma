@@ -1,0 +1,107 @@
+@model DeliveryOrderFormViewModel
+@{
+    ViewData["Title"] = "New Delivery Order";
+    ViewData["Menu"] = MenuCodes.SalesDeliveries;
+    Application.Sales.SalesOrderResponse? order = Model.Order;
+    IReadOnlyList<Application.Sales.SalesOrderLineResponse> openLines = order?.Lines?.Where(l => l.OutstandingBirds > 0).ToList() ?? [];
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel("New Delivery Order", "Choose the harvested trucks to deliver on the sales order; the amount is weighed kg × order price")' />
+
+<div class="card">
+    <div class="card-body">
+        <form method="get" asp-action="Create" class="row g-2 align-items-end">
+            <div class="col-md-8">
+                <label class="form-label" for="so-select">Sales order <span class="text-danger">*</span></label>
+                <select id="so-select" name="salesOrderId" class="form-select" data-lookup="@Url.Action("DeliverableSalesOrders", "Lookup", new { area = "" })"
+                        onchange="if (this.value) { this.form.submit(); }">
+                    <option value="">Search an approved sales order…</option>
+                    @if (order is not null)
+                    {
+                        <option value="@order.Id" selected>@order.Number — @order.CustomerName (@order.BranchCode)</option>
+                    }
+                </select>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (order is not null)
+{
+    <form asp-action="Create" method="post">
+        <form-token />
+        <input type="hidden" asp-for="SalesOrderId" />
+        <div class="card">
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="DeliveryDate" class="form-label"></label> <span class="text-danger">*</span>
+                        <input asp-for="DeliveryDate" type="date" class="form-control">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="VehicleNumber" class="form-label"></label>
+                        <input asp-for="VehicleNumber" class="form-control">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="DriverName" class="form-label"></label>
+                        <input asp-for="DriverName" class="form-control">
+                    </div>
+                    <div class="col-12 mb-3">
+                        <label asp-for="Notes" class="form-label"></label>
+                        <textarea asp-for="Notes" rows="2" class="form-control"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Undelivered harvests of branch @order.BranchCode</h5></div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead class="thead-light"><tr><th style="width: 3rem"></th><th>Harvest</th><th>Cycle / coop</th><th class="text-end">Birds</th><th class="text-end">kg</th><th class="text-end">Avg</th><th style="width: 30%">Sales order line</th></tr></thead>
+                        <tbody>
+                            @for (int i = 0; i < Model.Harvests.Count; i++)
+                            {
+                                Application.Sales.UndeliveredHarvestResponse harvest = Model.Harvests[i];
+                                DeliveryLineInput? input = Model.Lines.FirstOrDefault(l => l.HarvestId == harvest.HarvestId);
+                                <tr>
+                                    <td>
+                                        <input type="hidden" name="Lines[@i].HarvestId" value="@harvest.HarvestId">
+                                        <input class="form-check-input" type="checkbox" name="Lines[@i].Selected" value="true" checked="@(input?.Selected == true)" aria-label="Deliver">
+                                    </td>
+                                    <td>@Fmt.Date(harvest.Date) <span class="text-muted fs-12">day @harvest.AgeDays · @harvest.Notes</span></td>
+                                    <td>@harvest.CycleNumber · @harvest.CoopName <span class="text-muted fs-12">@harvest.FarmerName</span></td>
+                                    <td class="text-end">@Fmt.Number(harvest.Birds)</td>
+                                    <td class="text-end">@Fmt.Number(harvest.WeightKg, 2)</td>
+                                    <td class="text-end">@Fmt.Number(harvest.AverageWeightKg, 3)</td>
+                                    <td>
+                                        <select name="Lines[@i].SalesOrderLineNumber" class="form-select form-select-sm">
+                                            @foreach (Application.Sales.SalesOrderLineResponse line in openLines)
+                                            {
+                                                <option value="@line.LineNumber" selected="@(input?.SalesOrderLineNumber == line.LineNumber)">
+                                                    #@line.LineNumber @line.ItemCode · @Fmt.Number(line.OutstandingBirds) birds open · Rp @Fmt.Number(line.PricePerKg)/kg
+                                                </option>
+                                            }
+                                        </select>
+                                    </td>
+                                </tr>
+                            }
+                            @if (Model.Harvests.Count == 0)
+                            {
+                                <tr><td colspan="7" class="text-center text-muted py-3">No undelivered harvest in this branch.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Attachments</h5></div>
+            <div class="card-body"><partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, true)" /></div>
+        </div>
+
+        <partial name="Partials/_FormButtons" model='new FormButtonsModel(true, Url.Action("Details", "SalesOrders", new { id = order.Id })!, "Create Delivery")' />
+    </form>
+}

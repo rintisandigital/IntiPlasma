@@ -1,0 +1,44 @@
+@model ListViewModel<Application.Sales.DeliveryOrderResponse>
+@{
+    ViewData["Title"] = "Delivery Orders";
+    ViewData["Menu"] = MenuCodes.SalesDeliveries;
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Delivery Orders", "Harvested trucks delivered on approved sales orders (surat jalan)", MenuCodes.SalesDeliveries, "New Delivery")' />
+
+<div class="card">
+    <div class="card-header">
+        <partial name="_SalesFilter" model='new SalesFilterModel(Model.Search, "Search DO number", Model.BranchOptions, Model.Filters, Model.FilterOptions["status"])' />
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr><th>Number</th><th>Date</th><th>Sales order</th><th>Customer</th><th>Vehicle</th><th class="text-end">Birds</th><th class="text-end">kg</th><th class="text-end">Amount</th><th>Invoice</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Sales.DeliveryOrderResponse delivery in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@delivery.Number</td>
+                            <td>@Fmt.Date(delivery.DeliveryDate)</td>
+                            <td>@delivery.SalesOrderNumber</td>
+                            <td>@delivery.CustomerName</td>
+                            <td>@(delivery.VehicleNumber ?? "—")</td>
+                            <td class="text-end">@Fmt.Number(delivery.Birds)</td>
+                            <td class="text-end">@Fmt.Number(delivery.WeightKg, 2)</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(delivery.Amount)</td>
+                            <td>@(delivery.SalesInvoiceNumber ?? (delivery.SalesInvoiceId is null ? "—" : "draft"))</td>
+                            <td><partial name="Partials/_StatusBadge" model="delivery.Status" /></td>
+                            <td class="text-end"><a asp-action="Details" asp-route-id="@delivery.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="11" class="text-center text-muted py-4">No delivery orders found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="Partials/_Pagination" model="PaginationModel.From(Model.Rows)" />
+    </div>
+</div>

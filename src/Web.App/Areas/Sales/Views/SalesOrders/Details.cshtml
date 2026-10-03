@@ -1,0 +1,146 @@
+@model SalesOrderDetailsViewModel
+@{
+    Application.Sales.SalesOrderResponse order = Model.Order;
+    ViewData["Title"] = $"SO {order.Number}";
+    ViewData["Menu"] = MenuCodes.SalesOrders;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">SO @order.Number <partial name="Partials/_StatusBadge" model="order.Status" /></h4>
+            <h6>@order.CustomerName · @order.BranchCode</h6>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="Index" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+        @if (Model.CanEdit && Model.IsDraft)
+        {
+            <a asp-action="Edit" asp-route-id="@order.Id" class="btn btn-outline-primary"><i class="ti ti-edit me-1"></i>Edit</a>
+            <form asp-action="Approve" asp-route-id="@order.Id" method="post" data-confirm="Approve SO @order.Number?">
+                <button type="submit" class="btn btn-success"><i class="ti ti-check me-1"></i>Approve</button>
+            </form>
+        }
+        @if (Model.CanDeliver && Model.IsDeliverable)
+        {
+            <a asp-controller="DeliveryOrders" asp-action="Create" asp-route-salesOrderId="@order.Id" class="btn btn-primary"><i class="ti ti-truck-delivery me-1"></i>New Delivery</a>
+        }
+        @if (Model.CanEdit && Model.CanBeClosed)
+        {
+            <form asp-action="Close" asp-route-id="@order.Id" method="post" data-confirm="Close SO @order.Number? The remaining birds will no longer be expected.">
+                <button type="submit" class="btn btn-outline-secondary"><i class="ti ti-lock me-1"></i>Close</button>
+            </form>
+        }
+        @if (Model.CanEdit && Model.CanBeCancelled)
+        {
+            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancel-modal"><i class="ti ti-ban me-1"></i>Cancel SO</button>
+        }
+    </div>
+</div>
+
+@if (order.Status == "Cancelled" && order.CancellationReason is not null)
+{
+    <div class="alert alert-danger">Cancelled: @order.CancellationReason</div>
+}
+@if (order.CreditOverrideReason is not null)
+{
+    <div class="alert alert-warning">Approved above the credit limit: @order.CreditOverrideReason</div>
+}
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Order date</div><div class="fw-semibold">@Fmt.Date(order.OrderDate)</div></div>
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Delivery date</div><div class="fw-semibold">@(order.DeliveryDate is { } d ? Fmt.Date(d) : "—")</div></div>
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Approved at</div><div class="fw-semibold">@(order.ApprovedAtUtc is { } a ? Fmt.DateTime(a) : "—")</div></div>
+                    @if (!string.IsNullOrWhiteSpace(order.Notes))
+                    {
+                        <div class="col-12"><div class="text-muted fs-13">Notes</div><div style="white-space: pre-line">@order.Notes</div></div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        @if (Model.Credit is { } credit)
+        {
+            <div class="card @(Model.ExceedsCredit && Model.IsDraft ? "border-warning" : "")">
+                <div class="card-header"><h6 class="mb-0">Customer credit</h6></div>
+                <div class="card-body">
+                    <dl class="row mb-0 fs-13">
+                        <dt class="col-7 fw-normal">Credit limit</dt><dd class="col-5 text-end">@Fmt.Money(credit.CreditLimit)</dd>
+                        <dt class="col-7 fw-normal">Exposure (other orders &amp; invoices)</dt><dd class="col-5 text-end">@Fmt.Money(credit.Exposure)</dd>
+                        <dt class="col-7 fw-normal">Available</dt><dd class="col-5 text-end @(credit.Available < 0 ? "text-danger" : "")">@Fmt.Money(credit.Available)</dd>
+                        <dt class="col-7">This order (estimate)</dt><dd class="col-5 text-end fw-bold @(Model.ExceedsCredit ? "text-danger" : "")">@Fmt.Money(order.EstimatedAmount)</dd>
+                    </dl>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@if (Model.CanEdit && Model.IsDraft && (Model.CreditBlocked is not null || Model.ExceedsCredit))
+{
+    <div class="card border-warning">
+        <div class="card-body">
+            <div class="text-warning fw-semibold mb-2"><i class="ti ti-alert-triangle me-1"></i>@(Model.CreditBlocked ?? "This order exceeds the customer's available credit.")</div>
+            <form asp-action="ApproveOverLimit" asp-route-id="@order.Id" method="post" class="row g-2 align-items-end">
+                <div class="col-md-9">
+                    <label class="form-label" for="override-reason">Reason for approving above the credit limit <span class="text-danger">*</span></label>
+                    <input id="override-reason" name="reason" maxlength="500" class="form-control" required>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-warning w-100"><i class="ti ti-shield-check me-1"></i>Approve over limit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+<div class="card">
+    <div class="card-header"><h5 class="card-title mb-0">Lines</h5></div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead class="thead-light"><tr><th>#</th><th>Item</th><th class="text-end">Birds</th><th class="text-end">Est. kg</th><th class="text-end">Price/kg</th><th>VAT</th><th class="text-end">Estimated</th><th class="text-end">Delivered</th><th class="text-end">Open birds</th></tr></thead>
+                <tbody>
+                    @foreach (Application.Sales.SalesOrderLineResponse line in order.Lines ?? [])
+                    {
+                        <tr>
+                            <td>@line.LineNumber</td>
+                            <td>@line.ItemCode — @line.ItemName</td>
+                            <td class="text-end">@Fmt.Number(line.Birds)</td>
+                            <td class="text-end">@Fmt.Number(line.EstimatedWeightKg, 2)</td>
+                            <td class="text-end">@Fmt.Money(line.PricePerKg)</td>
+                            <td>@(line.TaxCode ?? "—")</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(line.EstimatedAmount)</td>
+                            <td class="text-end text-nowrap">@Fmt.Number(line.DeliveredBirds) / @Fmt.Number(line.DeliveredWeightKg, 2) kg</td>
+                            <td class="text-end">@Fmt.Number(line.OutstandingBirds)</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot><tr><th colspan="6" class="text-end">Estimated total (excl. VAT)</th><th class="text-end text-nowrap">@Fmt.Money(order.EstimatedAmount)</th><th colspan="2"></th></tr></tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h5 class="card-title mb-0">Attachments</h5></div>
+    <div class="card-body">
+        @if (Model.CanEdit && order.Status != "Cancelled")
+        {
+            <form asp-action="Documents" asp-route-id="@order.Id" method="post">
+                <partial name="Partials/_Attachments" model='new AttachmentsModel(Model.Attachments, true, "documents")' />
+                <button type="submit" class="btn btn-sm btn-primary mt-2"><i class="ti ti-device-floppy me-1"></i>Save attachments</button>
+            </form>
+        }
+        else
+        {
+            <partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, false)" />
+        }
+    </div>
+</div>
+
+<partial name="_ReasonModal" model='new ReasonModalModel("cancel-modal", $"Cancel SO {order.Number}", Url.Action("Cancel", new { id = order.Id })!, "Cancel SO")' />

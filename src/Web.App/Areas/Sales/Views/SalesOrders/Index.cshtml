@@ -1,0 +1,48 @@
+@model ListViewModel<Application.Sales.SalesOrderResponse>
+@{
+    ViewData["Title"] = "Sales Orders";
+    ViewData["Menu"] = MenuCodes.SalesOrders;
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Sales Orders", "Live bird orders; approval checks the customer credit limit", MenuCodes.SalesOrders, "New Sales Order")' />
+
+<div class="card">
+    <div class="card-header">
+        <partial name="_SalesFilter" model='new SalesFilterModel(Model.Search, "Search SO number", Model.BranchOptions, Model.Filters, Model.FilterOptions["status"])' />
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr><th>Number</th><th>Date</th><th>Branch</th><th>Customer</th><th class="text-end">Birds</th><th class="text-end">Delivered</th><th class="text-end">Estimated</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Sales.SalesOrderResponse order in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@order.Number</td>
+                            <td>@Fmt.Date(order.OrderDate)</td>
+                            <td>@order.BranchCode</td>
+                            <td>@order.CustomerName</td>
+                            <td class="text-end">@Fmt.Number(order.Birds)</td>
+                            <td class="text-end">@Fmt.Number(order.DeliveredBirds)</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(order.EstimatedAmount)</td>
+                            <td>
+                                <partial name="Partials/_StatusBadge" model="order.Status" />
+                                @if (order.CreditOverrideReason is not null)
+                                {
+                                    <span class="badge bg-warning text-dark" title="@order.CreditOverrideReason">Over limit</span>
+                                }
+                            </td>
+                            <td class="text-end"><a asp-action="Details" asp-route-id="@order.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="9" class="text-center text-muted py-4">No sales orders found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="Partials/_Pagination" model="PaginationModel.From(Model.Rows)" />
+    </div>
+</div>

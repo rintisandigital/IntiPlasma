@@ -1,7 +1,7 @@
 # Rangkuman Proyek — Aplikasi Peternakan Ayam Broiler Inti-Plasma
 
 > Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4), 2026-10-01 (Fase 5–8) dan 2026-10-02 (Fase 9 — lampiran dokumen; Fase W0 — fondasi WebApp).
-> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§16 (API) dan [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (WebApp, realisasi W0 di §10, W1 di §12, W2 di §13, W3 di §14, W4 di §15, W5 di §16). Fase API 0–9 dan W0–W5 selesai; berikutnya **Fase W6** (Penjualan & AR).
+> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§16 (API) dan [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (WebApp, realisasi W0 di §10, W1 di §12, W2 di §13, W3 di §14, W4 di §15, W5 di §16, W6 di §17). Fase API 0–9 dan W0–W6 selesai; berikutnya **Fase W7** (AP, Kas & Bank).
 
 ---
 
@@ -186,7 +186,12 @@
 ### Fase W5 — Produksi ✅ (detail: PLAN-WEBAPP §16)
 - **Cycles & Chick-in**: plan (coop + kontrak), halaman siklus bertahap (Planned → DOC in coop → Chick-in → Harvesting → Closed) dengan KPI dan tab Recordings, Harvests, Coop Stock, Performance (grafik), Cost, Attachments; chick-in, cancel, close, **PDF ringkasan siklus**.
 - **Daily Recordings** (input admin + revisi dengan timeline history, W-11) dan **Harvests** per truk (lampiran tiket timbangan); ekspor Excel/PDF. Tidak ada migration baru.
-- Tutup siklus mensyaratkan panen terjual (SO → DO → invoice terposting) — layar penjualan menyusul di W6.
+- Tutup siklus mensyaratkan panen terjual (SO → DO → invoice terposting) — kini lewat layar penjualan W6.
+
+### Fase W6 — Penjualan & AR ✅ (detail: PLAN-WEBAPP §17)
+- **Sales Orders** (panel kredit customer; approve dalam limit, di atas limit dengan alasan), **Delivery Orders** (panen per truk, **PDF surat jalan**), **Sales Invoices** (draft → post, **PDF dengan terbilang**), **Credit Notes** (PDF), **Customer Receipts** (alokasi ke invoice, uang muka, apply, void, **PDF receipt**), **Receivable Ledger & Aging** (ekspor).
+- Tambahan Application: `GetCustomerCreditQuery` (exposure kredit). Helper **terbilang** Rupiah (W-17). Tidak ada migration baru.
+- ⚠️ Credit override di WebApp memakai hak Edit Sales Orders + alasan wajib (API: permission `SalesCreditOverride`).
 
 ## 5. Alur Akuntansi yang Sudah Berjalan
 
@@ -246,11 +251,11 @@ Semua event di katalog kini sudah dipakai.
 
 - Setiap fase: domain + unit test invariant → command/query + validator → EF config + migration → endpoint + permission → **verifikasi end-to-end** ke PostgreSQL lokal pada database sementara `intiplasma_verify` (dibuat & dihapus otomatis; database `intiplasma` milik user tidak disentuh).
 - User yang melakukan **commit & migrate** setelah tiap fase.
-- Status test saat ini: **318 test lulus** (143 domain, 60 application, 14 arsitektur, 18 integration Web.Api, 83 integration Web.App).
+- Status test saat ini: **346 test lulus** (143 domain, 60 application, 14 arsitektur, 18 integration Web.Api, 111 integration Web.App).
 - Integration test (Testcontainers) **sudah bisa dijalankan** di mesin dev (container runtime tersedia) — `dotnet test IntiPlasma.slnx`.
 - Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario, Fase 7: 32 skenario, Fase 8: 35 skenario, Fase 9: 79 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
 - ⚠️ Sejak W0 Web.Api tidak memproses outbox: verifikasi yang hanya menjalankan API perlu `BackgroundJobs__Enabled=true`.
-- Verifikasi WebApp (W0: 49 skenario, W1: 36 skenario, W2: 40 skenario, W3: 48 skenario, W4: 51 skenario, W5: 42 skenario + regresi W0) memakai **Playwright** (dipasang di scratchpad, bukan di repo) terhadap Web.App :5098 + Web.Api :5099 pada `intiplasma_verify`; interaksi halaman lewat frame `content-frame`.
+- Verifikasi WebApp (W0: 49 skenario, W1: 36 skenario, W2: 40 skenario, W3: 48 skenario, W4: 51 skenario, W5: 42 skenario, W6: 42 skenario + regresi W0) memakai **Playwright** (dipasang di scratchpad, bukan di repo) terhadap Web.App :5098 + Web.Api :5099 pada `intiplasma_verify`; interaksi halaman lewat frame `content-frame`.
 - Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`, `Phase8_ReportingClosing`, `Phase9_Attachments`, `PhaseW0_UserStatus`, `PhaseW1_AccessControl`.
 
 ## 8. Catatan Terbuka / Hutang Teknis

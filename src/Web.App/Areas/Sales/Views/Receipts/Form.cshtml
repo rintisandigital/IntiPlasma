@@ -1,0 +1,132 @@
+@model ReceiptFormViewModel
+@{
+    ViewData["Title"] = "New Customer Receipt";
+    ViewData["Menu"] = MenuCodes.SalesReceipts;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel("New Customer Receipt", "Allocate the payment to open invoices; any amount not allocated can be kept as an advance (uang muka)")' />
+
+<div class="card">
+    <div class="card-body">
+        <form method="get" asp-action="Create" class="row g-2 align-items-end">
+            <div class="col-md-8">
+                <label class="form-label" for="customer-select">Customer <span class="text-danger">*</span></label>
+                <select id="customer-select" name="customerId" class="form-select" data-lookup="@Url.Action("Customers", "Lookup", new { area = "" })"
+                        onchange="if (this.value) { this.form.submit(); }">
+                    <option value="">Search customer…</option>
+                    @if (Model.CustomerId is not null)
+                    {
+                        <option value="@Model.CustomerId" selected>@Model.CustomerLabel</option>
+                    }
+                </select>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (Model.CustomerId is not null)
+{
+    <form asp-action="Create" method="post" id="receipt-form">
+        <form-token />
+        <input type="hidden" asp-for="CustomerId" />
+        <div class="card">
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label asp-for="CashBankAccountId" class="form-label"></label> <span class="text-danger">*</span>
+                        <select asp-for="CashBankAccountId" class="form-select" asp-items="Model.CashBankAccounts">
+                            <option value="">—</option>
+                        </select>
+                        <div class="form-text">The receipt belongs to the account's branch; invoices of that branch only.</div>
+                        <span asp-validation-for="CashBankAccountId" class="text-danger fs-13"></span>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label asp-for="ReceiptDate" class="form-label"></label> <span class="text-danger">*</span>
+                        <input asp-for="ReceiptDate" type="date" class="form-control">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="Reference" class="form-label"></label>
+                        <input asp-for="Reference" class="form-control">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="AdvanceAmount" class="form-label"></label>
+                        <input asp-for="AdvanceAmount" type="number" min="0" step="0.01" class="form-control text-end" id="advance">
+                    </div>
+                    <div class="col-12 mb-3">
+                        <label asp-for="Notes" class="form-label"></label>
+                        <input asp-for="Notes" class="form-control">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Open invoices</h5></div>
+            <div class="card-body p-0">
+                <table class="table mb-0">
+                    <thead class="thead-light"><tr><th>Invoice</th><th>Branch</th><th>Date</th><th>Due</th><th class="text-end">Days overdue</th><th class="text-end">Outstanding</th><th style="width: 20%">Pay now</th></tr></thead>
+                    <tbody>
+                        @for (int i = 0; i < Model.Invoices.Count; i++)
+                        {
+                            Application.Finance.Receivables.InvoiceAging invoice = Model.Invoices[i];
+                            AllocationInput? input = Model.Allocations.FirstOrDefault(a => a.SalesInvoiceId == invoice.SalesInvoiceId);
+                            <tr>
+                                <td class="fw-semibold">@invoice.Number</td>
+                                <td>@invoice.BranchCode</td>
+                                <td>@Fmt.Date(invoice.InvoiceDate)</td>
+                                <td>@Fmt.Date(invoice.DueDate)</td>
+                                <td class="text-end @(invoice.DaysOverdue > 0 ? "text-danger" : "")">@(invoice.DaysOverdue > 0 ? invoice.DaysOverdue.ToString(System.Globalization.CultureInfo.InvariantCulture) : "—")</td>
+                                <td class="text-end text-nowrap">@Fmt.Money(invoice.Outstanding)</td>
+                                <td>
+                                    <input type="hidden" name="Allocations[@i].SalesInvoiceId" value="@invoice.SalesInvoiceId">
+                                    <div class="input-group input-group-sm">
+                                        <input type="number" name="Allocations[@i].Amount" value="@input?.Amount?.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                                               min="0" step="0.01" max="@invoice.Outstanding.ToString(System.Globalization.CultureInfo.InvariantCulture)" class="form-control text-end allocation">
+                                        <button type="button" class="btn btn-light pay-full" data-amount="@invoice.Outstanding.ToString(System.Globalization.CultureInfo.InvariantCulture)" title="Pay the outstanding">Full</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        @if (Model.Invoices.Count == 0)
+                        {
+                            <tr><td colspan="7" class="text-center text-muted py-3">No open invoice — the receipt can be recorded as an advance.</td></tr>
+                        }
+                    </tbody>
+                    <tfoot><tr><th colspan="6" class="text-end">Total received (allocations + advance)</th><th class="text-end text-nowrap" id="receipt-total">—</th></tr></tfoot>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Attachments (transfer proof, giro)</h5></div>
+            <div class="card-body"><partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, true)" /></div>
+        </div>
+
+        <partial name="Partials/_FormButtons" model='new FormButtonsModel(true, Url.Action("Index")!, "Post Receipt")' />
+    </form>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            var form = document.getElementById('receipt-form');
+            if (!form) { return; }
+            var money = new Intl.NumberFormat('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            function recalc() {
+                var total = parseFloat(document.getElementById('advance').value) || 0;
+                form.querySelectorAll('.allocation').forEach(function (input) { total += parseFloat(input.value) || 0; });
+                document.getElementById('receipt-total').textContent = 'Rp ' + money.format(total);
+            }
+            form.addEventListener('input', recalc);
+            form.addEventListener('click', function (e) {
+                var button = e.target.closest('.pay-full');
+                if (button) {
+                    button.parentElement.querySelector('.allocation').value = button.dataset.amount;
+                    recalc();
+                }
+            });
+            recalc();
+        })();
+    </script>
+}

@@ -1,0 +1,41 @@
+@model ListViewModel<Application.Sales.SalesInvoiceResponse>
+@{
+    ViewData["Title"] = "Sales Invoices";
+    ViewData["Menu"] = MenuCodes.SalesInvoices;
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Sales Invoices", "Invoices from delivery orders; posting opens the receivable", MenuCodes.SalesInvoices, "New Invoice")' />
+
+<div class="card">
+    <div class="card-header">
+        <partial name="_SalesFilter" model='new SalesFilterModel(Model.Search, "Search invoice number", Model.BranchOptions, Model.Filters, Model.FilterOptions["status"])' />
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr><th>Number</th><th>Date</th><th>Due</th><th>Customer</th><th class="text-end">Total</th><th class="text-end">Outstanding</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Sales.SalesInvoiceResponse invoice in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@(invoice.Number ?? "(draft)")</td>
+                            <td>@Fmt.Date(invoice.InvoiceDate)</td>
+                            <td>@Fmt.Date(invoice.DueDate)</td>
+                            <td>@invoice.CustomerName</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(invoice.Total)</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(invoice.Outstanding)</td>
+                            <td><partial name="Partials/_StatusBadge" model="invoice.Status" /></td>
+                            <td class="text-end"><a asp-action="Details" asp-route-id="@invoice.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="8" class="text-center text-muted py-4">No invoices found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="Partials/_Pagination" model="PaginationModel.From(Model.Rows)" />
+    </div>
+</div>

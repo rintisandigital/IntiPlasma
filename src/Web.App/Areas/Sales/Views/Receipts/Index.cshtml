@@ -1,0 +1,42 @@
+@model ListViewModel<Application.Finance.Receivables.CustomerReceiptResponse>
+@{
+    ViewData["Title"] = "Customer Receipts";
+    ViewData["Menu"] = MenuCodes.SalesReceipts;
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Customer Receipts", "Payments received from customers, allocated to invoices or kept as advance", MenuCodes.SalesReceipts, "New Receipt")' />
+
+<div class="card">
+    <div class="card-header">
+        <partial name="_SalesFilter" model='new SalesFilterModel(Model.Search, "Search receipt number", Model.BranchOptions, Model.Filters, null)' />
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr><th>Number</th><th>Date</th><th>Customer</th><th>Cash/bank</th><th>Reference</th><th class="text-end">Amount</th><th class="text-end">Advance left</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Finance.Receivables.CustomerReceiptResponse receipt in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@receipt.Number</td>
+                            <td>@Fmt.Date(receipt.ReceiptDate)</td>
+                            <td>@receipt.CustomerName</td>
+                            <td>@(receipt.CashBankCode ?? receipt.CashAccountCode)</td>
+                            <td>@(receipt.Reference ?? "—")</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(receipt.Amount)</td>
+                            <td class="text-end text-nowrap">@(receipt.UnappliedAdvance > 0 ? Fmt.Money(receipt.UnappliedAdvance) : "—")</td>
+                            <td><partial name="Partials/_StatusBadge" model="receipt.Status" /></td>
+                            <td class="text-end"><a asp-action="Details" asp-route-id="@receipt.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="9" class="text-center text-muted py-4">No receipts found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="Partials/_Pagination" model="PaginationModel.From(Model.Rows)" />
+    </div>
+</div>

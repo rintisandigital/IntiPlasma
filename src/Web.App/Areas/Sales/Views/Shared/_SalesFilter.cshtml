@@ -1,0 +1,27 @@
+@model SalesFilterModel
+<form method="get" class="row g-2 align-items-end">
+    <div class="col-md-3">
+        <input type="search" name="search" value="@Model.Search" class="form-control" placeholder="@Model.Placeholder">
+    </div>
+    <div class="col-md-2">
+        <select name="branch" class="form-select" asp-items="Model.BranchOptions"></select>
+    </div>
+    @if (Model.StatusOptions is not null)
+    {
+        <div class="col-md-2">
+            <select name="status" class="form-select" asp-items="Model.StatusOptions">
+                <option value="">All statuses</option>
+            </select>
+        </div>
+    }
+    <div class="col-md-@(Model.StatusOptions is null ? "2" : "1")">
+        <input type="date" name="from" value="@Model.Filters.GetValueOrDefault("from")" class="form-control" title="From date">
+    </div>
+    <div class="col-md-@(Model.StatusOptions is null ? "2" : "1")">
+        <input type="date" name="to" value="@Model.Filters.GetValueOrDefault("to")" class="form-control" title="To date">
+    </div>
+    <div class="col-md-3 d-flex gap-2">
+        <button type="submit" class="btn btn-primary"><i class="ti ti-filter me-1"></i>Filter</button>
+        <a asp-action="Index" class="btn btn-light">Reset</a>
+    </div>
+</form>

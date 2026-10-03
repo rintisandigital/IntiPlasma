@@ -1,0 +1,174 @@
+@model ReceivablesViewModel
+@using System.Globalization
+@{
+    ViewData["Title"] = "Receivables";
+    ViewData["Menu"] = MenuCodes.SalesReceivables;
+    bool canExport = await Rights.CanAsync(MenuCodes.SalesReceivables, MenuRights.Export);
+    string Iso(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    bool isLedger = Model.Tab == "ledger";
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Receivable Ledger &amp; Aging</h4>
+            <h6>Kartu piutang per customer and umur piutang</h6>
+        </div>
+    </div>
+</div>
+
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link @(isLedger ? "" : "active")" asp-action="Index" asp-route-tab="aging" asp-route-branch="@Model.Branch">Aging</a></li>
+    <li class="nav-item"><a class="nav-link @(isLedger ? "active" : "")" asp-action="Index" asp-route-tab="ledger" asp-route-customerId="@Model.CustomerId" asp-route-branch="@Model.Branch">Customer ledger</a></li>
+</ul>
+
+<div class="card">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <input type="hidden" name="tab" value="@Model.Tab">
+            <div class="col-md-4">
+                <label class="form-label" for="customer-select">Customer @(isLedger ? "*" : "(optional)")</label>
+                <select id="customer-select" name="customerId" class="form-select" data-lookup="@Url.Action("Customers", "Lookup", new { area = "" })">
+                    <option value="">@(isLedger ? "Search customer…" : "All customers")</option>
+                    @if (Model.CustomerId is not null)
+                    {
+                        <option value="@Model.CustomerId" selected>@Model.CustomerLabel</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="branch">Branch</label>
+                <select id="branch" name="branch" class="form-select" asp-items="Model.BranchOptions"></select>
+            </div>
+            @if (isLedger)
+            {
+                <div class="col-md-2"><label class="form-label" for="from">From</label><input id="from" type="date" name="from" value="@Iso(Model.From)" class="form-control"></div>
+                <div class="col-md-2"><label class="form-label" for="to">To</label><input id="to" type="date" name="to" value="@Iso(Model.To)" class="form-control"></div>
+            }
+            else
+            {
+                <div class="col-md-2"><label class="form-label" for="asOf">As of</label><input id="asOf" type="date" name="asOf" value="@Iso(Model.AsOf)" class="form-control"></div>
+            }
+            <div class="col-md-2"><button type="submit" class="btn btn-primary w-100"><i class="ti ti-search me-1"></i>Show</button></div>
+        </form>
+    </div>
+</div>
+
+@if (isLedger)
+{
+    @if (Model.Ledger is { } ledger)
+    {
+        <div class="card">
+            <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div>
+                    <h5 class="card-title mb-0">@ledger.CustomerCode — @ledger.CustomerName</h5>
+                    <span class="text-muted fs-13">@Fmt.Date(ledger.From) – @Fmt.Date(ledger.To)</span>
+                </div>
+                @if (canExport)
+                {
+                    <div class="d-flex gap-2">
+                        <a asp-action="LedgerExport" asp-route-format="xlsx" asp-route-customerId="@ledger.CustomerId" asp-route-branch="@Model.Branch" asp-route-from="@Iso(ledger.From)" asp-route-to="@Iso(ledger.To)" target="_blank" class="btn btn-sm btn-outline-success">Excel</a>
+                        <a asp-action="LedgerExport" asp-route-format="pdf" asp-route-customerId="@ledger.CustomerId" asp-route-branch="@Model.Branch" asp-route-from="@Iso(ledger.From)" asp-route-to="@Iso(ledger.To)" target="_blank" class="btn btn-sm btn-outline-danger">PDF</a>
+                    </div>
+                }
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead class="thead-light"><tr><th>Date</th><th>Document</th><th>Number</th><th>Branch</th><th>Description</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th class="text-end">Balance</th></tr></thead>
+                        <tbody>
+                            <tr class="table-light fw-semibold"><td>@Fmt.Date(ledger.From)</td><td colspan="6">Opening balance</td><td class="text-end">@Fmt.Money(ledger.OpeningBalance)</td></tr>
+                            @foreach (Application.Finance.Receivables.ReceivableLedgerLine line in ledger.Lines)
+                            {
+                                <tr>
+                                    <td>@Fmt.Date(line.Date)</td>
+                                    <td>@EnumOptions.Label(line.DocumentType)</td>
+                                    <td>@line.Number</td>
+                                    <td>@line.BranchCode</td>
+                                    <td>@line.Description</td>
+                                    <td class="text-end">@(line.Debit == 0 ? "" : Fmt.Money(line.Debit))</td>
+                                    <td class="text-end">@(line.Credit == 0 ? "" : Fmt.Money(line.Credit))</td>
+                                    <td class="text-end">@Fmt.Money(line.Balance)</td>
+                                </tr>
+                            }
+                            <tr class="table-light fw-semibold">
+                                <td>@Fmt.Date(ledger.To)</td><td colspan="4">Closing balance</td>
+                                <td class="text-end">@Fmt.Money(ledger.TotalDebit)</td><td class="text-end">@Fmt.Money(ledger.TotalCredit)</td><td class="text-end">@Fmt.Money(ledger.ClosingBalance)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-light border">Choose a customer to show the ledger.</div>
+    }
+}
+else if (Model.Aging is { } aging)
+{
+    <div class="card">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <h5 class="card-title mb-0">Aging as of @Fmt.Date(aging.AsOf)</h5>
+            @if (canExport)
+            {
+                <div class="d-flex gap-2">
+                    <a asp-action="AgingExport" asp-route-format="xlsx" asp-route-customerId="@Model.CustomerId" asp-route-branch="@Model.Branch" asp-route-asOf="@Iso(aging.AsOf)" target="_blank" class="btn btn-sm btn-outline-success">Excel</a>
+                    <a asp-action="AgingExport" asp-route-format="pdf" asp-route-customerId="@Model.CustomerId" asp-route-branch="@Model.Branch" asp-route-asOf="@Iso(aging.AsOf)" target="_blank" class="btn btn-sm btn-outline-danger">PDF</a>
+                </div>
+            }
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="thead-light"><tr><th>Customer / invoice</th><th>Due</th><th class="text-end">Current</th><th class="text-end">1–30</th><th class="text-end">31–60</th><th class="text-end">61–90</th><th class="text-end">&gt; 90</th><th class="text-end">Total</th></tr></thead>
+                    <tbody>
+                        @foreach (Application.Finance.Receivables.CustomerAging customer in aging.Customers)
+                        {
+                            <tr class="fw-semibold table-light">
+                                <td colspan="2">
+                                    <a asp-action="Index" asp-route-tab="ledger" asp-route-customerId="@customer.CustomerId" asp-route-branch="@Model.Branch">@customer.CustomerCode — @customer.CustomerName</a>
+                                </td>
+                                <td class="text-end">@Fmt.Number(customer.Buckets.Current)</td>
+                                <td class="text-end">@Fmt.Number(customer.Buckets.Days1To30)</td>
+                                <td class="text-end">@Fmt.Number(customer.Buckets.Days31To60)</td>
+                                <td class="text-end">@Fmt.Number(customer.Buckets.Days61To90)</td>
+                                <td class="text-end">@Fmt.Number(customer.Buckets.Over90Days)</td>
+                                <td class="text-end">@Fmt.Number(customer.Buckets.Total)</td>
+                            </tr>
+                            @foreach (Application.Finance.Receivables.InvoiceAging invoice in customer.Invoices)
+                            {
+                                Application.Finance.Receivables.AgingBuckets buckets = Application.Finance.Receivables.AgingBuckets.For(invoice.DaysOverdue, invoice.Outstanding);
+                                <tr>
+                                    <td class="ps-4"><a asp-controller="SalesInvoices" asp-action="Details" asp-route-id="@invoice.SalesInvoiceId">@invoice.Number</a> <span class="text-muted fs-12">@invoice.BranchCode</span></td>
+                                    <td>@Fmt.Date(invoice.DueDate)</td>
+                                    <td class="text-end">@(buckets.Current == 0 ? "" : Fmt.Number(buckets.Current))</td>
+                                    <td class="text-end">@(buckets.Days1To30 == 0 ? "" : Fmt.Number(buckets.Days1To30))</td>
+                                    <td class="text-end">@(buckets.Days31To60 == 0 ? "" : Fmt.Number(buckets.Days31To60))</td>
+                                    <td class="text-end">@(buckets.Days61To90 == 0 ? "" : Fmt.Number(buckets.Days61To90))</td>
+                                    <td class="text-end">@(buckets.Over90Days == 0 ? "" : Fmt.Number(buckets.Over90Days))</td>
+                                    <td class="text-end">@Fmt.Number(invoice.Outstanding)</td>
+                                </tr>
+                            }
+                        }
+                        @if (aging.Customers.Count == 0)
+                        {
+                            <tr><td colspan="8" class="text-center text-muted py-3">No outstanding receivable.</td></tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr class="fw-bold">
+                            <td colspan="2">Total</td>
+                            <td class="text-end">@Fmt.Number(aging.Totals.Current)</td>
+                            <td class="text-end">@Fmt.Number(aging.Totals.Days1To30)</td>
+                            <td class="text-end">@Fmt.Number(aging.Totals.Days31To60)</td>
+                            <td class="text-end">@Fmt.Number(aging.Totals.Days61To90)</td>
+                            <td class="text-end">@Fmt.Number(aging.Totals.Over90Days)</td>
+                            <td class="text-end">@Fmt.Number(aging.Totals.Total)</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+}
