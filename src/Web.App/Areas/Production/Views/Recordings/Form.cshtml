@@ -1,0 +1,133 @@
+@model RecordingFormViewModel
+@{
+    Application.Cycles.CycleResponse? cycle = Model.Cycle;
+    string title = Model.IsRevision ? $"Revise Recording {Fmt.Date(Model.Date!.Value)}" : "New Daily Recording";
+    ViewData["Title"] = title;
+    ViewData["Menu"] = MenuCodes.ProductionRecordings;
+    string itemLookup = Url.Action("StockItems", "Lookup", new { area = "", warehouseId = Model.CoopWarehouseId })!;
+    string unitsUrl = Url.Action("ItemUnits", "Lookup", new { area = "" })!;
+    string cancelUrl = Model.IsRevision ? Url.Action("Details", new { id = Model.Id })! : Url.Action("Index", new { cycleId = Model.CycleId })!;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel(title, cycle is null ? null : $"{cycle.Number} · {cycle.CoopCode} {cycle.CoopName} · population {Fmt.Number(cycle.CurrentPopulation)}")' />
+
+<form asp-action="@(Model.IsRevision ? "Revise" : "Create")" method="post">
+    @if (Model.IsRevision)
+    {
+        <input type="hidden" asp-for="Id" />
+        <input type="hidden" asp-for="Date" />
+    }
+    else
+    {
+        <form-token />
+    }
+    <input type="hidden" asp-for="CycleId" />
+    <div class="card">
+        <div class="card-body">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label asp-for="Date" class="form-label"></label> <span class="text-danger">*</span>
+                    <input asp-for="Date" type="date" class="form-control" disabled="@Model.IsRevision">
+                    <span asp-validation-for="Date" class="text-danger fs-13"></span>
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label asp-for="Mortality" class="form-label"></label>
+                    <input asp-for="Mortality" type="number" min="0" step="1" class="form-control text-end">
+                    <span asp-validation-for="Mortality" class="text-danger fs-13"></span>
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label asp-for="Culling" class="form-label"></label>
+                    <input asp-for="Culling" type="number" min="0" step="1" class="form-control text-end">
+                    <span asp-validation-for="Culling" class="text-danger fs-13"></span>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label asp-for="AverageBodyWeightGram" class="form-label"></label>
+                    <input asp-for="AverageBodyWeightGram" type="number" min="1" step="0.01" class="form-control text-end">
+                    <span asp-validation-for="AverageBodyWeightGram" class="text-danger fs-13"></span>
+                </div>
+                @if (Model.IsRevision)
+                {
+                    <div class="col-12 mb-3">
+                        <label asp-for="Reason" class="form-label">Reason of the revision</label> <span class="text-danger">*</span>
+                        <input asp-for="Reason" class="form-control" maxlength="300">
+                        <span asp-validation-for="Reason" class="text-danger fs-13"></span>
+                        <div class="form-text">Revision @(Model.RevisionNumber + 1): the previous values are kept in the history; stock usage is corrected.</div>
+                    </div>
+                }
+                <div class="col-12 mb-3">
+                    <label asp-for="Notes" class="form-label"></label>
+                    <textarea asp-for="Notes" rows="2" class="form-control"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <h5 class="card-title mb-0">Feed &amp; OVK used (from the coop warehouse)</h5>
+            <button type="button" class="btn btn-sm btn-outline-primary" data-collection-add="Usages"><i class="ti ti-plus me-1"></i>Add item</button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table mb-0" data-collection="Usages">
+                    <thead class="thead-light"><tr><th style="width: 50%">Item</th><th style="width: 22%">Unit</th><th>Quantity</th><th></th></tr></thead>
+                    <tbody>
+                        <tr class="collection-empty"><td colspan="4" class="text-center text-muted py-3">No usage recorded.</td></tr>
+                        @for (int i = 0; i < Model.Usages.Count; i++)
+                        {
+                            StockLineInput line = Model.Usages[i];
+                            <tr class="collection-row">
+                                <td>
+                                    <select name="Usages[@i].ItemId" class="form-select line-item" data-lookup="@itemLookup" data-units-url="@unitsUrl" required>
+                                        @if (line.ItemId is not null)
+                                        {
+                                            <option value="@line.ItemId" selected>@(line.ItemLabel ?? line.ItemId.ToString())</option>
+                                        }
+                                        else
+                                        {
+                                            <option value="">Search item…</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="Usages[@i].UomId" class="form-select line-uom" required>
+                                        @foreach (SelectListItem unit in line.Units)
+                                        {
+                                            <option value="@unit.Value" selected="@(unit.Value == line.UomId?.ToString())">@unit.Text</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td><input type="number" name="Usages[@i].Quantity" value="@line.Quantity?.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture)" step="0.001" min="0.001" class="form-control text-end" required></td>
+                                <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h5 class="card-title mb-0">Attachments (photos)</h5></div>
+        <div class="card-body"><partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, true)" /></div>
+    </div>
+
+    <partial name="Partials/_FormButtons" model='new FormButtonsModel(true, cancelUrl, Model.IsRevision ? "Save Revision" : "Save Recording")' />
+</form>
+
+<template data-collection-template="Usages">
+    <tr class="collection-row">
+        <td>
+            <select name="Usages[__i__].ItemId" class="form-select line-item" data-lookup="@itemLookup" data-units-url="@unitsUrl" required>
+                <option value="">Search item…</option>
+            </select>
+        </td>
+        <td><select name="Usages[__i__].UomId" class="form-select line-uom" required></select></td>
+        <td><input type="number" name="Usages[__i__].Quantity" step="0.001" min="0.001" class="form-control text-end" required></td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+    </tr>
+</template>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

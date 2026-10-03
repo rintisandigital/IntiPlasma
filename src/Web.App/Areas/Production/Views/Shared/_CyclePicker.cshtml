@@ -1,0 +1,27 @@
+@* Chooses the cycle of the recordings/harvests page (active or harvesting cycles); reloads the page with ?cycleId=. *@
+@model CycleWorkspaceViewModel
+<div class="card">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-8">
+                <label class="form-label" for="cycle-picker">Cycle</label>
+                <select id="cycle-picker" name="cycleId" class="form-select" data-lookup="@Url.Action("RecordableCycles", "Lookup", new { area = "" })"
+                        onchange="if (this.value) { this.form.submit(); }">
+                    <option value="">Search an active cycle (number, coop)…</option>
+                    @if (Model.Cycle is not null)
+                    {
+                        <option value="@Model.Cycle.Id" selected>@Model.CycleLabel</option>
+                    }
+                </select>
+            </div>
+            @if (Model.Cycle is not null)
+            {
+                <div class="col-md-4 d-flex gap-2 align-items-center">
+                    <partial name="Partials/_StatusBadge" model="Model.Cycle.Status" />
+                    <span class="text-muted fs-13">Population @Fmt.Number(Model.Cycle.CurrentPopulation)</span>
+                    <a asp-controller="Cycles" asp-action="Details" asp-route-id="@Model.Cycle.Id" class="btn btn-sm btn-light ms-auto">Open cycle</a>
+                </div>
+            }
+        </form>
+    </div>
+</div>

@@ -1,6 +1,13 @@
 using System.Globalization;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Paging;
+using Application.Contracts;
+using Application.Contracts.Get;
+using Application.Coops;
+using Application.Coops.Get;
+using Application.Coops.GetById;
+using Application.Cycles;
+using Application.Cycles.Get;
 using Application.Farmers;
 using Application.Finance.Accounts;
 using Application.Farmers.Get;
@@ -13,6 +20,8 @@ using Application.Vendors;
 using Application.Vendors.Get;
 using Domain.Finance.Accounts;
 using Domain.MasterData.Farmers;
+using Domain.Partnership.Contracts;
+using Domain.Partnership.Cycles;
 using Domain.MasterData.Items;
 using Domain.Procurement.PurchaseOrders;
 using Microsoft.AspNetCore.Mvc;
@@ -187,6 +196,85 @@ public sealed class LookupController : AppController
             .Take(MaxResults)
             .Select(o => new LookupItem(o.Id, $"{o.Number} — {o.VendorName} ({o.BranchCode}, {o.OrderDate:dd/MM/yyyy})")));
     }
+
+    /// <summary>
+    /// Active coops without an open cycle — the coops a new cycle can be planned in.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> PlannableCoops(
+        string? q,
+        [FromServices] IQueryHandler<GetCoopsQuery, PagedList<CoopResponse>> query,
+        CancellationToken cancellationToken)
+    {
+        Result<PagedList<CoopResponse>> result = await query.Handle(
+            new GetCoopsQuery(new PageRequest(1, PageRequest.MaxPageSize, q), null, null), cancellationToken);
+
+        return Json(result.IsFailure
+            ? []
+            : result.Value.Items
+                .Where(c => c.IsActive && c.OpenCycleId is null)
+                .Take(MaxResults)
+                .Select(c => new LookupItem(c.Id, $"{c.Code} — {c.Name} · {c.FarmerName} ({c.FarmerType}, {c.BranchCode}, cap. {c.Capacity:#,##0})")));
+    }
+
+    /// <summary>
+    /// Active contracts of the coop's branch; none for an inti coop (inti cycles have no contract).
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> CoopContracts(
+        string? q,
+        Guid? coopId,
+        [FromServices] IQueryHandler<GetCoopByIdQuery, CoopResponse> coopQuery,
+        [FromServices] IQueryHandler<GetContractsQuery, PagedList<ContractResponse>> contractsQuery,
+        CancellationToken cancellationToken)
+    {
+        if (coopId is not Guid id || await coopQuery.Handle(new GetCoopByIdQuery(id), cancellationToken) is not { IsSuccess: true } coop ||
+            coop.Value.FarmerType == nameof(FarmerType.Inti))
+        {
+            return Json(Array.Empty<LookupItem>());
+        }
+
+        Result<PagedList<ContractResponse>> result = await contractsQuery.Handle(
+            new GetContractsQuery(new PageRequest(1, MaxResults, q), coop.Value.BranchId, ContractStatus.Active), cancellationToken);
+
+        return Json(result.IsFailure
+            ? []
+            : result.Value.Items.Select(c => new LookupItem(c.Id, $"{c.Code} — {c.Name} ({EnumLabel(c.Scheme)})")));
+    }
+
+    /// <summary>
+    /// Cycles that accept daily recordings and harvests (active or harvesting).
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> RecordableCycles(
+        string? q,
+        [FromServices] IQueryHandler<GetCyclesQuery, PagedList<CycleResponse>> query,
+        CancellationToken cancellationToken)
+    {
+        var cycles = new List<CycleResponse>();
+        foreach (CycleStatus status in new[] { CycleStatus.Active, CycleStatus.Harvesting })
+        {
+            Result<PagedList<CycleResponse>> result = await query.Handle(
+                new GetCyclesQuery(new PageRequest(1, MaxResults, q), null, null, null, status), cancellationToken);
+            if (result.IsSuccess)
+            {
+                cycles.AddRange(result.Value.Items);
+            }
+        }
+
+        return Json(cycles
+            .OrderBy(c => c.CoopCode)
+            .Take(MaxResults)
+            .Select(c => new LookupItem(c.Id, CycleLabel(c))));
+    }
+
+    public static string CycleLabel(CycleResponse cycle)
+    {
+        ArgumentNullException.ThrowIfNull(cycle);
+        return $"{cycle.Number} — {cycle.CoopCode} {cycle.CoopName} · {cycle.FarmerName} ({cycle.BranchCode})";
+    }
+
+    private static string EnumLabel(string value) => System.Text.RegularExpressions.Regex.Replace(value, "(?<=[a-z])(?=[A-Z])", " ");
 
     public sealed record LookupItem(Guid Value, string Text);
 

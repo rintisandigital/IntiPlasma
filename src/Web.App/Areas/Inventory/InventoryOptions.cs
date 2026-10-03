@@ -24,6 +24,12 @@ public sealed class InventoryOptions(
             .Where(w => w.IsActive && (branchId is null || w.BranchId == branchId))
             .Select(w => new WarehouseOption(w.Id, Label(w), w.BranchId, w.Type))];
 
+    /// <summary>
+    /// The coop's own warehouse (GK-{coop code}), created with the coop.
+    /// </summary>
+    public async Task<Guid?> CoopWarehouseIdAsync(Guid coopId, CancellationToken cancellationToken) =>
+        (await AllAsync(cancellationToken)).FirstOrDefault(w => w.CoopId == coopId)?.Id;
+
     public async Task<string?> LabelAsync(Guid? warehouseId, CancellationToken cancellationToken) =>
         (await AllAsync(cancellationToken)).FirstOrDefault(w => w.Id == warehouseId) is { } warehouse ? Label(warehouse) : null;
 

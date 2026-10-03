@@ -1,0 +1,137 @@
+@model CycleWorkspaceViewModel
+@{
+    ViewData["Title"] = "Harvests";
+    ViewData["Menu"] = MenuCodes.ProductionHarvests;
+    Application.Cycles.CycleResponse? cycle = Model.Cycle;
+    bool recordable = cycle is { Status: "Active" or "Harvesting" };
+    bool canExport = await Rights.CanAsync(MenuCodes.ProductionHarvests, MenuRights.Export);
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Harvests</h4>
+            <h6>Birds caught and weighed per truck; the first harvest moves the cycle to Harvesting</h6>
+        </div>
+    </div>
+    @if (cycle is not null && canExport)
+    {
+        <div class="d-flex flex-wrap gap-2">
+            <a asp-action="Export" asp-route-format="xlsx" asp-route-cycleId="@cycle.Id" target="_blank" class="btn btn-outline-success"><i class="ti ti-file-spreadsheet me-1"></i>Excel</a>
+            <a asp-action="Export" asp-route-format="pdf" asp-route-cycleId="@cycle.Id" target="_blank" class="btn btn-outline-danger"><i class="ti ti-file-type-pdf me-1"></i>PDF</a>
+        </div>
+    }
+</div>
+
+<partial name="_CyclePicker" model="Model" />
+
+@if (cycle is not null)
+{
+    @if (recordable && Model.CanCreate)
+    {
+        <form asp-action="Create" method="post">
+            <form-token />
+            <input type="hidden" asp-for="Harvest.CycleId" value="@cycle.Id" />
+            <div class="card">
+                <div class="card-header"><h5 class="card-title mb-0">Record a truck</h5></div>
+                <div class="card-body">
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                    <div class="row">
+                        <div class="col-md-2 mb-3">
+                            <label asp-for="Harvest.Date" class="form-label"></label> <span class="text-danger">*</span>
+                            <input asp-for="Harvest.Date" type="date" class="form-control">
+                            <span asp-validation-for="Harvest.Date" class="text-danger fs-13"></span>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label asp-for="Harvest.Birds" class="form-label"></label> <span class="text-danger">*</span>
+                            <input asp-for="Harvest.Birds" type="number" min="1" step="1" class="form-control text-end" id="harvest-birds">
+                            <span asp-validation-for="Harvest.Birds" class="text-danger fs-13"></span>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label asp-for="Harvest.WeightKg" class="form-label"></label> <span class="text-danger">*</span>
+                            <input asp-for="Harvest.WeightKg" type="number" min="0.001" step="0.001" class="form-control text-end" id="harvest-weight">
+                            <span asp-validation-for="Harvest.WeightKg" class="text-danger fs-13"></span>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Average (kg/bird)</label>
+                            <input class="form-control text-end" id="harvest-average" disabled>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="Harvest.Notes" class="form-label"></label>
+                            <input asp-for="Harvest.Notes" class="form-control" placeholder="Truck plate, driver, buyer…">
+                        </div>
+                        <div class="col-12">
+                            <partial name="Partials/_Attachments" model='new AttachmentsModel([], true, "Harvest.Documents")' />
+                        </div>
+                    </div>
+                    <div class="text-muted fs-13 mt-2">Population now: @Fmt.Number(cycle.CurrentPopulation) birds.</div>
+                </div>
+            </div>
+            <partial name="Partials/_FormButtons" model='new FormButtonsModel(true, Url.Action("Details", "Cycles", new { id = cycle.Id })!, "Record Harvest")' />
+        </form>
+    }
+
+    <div class="card">
+        <div class="card-header"><h5 class="card-title mb-0">Harvests of @cycle.Number</h5></div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table mb-0">
+                    <thead class="thead-light"><tr><th>Date</th><th class="text-end">Age</th><th class="text-end">Birds</th><th class="text-end">Weight (kg)</th><th class="text-end">Average (kg)</th><th>Truck / notes</th><th>Attachments</th></tr></thead>
+                    <tbody>
+                        @foreach (Application.Production.HarvestResponse harvest in Model.Harvests)
+                        {
+                            <tr>
+                                <td>@Fmt.Date(harvest.Date)</td>
+                                <td class="text-end">@harvest.AgeDays</td>
+                                <td class="text-end">@Fmt.Number(harvest.Birds)</td>
+                                <td class="text-end">@Fmt.Number(harvest.WeightKg, 2)</td>
+                                <td class="text-end">@Fmt.Number(harvest.AverageWeightKg, 3)</td>
+                                <td>@harvest.Notes</td>
+                                <td>
+                                    @harvest.Documents.Length
+                                    @if (Model.CanEdit)
+                                    {
+                                        <button type="button" class="btn btn-sm btn-light ms-1" data-bs-toggle="collapse" data-bs-target="#harvest-docs-@harvest.Id" title="Manage attachments"><i class="ti ti-paperclip"></i></button>
+                                    }
+                                </td>
+                            </tr>
+                            @if (Model.CanEdit)
+                            {
+                                <tr class="collapse" id="harvest-docs-@harvest.Id">
+                                    <td colspan="7">
+                                        <form asp-action="Documents" asp-route-id="@harvest.Id" asp-route-cycleId="@cycle.Id" method="post">
+                                            <partial name="Partials/_Attachments" model='new AttachmentsModel(Model.AttachmentsOf(harvest.Documents), true, "documents")' />
+                                            <button type="submit" class="btn btn-sm btn-primary mt-2">Save attachments</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        @if (Model.Harvests.Count == 0)
+                        {
+                            <tr><td colspan="7" class="text-center text-muted py-4">No harvest yet.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            var birds = document.getElementById('harvest-birds');
+            var weight = document.getElementById('harvest-weight');
+            var average = document.getElementById('harvest-average');
+            if (!birds) { return; }
+            function recalc() {
+                var b = parseFloat(birds.value), w = parseFloat(weight.value);
+                average.value = b > 0 && w > 0 ? (w / b).toFixed(3) : '';
+            }
+            birds.addEventListener('input', recalc);
+            weight.addEventListener('input', recalc);
+            recalc();
+        })();
+    </script>
+}

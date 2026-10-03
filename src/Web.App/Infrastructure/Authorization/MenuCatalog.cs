@@ -35,6 +35,9 @@ public static class MenuCodes
     public const string InventoryStockReturns = "inventory.stock-returns";
     public const string InventoryFeedMutations = "inventory.feed-mutations";
     public const string InventoryStock = "inventory.stock";
+    public const string ProductionCycles = "production.cycles";
+    public const string ProductionRecordings = "production.recordings";
+    public const string ProductionHarvests = "production.harvests";
 }
 
 /// <summary>
@@ -89,9 +92,9 @@ public static class MenuCatalog
         Page("inventory", "inventory.stock", "Stock Balance & Card", "/Inventory/Stock", MenuRights.Export, true);
 
         Group("production", "Production", "ti ti-egg", 60);
-        Page("production", "production.cycles", "Cycles & Chick-in", "/Production/Cycles", CreateEditExport, false);
-        Page("production", "production.recordings", "Daily Recordings", "/Production/Recordings", CreateEditExport, false);
-        Page("production", "production.harvests", "Harvests", "/Production/Harvests", CreateEditExport, false);
+        Page("production", "production.cycles", "Cycles & Chick-in", "/Production/Cycles", CreateEditExport, true);
+        Page("production", "production.recordings", "Daily Recordings", "/Production/Recordings", CreateEditExport, true);
+        Page("production", "production.harvests", "Harvests", "/Production/Harvests", CreateEditExport, true);
 
         Group("sales", "Sales", "ti ti-receipt", 70);
         Page("sales", "sales.orders", "Sales Orders", "/Sales/Orders", Crud, false);

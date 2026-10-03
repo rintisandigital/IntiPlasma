@@ -1,0 +1,398 @@
+@model CycleDetailsViewModel
+@using System.Globalization
+@using System.Text.Json
+@{
+    Application.Cycles.CycleResponse cycle = Model.Cycle;
+    ViewData["Title"] = $"Cycle {cycle.Number}";
+    ViewData["Menu"] = MenuCodes.ProductionCycles;
+    Domain.Partnership.Cycles.CyclePerformance? figures = Model.Performance?.Closing ?? Model.Performance?.Current;
+    string[] steps = ["Planned", "DOC in coop", "Chick-in", "Harvesting", "Closed"];
+    string Active(string tab) => Model.Tab == tab ? "active" : "";
+    string Show(string tab) => Model.Tab == tab ? "show active" : "";
+    IReadOnlyList<Application.Production.HarvestResponse> harvests = Model.Performance?.Harvests ?? [];
+    IReadOnlyList<Application.Production.DailyPerformance> days = Model.Performance?.Days ?? [];
+    string Num(decimal? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "null";
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Cycle @cycle.Number <partial name="Partials/_StatusBadge" model="cycle.Status" /></h4>
+            <h6>@cycle.CoopCode — @cycle.CoopName · @cycle.FarmerName (@cycle.FarmerType) · @cycle.BranchCode</h6>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="Index" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+        @if (Model.CanPrint)
+        {
+            <a asp-action="Print" asp-route-id="@cycle.Id" target="_blank" class="btn btn-outline-danger"><i class="ti ti-file-type-pdf me-1"></i>Summary PDF</a>
+        }
+        @if (Model.IsPlanned && Model.CanTransfer)
+        {
+            <a asp-area="Inventory" asp-controller="StockTransfers" asp-action="Create" class="btn btn-outline-primary"><i class="ti ti-truck me-1"></i>Transfer DOC</a>
+        }
+        @if (Model.IsPlanned && Model.CanEdit)
+        {
+            <a asp-action="ChickIn" asp-route-id="@cycle.Id" class="btn btn-primary"><i class="ti ti-feather me-1"></i>Chick-in</a>
+            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancel-modal"><i class="ti ti-ban me-1"></i>Cancel</button>
+        }
+        @if (Model.IsRecordable && Model.CanRecord)
+        {
+            <a asp-controller="Recordings" asp-action="Create" asp-route-cycleId="@cycle.Id" class="btn btn-primary"><i class="ti ti-clipboard-plus me-1"></i>Daily Recording</a>
+        }
+        @if (Model.IsRecordable && Model.CanHarvest)
+        {
+            <a asp-controller="Harvests" asp-action="Index" asp-route-cycleId="@cycle.Id" class="btn btn-outline-primary"><i class="ti ti-truck-delivery me-1"></i>Harvest</a>
+        }
+        @if (Model.IsRecordable && Model.CanEdit)
+        {
+            <form asp-action="Close" asp-route-id="@cycle.Id" method="post"
+                  data-confirm="Close cycle @cycle.Number? All birds must be harvested and sold, and the coop warehouse empty.">
+                <button type="submit" class="btn btn-outline-secondary"><i class="ti ti-lock me-1"></i>Close Cycle</button>
+            </form>
+        }
+    </div>
+</div>
+
+@if (cycle.Status == "Cancelled")
+{
+    <div class="alert alert-danger">Cancelled: @cycle.CancellationReason</div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body py-3">
+            <div class="d-flex flex-wrap justify-content-between gap-2">
+                @for (int i = 0; i < steps.Length; i++)
+                {
+                    int number = i + 1;
+                    bool done = number < Model.Step || Model.Step == 5;
+                    bool current = number == Model.Step && Model.Step != 5;
+                    string badge = "bg-light text-dark";
+                    if (done)
+                    {
+                        badge = "bg-success";
+                    }
+                    else if (current)
+                    {
+                        badge = "bg-primary";
+                    }
+                    <div class="d-flex align-items-center gap-2 flex-fill cycle-step @(current ? "fw-semibold" : "")">
+                        <span class="badge rounded-pill @badge">@(done ? "✓" : number.ToString(CultureInfo.InvariantCulture))</span>
+                        <span>@steps[i]</span>
+                    </div>
+                }
+            </div>
+            @if (Model.Step == 1)
+            {
+                <div class="text-muted fs-13 mt-2">Next: transfer DOC from a central warehouse to the coop warehouse, then record the chick-in.</div>
+            }
+            else if (Model.Step == 2)
+            {
+                <div class="text-muted fs-13 mt-2">@Fmt.Number(Model.DocInCoop, 0) DOC in the coop warehouse — record the chick-in.</div>
+            }
+        </div>
+    </div>
+}
+
+@if (figures is not null && cycle.InitialPopulation is not null)
+{
+    <div class="row g-3 mb-3">
+        @foreach ((string label, string value) in new[]
+        {
+            ("Population", Fmt.Number(figures.Population)),
+            ("Depletion", $"{Fmt.Number(figures.DepletionPercent, 2)} %"),
+            ("Age", figures.AgeDays is { } age ? $"{Fmt.Number(age, 0)} days" : "—"),
+            ("Body weight", figures.AverageWeightKg is { } bw ? $"{Fmt.Number(bw, 3)} kg" : "—"),
+            ("Feed used", $"{Fmt.Number(figures.FeedKg, 0)} kg"),
+            ("FCR", figures.Fcr is { } fcr ? Fmt.Number(fcr, 3) : "—"),
+            ("IP", figures.Ip is { } ip ? Fmt.Number(ip, 0) : "—"),
+            ("Harvested", $"{Fmt.Number(figures.HarvestedBirds)} / {Fmt.Number(figures.HarvestedWeightKg, 0)} kg")
+        })
+        {
+            <div class="col-6 col-md-3 col-xl">
+                <div class="card mb-0 h-100"><div class="card-body py-2">
+                    <div class="text-muted fs-12">@label</div>
+                    <div class="fw-bold fs-16">@value</div>
+                </div></div>
+            </div>
+        }
+    </div>
+}
+
+<ul class="nav nav-tabs mb-3" role="tablist">
+    @foreach ((string key, string title) in new[] { ("overview", "Overview"), ("recordings", $"Recordings ({Model.Recordings.Count})"), ("harvests", $"Harvests ({harvests.Count})"), ("stock", "Coop Stock"), ("performance", "Performance"), ("cost", "Cost"), ("attachments", $"Attachments ({Model.Attachments.Count})") })
+    {
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @Active(key)" data-bs-toggle="tab" data-bs-target="#tab-@key" type="button" role="tab">@title</button>
+        </li>
+    }
+</ul>
+
+<div class="tab-content">
+    <div class="tab-pane fade @Show("overview")" id="tab-overview" role="tabpanel">
+        <div class="card"><div class="card-body">
+            <div class="row">
+                <div class="col-md-3 mb-3"><div class="text-muted fs-13">Planned chick-in</div><div class="fw-semibold">@Fmt.Date(cycle.PlannedChickInDate) · @Fmt.Number(cycle.PlannedPopulation) birds</div></div>
+                <div class="col-md-3 mb-3"><div class="text-muted fs-13">Chick-in</div><div class="fw-semibold">@(cycle.ChickInDate is { } chickIn ? $"{Fmt.Date(chickIn)} · {Fmt.Number(cycle.InitialPopulation ?? 0)} birds" : "—")</div></div>
+                <div class="col-md-3 mb-3"><div class="text-muted fs-13">Mortality / culling</div><div class="fw-semibold">@Fmt.Number(cycle.TotalMortality) / @Fmt.Number(cycle.TotalCulling)</div></div>
+                <div class="col-md-3 mb-3"><div class="text-muted fs-13">Closed</div><div class="fw-semibold">@(cycle.ClosedDate is { } closed ? Fmt.Date(closed) : "—")</div></div>
+                <div class="col-md-3 mb-3"><div class="text-muted fs-13">Contract</div><div class="fw-semibold">@(cycle.ContractCode ?? "— (inti)")</div></div>
+                @if (!string.IsNullOrWhiteSpace(cycle.Notes))
+                {
+                    <div class="col-md-9 mb-3"><div class="text-muted fs-13">Notes</div><div style="white-space: pre-line">@cycle.Notes</div></div>
+                }
+            </div>
+            @if (cycle.ContractSnapshot is { ValueKind: JsonValueKind.Object } snapshot)
+            {
+                <details>
+                    <summary class="text-primary">Contract terms frozen for this cycle</summary>
+                    <pre class="bg-light p-2 mt-2 fs-12 mb-0" style="white-space: pre-wrap">@JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true })</pre>
+                </details>
+            }
+        </div></div>
+    </div>
+
+    <div class="tab-pane fade @Show("recordings")" id="tab-recordings" role="tabpanel">
+        <div class="card"><div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="thead-light"><tr><th>Date</th><th class="text-end">Age</th><th class="text-end">Mortality</th><th class="text-end">Culling</th><th class="text-end">BW (g)</th><th class="text-end">Feed (kg)</th><th>Revision</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (Application.Production.DailyRecordingResponse recording in Model.Recordings.OrderByDescending(r => r.Date))
+                        {
+                            <tr>
+                                <td>@Fmt.Date(recording.Date)</td>
+                                <td class="text-end">@recording.AgeDays</td>
+                                <td class="text-end">@Fmt.Number(recording.Mortality)</td>
+                                <td class="text-end">@Fmt.Number(recording.Culling)</td>
+                                <td class="text-end">@(recording.AverageBodyWeightGram is { } g ? Fmt.Number(g, 0) : "—")</td>
+                                <td class="text-end">@Fmt.Number(recording.FeedKg, 1)</td>
+                                <td>@(recording.RevisionNumber > 0 ? $"rev. {recording.RevisionNumber}" : "—")</td>
+                                <td class="text-end"><a asp-controller="Recordings" asp-action="Details" asp-route-id="@recording.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                            </tr>
+                        }
+                        @if (Model.Recordings.Count == 0)
+                        {
+                            <tr><td colspan="8" class="text-center text-muted py-3">No recording yet.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div></div>
+    </div>
+
+    <div class="tab-pane fade @Show("harvests")" id="tab-harvests" role="tabpanel">
+        <div class="card"><div class="card-body p-0">
+            <table class="table table-sm mb-0">
+                <thead class="thead-light"><tr><th>Date</th><th class="text-end">Age</th><th class="text-end">Birds</th><th class="text-end">Weight (kg)</th><th class="text-end">Average (kg)</th><th>Truck / notes</th></tr></thead>
+                <tbody>
+                    @foreach (Application.Production.HarvestResponse harvest in harvests)
+                    {
+                        <tr>
+                            <td>@Fmt.Date(harvest.Date)</td>
+                            <td class="text-end">@harvest.AgeDays</td>
+                            <td class="text-end">@Fmt.Number(harvest.Birds)</td>
+                            <td class="text-end">@Fmt.Number(harvest.WeightKg, 2)</td>
+                            <td class="text-end">@Fmt.Number(harvest.AverageWeightKg, 3)</td>
+                            <td>@harvest.Notes</td>
+                        </tr>
+                    }
+                    @if (harvests.Count == 0)
+                    {
+                        <tr><td colspan="6" class="text-center text-muted py-3">No harvest yet.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div></div>
+    </div>
+
+    <div class="tab-pane fade @Show("stock")" id="tab-stock" role="tabpanel">
+        <div class="card"><div class="card-body p-0">
+            <table class="table table-sm mb-0">
+                <thead class="thead-light"><tr><th>Item</th><th>Category</th><th class="text-end">Quantity</th><th class="text-end">Value</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (Application.Inventory.StockBalanceResponse stock in Model.CoopStock)
+                    {
+                        <tr>
+                            <td>@stock.ItemCode — @stock.ItemName</td>
+                            <td>@EnumOptions.Label(stock.ItemCategory)</td>
+                            <td class="text-end">@Fmt.Number(stock.Quantity, 3) @stock.BaseUomCode</td>
+                            <td class="text-end">@Fmt.Money(stock.Value)</td>
+                            <td class="text-end">
+                                <a asp-area="Inventory" asp-controller="Stock" asp-action="Card" asp-route-warehouseId="@stock.WarehouseId" asp-route-itemId="@stock.ItemId"
+                                   class="btn btn-sm btn-light" title="Stock card"><i class="ti ti-list-details"></i></a>
+                            </td>
+                        </tr>
+                    }
+                    @if (Model.CoopStock.Count == 0)
+                    {
+                        <tr><td colspan="5" class="text-center text-muted py-3">The coop warehouse is empty.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div></div>
+    </div>
+
+    <div class="tab-pane fade @Show("performance")" id="tab-performance" role="tabpanel">
+        @if (days.Count == 0)
+        {
+            <div class="alert alert-light border">Performance appears after the chick-in and the first daily recording.</div>
+        }
+        else
+        {
+            <div class="row">
+                <div class="col-lg-6"><div class="card"><div class="card-header"><h6 class="mb-0">Population & depletion</h6></div><div class="card-body"><canvas id="chart-population" height="220"></canvas></div></div></div>
+                <div class="col-lg-6"><div class="card"><div class="card-header"><h6 class="mb-0">Body weight vs feed</h6></div><div class="card-body"><canvas id="chart-growth" height="220"></canvas></div></div></div>
+            </div>
+            <div class="card"><div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead class="thead-light"><tr><th>Date</th><th class="text-end">Age</th><th class="text-end">Population</th><th class="text-end">Depletion %</th><th class="text-end">Feed cum. (kg)</th><th class="text-end">BW (kg)</th><th class="text-end">FCR</th><th class="text-end">ADG (g)</th><th class="text-end">IP</th></tr></thead>
+                        <tbody>
+                            @foreach (Application.Production.DailyPerformance day in days.Reverse())
+                            {
+                                <tr>
+                                    <td>@Fmt.Date(day.Date)</td>
+                                    <td class="text-end">@day.AgeDays</td>
+                                    <td class="text-end">@Fmt.Number(day.Cumulative.Population)</td>
+                                    <td class="text-end">@Fmt.Number(day.Cumulative.DepletionPercent, 2)</td>
+                                    <td class="text-end">@Fmt.Number(day.Cumulative.FeedKg, 1)</td>
+                                    <td class="text-end">@(day.Cumulative.AverageWeightKg is { } w ? Fmt.Number(w, 3) : "—")</td>
+                                    <td class="text-end">@(day.Cumulative.Fcr is { } f ? Fmt.Number(f, 3) : "—")</td>
+                                    <td class="text-end">@(day.Cumulative.AdgGram is { } a ? Fmt.Number(a, 1) : "—")</td>
+                                    <td class="text-end">@(day.Cumulative.Ip is { } i ? Fmt.Number(i, 0) : "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div></div>
+        }
+    </div>
+
+    <div class="tab-pane fade @Show("cost")" id="tab-cost" role="tabpanel">
+        @if (Model.Cost is { } cost)
+        {
+            <div class="row">
+                <div class="col-lg-7"><div class="card"><div class="card-header"><h6 class="mb-0">Sapronak consumed</h6></div><div class="card-body p-0">
+                    <table class="table table-sm mb-0">
+                        <thead class="thead-light"><tr><th>Item</th><th>Category</th><th class="text-end">Quantity</th><th class="text-end">Cost</th></tr></thead>
+                        <tbody>
+                            @foreach (Application.Costing.ConsumedInputResponse input in cost.Inputs)
+                            {
+                                <tr><td>@input.ItemCode</td><td>@EnumOptions.Label(input.Category)</td><td class="text-end">@Fmt.Number(input.Quantity, 3)</td><td class="text-end">@Fmt.Money(input.Cost)</td></tr>
+                            }
+                            @if (cost.Inputs.Count == 0)
+                            {
+                                <tr><td colspan="4" class="text-center text-muted py-3">Nothing consumed yet.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div></div></div>
+                <div class="col-lg-5"><div class="card"><div class="card-header"><h6 class="mb-0">@(cost.IsFinal ? "Final cost" : "Running cost (estimate)")</h6></div><div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-7 fw-normal">DOC</dt><dd class="col-5 text-end">@Fmt.Money(cost.DocCost)</dd>
+                        <dt class="col-7 fw-normal">Feed</dt><dd class="col-5 text-end">@Fmt.Money(cost.FeedCost)</dd>
+                        <dt class="col-7 fw-normal">OVK</dt><dd class="col-5 text-end">@Fmt.Money(cost.OvkCost)</dd>
+                        <dt class="col-7">Total</dt><dd class="col-5 text-end fw-bold">@Fmt.Money(cost.TotalCost)</dd>
+                        <dt class="col-7 fw-normal">Cost per kg</dt><dd class="col-5 text-end">@(cost.CostPerKg is { } perKg ? Fmt.Money(perKg) : "—")</dd>
+                        <dt class="col-7 fw-normal">Cost per bird</dt><dd class="col-5 text-end">@(cost.CostPerBird is { } perBird ? Fmt.Money(perBird) : "—")</dd>
+                        <dt class="col-7 fw-normal">Recognized on invoices</dt><dd class="col-5 text-end">@Fmt.Money(cost.RecognizedCost)</dd>
+                        @if (cost.Adjustment is { } adjustment)
+                        {
+                            <dt class="col-7 fw-normal">Closing adjustment</dt><dd class="col-5 text-end">@Fmt.Money(adjustment)</dd>
+                        }
+                        @if (cost.PlasmaIncome is { } income)
+                        {
+                            <dt class="col-7 fw-normal">Plasma income</dt><dd class="col-5 text-end">@Fmt.Money(income)</dd>
+                        }
+                    </dl>
+                </div></div></div>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-light border">No cost yet.</div>
+        }
+    </div>
+
+    <div class="tab-pane fade @Show("attachments")" id="tab-attachments" role="tabpanel">
+        <div class="card"><div class="card-body">
+            @if (Model.CanEdit && cycle.Status != "Cancelled")
+            {
+                <form asp-action="Documents" asp-route-id="@cycle.Id" method="post">
+                    <partial name="Partials/_Attachments" model='new AttachmentsModel(Model.Attachments, true, "documents")' />
+                    <button type="submit" class="btn btn-sm btn-primary mt-2"><i class="ti ti-device-floppy me-1"></i>Save attachments</button>
+                </form>
+            }
+            else
+            {
+                <partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, false)" />
+            }
+        </div></div>
+    </div>
+</div>
+
+@if (Model.IsPlanned && Model.CanEdit)
+{
+    <div class="modal fade" id="cancel-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form asp-action="Cancel" asp-route-id="@cycle.Id" method="post" class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Cancel cycle @cycle.Number</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <label for="cancel-reason" class="form-label">Reason <span class="text-danger">*</span></label>
+                    <textarea id="cancel-reason" name="reason" rows="3" maxlength="500" class="form-control" required></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Back</button>
+                    <button type="submit" class="btn btn-danger">Cancel Cycle</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    @if (days.Count > 0)
+    {
+        <script src="assets/plugins/chartjs/chart.min.js"></script>
+        <script>
+            (function () {
+                if (!window.Chart) { return; }
+                var labels = [@Html.Raw(string.Join(",", days.Select(d => d.AgeDays.ToString(CultureInfo.InvariantCulture))))];
+                var population = [@Html.Raw(string.Join(",", days.Select(d => d.Cumulative.Population.ToString(CultureInfo.InvariantCulture))))];
+                var depletion = [@Html.Raw(string.Join(",", days.Select(d => Num(d.Cumulative.DepletionPercent))))];
+                var weight = [@Html.Raw(string.Join(",", days.Select(d => Num(d.Cumulative.AverageWeightKg))))];
+                var feed = [@Html.Raw(string.Join(",", days.Select(d => Num(d.Cumulative.FeedKg))))];
+                var primary = getComputedStyle(document.documentElement).getPropertyValue('--ip-primary').trim() || '#0984E3';
+
+                new Chart(document.getElementById('chart-population'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'Population', data: population, borderColor: primary, yAxisID: 'y', tension: 0.2 },
+                            { label: 'Depletion %', data: depletion, borderColor: '#e74c3c', yAxisID: 'y1', tension: 0.2 }
+                        ]
+                    },
+                    options: { scales: { x: { title: { display: true, text: 'Age (days)' } }, y1: { position: 'right', grid: { drawOnChartArea: false } } } }
+                });
+
+                new Chart(document.getElementById('chart-growth'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'Body weight (kg)', data: weight, borderColor: '#27ae60', yAxisID: 'y', spanGaps: true, tension: 0.2 },
+                            { label: 'Feed cumulative (kg)', data: feed, borderColor: '#f39c12', yAxisID: 'y1', tension: 0.2 }
+                        ]
+                    },
+                    options: { scales: { x: { title: { display: true, text: 'Age (days)' } }, y1: { position: 'right', grid: { drawOnChartArea: false } } } }
+                });
+            })();
+        </script>
+    }
+}

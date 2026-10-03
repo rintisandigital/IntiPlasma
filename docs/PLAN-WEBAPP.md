@@ -402,7 +402,7 @@ Use case Application/Domain baru dikerjakan & diuji dulu (unit test seperti fase
 ### Fase W4 — Pengadaan & Gudang ✅ (selesai 2026-10-03, realisasi §15)
 - PO (approve/cancel/close, progres penerimaan, **PDF PO**), BPB (**PDF**), transfer stok, retur kandang → induk, mutasi pakan; saldo stok & kartu stok (ekspor Excel/PDF).
 
-### Fase W5 — Produksi
+### Fase W5 — Produksi ✅ (selesai 2026-10-03, realisasi §16)
 - Siklus & chick-in (wizard), detail siklus (tab Recording, Harvest, Coop Stock, Performance, Cost, Attachments), **daily recording** (input admin + revisi + timeline, W-11), panen per truk, grafik performa, tutup siklus (+ PDF ringkasan).
 
 ### Fase W6 — Penjualan & AR
@@ -779,3 +779,25 @@ Tidak ada perubahan Domain/Application/Web.Api dan **tidak ada migration baru** 
 
 ### 15.4 Catatan
 - ⚠️ BPB/transfer/retur tetap bisa diposting walau **tahun fiskal belum dibuka**; jurnal otomatisnya lalu gagal (dead letter `FiscalPeriods.NotFoundForDate`) dan memblokir tutup periode. Buka tahun fiskal (W3) sebelum transaksi gudang. Layar dead letter/retry menyusul di W9.
+
+---
+
+## 16. Realisasi Fase W5 — Produksi (2026-10-03)
+
+Tidak ada perubahan Domain/Application/Web.Api dan **tidak ada migration baru** — layar memakai use case Fase 4 & 7.
+
+### 16.1 Layar (`Areas/Production`)
+| Halaman | Realisasi |
+|---|---|
+| **Cycles & Chick-in** | List (cabang/status/cari) + ekspor. **Plan**: coop via lookup (hanya coop aktif tanpa siklus terbuka), kontrak via lookup yang bergantung pada coop (kontrak aktif cabang coop; kosong untuk coop inti), tanggal & populasi rencana. **Halaman siklus** = alur bertahap (pengganti wizard): indikator langkah *Planned → DOC in coop → Chick-in → Harvesting → Closed* dengan aksi per langkah (Transfer DOC, Chick-in, Daily Recording, Harvest, Close, Cancel + alasan), kartu KPI (populasi, deplesi, umur, BW, pakan, FCR, IP, panen) dan tab **Overview** (+ syarat kontrak yang dibekukan), **Recordings**, **Harvests**, **Coop Stock** (+ tautan kartu stok), **Performance** (2 grafik Chart.js + tabel harian kumulatif), **Cost** (sapronak terpakai, biaya berjalan/final, per kg/ekor, HPP diakui, penyesuaian, pendapatan plasma), **Attachments**. **Chick-in**: DOC yang ada di gudang kandang terisi otomatis. **Summary PDF** (interim / *Cycle Closing Summary*). |
+| **Daily Recordings** | Pilih siklus (lookup siklus Active/Harvesting) → daftar recording + ekspor; form input (tanggal default = hari setelah recording terakhir, mati, afkir, BW gram, catatan, pemakaian pakan/OVK dari stok gudang kandang dengan satuan otomatis, lampiran); detail + **revisi** (alasan wajib, nilai lama di **timeline History**). |
+| **Harvests** | Pilih siklus → form per truk (tanggal, ekor, kg, rata-rata dihitung langsung, truk/catatan, lampiran tiket timbangan) + daftar panen dengan kelola lampiran per panen; ekspor. |
+
+- Hak menu: Cycles Create/Edit/Export (Create = plan; Edit = chick-in, cancel, close, lampiran), Recordings Create/Edit/Export (Edit = revisi), Harvests Create/Edit/Export (Edit = lampiran panen).
+- Lookup baru: `/Lookup/PlannableCoops`, `/Lookup/CoopContracts?coopId=`, `/Lookup/RecordableCycles`. `InventoryOptions.CoopWarehouseIdAsync`.
+- Form BPB: keterangan diperjelas — hanya DOC yang boleh diterima langsung ke gudang kandang (aturan domain sejak Fase 3).
+
+### 16.2 Pengujian & verifikasi
+- **Test: 318 lulus** — Domain 143, Application 60, Arsitektur 14, Integration Web.Api 18, Integration Web.App 83 (+5): halaman produksi terbuka; alur plan → coop hilang dari lookup → DOC (BPB langsung ke gudang kandang) + pakan (gudang pusat → transfer) → chick-in → recording + revisi (history, total mati terkoreksi) → panen (Harvesting) → close ditolak saat populasi tersisa → grafik performa & biaya berjalan → PDF ringkasan → ekspor; plan kedua → cancel dengan alasan.
+- **End-to-end W5 42/42**: setup + buka tahun fiskal; coop plasma tanpa kontrak ditolak, coop inti tanpa tawaran kontrak; plan (langkah 1, coop tak bisa direncanakan lagi); PO, BPB DOC ke kandang, pakan ke kandang ditolak → gudang pusat → transfer; langkah 2; chick-in terisi otomatis → Active 1.000 ekor; 3 recording harian (tanggal default berurutan, stok pakan berkurang), tanggal ganda ditolak; revisi (tanpa alasan ditolak, history, total & stok terkoreksi); 2 truk panen (rata-rata langsung, melebihi populasi ditolak); close ditolak (sisa pakan); **penjualan lewat Web.Api** (SO → 2 DO per panen → invoice diposting, layar W6 belum ada) + retur sisa pakan → **close berhasil**, biaya final, aksi hilang, 2 grafik ter-render, PDF ringkasan penutupan; cancel siklus terencana; 3 ekspor; outbox tanpa dead letter; tanpa error JS.
+- **Regresi**: E2E W4 51/51, W3 48/48, W2 40/40, W0 49/49, header 15/15.

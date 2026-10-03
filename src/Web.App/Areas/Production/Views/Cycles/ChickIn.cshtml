@@ -1,0 +1,62 @@
+@model ChickInFormViewModel
+@{
+    Application.Cycles.CycleResponse cycle = Model.Cycle!;
+    ViewData["Title"] = $"Chick-in {cycle.Number}";
+    ViewData["Menu"] = MenuCodes.ProductionCycles;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel($"Chick-in — {cycle.Number}", $"{cycle.CoopCode} {cycle.CoopName} · planned {Fmt.Number(cycle.PlannedPopulation)} birds on {Fmt.Date(cycle.PlannedChickInDate)}")' />
+
+@if (Model.DocStock.Count == 0)
+{
+    <div class="alert alert-warning">
+        There is no DOC in the coop warehouse yet. Transfer DOC from a central warehouse to the coop warehouse first.
+        <a asp-area="Inventory" asp-controller="StockTransfers" asp-action="Create" class="alert-link">New stock transfer</a>
+    </div>
+}
+else
+{
+    <form asp-action="ChickIn" asp-route-id="@cycle.Id" method="post">
+        <form-token />
+        <div class="card">
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="ChickInDate" class="form-label"></label> <span class="text-danger">*</span>
+                        <input asp-for="ChickInDate" type="date" class="form-control">
+                        <span asp-validation-for="ChickInDate" class="text-danger fs-13"></span>
+                    </div>
+                </div>
+                <table class="table mb-0">
+                    <thead class="thead-light"><tr><th>DOC item</th><th class="text-end">In coop warehouse</th><th style="width: 22%">Birds placed</th></tr></thead>
+                    <tbody>
+                        @for (int i = 0; i < Model.DocStock.Count; i++)
+                        {
+                            Application.Inventory.StockBalanceResponse doc = Model.DocStock[i];
+                            ChickInLineInput? line = Model.Lines.FirstOrDefault(l => l.ItemId == doc.ItemId);
+                            <tr>
+                                <td>@doc.ItemCode — @doc.ItemName</td>
+                                <td class="text-end">@Fmt.Number(doc.Quantity, 0) @doc.BaseUomCode</td>
+                                <td>
+                                    <input type="hidden" name="Lines[@i].ItemId" value="@doc.ItemId">
+                                    <input type="number" name="Lines[@i].Quantity" value="@line?.Quantity" min="0" step="1"
+                                           max="@Math.Floor(doc.Quantity).ToString(System.Globalization.CultureInfo.InvariantCulture)" class="form-control text-end">
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <p class="text-muted fs-13 mt-2 mb-0">The initial population is the number of birds placed; the DOC leaves the coop warehouse into the cycle.</p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Attachments (delivery note, photos)</h5></div>
+            <div class="card-body"><partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, true)" /></div>
+        </div>
+        <partial name="Partials/_FormButtons" model='new FormButtonsModel(true, Url.Action("Details", new { id = cycle.Id })!, "Record Chick-in")' />
+    </form>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
