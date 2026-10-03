@@ -1,6 +1,7 @@
 using Application.Abstractions.Authentication;
 using Application.UnitTests.Abstractions;
 using Application.Users.SignIn;
+using Domain.Access;
 using Domain.Users;
 using SharedKernel;
 
@@ -64,6 +65,19 @@ public sealed class SignInUserCommandHandlerTests : BaseHandlerTest
         result.Value.SecurityStamp.ShouldBe(user.SecurityStamp);
     }
 
+    [Fact]
+    public async Task Handle_Should_ReturnNoMenuAccess_WhenUserHasNoMenuAccessProfile()
+    {
+        await using TestDbContext context = CreateDbContext();
+        await SeedUserAsync(context, menuAccess: false);
+        var handler = new SignInUserCommandHandler(context, Hasher(verifies: true));
+
+        Result<SignedInUserResponse> result = await handler.Handle(
+            new SignInUserCommand(Email, Password), CancellationToken.None);
+
+        result.Error.ShouldBe(UserErrors.NoMenuAccess);
+    }
+
     private static IPasswordHasher Hasher(bool verifies)
     {
         IPasswordHasher hasher = Substitute.For<IPasswordHasher>();
@@ -71,9 +85,14 @@ public sealed class SignInUserCommandHandlerTests : BaseHandlerTest
         return hasher;
     }
 
-    private static async Task<User> SeedUserAsync(TestDbContext context, bool active = true)
+    private static async Task<User> SeedUserAsync(TestDbContext context, bool active = true, bool menuAccess = true)
     {
         var user = User.Create(Email, "System", "Administrator", "hash");
+        if (menuAccess)
+        {
+            user.SetAccess(MenuAccessProfile.FullAccessId, null, null);
+        }
+
         if (!active)
         {
             user.Deactivate();

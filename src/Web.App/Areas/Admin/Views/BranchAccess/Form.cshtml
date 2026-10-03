@@ -1,0 +1,103 @@
+@model BranchAccessFormViewModel
+@{
+    bool isNew = Model.Id is null;
+    ViewData["Title"] = isNew ? "Add Branch Access" : $"Edit {Model.Name}";
+    ViewData["Menu"] = MenuCodes.AdminBranchAccess;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">@(isNew ? "Add Branch Access" : "Edit Branch Access")</h4>
+            <h6>All branches, or a list of branches</h6>
+        </div>
+    </div>
+    <div class="page-btn">
+        <a asp-action="Index" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+    </div>
+</div>
+
+<form asp-action="@(isNew ? "Create" : "Edit")" method="post">
+    @if (isNew)
+    {
+        <form-token />
+    }
+    else
+    {
+        <input type="hidden" asp-for="Id" />
+    }
+    <div class="card">
+        <div class="card-body">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+            <div class="row">
+                <div class="col-md-5 mb-3">
+                    <label asp-for="Name" class="form-label"></label> <span class="text-danger">*</span>
+                    <input asp-for="Name" class="form-control" placeholder="e.g. West Java Area">
+                    <span asp-validation-for="Name" class="text-danger fs-13"></span>
+                </div>
+                <div class="col-md-7 mb-3">
+                    <label asp-for="Description" class="form-label"></label>
+                    <input asp-for="Description" class="form-control">
+                </div>
+            </div>
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" role="switch" id="AllBranches" name="AllBranches" value="true"
+                       checked="@(Model.AllBranches == true)">
+                <label class="form-check-label" for="AllBranches">All branches (including branches created later)</label>
+            </div>
+            @if (!isNew && Model.UserCount > 0)
+            {
+                <p class="text-muted fs-13 mb-0"><i class="ti ti-info-circle me-1"></i>Used by @Model.UserCount user(s); changes apply to them immediately.</p>
+            }
+        </div>
+    </div>
+
+    <div class="card" id="branch-list">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <h5 class="card-title mb-0">Branches</h5>
+            <input type="search" class="form-control form-control-sm w-auto" placeholder="Filter" id="branch-filter">
+        </div>
+        <div class="card-body">
+            <div class="row">
+                @foreach (Application.Branches.BranchResponse branch in Model.Branches)
+                {
+                    <div class="col-md-4 branch-item" data-text="@($"{branch.Code} {branch.Name}".ToUpperInvariant())">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="BranchIds" value="@branch.Id" id="branch-@branch.Id"
+                                   checked="@Model.BranchIds.Contains(branch.Id)">
+                            <label class="form-check-label @(branch.IsActive ? "" : "text-muted")" for="branch-@branch.Id">
+                                <span class="fw-semibold">@branch.Code</span> — @branch.Name
+                                @if (!branch.IsActive)
+                                {
+                                    <span class="badge bg-secondary ms-1">Inactive</span>
+                                }
+                            </label>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 mb-4">
+        <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Save</button>
+        <a asp-action="Index" class="btn btn-light">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        (function () {
+            var all = document.getElementById('AllBranches');
+            var list = document.getElementById('branch-list');
+            function toggle() { list.hidden = all.checked; }
+            all.addEventListener('change', toggle);
+            toggle();
+            document.getElementById('branch-filter').addEventListener('input', function () {
+                var term = this.value.trim().toUpperCase();
+                document.querySelectorAll('.branch-item').forEach(function (item) {
+                    item.hidden = term && item.dataset.text.indexOf(term) < 0;
+                });
+            });
+        })();
+    </script>
+}

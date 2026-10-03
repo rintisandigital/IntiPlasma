@@ -170,6 +170,127 @@
         });
     });
 
+    /* Menu search (header): matches the sidebar links, i.e. only menus the user may view. */
+    (function () {
+        var form = document.querySelector('.menu-search');
+        if (!form) {
+            return;
+        }
+
+        var input = form.querySelector('.menu-search-input');
+        var list = form.querySelector('.menu-search-list');
+        var empty = form.querySelector('.menu-search-empty');
+        var toggle = form.querySelector('[data-bs-toggle="dropdown"]');
+        var maxResults = 10;
+
+        function groupTitle(link) {
+            var pane = link.closest('.tab-pane');
+            var tab = pane ? document.querySelector('[data-bs-target="#' + pane.id + '"]') : null;
+            return tab ? tab.getAttribute('title') : '';
+        }
+
+        function entries() {
+            var seen = {};
+            var result = [];
+            document.querySelectorAll('#two-col-sidebar a[target="content-frame"][data-menu-code]').forEach(function (link) {
+                var code = link.getAttribute('data-menu-code');
+                if (seen[code]) {
+                    return;
+                }
+                seen[code] = true;
+                result.push({ title: link.textContent.trim(), group: groupTitle(link), url: link.getAttribute('href') });
+            });
+            return result;
+        }
+
+        function open(url) {
+            showLoader();
+            window.open(url, 'content-frame');
+            input.value = '';
+            render();
+            if (window.bootstrap && toggle) {
+                bootstrap.Dropdown.getOrCreateInstance(toggle).hide();
+            }
+        }
+
+        function render() {
+            var term = input.value.trim().toLowerCase();
+            var matches = entries().filter(function (e) {
+                return !term || e.title.toLowerCase().indexOf(term) >= 0 || e.group.toLowerCase().indexOf(term) >= 0;
+            }).slice(0, maxResults);
+
+            list.innerHTML = '';
+            matches.forEach(function (e, index) {
+                var item = document.createElement('li');
+                var link = document.createElement('a');
+                link.href = e.url;
+                link.className = 'dropdown-item rounded-1' + (index === 0 && term ? ' active' : '');
+                link.setAttribute('data-menu-url', e.url);
+                link.textContent = e.title;
+                if (e.group) {
+                    var group = document.createElement('small');
+                    group.className = 'text-muted ms-2';
+                    group.textContent = e.group;
+                    link.appendChild(group);
+                }
+                item.appendChild(link);
+                list.appendChild(item);
+            });
+            empty.hidden = matches.length > 0;
+        }
+
+        input.addEventListener('input', function () {
+            render();
+            if (window.bootstrap && toggle) {
+                bootstrap.Dropdown.getOrCreateInstance(toggle).show();
+            }
+        });
+        input.addEventListener('focus', render);
+
+        input.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                var first = list.querySelector('[data-menu-url]');
+                if (first) {
+                    open(first.getAttribute('data-menu-url'));
+                }
+            } else if (event.key === 'Escape') {
+                input.value = '';
+                input.blur();
+                if (window.bootstrap && toggle) {
+                    bootstrap.Dropdown.getOrCreateInstance(toggle).hide();
+                }
+            }
+        });
+
+        list.addEventListener('click', function (event) {
+            var link = event.target.closest('[data-menu-url]');
+            if (link) {
+                event.preventDefault();
+                open(link.getAttribute('data-menu-url'));
+            }
+        });
+
+        form.addEventListener('submit', function (event) { event.preventDefault(); });
+
+        /* Bootstrap closes the dropdown on Escape (it stops the key event before it reaches the input) and on an
+           outside click: start the next search from scratch. */
+        if (toggle) {
+            toggle.addEventListener('hidden.bs.dropdown', function () {
+                input.value = '';
+                render();
+            });
+        }
+
+        /* Ctrl+K / Cmd+K focuses the search box. */
+        document.addEventListener('keydown', function (event) {
+            if ((event.ctrlKey || event.metaKey) && (event.key === 'k' || event.key === 'K')) {
+                event.preventDefault();
+                input.focus();
+            }
+        });
+    })();
+
     window.addEventListener('resize', adjustFrameHeight);
     adjustFrameHeight();
 

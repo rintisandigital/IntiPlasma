@@ -1,4 +1,5 @@
 using Application.Abstractions.Authentication;
+using Domain.Access;
 using Domain.Users;
 using Infrastructure.Database;
 using Microsoft.AspNetCore.Hosting;
@@ -6,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
+using Web.App.Infrastructure.Authorization;
 
 namespace Web.App.IntegrationTests;
 
@@ -43,18 +45,22 @@ public sealed class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifeti
         await dbContext.Database.MigrateAsync();
 
         await DatabaseSeeder.SeedAsync(Services);
+
+        // The hosted sync may have run before the migration; make the catalog available to every test.
+        await MenuCatalogSyncService.SyncAsync(Services.GetRequiredService<IServiceScopeFactory>(), CancellationToken.None);
     }
 
     /// <summary>
-    /// Adds a user directly in the database (user management screens arrive in W1).
+    /// Adds a user directly in the database. By default the user has Full Access (menus) and no branch profile.
     /// </summary>
-    public async Task<User> CreateUserAsync(string email, string password, bool active = true)
+    public async Task<User> CreateUserAsync(string email, string password, bool active = true, Guid? menuAccessProfileId = null)
     {
         using IServiceScope scope = Services.CreateScope();
         ApplicationDbContext dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         IPasswordHasher hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
         var user = User.Create(email, "Test", "User", hasher.Hash(password));
+        user.SetAccess(menuAccessProfileId ?? MenuAccessProfile.FullAccessId, null, null);
         if (!active)
         {
             user.Deactivate();
@@ -64,6 +70,27 @@ public sealed class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifeti
         await dbContext.SaveChangesAsync();
 
         return user;
+    }
+
+    /// <summary>
+    /// A menu access profile granting the given rights by menu code.
+    /// </summary>
+    public async Task<Guid> CreateMenuProfileAsync(string name, params (string Code, MenuRights Rights)[] grants)
+    {
+        using IServiceScope scope = Services.CreateScope();
+        ApplicationDbContext dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        List<Menu> menus = await dbContext.Menus.ToListAsync();
+        MenuAccessProfile profile = MenuAccessProfile.Create(
+            name,
+            null,
+            grants.Select(g => new MenuAccessGrant(menus.Single(m => m.Code == g.Code).Id, g.Rights)),
+            menus).Value;
+
+        dbContext.MenuAccessProfiles.Add(profile);
+        await dbContext.SaveChangesAsync();
+
+        return profile.Id;
     }
 
     public async Task DeactivateAsync(Guid userId)

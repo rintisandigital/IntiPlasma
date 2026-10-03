@@ -35,12 +35,6 @@
     display: flex;
 }
 
-.mainboard .header .branch-switcher .nav-link {
-    gap: 6px;
-    font-weight: 600;
-    color: #092C4C;
-}
-
 .mainboard .header .branch-switcher .dropdown-menu {
     max-height: 360px;
     overflow-y: auto;

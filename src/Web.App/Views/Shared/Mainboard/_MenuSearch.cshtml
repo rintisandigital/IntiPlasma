@@ -1,0 +1,27 @@
+@* Header menu search (W-23): filters the menus in the sidebar (already limited to what the user may view) and
+   opens the chosen page in the content iframe. Behaviour in mainboard.js. Ctrl+K focuses the box. *@
+<li class="nav-item nav-searchinputs">
+    <div class="top-nav-search">
+        <a href="javascript:void(0);" class="responsive-search">
+            <i class="fa fa-search"></i>
+        </a>
+        <form action="#" class="dropdown menu-search" autocomplete="off" role="search">
+            <div class="searchinputs input-group dropdown-toggle" id="menuSearchToggle" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                <input type="text" class="menu-search-input" placeholder="Search menu" aria-label="Search menu">
+                <div class="search-addon">
+                    <span><i class="ti ti-search"></i></span>
+                </div>
+                <span class="input-group-text">
+                    <kbd class="d-flex align-items-center"><img src="assets/img/icons/command.svg" alt="Ctrl" class="me-1">K</kbd>
+                </span>
+            </div>
+            <div class="dropdown-menu search-dropdown menu-search-results" aria-labelledby="menuSearchToggle">
+                <div class="search-info">
+                    <h6><span><i class="ti ti-layout-sidebar me-1"></i></span>Menus</h6>
+                    <ul class="list-unstyled mb-0 menu-search-list"></ul>
+                    <p class="text-muted mb-0 menu-search-empty" hidden>No matching menu.</p>
+                </div>
+            </div>
+        </form>
+    </div>
+</li>

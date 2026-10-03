@@ -1,0 +1,61 @@
+@model SharedKernel.PagedList<Application.Branches.BranchResponse>
+@{
+    ViewData["Title"] = "Branches";
+    ViewData["Menu"] = MenuCodes.AdminBranches;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Branches</h4>
+            <h6>Company branches; an inactive branch disappears from every user's branches</h6>
+        </div>
+    </div>
+    <div class="page-btn">
+        <a asp-action="Create" asp-menu="@MenuCodes.AdminBranches" asp-right="Create" class="btn btn-primary">
+            <i class="ti ti-circle-plus me-1"></i>Add Branch
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <partial name="Partials/_FilterBar" model='new FilterBarModel(ViewData["Search"] as string, "Search code or name")' />
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Address</th>
+                        <th>Phone</th>
+                        <th>Status</th>
+                        <th class="text-end"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Branches.BranchResponse branch in Model.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@branch.Code</td>
+                            <td>@branch.Name</td>
+                            <td class="text-muted">@branch.Address</td>
+                            <td class="text-muted">@branch.Phone</td>
+                            <td><partial name="Partials/_StatusBadge" model='branch.IsActive ? "Active" : "Inactive"' /></td>
+                            <td class="text-end">
+                                <a asp-action="Edit" asp-route-id="@branch.Id" asp-menu="@MenuCodes.AdminBranches" asp-right="Edit"
+                                   class="btn btn-sm btn-light" title="Edit"><i class="ti ti-edit"></i></a>
+                            </td>
+                        </tr>
+                    }
+                    @if (Model.Items.Count == 0)
+                    {
+                        <tr><td colspan="6" class="text-center text-muted py-4">No branches found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="Partials/_Pagination" model="PaginationModel.From(Model)" />
+    </div>
+</div>

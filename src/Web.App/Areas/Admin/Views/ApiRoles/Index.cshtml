@@ -1,0 +1,54 @@
+@model IReadOnlyList<Application.Roles.Get.RoleResponse>
+@{
+    ViewData["Title"] = "API Roles";
+    ViewData["Menu"] = MenuCodes.AdminApiRoles;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">API Roles</h4>
+            <h6>Permissions for the API and the mobile app (the web app uses menu access)</h6>
+        </div>
+    </div>
+    <div class="page-btn">
+        <a asp-action="Create" asp-menu="@MenuCodes.AdminApiRoles" asp-right="Create" class="btn btn-primary">
+            <i class="ti ti-circle-plus me-1"></i>Add Role
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th class="text-end">Permissions</th>
+                        <th class="text-end"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Roles.Get.RoleResponse role in Model)
+                    {
+                        <tr>
+                            <td class="fw-medium">
+                                @role.Name
+                                @if (role.IsSystem)
+                                {
+                                    <span class="badge bg-info ms-1">System</span>
+                                }
+                            </td>
+                            <td class="text-muted">@role.Description</td>
+                            <td class="text-end">@role.Permissions.Count</td>
+                            <td class="text-end">
+                                <a asp-action="Edit" asp-route-id="@role.Id" class="btn btn-sm btn-light" title="View"><i class="ti ti-eye"></i></a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

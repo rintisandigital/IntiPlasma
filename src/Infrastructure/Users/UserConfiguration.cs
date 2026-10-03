@@ -1,3 +1,4 @@
+using Domain.Access;
 using Domain.MasterData.Branches;
 using Domain.Roles;
 using Domain.Users;
@@ -31,29 +32,21 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasField("_roles")
             .UsePropertyAccessMode(PropertyAccessMode.Field);
 
-        builder.HasMany(u => u.Branches)
-            .WithOne()
-            .HasForeignKey(ub => ub.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
+        // A profile in use cannot be deleted (the use case reports how many users still use it).
+        builder.HasOne<MenuAccessProfile>()
+            .WithMany()
+            .HasForeignKey(u => u.MenuAccessProfileId)
+            .OnDelete(DeleteBehavior.Restrict);
 
-        builder.Navigation(u => u.Branches)
-            .HasField("_branches")
-            .UsePropertyAccessMode(PropertyAccessMode.Field);
-    }
-}
-
-internal sealed class UserBranchConfiguration : IEntityTypeConfiguration<UserBranch>
-{
-    public void Configure(EntityTypeBuilder<UserBranch> builder)
-    {
-        builder.ToTable("user_branches", Schemas.Identity);
-
-        builder.HasKey(ub => new { ub.UserId, ub.BranchId });
+        builder.HasOne<BranchAccessProfile>()
+            .WithMany()
+            .HasForeignKey(u => u.BranchAccessProfileId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne<Branch>()
             .WithMany()
-            .HasForeignKey(ub => ub.BranchId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .HasForeignKey(u => u.DefaultBranchId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
 

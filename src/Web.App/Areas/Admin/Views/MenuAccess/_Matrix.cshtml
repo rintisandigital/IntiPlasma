@@ -1,0 +1,111 @@
+@* Menu × rights matrix. Editable (Form) or read-only (Details: ViewData["ReadOnly"] = true). Unsupported rights
+   show a dash; unreleased menus are greyed (they can be granted ahead of their release, W-25). *@
+@model MenuAccessFormViewModel
+@{
+    bool readOnly = ViewData["ReadOnly"] as bool? == true;
+    MenuRights[] columns = [MenuRights.View, MenuRights.Create, MenuRights.Edit, MenuRights.Delete, MenuRights.Export];
+}
+<div class="table-responsive">
+    <table class="table table-sm align-middle mb-0 menu-matrix">
+        <thead class="thead-light">
+            <tr>
+                <th>Menu</th>
+                @foreach (MenuRights column in columns)
+                {
+                    <th class="text-center" style="width: 90px">
+                        @column
+                        @if (!readOnly)
+                        {
+                            <br /><input type="checkbox" class="form-check-input matrix-col" data-right="@column" title="All @column">
+                        }
+                    </th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @for (int i = 0; i < Model.Rows.Count; i++)
+            {
+                MenuAccessRowInput row = Model.Rows[i];
+                if (i == 0 || Model.Rows[i - 1].GroupCode != row.GroupCode)
+                {
+                    <tr class="table-light" data-group="@row.GroupCode">
+                        <td colspan="6" class="fw-semibold">
+                            @if (!readOnly)
+                            {
+                                <input type="checkbox" class="form-check-input me-2 matrix-group" data-group="@row.GroupCode" title="Whole group">
+                            }
+                            @row.GroupName
+                        </td>
+                    </tr>
+                }
+                <tr class="@(row.IsAvailable && row.IsActive ? "" : "text-muted")" data-row data-group="@row.GroupCode">
+                    <td>
+                        <input type="hidden" name="Rows[@i].MenuId" value="@row.MenuId" />
+                        @if (!readOnly)
+                        {
+                            <input type="checkbox" class="form-check-input me-2 matrix-row" title="Whole row">
+                        }
+                        @row.Name
+                        @if (!row.IsAvailable)
+                        {
+                            <span class="badge bg-light text-muted ms-1">Coming soon</span>
+                        }
+                        else if (!row.IsActive)
+                        {
+                            <span class="badge bg-light text-muted ms-1">Inactive</span>
+                        }
+                    </td>
+                    @foreach (MenuRights column in columns)
+                    {
+                        <td class="text-center">
+                            @if ((row.Supported & column) == column)
+                            {
+                                <input type="checkbox" class="form-check-input matrix-cell" name="Rows[@i].@column" value="true"
+                                       data-right="@column" checked="@row.Has(column)" disabled="@readOnly">
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (!readOnly)
+{
+    <script>
+        // Any right needs View; removing View removes the other rights of the row.
+        (function () {
+            var table = document.querySelector('.menu-matrix');
+            function cells(row) { return row.querySelectorAll('.matrix-cell'); }
+            function view(row) { return row.querySelector('.matrix-cell[data-right="View"]'); }
+            function normalize(row, changed) {
+                var v = view(row);
+                if (!v) { return; }
+                if (changed && changed !== v && changed.checked) { v.checked = true; }
+                if (changed === v && !v.checked) { cells(row).forEach(function (c) { c.checked = false; }); }
+            }
+            table.addEventListener('change', function (e) {
+                var t = e.target;
+                if (t.classList.contains('matrix-cell')) {
+                    normalize(t.closest('tr'), t);
+                } else if (t.classList.contains('matrix-row')) {
+                    cells(t.closest('tr')).forEach(function (c) { c.checked = t.checked; });
+                } else if (t.classList.contains('matrix-group')) {
+                    table.querySelectorAll('tr[data-row][data-group="' + t.dataset.group + '"]').forEach(function (row) {
+                        cells(row).forEach(function (c) { c.checked = t.checked; });
+                    });
+                } else if (t.classList.contains('matrix-col')) {
+                    table.querySelectorAll('tr[data-row]').forEach(function (row) {
+                        var c = row.querySelector('.matrix-cell[data-right="' + t.dataset.right + '"]');
+                        if (c) { c.checked = t.checked; normalize(row, c); }
+                    });
+                }
+            });
+        })();
+    </script>
+}

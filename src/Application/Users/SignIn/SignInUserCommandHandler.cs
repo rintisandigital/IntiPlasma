@@ -27,6 +27,12 @@ internal sealed class SignInUserCommandHandler(IApplicationDbContext context, IP
             return Result.Failure<SignedInUserResponse>(UserErrors.Inactive);
         }
 
+        // Web.App shows nothing without a menu access profile (the API does not need one).
+        if (user.MenuAccessProfileId is null)
+        {
+            return Result.Failure<SignedInUserResponse>(UserErrors.NoMenuAccess);
+        }
+
         return new SignedInUserResponse(user.Id, user.Email, user.FirstName, user.LastName, user.SecurityStamp);
     }
 }

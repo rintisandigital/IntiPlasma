@@ -12,6 +12,22 @@ public static class PermissionCacheKeys
     public static string BranchesForUser(Guid userId) => $"branches:user:{userId}";
 
     /// <summary>
+    /// Web.App menu rights of the user (from the menu access profile).
+    /// </summary>
+    public static string MenuAccessForUser(Guid userId) => $"menu-access:user:{userId}";
+
+    /// <summary>
+    /// Every per-user access entry, for invalidation after a change to that user.
+    /// </summary>
+    public static IEnumerable<string> AllForUser(Guid userId) =>
+    [
+        ForUser(userId),
+        BranchesForUser(userId),
+        MenuAccessForUser(userId),
+        SessionForUser(userId)
+    ];
+
+    /// <summary>
     /// Cookie session data (active flag + security stamp) re-validated by Web.App.
     /// </summary>
     public static string SessionForUser(Guid userId) => $"session:user:{userId}";

@@ -1,0 +1,91 @@
+@model UserIndexViewModel
+@{
+    ViewData["Title"] = "Users";
+    ViewData["Menu"] = MenuCodes.AdminUsers;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Users</h4>
+            <h6>Accounts, menu access and branch access</h6>
+        </div>
+    </div>
+    <div class="page-btn">
+        <a asp-action="Create" asp-menu="@MenuCodes.AdminUsers" asp-right="Create" class="btn btn-primary">
+            <i class="ti ti-circle-plus me-1"></i>Add User
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label fs-13 mb-1">Search</label>
+                <input type="search" name="search" value="@Model.Search" class="form-control" placeholder="Name or email">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fs-13 mb-1">Status</label>
+                <select name="status" class="form-select">
+                    <option value="">All</option>
+                    <option value="active" selected="@(Model.Status == "active")">Active</option>
+                    <option value="inactive" selected="@(Model.Status == "inactive")">Inactive</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fs-13 mb-1">Menu access</label>
+                <select name="menuAccessProfileId" class="form-select" asp-items="Model.MenuProfiles">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fs-13 mb-1">Branch access</label>
+                <select name="branchAccessProfileId" class="form-select" asp-items="Model.BranchProfiles">
+                    <option value="">All</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="ti ti-filter me-1"></i>Filter</button>
+                <a asp-action="Index" class="btn btn-light">Reset</a>
+            </div>
+        </form>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Menu Access</th>
+                        <th>Branch Access</th>
+                        <th>API Roles</th>
+                        <th>Status</th>
+                        <th class="text-end"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Users.Manage.UserListItem user in Model.Users.Items)
+                    {
+                        <tr>
+                            <td class="fw-medium">@user.FirstName @user.LastName</td>
+                            <td>@user.Email</td>
+                            <td>@(user.MenuAccessProfileName ?? "—")</td>
+                            <td>@(user.BranchAccessProfileName ?? "—")</td>
+                            <td class="text-muted">@(user.Roles ?? "—")</td>
+                            <td><partial name="Partials/_StatusBadge" model='user.IsActive ? "Active" : "Inactive"' /></td>
+                            <td class="text-end">
+                                <a asp-action="Details" asp-route-id="@user.Id" class="btn btn-sm btn-light" title="View"><i class="ti ti-eye"></i></a>
+                            </td>
+                        </tr>
+                    }
+                    @if (Model.Users.Items.Count == 0)
+                    {
+                        <tr><td colspan="7" class="text-center text-muted py-4">No users found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="Partials/_Pagination" model="PaginationModel.From(Model.Users)" />
+    </div>
+</div>

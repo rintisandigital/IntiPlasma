@@ -1,0 +1,60 @@
+@model MenuEditViewModel
+@{
+    ViewData["Title"] = "Edit Menu";
+    ViewData["Menu"] = MenuCodes.AdminMenus;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Edit Menu</h4>
+            <h6>@Model.Code · default name "@Model.DefaultName"</h6>
+        </div>
+    </div>
+    <div class="page-btn">
+        <a asp-action="Index" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-xl-6 col-lg-8">
+        <form asp-action="Edit" method="post" class="card">
+            <input type="hidden" asp-for="Id" />
+            <input type="hidden" asp-for="Code" />
+            <input type="hidden" asp-for="DefaultName" />
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                <div class="mb-3">
+                    <label asp-for="Name" class="form-label"></label> <span class="text-danger">*</span>
+                    <input asp-for="Name" class="form-control">
+                    <span asp-validation-for="Name" class="text-danger fs-13"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="Icon" class="form-label"></label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i id="icon-preview" class="@Model.Icon"></i></span>
+                        <input asp-for="Icon" class="form-control" placeholder="ti ti-database">
+                    </div>
+                    <div class="form-text">Tabler icon class, shown for module groups.</div>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="SortOrder" class="form-label"></label>
+                    <input asp-for="SortOrder" type="number" min="0" max="9999" class="form-control">
+                </div>
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="IsActive" name="IsActive" value="true"
+                           checked="@(Model.IsActive == true)">
+                    <label class="form-check-label" for="IsActive">Active (an inactive menu is hidden and blocked for everyone)</label>
+                </div>
+                <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('Icon').addEventListener('input', function () {
+            document.getElementById('icon-preview').className = this.value;
+        });
+    </script>
+}

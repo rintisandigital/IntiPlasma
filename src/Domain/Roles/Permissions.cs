@@ -14,11 +14,7 @@ public static class Permissions
     public const string BranchesRead = "branches:read";
     public const string BranchesManage = "branches:manage";
 
-    /// <summary>
-    /// Grants access to the data of every branch (head office). Without it a user only sees
-    /// the branches assigned to them.
-    /// </summary>
-    public const string BranchesAccessAll = "branches:access-all";
+    // Branch scope is no longer a permission: it comes from the user's branch access profile (PhaseW1).
 
     /// <summary>
     /// Company-wide reference data: units of measure, items, tax codes, vendors and customers.
@@ -255,7 +251,6 @@ public static class Permissions
         RolesManage,
         BranchesRead,
         BranchesManage,
-        BranchesAccessAll,
         MasterDataRead,
         MasterDataManage,
         WarehousesRead,

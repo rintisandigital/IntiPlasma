@@ -1,0 +1,67 @@
+@model BranchFormViewModel
+@{
+    bool isNew = Model.Id is null;
+    ViewData["Title"] = isNew ? "Add Branch" : $"Edit {Model.Code}";
+    ViewData["Menu"] = MenuCodes.AdminBranches;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">@(isNew ? "Add Branch" : "Edit Branch")</h4>
+            <h6>The code is used in document numbers (e.g. PO/BDG/2026/X/0001)</h6>
+        </div>
+    </div>
+    <div class="page-btn">
+        <a asp-action="Index" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-xl-6 col-lg-8">
+        <form asp-action="@(isNew ? "Create" : "Edit")" method="post" class="card">
+            @if (isNew)
+            {
+                <form-token />
+            }
+            else
+            {
+                <input type="hidden" asp-for="Id" />
+                <input type="hidden" asp-for="Code" />
+            }
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                <div class="mb-3">
+                    <label asp-for="Code" class="form-label"></label> <span class="text-danger">*</span>
+                    <input asp-for="Code" class="form-control text-uppercase" disabled="@(!isNew)">
+                    <span asp-validation-for="Code" class="text-danger fs-13"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="Name" class="form-label"></label> <span class="text-danger">*</span>
+                    <input asp-for="Name" class="form-control">
+                    <span asp-validation-for="Name" class="text-danger fs-13"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="Address" class="form-label"></label>
+                    <input asp-for="Address" class="form-control">
+                </div>
+                <div class="mb-3">
+                    <label asp-for="Phone" class="form-label"></label>
+                    <input asp-for="Phone" class="form-control">
+                </div>
+                @if (!isNew)
+                {
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="IsActive" name="IsActive" value="true"
+                               checked="@(Model.IsActive == true)">
+                        <label class="form-check-label" for="IsActive">Active</label>
+                    </div>
+                }
+                <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

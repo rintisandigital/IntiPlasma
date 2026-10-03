@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Web.App.Infrastructure;
 using Web.App.Infrastructure.Auth;
+using Web.App.Infrastructure.Authorization;
 using Web.App.Infrastructure.Forms;
 using Web.App.Infrastructure.Formatting;
 using Web.App.Infrastructure.Navigation;
@@ -39,7 +40,10 @@ public static class DependencyInjection
         services.AddAppLocalization(configuration);
 
         services.AddScoped<IBranchContext, BranchContext>();
-        services.AddScoped<IMainboardMenuProvider, StaticMainboardMenuProvider>();
+        services.AddScoped<IMainboardMenuProvider, DatabaseMainboardMenuProvider>();
+        services.AddScoped<IMenuRights, MenuRightsService>();
+        services.AddScoped<Areas.Admin.Controllers.AdminLookups>();
+        services.AddHostedService<MenuCatalogSyncService>();
         services.AddScoped<IWorkflowActionService, DirectWorkflowActionService>();
         services.AddSingleton<DisplayFormatter>();
 
@@ -66,6 +70,8 @@ public static class DependencyInjection
             });
 
         services.AddAuthorization();
+        services.AddSingleton<IAuthorizationPolicyProvider, MenuPolicyProvider>();
+        services.AddScoped<IAuthorizationHandler, MenuAuthorizationHandler>();
     }
 
     /// <summary>

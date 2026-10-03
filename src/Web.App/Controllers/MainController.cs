@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using Web.App.Infrastructure.Auth;
+using Web.App.Infrastructure.Authorization;
 
 namespace Web.App.Controllers;
 
 /// <summary>
 /// The mainboard (header + sidebar + content iframe) and the dashboard shown in the iframe.
 /// </summary>
+[AuthenticatedOnly]
 public sealed class MainController(IBranchContext branchContext) : AppController
 {
     [HttpGet]

@@ -78,7 +78,9 @@ internal sealed class BranchContext(
             return branch;
         }
 
-        return user.Branches.Count > 0 ? user.Branches[0] : null;
+        // No (valid) selection yet: the user's default branch, otherwise the first accessible branch.
+        return user.Branches.FirstOrDefault(b => b.Id == user.DefaultBranchId)
+            ?? (user.Branches.Count > 0 ? user.Branches[0] : null);
     }
 
     public async Task<bool> SelectAsync(Guid? branchId, CancellationToken cancellationToken = default)

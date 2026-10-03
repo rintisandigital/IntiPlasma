@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Application.Abstractions.Data;
+using Domain.Access;
 using Domain.Costing.PlasmaSettlements;
 using Domain.Documents.Attachments;
 using Domain.Finance.Accounts;
@@ -58,6 +59,14 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<RefreshToken> RefreshTokens { get; set; }
 
     public DbSet<Role> Roles { get; set; }
+
+    public DbSet<DeletedUser> DeletedUsers { get; set; }
+
+    public DbSet<Menu> Menus { get; set; }
+
+    public DbSet<MenuAccessProfile> MenuAccessProfiles { get; set; }
+
+    public DbSet<BranchAccessProfile> BranchAccessProfiles { get; set; }
 
     public DbSet<Branch> Branches { get; set; }
 

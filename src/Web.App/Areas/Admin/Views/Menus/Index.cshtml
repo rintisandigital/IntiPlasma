@@ -1,0 +1,70 @@
+@model IReadOnlyList<Application.Access.Menus.MenuResponse>
+@{
+    ViewData["Title"] = "Menus";
+    ViewData["Menu"] = MenuCodes.AdminMenus;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Menus</h4>
+            <h6>Display name, icon, order and active flag of the sidebar menus</h6>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Menu</th>
+                        <th>Code</th>
+                        <th class="text-end">Order</th>
+                        <th>Status</th>
+                        <th class="text-end"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Access.Menus.MenuResponse menu in Model.Where(m => m.InCatalog))
+                    {
+                        bool isGroup = menu.ParentCode is null;
+                        <tr class="@(isGroup ? "table-light" : "")">
+                            <td class="@(isGroup ? "fw-semibold" : "ps-4")">
+                                @if (isGroup)
+                                {
+                                    <i class="@(menu.Icon ?? "ti ti-folder") me-1"></i>
+                                }
+                                @menu.Name
+                                @if (menu.Name != menu.DefaultName)
+                                {
+                                    <span class="text-muted fs-12 ms-1">(@menu.DefaultName)</span>
+                                }
+                            </td>
+                            <td class="text-muted fs-13">@menu.Code</td>
+                            <td class="text-end">@menu.SortOrder</td>
+                            <td>
+                                @if (!menu.IsActive)
+                                {
+                                    <span class="badge bg-secondary">Inactive</span>
+                                }
+                                else if (!menu.IsAvailable)
+                                {
+                                    <span class="badge bg-light text-muted">Coming soon</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success">Active</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <a asp-action="Edit" asp-route-id="@menu.Id" asp-menu="@MenuCodes.AdminMenus" asp-right="Edit"
+                                   class="btn btn-sm btn-light" title="Edit"><i class="ti ti-edit"></i></a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

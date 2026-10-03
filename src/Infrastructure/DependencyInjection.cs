@@ -177,6 +177,8 @@ public static class DependencyInjection
 
         services.AddScoped<IBranchAccess, BranchAccess>();
 
+        services.AddScoped<IMenuAccessProvider, MenuAccessProvider>();
+
         return services;
     }
 

@@ -5,7 +5,6 @@ namespace Domain.Users;
 public sealed class User : AggregateRoot
 {
     private readonly List<UserRole> _roles = [];
-    private readonly List<UserBranch> _branches = [];
 
     private User(Guid id, string email, string firstName, string lastName, string passwordHash)
         : base(id)
@@ -38,8 +37,22 @@ public sealed class User : AggregateRoot
     /// </summary>
     public string SecurityStamp { get; private set; }
 
+    /// <summary>
+    /// "Akses Menu": the Web.App menus and rights of the user. Without it the user cannot sign in to Web.App.
+    /// </summary>
+    public Guid? MenuAccessProfileId { get; private set; }
+
+    /// <summary>
+    /// "Akses Cabang": the branches the user may work in (Web.Api and Web.App). Without it no branch is visible.
+    /// </summary>
+    public Guid? BranchAccessProfileId { get; private set; }
+
+    /// <summary>
+    /// Branch selected in Web.App after sign-in; must be covered by the branch access profile.
+    /// </summary>
+    public Guid? DefaultBranchId { get; private set; }
+
     public IReadOnlyCollection<UserRole> Roles => [.. _roles];
-    public IReadOnlyCollection<UserBranch> Branches => [.. _branches];
 
     public static User Create(string email, string firstName, string lastName, string passwordHash)
     {
@@ -67,19 +80,21 @@ public sealed class User : AggregateRoot
         Raise(new UserRolesChangedDomainEvent(Id));
     }
 
-    /// <summary>
-    /// Replaces the branches the user may access. The caller is responsible for rejecting unknown branch ids.
-    /// </summary>
-    public void SetBranches(IEnumerable<Guid> branchIds)
+    public void UpdateProfile(string firstName, string lastName)
     {
-        var desired = branchIds.ToHashSet();
+        FirstName = firstName.Trim();
+        LastName = lastName.Trim();
+    }
 
-        _branches.RemoveAll(b => !desired.Contains(b.BranchId));
-
-        foreach (Guid branchId in desired.Where(id => _branches.TrueForAll(b => b.BranchId != id)))
-        {
-            _branches.Add(new UserBranch(Id, branchId));
-        }
+    /// <summary>
+    /// Assigns the menu and branch access profiles. The caller checks that the profiles exist and that the
+    /// default branch is covered by the branch profile (it needs the profile's data).
+    /// </summary>
+    public void SetAccess(Guid? menuAccessProfileId, Guid? branchAccessProfileId, Guid? defaultBranchId)
+    {
+        MenuAccessProfileId = menuAccessProfileId;
+        BranchAccessProfileId = branchAccessProfileId;
+        DefaultBranchId = branchAccessProfileId is null ? null : defaultBranchId;
     }
 
     public void ChangePassword(string passwordHash)

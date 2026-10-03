@@ -1,7 +1,7 @@
 # Rangkuman Proyek — Aplikasi Peternakan Ayam Broiler Inti-Plasma
 
 > Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4), 2026-10-01 (Fase 5–8) dan 2026-10-02 (Fase 9 — lampiran dokumen; Fase W0 — fondasi WebApp).
-> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§16 (API) dan [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (WebApp, realisasi W0 di §10). Fase API 0–9 dan Fase W0 selesai; berikutnya **Fase W1** (Akses Menu, Akses Cabang & administrasi).
+> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§16 (API) dan [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (WebApp, realisasi W0 di §10, W1 di §12). Fase API 0–9, W0 dan W1 selesai; berikutnya **Fase W2** (ekspor Excel/PDF & master data).
 
 ---
 
@@ -159,6 +159,13 @@
 - UI: mainboard + iframe (hash `/#/path`, Back/refresh/deep link), login cookie dengan validasi stamp, ganti password, pemilih cabang, halaman error, tema `#0984E3`, aset 84 → 21 MB, UI English + format id-ID.
 - Pondasi untuk fase berikut: `FormTokenFilter` (double-submit), `DbExceptionFilter` (concurrency), `[WorkflowAction]`, partial umum, `DisplayFormatter`.
 
+### Fase W1 — Akses Menu, Akses Cabang & Administrasi ✅ (detail: PLAN-WEBAPP §12)
+- **Akses Menu** (profil hak View/Create/Edit/Delete/Export per menu) & **Akses Cabang** (semua/daftar cabang): master ber-CRUD, satu profil dipakai banyak user, satu profil per jenis per user. Profil sistem Full Access & All Branches.
+- `BranchAccess` kini dari profil Akses Cabang (berlaku API & WebApp); ⚠️ `branches:access-all` & `PUT users/{id}/branches` dihapus → `branch-access-profiles` + `PUT users/{id}/access`. Migration `PhaseW1_AccessControl` memindahkan data lama.
+- Katalog menu di kode (`MenuCatalog`, disinkron saat startup; menu belum rilis tersembunyi), `[MenuAccess]` di setiap action (dijaga test arsitektur), sidebar & pencarian menu hanya `CanView`.
+- Administrasi di Web.App: Users (password awal, akses, role API, aktif/nonaktif, reset password, **hapus dengan backup `identity.user_old`**), Menu Access (matriks), Branch Access, Menus, API Roles, Branches.
+- ⚠️ Setelah migrate, user non-Administrator perlu diberi Akses Menu dulu sebelum bisa login ke Web.App.
+
 ## 5. Alur Akuntansi yang Sudah Berjalan
 
 | Transaksi | Jurnal otomatis |
@@ -211,12 +218,12 @@ Semua event di katalog kini sudah dipakai.
 
 - Setiap fase: domain + unit test invariant → command/query + validator → EF config + migration → endpoint + permission → **verifikasi end-to-end** ke PostgreSQL lokal pada database sementara `intiplasma_verify` (dibuat & dihapus otomatis; database `intiplasma` milik user tidak disentuh).
 - User yang melakukan **commit & migrate** setelah tiap fase.
-- Status test saat ini: **207 test lulus** (124 domain, 48 application, 11 arsitektur, 13 integration Web.Api, 11 integration Web.App).
+- Status test saat ini: **250 test lulus** (143 domain, 60 application, 14 arsitektur, 18 integration Web.Api, 15 integration Web.App).
 - Integration test (Testcontainers) **sudah bisa dijalankan** di mesin dev (container runtime tersedia) — `dotnet test IntiPlasma.slnx`.
 - Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario, Fase 7: 32 skenario, Fase 8: 35 skenario, Fase 9: 79 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
 - ⚠️ Sejak W0 Web.Api tidak memproses outbox: verifikasi yang hanya menjalankan API perlu `BackgroundJobs__Enabled=true`.
-- Verifikasi WebApp (W0: 49 skenario) memakai **Playwright** (dipasang di scratchpad, bukan di repo) terhadap Web.App :5098 + Web.Api :5099 pada `intiplasma_verify`; interaksi halaman lewat frame `content-frame`.
-- Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`, `Phase8_ReportingClosing`, `Phase9_Attachments`, `PhaseW0_UserStatus`.
+- Verifikasi WebApp (W0: 49 skenario, W1: 36 skenario + regresi W0) memakai **Playwright** (dipasang di scratchpad, bukan di repo) terhadap Web.App :5098 + Web.Api :5099 pada `intiplasma_verify`; interaksi halaman lewat frame `content-frame`.
+- Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`, `Phase8_ReportingClosing`, `Phase9_Attachments`, `PhaseW0_UserStatus`, `PhaseW1_AccessControl`.
 
 ## 8. Catatan Terbuka / Hutang Teknis
 

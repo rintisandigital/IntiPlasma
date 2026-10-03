@@ -1,3 +1,10 @@
+using Application.Abstractions.Authorization;
+using Application.Abstractions.Messaging;
+using Application.Access.Menus;
+using Domain.Access;
+using SharedKernel;
+using Web.App.Infrastructure.Authorization;
+
 namespace Web.App.Infrastructure.Navigation;
 
 /// <summary>
@@ -14,37 +21,54 @@ public sealed record MenuItem(string Code, string Title, string? Url, IReadOnlyL
 }
 
 /// <summary>
-/// The menu shown to the current user. W0 serves a fixed menu; W1 replaces it with the database catalog
-/// filtered by the user's Menu Access (only <c>CanView</c> items).
+/// The menu shown to the current user: the built-in Dashboard plus every usable catalog page (released,
+/// active, in the catalog) the user may view, grouped by module. Groups without such a page are hidden.
 /// </summary>
 public interface IMainboardMenuProvider
 {
     Task<IReadOnlyList<MenuGroup>> GetMenuAsync(CancellationToken cancellationToken = default);
 }
 
-internal sealed class StaticMainboardMenuProvider(LinkGenerator links, IHttpContextAccessor httpContextAccessor)
-    : IMainboardMenuProvider
+internal sealed class DatabaseMainboardMenuProvider(
+    IQueryHandler<GetMenusQuery, IReadOnlyList<MenuResponse>> menusQuery,
+    IMenuRights menuRights,
+    LinkGenerator links,
+    IHttpContextAccessor httpContextAccessor) : IMainboardMenuProvider
 {
-    public Task<IReadOnlyList<MenuGroup>> GetMenuAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<MenuGroup>> GetMenuAsync(CancellationToken cancellationToken = default)
     {
         HttpContext httpContext = httpContextAccessor.HttpContext
             ?? throw new InvalidOperationException("The menu requires an HTTP request.");
 
-        string Url(string action, string controller) =>
-            links.GetPathByAction(httpContext, action, controller) ?? "/";
+        string dashboardUrl = links.GetPathByAction(httpContext, "Dashboard", "Main") ?? "/";
+        string pathBase = httpContext.Request.PathBase;
 
-        IReadOnlyList<MenuGroup> menu =
-        [
-            new MenuGroup("dashboard", "Dashboard", "ti ti-smart-home",
-            [
-                new MenuSection("Dashboard", [MenuItem.Link("dashboard", "Dashboard", Url("Dashboard", "Main"))])
-            ]),
-            new MenuGroup("account", "My Account", "ti ti-user-circle",
-            [
-                new MenuSection("My Account", [MenuItem.Link("account.password", "Change Password", Url("ChangePassword", "Account"))])
-            ])
-        ];
+        var groups = new List<MenuGroup>
+        {
+            new("dashboard", "Dashboard", "ti ti-smart-home",
+                [new MenuSection("Dashboard", [MenuItem.Link("dashboard", "Dashboard", dashboardUrl)])])
+        };
 
-        return Task.FromResult(menu);
+        Result<IReadOnlyList<MenuResponse>> menus = await menusQuery.Handle(new GetMenusQuery(), cancellationToken);
+        if (menus.IsFailure)
+        {
+            return groups;
+        }
+
+        MenuAccess access = await menuRights.GetAsync();
+
+        foreach (MenuResponse group in menus.Value.Where(m => m.ParentCode is null && m.InCatalog && m.IsActive))
+        {
+            List<MenuItem> items = [.. menus.Value
+                .Where(m => m.ParentCode == group.Code && m.Route is not null && access.Has(m.Code, MenuRights.View))
+                .Select(m => MenuItem.Link(m.Code, m.Name, pathBase + m.Route))];
+
+            if (items.Count > 0)
+            {
+                groups.Add(new MenuGroup(group.Code, group.Name, group.Icon ?? "ti ti-folder", [new MenuSection(group.Name, items)]));
+            }
+        }
+
+        return groups;
     }
 }

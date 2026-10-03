@@ -1,0 +1,64 @@
+@model SharedKernel.PagedList<Application.Access.MenuAccessProfiles.MenuAccessProfileListItem>
+@{
+    ViewData["Title"] = "Menu Access";
+    ViewData["Menu"] = MenuCodes.AdminMenuAccess;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Menu Access</h4>
+            <h6>Profiles of menu rights; each user uses one profile</h6>
+        </div>
+    </div>
+    <div class="page-btn">
+        <a asp-action="Create" asp-menu="@MenuCodes.AdminMenuAccess" asp-right="Create" class="btn btn-primary">
+            <i class="ti ti-circle-plus me-1"></i>Add Menu Access
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <partial name="Partials/_FilterBar" model='new FilterBarModel(ViewData["Search"] as string, "Search profile")' />
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th class="text-end">Menus</th>
+                        <th class="text-end">Users</th>
+                        <th class="text-end"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Access.MenuAccessProfiles.MenuAccessProfileListItem profile in Model.Items)
+                    {
+                        <tr>
+                            <td class="fw-medium">
+                                @profile.Name
+                                @if (profile.IsSystem)
+                                {
+                                    <span class="badge bg-info ms-1">System</span>
+                                }
+                            </td>
+                            <td class="text-muted">@profile.Description</td>
+                            <td class="text-end">@(profile.MenuCount?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "All")</td>
+                            <td class="text-end">@profile.UserCount</td>
+                            <td class="text-end">
+                                <a asp-action="Details" asp-route-id="@profile.Id" class="btn btn-sm btn-light" title="View"><i class="ti ti-eye"></i></a>
+                            </td>
+                        </tr>
+                    }
+                    @if (Model.Items.Count == 0)
+                    {
+                        <tr><td colspan="5" class="text-center text-muted py-4">No profiles found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="Partials/_Pagination" model="PaginationModel.From(Model)" />
+    </div>
+</div>

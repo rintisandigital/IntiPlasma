@@ -48,6 +48,11 @@ app.MapHealthChecks("health", new HealthCheckOptions
 });
 
 app.MapControllerRoute(
+    name: "areas",
+    pattern: "{area:exists}/{controller}/{action=Index}/{id?}")
+    .WithStaticAssets();
+
+app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Main}/{action=Index}/{id?}")
     .WithStaticAssets();

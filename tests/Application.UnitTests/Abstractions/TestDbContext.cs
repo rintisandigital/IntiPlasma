@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Application.Abstractions.Data;
+using Domain.Access;
 using Domain.Costing.PlasmaSettlements;
 using Domain.Documents.Attachments;
 using Domain.Finance.Accounts;
@@ -52,6 +53,14 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
     public DbSet<RefreshToken> RefreshTokens { get; set; }
 
     public DbSet<Role> Roles { get; set; }
+
+    public DbSet<DeletedUser> DeletedUsers { get; set; }
+
+    public DbSet<Menu> Menus { get; set; }
+
+    public DbSet<MenuAccessProfile> MenuAccessProfiles { get; set; }
+
+    public DbSet<BranchAccessProfile> BranchAccessProfiles { get; set; }
 
     public DbSet<Branch> Branches { get; set; }
 
@@ -132,9 +141,12 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>().Navigation(u => u.Roles).HasField("_roles");
-        modelBuilder.Entity<User>().Navigation(u => u.Branches).HasField("_branches");
         modelBuilder.Entity<UserRole>().HasKey(ur => new { ur.UserId, ur.RoleId });
-        modelBuilder.Entity<UserBranch>().HasKey(ub => new { ub.UserId, ub.BranchId });
+
+        modelBuilder.Entity<MenuAccessProfile>().Navigation(p => p.Items).HasField("_items");
+        modelBuilder.Entity<MenuAccessItem>().HasKey(i => new { i.ProfileId, i.MenuId });
+        modelBuilder.Entity<BranchAccessProfile>().Navigation(p => p.Branches).HasField("_branches");
+        modelBuilder.Entity<BranchAccessProfileBranch>().HasKey(b => new { b.ProfileId, b.BranchId });
 
         modelBuilder.Entity<Role>().Navigation(r => r.Permissions).HasField("_permissions");
         modelBuilder.Entity<RolePermission>().HasKey(rp => new { rp.RoleId, rp.Permission });

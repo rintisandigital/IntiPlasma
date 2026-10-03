@@ -8,8 +8,8 @@ public interface IBranchAccess
     Task<BranchScope> GetScopeAsync(CancellationToken cancellationToken = default);
 }
 
-/// <param name="AllBranches">True for head office users (permission <c>branches:access-all</c>).</param>
-/// <param name="BranchIds">Branches assigned to the user; ignored when <paramref name="AllBranches"/> is true.</param>
+/// <param name="AllBranches">True when the user's branch access profile covers every branch.</param>
+/// <param name="BranchIds">Active branches of the user's profile; ignored when <paramref name="AllBranches"/> is true.</param>
 public sealed record BranchScope(bool AllBranches, Guid[] BranchIds)
 {
     public static readonly BranchScope All = new(true, []);

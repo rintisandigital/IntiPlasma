@@ -1,0 +1,32 @@
+@model UserAccessViewModel
+@{
+    ViewData["Title"] = "Change Access";
+    ViewData["Menu"] = MenuCodes.AdminUsers;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Change Access</h4>
+            <h6>@Model.DisplayName</h6>
+        </div>
+    </div>
+    <div class="page-btn">
+        <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+    </div>
+</div>
+
+<form asp-action="Access" method="post">
+    <input type="hidden" asp-for="Id" />
+    <input type="hidden" asp-for="DisplayName" />
+    <div class="card">
+        <div class="card-body">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+            <partial name="_AccessFields" model="Model" />
+            <p class="text-muted fs-13 mb-0"><i class="ti ti-info-circle me-1"></i>Changes apply immediately, also to the user's open sessions and the mobile app.</p>
+        </div>
+    </div>
+    <div class="d-flex gap-2 mb-4">
+        <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Save Access</button>
+        <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-light">Cancel</a>
+    </div>
+</form>

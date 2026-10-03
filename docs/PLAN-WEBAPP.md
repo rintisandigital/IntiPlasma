@@ -382,7 +382,7 @@ Use case Application/Domain baru dikerjakan & diuji dulu (unit test seperti fase
 - Partial umum: page header, filter bar, pagination, status badge, money/date, `_DocumentActions`.
 - **Selesai bila**: login admin → dashboard kosong → ganti cabang → change password → logout; user nonaktif tidak bisa login (WebApp & API); jurnal otomatis dari transaksi API tetap terbentuk lewat job di Web.App.
 
-### Fase W1 — Akses Menu, Akses Cabang & Administrasi
+### Fase W1 — Akses Menu, Akses Cabang & Administrasi ✅ (selesai 2026-10-03; rencana §11, realisasi §12)
 - Domain: `Menu`, `MenuAccessProfile`, `BranchAccessProfile`, `User.SetAccess` (§4.2–4.5). Migration `PhaseW1_AccessControl` (termasuk migrasi data §4.6 dan penghapusan `user_branches` & `branches:access-all`).
 - Application: use case §2.3 (CRUD profil, user, katalog menu); `IMenuAccessProvider` + cache; `BranchAccess` versi profil.
 - Web.Api: `PUT users/{id}/access` (menggantikan `PUT users/{id}/branches`), CRUD profil, `GET users`, aktif/nonaktif, reset password.
@@ -488,3 +488,182 @@ Seluruh keputusan W-1 s.d. W-20 sudah disepakati (lihat §1). Keputusan baru yan
 - Route default `Main/Index` = `/`, jadi URL mainboard berbentuk `/#/path` (bukan `/Main#/path`); keduanya berfungsi.
 - `Program` hasil top-level statements di .NET 10 bersifat public → test arsitektur memakai `typeof(Web.Api.Program)` / `typeof(Web.App.Program)` secara eksplisit.
 - Belum ada: menu dari DB & `[MenuAccess]` (W1), notifikasi header, lockout login (W10), Data Protection key ring bersama untuk banyak replika Web.App (W10).
+
+---
+
+## 11. Rencana Detail Fase W1 — Akses Menu, Akses Cabang & Administrasi
+
+> Disusun 2026-10-03 setelah W0 di-commit (`c47a18e`, `29631bc`). Melengkapi §4 (desain) dengan detail teknis, urutan kerja, dan keputusan yang masih perlu disepakati (§11.10).
+
+### 11.1 Ruang lingkup & hasil akhir
+- Admin dapat mengelola **Akses Menu** (profil + matriks hak), **Akses Cabang** (profil + daftar cabang), **User** (buat, ubah, akses, aktif/nonaktif, reset password), **Menu** (label/ikon/urutan/aktif), **Role API**, dan **Cabang** — semuanya di Web.App.
+- Sidebar mainboard hanya menampilkan menu `CanView` dari Akses Menu user; setiap action controller dijaga `[MenuAccess]`.
+- `BranchAccess` (dipakai semua use case, API & Web.App) membaca **profil Akses Cabang**; `user_branches` dan permission `branches:access-all` dihapus.
+- **Selesai bila**: user staf dengan profil terbatas hanya melihat menu & cabangnya, tombol tanpa hak tersembunyi, URL langsung ke halaman tanpa hak → 403, dan perubahan profil berlaku tanpa login ulang di Web.App **dan** Web.Api.
+
+### 11.2 Model domain (schema `identity`)
+| Aggregate / entity | Isi | Invariant & perilaku |
+|---|---|---|
+| `Menu` (aggregate, disinkron dari katalog) | `Code` (unik, ≤ 100), `ParentCode`, `Name`, `DefaultName`, `Icon`, `Route`, `SortOrder`, `IsActive`, `IsAvailable` (layar sudah dirilis), `SupportsCreate/Edit/Delete/Export`, `IsCustomized` | `Sync(catalogEntry)` hanya menimpa struktur (parent, route, supports, available, default name); nama/ikon/urutan/aktif tidak ditimpa bila `IsCustomized`. `Customize(name, icon, sortOrder, isActive)` menandai `IsCustomized`. |
+| `MenuAccessProfile` (aggregate) | `Name` (unik), `Description`, `IsSystem`, `Items` (`MenuId`, `CanView/Create/Edit/Delete/Export`) | `SetItems(items, menus)`: hak selain View ⇒ View wajib; hak yang tidak didukung menu ditolak; baris tanpa hak apa pun dibuang. Profil sistem **Full Access** tidak bisa diubah/dihapus (haknya dihitung, tanpa baris). `Duplicate(newName)`. Event `MenuAccessProfileChangedDomainEvent`. |
+| `BranchAccessProfile` (aggregate) | `Name` (unik), `Description`, `AllBranches`, `IsSystem`, `Branches` (`BranchId`) | `AllBranches` ⇒ daftar dikosongkan; selain itu minimal 1 cabang. Profil sistem **All Branches** tidak bisa diubah/dihapus. Event `BranchAccessProfileChangedDomainEvent`. |
+| `User` (+) | `MenuAccessProfileId?`, `BranchAccessProfileId?`, `DefaultBranchId?`, `UpdateProfile(first, last)`, `SetAccess(menuProfileId, branchProfileId, defaultBranchId)`, `ResetPassword(hash)` (= stamp baru) | `_branches`/`SetBranches` & `UserBranch` **dihapus**. Validasi "default branch termasuk profil cabang" dilakukan handler (butuh data profil). Password awal/reset **tidak** wajib diganti saat login (W-21). |
+| `DeletedUser` (tabel `identity.user_old`, W-22) | Salinan user saat dihapus: `id` (Guid v7 baris backup), `user_id`, `email`, `first_name`, `last_name`, `password_hash`, `is_active`, `menu_access_profile_id`, `branch_access_profile_id`, `default_branch_id`, `roles` (jsonb: id + nama role), audit asli (`created_at_utc/by`, `modified_at_utc/by`), `deleted_at_utc`, `deleted_by`, `reason` (opsional) | Dibuat oleh `User.Delete…` → handler menulis backup **dalam transaksi yang sama** sebelum `DELETE`; tidak ada FK ke `users` (user sudah hilang). Tanpa fitur restore di UI (pemulihan manual lewat SQL bila perlu). |
+| Error baru | `Menus.NotFound`, `MenuAccessProfiles.NotFound/NameNotUnique/SystemReadOnly/InUse(count)/RightNotSupported/ViewRequired`, `BranchAccessProfiles.NotFound/NameNotUnique/SystemReadOnly/InUse(count)/BranchRequired`, `Users.DefaultBranchNotAccessible`, `Users.CannotDeactivateSelf`, `Users.CannotDeleteSelf`, `Users.LastAdministrator` | |
+
+### 11.3 Migration `PhaseW1_AccessControl` (urutan di dalam satu migration)
+1. Tabel baru: `menus`, `menu_access_profiles`, `menu_access_profile_items`, `branch_access_profiles`, `branch_access_profile_branches`, `user_old` (backup user terhapus, index `user_id` & `email`); kolom `users.menu_access_profile_id`, `branch_access_profile_id`, `default_branch_id` (FK; `RESTRICT` untuk profil, `SET NULL` untuk cabang default).
+2. Data: profil sistem **Full Access** & **All Branches** (id tetap, ditulis di kode) dibuat.
+3. Data: user dengan role yang memiliki `branches:access-all` → `branch_access_profile_id = All Branches`.
+4. Data: user lain yang punya `user_branches` → satu profil per **kombinasi cabang yang sama** (nama "Branches: BDG, JKT"), user diarahkan ke profilnya; `default_branch_id` = cabang pertama (urut kode).
+5. Data: user dengan role `Administrator` → `menu_access_profile_id = Full Access`.
+6. Hapus baris `role_permissions` dengan `branches:access-all`; `DROP TABLE identity.user_branches`.
+7. `Down`: membuat ulang `user_branches` dari profil (best effort) — dicatat sebagai *lossy*.
+- Seeder: memastikan kedua profil sistem ada dan admin seed memakai keduanya (idempoten). `Permissions.BranchesAccessAll` dihapus dari katalog; `Administrator.SyncSystemPermissions` otomatis membuangnya.
+
+### 11.4 Application (use case baru/berubah)
+| Kelompok | Use case | Catatan |
+|---|---|---|
+| Users | `GetUsersQuery` (search, status, menu profile, branch profile; paging), `GetUserByIdQuery` (diperluas: status, profil, cabang default, role, **cabang efektif & menu efektif**), `CreateUserCommand` (data + password awal + akses + role API, satu transaksi), `UpdateUserCommand` (nama), `SetUserAccessCommand`, `AssignUserRolesCommand` (tetap), `DeactivateUserCommand` / `ActivateUserCommand` (tidak bisa menonaktifkan diri sendiri), `ResetUserPasswordCommand` (stamp baru + cabut refresh token; tanpa kewajiban ganti password), `DeleteUserCommand(userId, reason?)` (W-22: tolak hapus diri sendiri & admin Full Access aktif terakhir → tulis `user_old` → hapus user; `user_roles` & `refresh_tokens` ikut terhapus lewat cascade; email bisa dipakai lagi) | Semua perubahan akses & hapus → `ICacheInvalidator` (key user: permission, menu, branch, session) → sesi user terhapus langsung berakhir. |
+| Akses Menu | `GetMenuAccessProfilesQuery` (+ jumlah user, jumlah menu View), `GetMenuAccessProfileByIdQuery` (matriks lengkap seluruh menu katalog), `Create…`, `Update…` (nama + matriks), `Duplicate…`, `Delete…` (tolak bila dipakai) | Update/Delete → `RemoveByTagAsync(permissions)`. |
+| Akses Cabang | `GetBranchAccessProfilesQuery`, `GetBranchAccessProfileByIdQuery`, `Create…`, `Update…`, `Delete…` | idem. |
+| Menu | `SyncMenuCatalogCommand(entries)`, `GetMenusQuery` (tree), `UpdateMenuCommand` (customize) | Sync dipanggil Web.App saat startup. |
+| Akses saat ini | `GetMyMenuAccessQuery` (dipakai provider menu & policy), `GetCurrentUserQuery` (tetap; cabang dari profil + `DefaultBranchId`) | |
+| Dihapus | `AssignUserBranchesCommand` (+ validator) | ⚠️ diganti `SetUserAccessCommand`. |
+
+### 11.5 Infrastructure
+- `BranchAccess`: scope = profil Akses Cabang user (`AllBranches` atau daftar cabang **aktif**); tanpa profil ⇒ scope kosong. Tetap di-cache 10 menit bertag `permissions`.
+- `MenuAccessProvider` (`IMenuAccessProvider`, abstraksi di Application): hak efektif per user (`FullAccess` atau peta `code → hak`), cache `menu-access:user:{id}` bertag `permissions`.
+- `PermissionCacheKeys`: tambah `MenuAccessForUser`; semua invalidasi lewat `ICacheInvalidator` (lintas proses, W0).
+- EF configuration + DbSet `IApplicationDbContext`: `Menus`, `MenuAccessProfiles`, `BranchAccessProfiles`.
+
+### 11.6 Web.Api
+| Endpoint | Status |
+|---|---|
+| `GET users`, `PUT users/{id}`, `PUT users/{id}/access`, `POST users/{id}/deactivate`, `POST users/{id}/activate`, `POST users/{id}/reset-password`, `DELETE users/{id}` | baru (`users:manage` / `users:read`) |
+| `PUT users/{id}/branches` | ⚠️ **dihapus** (diganti `PUT users/{id}/access`) |
+| `GET/POST/PUT/DELETE branch-access-profiles` | baru (`users:manage`) — akses cabang juga berlaku untuk API/mobile |
+| Akses Menu & Menu | **tidak** dibuat endpoint API (khusus Web.App) — W-24 |
+| `GET permissions` | `branches:access-all` hilang dari daftar |
+
+### 11.7 Web.App
+**Perbaikan W0** ✅ (selesai 2026-10-03, sebelum W1 dimulai):
+- `BranchSwitcher/Default.cshtml` memakai tampilan `select-store-dropdown` (commit `29631bc`) **dengan** hook yang dibutuhkan `mainboard.js` (`.branch-switcher`, `data-switch-url`, `.active-branch-name`); item "All Branches" kini berlabel benar.
+- Kotak search dipindah ke partial `Mainboard/_MenuSearch.cshtml` dan dijadikan **pencarian menu** (W-23): mencari judul menu & grup dari link sidebar (otomatis hanya menu `CanView` setelah W1), Enter/klik membuka di iframe, `Ctrl+K` fokus, Escape/klik luar menutup & mengosongkan. Konten demo template dihapus.
+- Verifikasi: header 15/15 (Playwright), regresi E2E W0 49/49.
+
+**Otorisasi**
+- `MenuRight` (`View/Create/Edit/Delete/Export`), `[MenuAccess(code, right)]` (controller atau action; action menimpa controller), `[AuthenticatedOnly]` (penanda halaman umum: dashboard, ganti password).
+- `MenuPolicyProvider` (`menu:{code}:{right}`) + `MenuAuthorizationHandler` (`IMenuAccessProvider`); nama policy lain jatuh ke provider default.
+- Tag helper `asp-menu` / `asp-right` pada `<a>`, `<button>`, `<form>` (elemen tidak dirender bila tidak berhak); `IMenuRights` untuk kondisi di view.
+- 403 untuk halaman tanpa hak → `/Error/403` di dalam iframe.
+
+**Katalog menu (draf, `Web.App/Infrastructure/Authorization/MenuCatalog.cs`)** — hak: C=Create, E=Edit, D=Delete, X=Export (View selalu ada). `Rilis` = fase layar tersedia; menu belum rilis **tidak tampil di sidebar** tetapi tampil abu-abu di matriks (W-25).
+
+| Grup (ikon) | Kode | Menu | Hak | Rilis |
+|---|---|---|---|---|
+| Dashboard (`ti-smart-home`) | `dashboard` | Dashboard | – | W0 |
+| Master Data (`ti-database`) | `master.uoms`, `master.tax-codes`, `master.items`, `master.warehouses`, `master.vendors`, `master.customers` | UoM, Tax Codes, Items, Warehouses, Vendors, Customers | C E D X | W2 |
+| Partnership (`ti-users-group`) | `partnership.farmers`, `partnership.coops`, `partnership.contracts` | Farmers, Coops, Contracts | C E D X | W2 |
+| Procurement (`ti-shopping-cart`) | `procurement.purchase-orders` | Purchase Orders | C E D X | W4 |
+| Inventory (`ti-building-warehouse`) | `inventory.goods-receipts`, `inventory.stock-transfers`, `inventory.stock-returns`, `inventory.feed-mutations` | Goods Receipts, Transfers, Returns, Feed Mutations | C X | W4 |
+| | `inventory.stock` | Stock Balance & Card | X | W4 |
+| Production (`ti-egg`) | `production.cycles`, `production.recordings`, `production.harvests` | Cycles & Chick-in, Daily Recordings, Harvests | C E X | W5 |
+| Sales (`ti-receipt`) | `sales.orders`, `sales.invoices` | Sales Orders, Sales Invoices | C E D X | W6 |
+| | `sales.deliveries`, `sales.credit-notes`, `sales.receipts` | Delivery Orders, Credit Notes, Customer Receipts | C E X | W6 |
+| | `sales.receivables` | Receivable Ledger & Aging | X | W6 |
+| Finance (`ti-building-bank`) | `finance.accounts`, `finance.cost-centers`, `finance.journal-templates`, `finance.cash-bank-accounts` | COA, Cost Centers, Journal Templates, Cash/Bank Accounts | C E D X | W3 |
+| | `finance.fiscal-periods`, `finance.journal-mappings` | Fiscal Periods, Auto Journal Mappings | E X | W3 |
+| | `finance.vendor-invoices`, `finance.payment-vouchers`, `finance.cash-transactions` | Vendor Invoices, Payment Vouchers, Cash In/Out | C E D X | W7 |
+| | `finance.bank-transfers`, `finance.bank-reconciliations` | Bank Transfers, Reconciliations | C E X | W7 |
+| | `finance.payables` | Payable Ledger & Aging | X | W7 |
+| | `finance.journals` | Journals | C E D X | W9 |
+| Costing (`ti-calculator`) | `costing.cycle-costs` | Cycle Cost | X | W8 |
+| | `costing.settlements` | Plasma Settlements | C E X | W8 |
+| Reports (`ti-report-analytics`) | `reports.general-ledger`, `reports.trial-balance`, `reports.income-statement`, `reports.balance-sheet`, `reports.cash-flow`, `reports.profitability`, `reports.tax` | GL, Trial Balance, Income Statement, Balance Sheet, Cash Flow, Profitability, Tax Recap | X | W9 |
+| Administration (`ti-settings`) | `admin.users` | Users | C E D X | W1 |
+| | `admin.menu-access`, `admin.branch-access` | Menu Access, Branch Access | C E D X | W1 |
+| | `admin.menus` | Menus | E | W1 |
+| | `admin.api-roles`, `admin.branches` | API Roles, Branches | C E X | W1 |
+| | `admin.failed-events` | Failed Events | E | W9 |
+
+Halaman "Change Password" tetap di menu user (`[AuthenticatedOnly]`), bukan bagian katalog.
+
+**Layar**
+| Layar | Detail |
+|---|---|
+| Users | List (search, status, Menu Access, Branch Access, paging); Create (nama, email, password awal + konfirmasi, Menu Access, Branch Access, cabang default yang difilter dari profil terpilih, role API opsional); Detail (status, profil, menu efektif ringkas, cabang efektif, role); aksi Edit, Change Access, Activate/Deactivate (konfirmasi), Reset Password (modal, password baru diketik admin), **Delete** (`CanDelete`; konfirmasi + alasan opsional; backup ke `user_old`). |
+| Menu Access | List (nama, #user, #menu View, sistem); Create/Edit: matriks tree per grup — checkbox per sel, centang semua per baris/kolom/grup, sel tidak didukung disembunyikan, menu belum rilis abu-abu; Duplicate; Delete (ditolak bila dipakai). |
+| Branch Access | List (nama, all/#cabang, #user); Create/Edit (toggle All branches, multi-select cabang aktif dengan pencarian); Delete. |
+| Menus | Tree; edit nama tampilan, ikon (class tabler + pratinjau), urutan, aktif. |
+| API Roles | List, Create/Edit (nama, deskripsi, permission dikelompokkan per modul). |
+| Branches | List, Create, Edit (nama, alamat, telepon, aktif). |
+
+**Lain-lain**
+- `DatabaseMainboardMenuProvider` menggantikan menu statis (grup tanpa item `CanView` & tersedia disembunyikan).
+- `Program.cs`: `SyncMenuCatalogCommand` dijalankan saat startup (gagal → log error, aplikasi tetap jalan dengan katalog terakhir).
+- `BranchContext`: memakai `DefaultBranchId` sebagai pilihan awal.
+
+### 11.8 Pengujian & verifikasi
+- **Domain**: invariant `MenuAccessProfile` (View wajib, hak tidak didukung, sistem read-only, duplicate), `BranchAccessProfile` (all vs daftar, minimal 1), `Menu.Sync` vs `Customize`, `User.SetAccess/ResetPassword`.
+- **Application**: CRUD profil (nama unik, tolak hapus profil terpakai), create user dengan akses + cabang default tidak valid, nonaktifkan/hapus diri sendiri ditolak, hapus admin Full Access terakhir ditolak, hapus user menulis backup lengkap (termasuk role) sebelum menghapus, sync katalog idempoten, invalidasi cache dipanggil.
+- **Integration Web.Api** (Testcontainers): migrasi data (`user_branches` & `branches:access-all` → profil), `BranchAccess` (all, daftar, cabang nonaktif, tanpa profil), endpoint `users/{id}/access`, `PUT users/{id}/branches` → 404.
+- **Arsitektur**: setiap action controller Web.App punya `[MenuAccess]`/`[AllowAnonymous]`/`[AuthenticatedOnly]`; setiap kode `[MenuAccess]` ada di `MenuCatalog`; kode katalog unik.
+- **Integration Web.App**: sidebar hanya `CanView`; 403 tanpa hak; tombol tersembunyi; Full Access.
+- **End-to-end (Playwright)**: admin membuat profil "Finance Staff" & "Area Alpha" → membuat user staf → staf login: sidebar & cabang terbatas, URL admin → 403; admin menambah hak saat staf login → menu muncul setelah reload tanpa login ulang; API (token staf) hanya melihat cabang profilnya; ubah profil cabang di Web.App → API langsung mengikuti; hapus profil terpakai ditolak; reset password → sesi staf berakhir; hapus user staf → baris `user_old` ada (psql), sesi & token API staf langsung tidak berlaku, email bisa didaftarkan ulang; pencarian menu hanya menemukan menu `CanView`.
+
+### 11.9 Urutan task
+1. ~~Perbaikan BranchSwitcher & pencarian menu (W-23)~~ ✅ selesai 2026-10-03.
+2. Domain: `Menu`, `MenuAccessProfile`, `BranchAccessProfile`, perubahan `User` (+ unit test).
+3. EF configuration + migration `PhaseW1_AccessControl` (DDL + migrasi data) + seeder profil sistem.
+4. `BranchAccess` & `MenuAccessProvider` + cache keys; hapus `branches:access-all` & `AssignUserBranchesCommand`.
+5. Use case §11.4 (+ unit test).
+6. Endpoint Web.Api §11.6 (+ integration test).
+7. Web.App: `MenuCatalog`, sync saat startup, policy/handler/atribut/tag helper, `DatabaseMainboardMenuProvider`, test arsitektur.
+8. Layar Administration (Users, Menu Access, Branch Access, Menus, API Roles, Branches).
+9. Integration test Web.App + verifikasi end-to-end; update RANGKUMAN & §12 (realisasi W1).
+
+### 11.10 Keputusan (disepakati 2026-10-03)
+| # | Topik | Keputusan |
+|---|-------|-----------|
+| W-21 | Password awal / reset oleh admin | Admin mengetik password awal/baru; user **tidak wajib** menggantinya saat login. |
+| W-22 | Hapus user | User **bisa dihapus**; sebelum dihapus datanya **disalin ke tabel backup `identity.user_old`** dalam transaksi yang sama (detail §11.2/§11.4). Hapus diri sendiri & admin Full Access aktif terakhir ditolak. |
+| W-23 | Kotak search di header | Dijadikan **pencarian menu** (sudah dikerjakan, §11.7). |
+| W-24 | Endpoint API untuk Akses Menu & Menu | **Tidak dibuat**. |
+| W-25 | Menu yang belum rilis | **Tidak tampil di sidebar** (tampil abu-abu di matriks Akses Menu). |
+| W-26 | Kebijakan password | **Minimal 8 karakter**. |
+
+---
+
+## 12. Realisasi Fase W1 — Akses Menu, Akses Cabang & Administrasi (2026-10-03)
+
+### 12.1 Domain & data
+| Area | Realisasi |
+|---|---|
+| `Domain.Access` | `MenuRights` (flags View/Create/Edit/Delete/Export), `Menu` (`Sync` vs `Customize`, `RemoveFromCatalog`, `IsUsable`, `SupportedRights`), `MenuAccessProfile` (+ `MenuAccessItem`, `MenuAccessGrant`; View wajib, hak tak didukung ditolak, Full Access read-only, `Duplicate`), `BranchAccessProfile` (+ `BranchAccessProfileBranch`; all vs daftar, minimal 1 cabang, All Branches read-only, `Covers`). Id profil sistem tetap: Full Access `0199a3c0-…-0001`, All Branches `0199a3c0-…-0002`. |
+| `User` | `MenuAccessProfileId`, `BranchAccessProfileId`, `DefaultBranchId`, `UpdateProfile`, `SetAccess`; `UserBranch`/`SetBranches` dihapus. `DeletedUser` (tabel `identity.user_old`, W-22) menyalin data user + `role_ids uuid[]` + `role_names text[]` + audit asli + `deleted_at/by` + alasan. Error baru: `Users.NoMenuAccess/DefaultBranchNotAccessible/CannotDeactivateSelf/CannotDeleteSelf/LastAdministrator`. |
+| Permission | ⚠️ `branches:access-all` dihapus dari katalog (W-14). |
+| Migration **`PhaseW1_AccessControl`** | Tabel `menus`, `menu_access_profiles(+_items)`, `branch_access_profiles(+_branches)`, `user_old`; kolom akses di `users` (FK profil `RESTRICT`, cabang default `SET NULL`). Migrasi data: profil sistem; pemegang `branches:access-all` → All Branches; `user_branches` → satu profil per kombinasi cabang ("Branches: BDG, JKT", default = cabang pertama); role Administrator → Full Access; hapus permission lama; drop `user_branches`. `Down` best effort (lossy untuk All Branches). Diuji: data gaya lama → migrate → hasil sesuai; rollback → `user_branches` kembali; migrate ulang OK. |
+| Seeder | Membuat profil sistem bila belum ada dan memberi admin seed Full Access + All Branches. |
+
+### 12.2 Application, Infrastructure, Web.Api
+- **Users** (`Application/Users/Manage`): `GetUsersQuery` (search, status, profil), `CreateUserCommand` (password awal, akses, role API — satu transaksi), `UpdateUserCommand`, `SetUserAccessCommand`, `Deactivate/ActivateUserCommand` (cabut refresh token), `ResetUserPasswordCommand` (tanpa wajib ganti, W-21), `DeleteUserCommand` (backup `user_old` → hapus; tolak diri sendiri & admin Full Access aktif terakhir). `UserAccessRules`: validasi profil + cabang default, guard admin terakhir, invalidasi semua cache per user. `GetUserByIdQuery` diperluas (status, profil, cabang default, role id/nama, cabang efektif). `SignInUserCommand` menolak user tanpa Akses Menu. `GetCurrentUserQuery` + `DefaultBranchId`. `AssignUserBranchesCommand` ⚠️ dihapus.
+- **Akses Menu / Akses Cabang / Menu** (`Application/Access`): list (+ jumlah user/menu/cabang), detail (matriks seluruh menu katalog), create/update/duplicate/delete (tolak bila dipakai, 409 `InUse`); update cabang mengosongkan cabang default user yang tak lagi tercakup. `SyncMenuCatalogCommand` (idempoten, mempertahankan kustomisasi), `GetMenusQuery`, `UpdateMenuCommand`. Perubahan profil/menu → `RemoveByTagAsync(permissions)` lintas proses.
+- **Infrastructure**: `BranchAccess` membaca profil Akses Cabang (cabang aktif; tanpa profil = tidak ada cabang); `MenuAccessProvider` (`IMenuAccessProvider`) menghitung hak efektif per user (hanya menu usable; Full Access = semua hak yang didukung), cache `menu-access:user:{id}` bertag `permissions`.
+- **Web.Api**: `GET users`, `PUT users/{id}`, `PUT users/{id}/access`, `POST users/{id}/deactivate|activate|reset-password`, `DELETE users/{id}?reason=`, CRUD `branch-access-profiles` (`users:read/manage`). ⚠️ `PUT users/{id}/branches` dihapus. Tidak ada endpoint Akses Menu/Menu (W-24).
+
+### 12.3 Web.App
+- **Otorisasi**: `MenuCatalog` (11 grup, 51 halaman; W1 merilis 6 halaman Administration, sisanya `IsAvailable=false`), `MenuCatalogSyncService` (hosted, retry 30 detik), `[MenuAccess(code, right)]` (turunan `AuthorizeAttribute`, policy `menu:{code}:{right}` lewat `MenuPolicyProvider` + `MenuAuthorizationHandler`), `[AuthenticatedOnly]`, `IMenuRights` (sekali per request), tag helper `asp-menu`/`asp-right` (a, button, form, li, div).
+- **Sidebar**: `DatabaseMainboardMenuProvider` — Dashboard bawaan + grup katalog yang punya halaman `CanView`. Penyesuaian dari rencana §11.7: **Dashboard tidak masuk katalog** (semua user yang login melihatnya) dan grup sidebar "My Account" dihapus (Change Password tetap di menu user).
+- **Layar `Areas/Admin`**: Users (list + filter, detail + cabang efektif, create dengan `<form-token />`, edit, change access + role API, activate/deactivate, reset password via modal, delete via modal + alasan), Menu Access (list, detail read-only, form matriks dengan centang baris/kolom/grup, View otomatis, menu "Coming soon" abu-abu, duplicate, delete), Branch Access (list, detail, form all/daftar + filter), Menus (daftar bertingkat, edit nama/ikon/urutan/aktif), API Roles (permission per modul; role sistem read-only), Branches (list, create, edit + aktif). Cabang default difilter lewat AJAX `Users/ProfileBranches`.
+- `BranchContext` memakai `DefaultBranchId` sebagai pilihan awal.
+
+### 12.4 Pengujian & verifikasi
+- **Test: 250 lulus** — Domain 143 (+19), Application 60 (+12), Arsitektur 14 (+3: setiap action punya `[MenuAccess]`/`[AuthenticatedOnly]`/`[AllowAnonymous]`, setiap kode ada di katalog, katalog unik & halaman punya grup), Integration Web.Api 18 (+5: cakupan cabang dari profil termasuk perubahan tanpa login ulang, tanpa profil = 403, endpoint lama hilang, hapus user + backup + token dicabut, list user), Integration Web.App 15 (+4: tanpa Akses Menu ditolak, sidebar admin & menu belum rilis tersembunyi, user terbatas hanya melihat/membuka menu yang diberikan, create → delete user via UI dengan backup).
+- **End-to-end W1 36/36** (Playwright, Web.App + Web.Api, DB `intiplasma_verify` dengan data gaya lama yang dimigrasi): profil hasil migrasi tampil; buat Branch Access, API Role, Menu Access (perilaku matriks), user staf (cabang default mengikuti profil, role API); staf hanya melihat Dashboard + Branches, cabang hanya Bandung, pencarian menu tak menemukan menu lain, `/Admin/Users` → Access denied, tanpa tombol Add; hak baru muncul tanpa login ulang; **Web.Api mengikuti perubahan Akses Cabang yang dibuat di Web.App** (403 → 200, lintas proses); hapus profil terpakai ditolak; rename menu terlihat user lain; reset password mengakhiri sesi staf (login dengan password baru tanpa paksaan ganti); hapus staf → baris `user_old` (alasan + nama role), sesi & refresh token berakhir, email bisa dipakai lagi; user tanpa Akses Menu tidak bisa login; tanpa error JS.
+- **Regresi**: E2E W0 49/49 dan header 15/15 (skrip disesuaikan: akses staf lewat `users/{id}/access`, Change Password dibuka dari menu user, pencarian menu memakai "Users").
+
+### 12.5 Catatan
+- ⚠️ Setelah migrate, user selain Administrator **belum punya Akses Menu** sehingga belum bisa login ke Web.App sampai admin memberinya profil (API tetap jalan sesuai role).
+- ⚠️ Skrip/klien yang memakai `PUT users/{id}/branches` harus beralih ke `branch-access-profiles` + `PUT users/{id}/access`.
+- Ekspor (CanExport) baru dipakai mulai W2; hak Export sudah bisa diatur di matriks.

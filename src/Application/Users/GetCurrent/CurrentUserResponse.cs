@@ -11,6 +11,11 @@ public sealed record CurrentUserResponse
     public string LastName { get; init; }
 
     /// <summary>
+    /// Branch selected after sign-in (null: the first accessible branch).
+    /// </summary>
+    public Guid? DefaultBranchId { get; init; }
+
+    /// <summary>
     /// True when the user may access every branch, including branches created later.
     /// </summary>
     public bool AllBranches { get; init; }

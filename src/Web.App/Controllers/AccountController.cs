@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using SharedKernel;
 using Web.App.Infrastructure.Auth;
+using Web.App.Infrastructure.Authorization;
 using Web.App.Models.Account;
 
 namespace Web.App.Controllers;
@@ -13,6 +14,7 @@ namespace Web.App.Controllers;
 /// <summary>
 /// The signed-in user's own account (opened in the content iframe from the user menu).
 /// </summary>
+[AuthenticatedOnly]
 public sealed class AccountController(
     ICommandHandler<ChangeOwnPasswordCommand> changePassword,
     IQueryHandler<GetUserSessionQuery, UserSessionResponse> sessionQuery) : AppController

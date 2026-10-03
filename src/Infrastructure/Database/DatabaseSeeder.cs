@@ -1,4 +1,5 @@
 using Application.Abstractions.Authentication;
+using Domain.Access;
 using Domain.MasterData.Uoms;
 using Domain.Roles;
 using Domain.Users;
@@ -36,17 +37,28 @@ public static class DatabaseSeeder
             administrator.SyncSystemPermissions();
         }
 
+        await SeedAccessProfilesAsync(dbContext, cancellationToken);
+
         string? email = configuration["Seed:Admin:Email"];
         string? password = configuration["Seed:Admin:Password"];
 
-        if (!string.IsNullOrWhiteSpace(email) &&
-            !string.IsNullOrWhiteSpace(password) &&
-            !await dbContext.Users.AnyAsync(u => u.Email == email, cancellationToken))
+        if (!string.IsNullOrWhiteSpace(email) && !string.IsNullOrWhiteSpace(password))
         {
-            var admin = User.Create(email, "System", "Administrator", passwordHasher.Hash(password));
-            admin.SetRoles([administrator.Id]);
+            User? admin = await dbContext.Users.SingleOrDefaultAsync(u => u.Email == email, cancellationToken);
 
-            dbContext.Users.Add(admin);
+            if (admin is null)
+            {
+                admin = User.Create(email, "System", "Administrator", passwordHasher.Hash(password));
+                admin.SetRoles([administrator.Id]);
+
+                dbContext.Users.Add(admin);
+            }
+
+            // The seeded administrator always keeps full menu and branch access.
+            if (admin.MenuAccessProfileId is null || admin.BranchAccessProfileId is null)
+            {
+                admin.SetAccess(MenuAccessProfile.FullAccessId, BranchAccessProfile.AllBranchesId, admin.DefaultBranchId);
+            }
         }
 
         await SeedUomsAsync(dbContext, cancellationToken);
@@ -54,6 +66,22 @@ public static class DatabaseSeeder
         await FinanceSeeder.SeedAsync(dbContext, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// System profiles Full Access and All Branches (also created by the PhaseW1 migration).
+    /// </summary>
+    private static async Task SeedAccessProfilesAsync(ApplicationDbContext dbContext, CancellationToken cancellationToken)
+    {
+        if (!await dbContext.MenuAccessProfiles.AnyAsync(p => p.Id == MenuAccessProfile.FullAccessId, cancellationToken))
+        {
+            dbContext.MenuAccessProfiles.Add(MenuAccessProfile.CreateFullAccess());
+        }
+
+        if (!await dbContext.BranchAccessProfiles.AnyAsync(p => p.Id == BranchAccessProfile.AllBranchesId, cancellationToken))
+        {
+            dbContext.BranchAccessProfiles.Add(BranchAccessProfile.CreateAllBranches());
+        }
     }
 
     /// <summary>

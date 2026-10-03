@@ -1,0 +1,62 @@
+@* Menu access, branch access, default branch and API roles (create + change access forms). *@
+@model IUserAccessForm
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <label for="MenuAccessProfileId" class="form-label">Menu access</label>
+        <select id="MenuAccessProfileId" name="MenuAccessProfileId" class="form-select" asp-items="Model.Options.MenuProfiles">
+            <option value="">— None (cannot sign in to the web app) —</option>
+        </select>
+    </div>
+    <div class="col-md-6 mb-3">
+        <label for="BranchAccessProfileId" class="form-label">Branch access</label>
+        <select id="BranchAccessProfileId" name="BranchAccessProfileId" class="form-select" asp-items="Model.Options.BranchProfiles"
+                data-branches-url="@Url.Action("ProfileBranches", "Users", new { area = "Admin" })">
+            <option value="">— None (no branch data) —</option>
+        </select>
+    </div>
+    <div class="col-md-6 mb-3">
+        <label for="DefaultBranchId" class="form-label">Default branch</label>
+        <select id="DefaultBranchId" name="DefaultBranchId" class="form-select" asp-items="Model.Options.DefaultBranches">
+            <option value="">— First accessible branch —</option>
+        </select>
+        <div class="form-text">Selected in the header after sign-in; must be covered by the branch access.</div>
+    </div>
+</div>
+
+<label class="form-label">API roles <span class="text-muted fs-13">(Web.Api / mobile only)</span></label>
+<div class="row mb-3">
+    @foreach (Application.Roles.Get.RoleResponse role in Model.Options.Roles)
+    {
+        <div class="col-md-4">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="RoleIds" value="@role.Id" id="role-@role.Id"
+                       checked="@Model.RoleIds.Contains(role.Id)">
+                <label class="form-check-label" for="role-@role.Id">@role.Name</label>
+            </div>
+        </div>
+    }
+</div>
+
+<script>
+    // Default branch options follow the selected branch access profile.
+    (function () {
+        var profile = document.getElementById('BranchAccessProfileId');
+        var branch = document.getElementById('DefaultBranchId');
+        profile.addEventListener('change', function () {
+            var keep = branch.value;
+            branch.length = 1;
+            if (!profile.value) { return; }
+            fetch(profile.dataset.branchesUrl + '?profileId=' + encodeURIComponent(profile.value), {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+                .then(function (r) { return r.ok ? r.json() : []; })
+                .then(function (items) {
+                    items.forEach(function (b) {
+                        var option = new Option(b.name, b.id, false, b.id === keep);
+                        branch.add(option);
+                    });
+                });
+        });
+    })();
+</script>

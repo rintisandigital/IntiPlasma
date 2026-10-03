@@ -24,6 +24,282 @@ namespace Infrastructure.Database.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Domain.Access.BranchAccessProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AllBranches")
+                        .HasColumnType("boolean")
+                        .HasColumnName("all_branches");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_system");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_branch_access_profiles");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_branch_access_profiles_name");
+
+                    b.ToTable("branch_access_profiles", "identity");
+                });
+
+            modelBuilder.Entity("Domain.Access.BranchAccessProfileBranch", b =>
+                {
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("profile_id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.HasKey("ProfileId", "BranchId")
+                        .HasName("pk_branch_access_profile_branches");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_branch_access_profile_branches_branch_id");
+
+                    b.ToTable("branch_access_profile_branches", "identity");
+                });
+
+            modelBuilder.Entity("Domain.Access.Menu", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("DefaultName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("default_name");
+
+                    b.Property<string>("Icon")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("icon");
+
+                    b.Property<bool>("InCatalog")
+                        .HasColumnType("boolean")
+                        .HasColumnName("in_catalog");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsAvailable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_available");
+
+                    b.Property<bool>("IsCustomized")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_customized");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ParentCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("parent_code");
+
+                    b.Property<string>("Route")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("route");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<bool>("SupportsCreate")
+                        .HasColumnType("boolean")
+                        .HasColumnName("supports_create");
+
+                    b.Property<bool>("SupportsDelete")
+                        .HasColumnType("boolean")
+                        .HasColumnName("supports_delete");
+
+                    b.Property<bool>("SupportsEdit")
+                        .HasColumnType("boolean")
+                        .HasColumnName("supports_edit");
+
+                    b.Property<bool>("SupportsExport")
+                        .HasColumnType("boolean")
+                        .HasColumnName("supports_export");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_menus");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_menus_code");
+
+                    b.ToTable("menus", "identity");
+                });
+
+            modelBuilder.Entity("Domain.Access.MenuAccessItem", b =>
+                {
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("profile_id");
+
+                    b.Property<Guid>("MenuId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("menu_id");
+
+                    b.Property<bool>("CanCreate")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_create");
+
+                    b.Property<bool>("CanDelete")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_delete");
+
+                    b.Property<bool>("CanEdit")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_edit");
+
+                    b.Property<bool>("CanExport")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_export");
+
+                    b.Property<bool>("CanView")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_view");
+
+                    b.HasKey("ProfileId", "MenuId")
+                        .HasName("pk_menu_access_profile_items");
+
+                    b.HasIndex("MenuId")
+                        .HasDatabaseName("ix_menu_access_profile_items_menu_id");
+
+                    b.ToTable("menu_access_profile_items", "identity");
+                });
+
+            modelBuilder.Entity("Domain.Access.MenuAccessProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_system");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_menu_access_profiles");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_menu_access_profiles_name");
+
+                    b.ToTable("menu_access_profiles", "identity");
+                });
+
             modelBuilder.Entity("Domain.Costing.PlasmaSettlements.PlasmaSettlement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5295,6 +5571,106 @@ namespace Infrastructure.Database.Migrations
                     b.ToTable("sales_order_lines", "sales");
                 });
 
+            modelBuilder.Entity("Domain.Users.DeletedUser", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("BranchAccessProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_access_profile_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid?>("DefaultBranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("default_branch_id");
+
+                    b.Property<DateTime>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("email");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("first_name");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("last_name");
+
+                    b.Property<Guid?>("MenuAccessProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("menu_access_profile_id");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("password_hash");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.PrimitiveCollection<Guid[]>("RoleIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("role_ids");
+
+                    b.PrimitiveCollection<string[]>("RoleNames")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("role_names");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_user_old");
+
+                    b.HasIndex("Email")
+                        .HasDatabaseName("ix_user_old_email");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_user_old_user_id");
+
+                    b.ToTable("user_old", "identity");
+                });
+
             modelBuilder.Entity("Domain.Users.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5336,6 +5712,10 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("BranchAccessProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_access_profile_id");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
@@ -5343,6 +5723,10 @@ namespace Infrastructure.Database.Migrations
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("created_by");
+
+                    b.Property<Guid?>("DefaultBranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("default_branch_id");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -5365,6 +5749,10 @@ namespace Infrastructure.Database.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("last_name");
+
+                    b.Property<Guid?>("MenuAccessProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("menu_access_profile_id");
 
                     b.Property<DateTime?>("ModifiedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -5394,30 +5782,20 @@ namespace Infrastructure.Database.Migrations
                     b.HasKey("Id")
                         .HasName("pk_users");
 
+                    b.HasIndex("BranchAccessProfileId")
+                        .HasDatabaseName("ix_users_branch_access_profile_id");
+
+                    b.HasIndex("DefaultBranchId")
+                        .HasDatabaseName("ix_users_default_branch_id");
+
                     b.HasIndex("Email")
                         .IsUnique()
                         .HasDatabaseName("ix_users_email");
 
+                    b.HasIndex("MenuAccessProfileId")
+                        .HasDatabaseName("ix_users_menu_access_profile_id");
+
                     b.ToTable("users", "identity");
-                });
-
-            modelBuilder.Entity("Domain.Users.UserBranch", b =>
-                {
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.Property<Guid>("BranchId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("branch_id");
-
-                    b.HasKey("UserId", "BranchId")
-                        .HasName("pk_user_branches");
-
-                    b.HasIndex("BranchId")
-                        .HasDatabaseName("ix_user_branches_branch_id");
-
-                    b.ToTable("user_branches", "identity");
                 });
 
             modelBuilder.Entity("Domain.Users.UserRole", b =>
@@ -5498,6 +5876,40 @@ namespace Infrastructure.Database.Migrations
                         .HasFilter("processed_on_utc IS NULL");
 
                     b.ToTable("outbox_messages", "infrastructure");
+                });
+
+            modelBuilder.Entity("Domain.Access.BranchAccessProfileBranch", b =>
+                {
+                    b.HasOne("Domain.MasterData.Branches.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_branch_access_profile_branches_branches_branch_id");
+
+                    b.HasOne("Domain.Access.BranchAccessProfile", null)
+                        .WithMany("Branches")
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_branch_access_profile_branches_branch_access_profiles_profi");
+                });
+
+            modelBuilder.Entity("Domain.Access.MenuAccessItem", b =>
+                {
+                    b.HasOne("Domain.Access.Menu", null)
+                        .WithMany()
+                        .HasForeignKey("MenuId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_menu_access_profile_items_menus_menu_id");
+
+                    b.HasOne("Domain.Access.MenuAccessProfile", null)
+                        .WithMany("Items")
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_menu_access_profile_items_menu_access_profiles_profile_id");
                 });
 
             modelBuilder.Entity("Domain.Costing.PlasmaSettlements.PlasmaSettlement", b =>
@@ -6699,21 +7111,25 @@ namespace Infrastructure.Database.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Domain.Users.UserBranch", b =>
+            modelBuilder.Entity("Domain.Users.User", b =>
                 {
+                    b.HasOne("Domain.Access.BranchAccessProfile", null)
+                        .WithMany()
+                        .HasForeignKey("BranchAccessProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_users_branch_access_profiles_branch_access_profile_id");
+
                     b.HasOne("Domain.MasterData.Branches.Branch", null)
                         .WithMany()
-                        .HasForeignKey("BranchId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_user_branches_branches_branch_id");
+                        .HasForeignKey("DefaultBranchId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_users_branches_default_branch_id");
 
-                    b.HasOne("Domain.Users.User", null)
-                        .WithMany("Branches")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_user_branches_users_user_id");
+                    b.HasOne("Domain.Access.MenuAccessProfile", null)
+                        .WithMany()
+                        .HasForeignKey("MenuAccessProfileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_users_menu_access_profiles_menu_access_profile_id");
                 });
 
             modelBuilder.Entity("Domain.Users.UserRole", b =>
@@ -6731,6 +7147,16 @@ namespace Infrastructure.Database.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_user_roles_users_user_id");
+                });
+
+            modelBuilder.Entity("Domain.Access.BranchAccessProfile", b =>
+                {
+                    b.Navigation("Branches");
+                });
+
+            modelBuilder.Entity("Domain.Access.MenuAccessProfile", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("Domain.Costing.PlasmaSettlements.PlasmaSettlement", b =>
@@ -6860,8 +7286,6 @@ namespace Infrastructure.Database.Migrations
 
             modelBuilder.Entity("Domain.Users.User", b =>
                 {
-                    b.Navigation("Branches");
-
                     b.Navigation("Roles");
                 });
 #pragma warning restore 612, 618
