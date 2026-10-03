@@ -11,6 +11,7 @@ namespace Web.App.Infrastructure.Authorization;
 [HtmlTargetElement("button", Attributes = MenuAttribute)]
 [HtmlTargetElement("form", Attributes = MenuAttribute)]
 [HtmlTargetElement("li", Attributes = MenuAttribute)]
+[HtmlTargetElement("ul", Attributes = MenuAttribute)]
 [HtmlTargetElement("div", Attributes = MenuAttribute)]
 public sealed class MenuRightTagHelper(IMenuRights menuRights) : TagHelper
 {

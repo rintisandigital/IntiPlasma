@@ -24,11 +24,23 @@ public sealed class DisplayFormatter
     public string Number(decimal value, int decimals = 2) =>
         value.ToString($"N{decimals.ToString(CultureInfo.InvariantCulture)}", _culture);
 
+    /// <summary>1.234.567 (counts: birds, coops, rows)</summary>
+    public string Number(int value) => value.ToString("N0", _culture);
+
+    /// <summary>1.234.567</summary>
+    public string Number(long value) => value.ToString("N0", _culture);
+
     /// <summary>Rp 1.234.567,89</summary>
     public string Money(decimal value) => $"Rp {Number(value)}";
 
     /// <summary>dd/MM/yyyy</summary>
     public string Date(DateOnly value) => value.ToString("dd/MM/yyyy", _culture);
+
+    /// <summary>The current time in the configured time zone.</summary>
+    public DateTime LocalNow() => TimeZoneInfo.ConvertTimeFromUtc(System.DateTime.UtcNow, _timeZone);
+
+    /// <summary>Today in the configured time zone.</summary>
+    public DateOnly Today() => DateOnly.FromDateTime(LocalNow());
 
     /// <summary>A UTC timestamp shown in the configured time zone: dd/MM/yyyy HH:mm.</summary>
     public string DateTime(DateTime utcValue) =>

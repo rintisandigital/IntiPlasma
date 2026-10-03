@@ -1,0 +1,122 @@
+@model ItemFormViewModel
+@{
+    ViewData["Title"] = Model.IsNew ? "Add Item" : $"Item {Model.Code}";
+    ViewData["Menu"] = MenuCodes.MasterItems;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel(Model.IsNew ? "Add Item" : $"Item {Model.Code}", "Code, category and base unit cannot change once the item is used")' />
+
+<form asp-action="@(Model.IsNew ? "Create" : "Edit")" method="post">
+    @if (Model.IsNew)
+    {
+        <form-token />
+    }
+    else
+    {
+        <input type="hidden" asp-for="Id" />
+        <input type="hidden" asp-for="Code" />
+        <input type="hidden" asp-for="Category" />
+        <input type="hidden" asp-for="BaseUomId" />
+    }
+    <fieldset disabled="@(!Model.CanSave)">
+        <div class="card">
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="Code" class="form-label"></label> <span class="text-danger">*</span>
+                        <input asp-for="Code" class="form-control text-uppercase" disabled="@(!Model.IsNew)">
+                        <span asp-validation-for="Code" class="text-danger fs-13"></span>
+                    </div>
+                    <div class="col-md-5 mb-3">
+                        <label asp-for="Name" class="form-label"></label> <span class="text-danger">*</span>
+                        <input asp-for="Name" class="form-control">
+                        <span asp-validation-for="Name" class="text-danger fs-13"></span>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label asp-for="Category" class="form-label"></label> <span class="text-danger">*</span>
+                        <select asp-for="Category" class="form-select" asp-items="EnumOptions.For(Model.Category)" disabled="@(!Model.IsNew)">
+                            <option value="">—</option>
+                        </select>
+                        <span asp-validation-for="Category" class="text-danger fs-13"></span>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="BaseUomId" class="form-label"></label> <span class="text-danger">*</span>
+                        <select asp-for="BaseUomId" class="form-select" asp-items="Model.Uoms" disabled="@(!Model.IsNew)">
+                            <option value="">—</option>
+                        </select>
+                        <span asp-validation-for="BaseUomId" class="text-danger fs-13"></span>
+                    </div>
+                    <div class="col-md-5 mb-3">
+                        <label asp-for="TaxCodeId" class="form-label"></label>
+                        <select asp-for="TaxCodeId" class="form-select" asp-items="Model.TaxCodes">
+                            <option value="">— None —</option>
+                        </select>
+                    </div>
+                    @if (!Model.IsNew)
+                    {
+                        <div class="col-md-4 mb-3 d-flex align-items-end">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" role="switch" id="IsActive" name="IsActive" value="true" checked="@(Model.IsActive == true)">
+                                <label class="form-check-label" for="IsActive">Active</label>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h5 class="card-title mb-0">Unit conversions</h5>
+                @if (Model.CanSave)
+                {
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-collection-add="Conversions"><i class="ti ti-plus me-1"></i>Add conversion</button>
+                }
+            </div>
+            <div class="card-body p-0">
+                <table class="table mb-0" data-collection="Conversions">
+                    <thead class="thead-light"><tr><th>Unit</th><th>Base units in 1 unit</th><th></th></tr></thead>
+                    <tbody>
+                        <tr class="collection-empty"><td colspan="3" class="text-center text-muted py-3">No conversion (e.g. 1 SAK = 50 KG).</td></tr>
+                        @for (int i = 0; i < Model.Conversions.Count; i++)
+                        {
+                            <tr class="collection-row">
+                                <td>
+                                    <select name="Conversions[@i].UomId" class="form-select" required>
+                                        @foreach (SelectListItem uom in Model.Uoms)
+                                        {
+                                            <option value="@uom.Value" selected="@(uom.Value == Model.Conversions[i].UomId?.ToString())">@uom.Text</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td><input type="number" name="Conversions[@i].Factor" value="@Model.Conversions[i].Factor" step="0.000001" min="0" class="form-control" required></td>
+                                <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </fieldset>
+    <partial name="Partials/_FormButtons" model='new FormButtonsModel(Model.CanSave, Url.Action("Index")!)' />
+</form>
+
+<template data-collection-template="Conversions">
+    <tr class="collection-row">
+        <td>
+            <select name="Conversions[__i__].UomId" class="form-select" required>
+                <option value="">—</option>
+                @foreach (SelectListItem uom in Model.Uoms)
+                {
+                    <option value="@uom.Value">@uom.Text</option>
+                }
+            </select>
+        </td>
+        <td><input type="number" name="Conversions[__i__].Factor" step="0.000001" min="0" class="form-control" required></td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+    </tr>
+</template>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

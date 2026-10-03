@@ -1,0 +1,54 @@
+@model ListViewModel<Application.TaxCodes.Get.TaxCodeResponse>
+@{
+    ViewData["Title"] = "Tax Codes";
+    ViewData["Menu"] = MenuCodes.MasterTaxCodes;
+    DateOnly today = Fmt.Today();
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Tax Codes", "PPN and PPh codes with dated rates", MenuCodes.MasterTaxCodes, "Add Tax Code")' />
+
+<div class="card">
+    <div class="card-header">
+        <partial name="Partials/_FilterBar" model='new FilterBarModel(Model.Search, "Search code or name")' />
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr><th>Code</th><th>Name</th><th>Type</th><th>Treatment / Article</th><th class="text-end">Current rate</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.TaxCodes.Get.TaxCodeResponse taxCode in Model.Rows.Items)
+                    {
+                        Application.TaxCodes.Get.TaxRateResponse? rate = taxCode.Rates.Where(r => r.EffectiveFrom <= today).MaxBy(r => r.EffectiveFrom);
+                        <tr>
+                            <td class="fw-semibold">@taxCode.Code</td>
+                            <td>@taxCode.Name</td>
+                            <td>@(taxCode.Type == "Vat" ? "PPN" : "PPh")</td>
+                            <td>@EnumOptions.Label(taxCode.VatTreatment ?? taxCode.IncomeTaxArticle ?? "")</td>
+                            <td class="text-end">
+                                @if (rate is not null)
+                                {
+                                    @(Fmt.Number(rate.RatePercent))<text>%</text>
+                                    @if (rate.TaxBaseRatio != 1)
+                                    {
+                                        <span class="text-muted fs-12"> × @Fmt.Number(rate.TaxBaseRatio, 4)</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td><partial name="Partials/_StatusBadge" model='taxCode.IsActive ? "Active" : "Inactive"' /></td>
+                            <td class="text-end"><a asp-action="Edit" asp-route-id="@taxCode.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="7" class="text-center text-muted py-4">No tax codes yet. Enter the rates confirmed by the tax consultant.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

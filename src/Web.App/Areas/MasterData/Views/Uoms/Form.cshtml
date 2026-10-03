@@ -1,0 +1,44 @@
+@model UomFormViewModel
+@{
+    ViewData["Title"] = Model.IsNew ? "Add Unit" : $"Unit {Model.Code}";
+    ViewData["Menu"] = MenuCodes.MasterUoms;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel(Model.IsNew ? "Add Unit" : $"Unit {Model.Code}", "Unit of measure")' />
+
+<div class="row">
+    <div class="col-xl-6 col-lg-8">
+        <form asp-action="@(Model.IsNew ? "Create" : "Edit")" method="post">
+            @if (Model.IsNew)
+            {
+                <form-token />
+            }
+            else
+            {
+                <input type="hidden" asp-for="Id" />
+                <input type="hidden" asp-for="Code" />
+            }
+            <fieldset disabled="@(!Model.CanSave)">
+                <div class="card">
+                    <div class="card-body">
+                        <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                        <div class="mb-3">
+                            <label asp-for="Code" class="form-label"></label> <span class="text-danger">*</span>
+                            <input asp-for="Code" class="form-control text-uppercase" disabled="@(!Model.IsNew)">
+                            <span asp-validation-for="Code" class="text-danger fs-13"></span>
+                        </div>
+                        <div class="mb-3">
+                            <label asp-for="Name" class="form-label"></label> <span class="text-danger">*</span>
+                            <input asp-for="Name" class="form-control">
+                            <span asp-validation-for="Name" class="text-danger fs-13"></span>
+                        </div>
+                    </div>
+                </div>
+            </fieldset>
+            <partial name="Partials/_FormButtons" model='new FormButtonsModel(Model.CanSave, Url.Action("Index")!)' />
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,15 @@
+@using Web.App
+@using Web.App.Controllers
+@using Web.App.Infrastructure
+@using Web.App.Infrastructure.Auth
+@using Web.App.Infrastructure.Authorization
+@using Web.App.Models.Shared
+@using Web.App.Areas.Partnership.Models
+@using Web.App.Areas.MasterData.Models
+@using Domain.Access
+@using Microsoft.Extensions.Options
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, Web.App
+@inject Web.App.Infrastructure.Formatting.DisplayFormatter Fmt
+@inject IOptions<AppOptions> AppSettings
+@inject IMenuRights Rights

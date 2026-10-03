@@ -84,12 +84,12 @@
             return true;
         });
 
-        /* Decimal input in Indonesian format (W-16): comma as the decimal separator. */
+        /* Decimal input: the request culture is en-US, so the decimal separator is a dot. */
         $(document).on('keypress', '.DecimalOnly', function (e) {
             var val = $(this).val();
-            if ('-,0123456789'.indexOf(e.key) < 0) { return false; }
+            if ('-.0123456789'.indexOf(e.key) < 0) { return false; }
             if (e.key === '-' && val !== '') { return false; }
-            if (e.key === ',' && (val === '' || val === '-' || val.indexOf(',') > -1)) { return false; }
+            if (e.key === '.' && (val === '' || val === '-' || val.indexOf('.') > -1)) { return false; }
             return true;
         });
     });

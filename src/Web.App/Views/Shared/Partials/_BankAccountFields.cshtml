@@ -1,0 +1,16 @@
+@* Bank account. Usage: <partial name="Partials/_BankAccountFields" for="BankAccount" />. *@
+@model BankAccountInput
+<div class="row">
+    <div class="col-md-4 mb-3">
+        <label asp-for="BankName" class="form-label"></label>
+        <input asp-for="BankName" class="form-control">
+    </div>
+    <div class="col-md-4 mb-3">
+        <label asp-for="AccountNumber" class="form-label"></label>
+        <input asp-for="AccountNumber" class="form-control">
+    </div>
+    <div class="col-md-4 mb-3">
+        <label asp-for="AccountHolderName" class="form-label"></label>
+        <input asp-for="AccountHolderName" class="form-control">
+    </div>
+</div>

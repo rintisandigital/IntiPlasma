@@ -1,0 +1,21 @@
+@* NPWP/NITKU/PKP. Usage: <partial name="Partials/_TaxIdentityFields" for="TaxIdentity" /> (the prefix comes from "for"). *@
+@model TaxIdentityInput
+<div class="row">
+    <div class="col-md-4 mb-3">
+        <label asp-for="Npwp" class="form-label"></label>
+        <input asp-for="Npwp" class="form-control" placeholder="15 or 16 digits">
+        <span asp-validation-for="Npwp" class="text-danger fs-13"></span>
+    </div>
+    <div class="col-md-5 mb-3">
+        <label asp-for="Nitku" class="form-label"></label>
+        <input asp-for="Nitku" class="form-control" placeholder="22 digits">
+        <span asp-validation-for="Nitku" class="text-danger fs-13"></span>
+    </div>
+    <div class="col-md-3 mb-3 d-flex align-items-end">
+        <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" role="switch" id="@Html.IdFor(m => m.IsPkp)" name="@Html.NameFor(m => m.IsPkp)"
+                   value="true" checked="@(Model?.IsPkp == true)">
+            <label class="form-check-label" for="@Html.IdFor(m => m.IsPkp)">PKP (VAT registered)</label>
+        </div>
+    </div>
+</div>

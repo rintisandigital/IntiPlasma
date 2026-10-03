@@ -26,7 +26,13 @@ public sealed class AuthController(
             return RedirectToLocal(returnUrl);
         }
 
-        return View(new LoginViewModel { ReturnUrl = returnUrl });
+        var model = new LoginViewModel { ReturnUrl = returnUrl };
+        #if DEBUG
+        model.Email = "admin@intiplasma.local";
+        model.Password = "Admin123!";
+        #endif
+
+        return View(model);
     }
 
     [HttpPost]

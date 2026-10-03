@@ -1,0 +1,27 @@
+@* Excel/PDF buttons of a list page (shown with the Export right). They call the controller's Export action with
+   the same query string, so the file contains exactly the filtered list. Usage:
+   <partial name="Partials/_ExportButtons" model='"master.items"' /> *@
+@model string
+@{
+    var query = ViewContext.HttpContext.Request.Query
+        .Where(q => q.Key is not ("page" or "format"))
+        .ToDictionary(q => q.Key, q => (object?)q.Value.ToString());
+
+    string Url(string format)
+    {
+        var values = new RouteValueDictionary(query) { ["format"] = format };
+        return this.Url.Action("Export", values) ?? "#";
+    }
+}
+<ul class="table-top-head" asp-menu="@Model" asp-right="Export">
+    <li>
+        <a href="@Url("xlsx")" target="_blank" data-bs-toggle="tooltip" data-bs-placement="top" title="Export to Excel">
+            <img src="assets/img/icons/excel.svg" alt="Excel">
+        </a>
+    </li>
+    <li>
+        <a href="@Url("pdf")" target="_blank" data-bs-toggle="tooltip" data-bs-placement="top" title="Export to PDF">
+            <img src="assets/img/icons/pdf.svg" alt="PDF">
+        </a>
+    </li>
+</ul>

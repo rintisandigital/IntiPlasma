@@ -1,0 +1,123 @@
+@model TaxCodeFormViewModel
+@{
+    ViewData["Title"] = Model.IsNew ? "Add Tax Code" : $"Tax Code {Model.Code}";
+    ViewData["Menu"] = MenuCodes.MasterTaxCodes;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel(Model.IsNew ? "Add Tax Code" : $"Tax Code {Model.Code}", "For VAT \"DPP nilai lain\" (12% × 11/12) enter an effective 11% with ratio 1")' />
+
+<form asp-action="@(Model.IsNew ? "Create" : "Edit")" method="post">
+    @if (Model.IsNew)
+    {
+        <form-token />
+    }
+    else
+    {
+        <input type="hidden" asp-for="Id" />
+        <input type="hidden" asp-for="Code" />
+        <input type="hidden" asp-for="Type" />
+        <input type="hidden" asp-for="VatTreatment" />
+        <input type="hidden" asp-for="IncomeTaxArticle" />
+    }
+    <fieldset disabled="@(!Model.CanSave)">
+        <div class="card">
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="Code" class="form-label"></label> <span class="text-danger">*</span>
+                        <input asp-for="Code" class="form-control text-uppercase" disabled="@(!Model.IsNew)">
+                        <span asp-validation-for="Code" class="text-danger fs-13"></span>
+                    </div>
+                    <div class="col-md-5 mb-3">
+                        <label asp-for="Name" class="form-label"></label> <span class="text-danger">*</span>
+                        <input asp-for="Name" class="form-control">
+                        <span asp-validation-for="Name" class="text-danger fs-13"></span>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label asp-for="Type" class="form-label"></label> <span class="text-danger">*</span>
+                        <select asp-for="Type" class="form-select" disabled="@(!Model.IsNew)" id="tax-type">
+                            <option value="">—</option>
+                            <option value="Vat">PPN (VAT)</option>
+                            <option value="IncomeTax">PPh (income tax)</option>
+                        </select>
+                        <span asp-validation-for="Type" class="text-danger fs-13"></span>
+                    </div>
+                    <div class="col-md-4 mb-3" data-tax-type="Vat">
+                        <label asp-for="VatTreatment" class="form-label"></label>
+                        <select asp-for="VatTreatment" class="form-select" asp-items="EnumOptions.For(Model.VatTreatment)" disabled="@(!Model.IsNew)">
+                            <option value="">—</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3" data-tax-type="IncomeTax">
+                        <label asp-for="IncomeTaxArticle" class="form-label"></label>
+                        <select asp-for="IncomeTaxArticle" class="form-select" asp-items="EnumOptions.For(Model.IncomeTaxArticle)" disabled="@(!Model.IsNew)">
+                            <option value="">—</option>
+                        </select>
+                    </div>
+                    @if (!Model.IsNew)
+                    {
+                        <div class="col-md-4 mb-3 d-flex align-items-end">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" role="switch" id="IsActive" name="IsActive" value="true" checked="@(Model.IsActive == true)">
+                                <label class="form-check-label" for="IsActive">Active</label>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h5 class="card-title mb-0">Rates</h5>
+                @if (Model.CanSave)
+                {
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-collection-add="Rates"><i class="ti ti-plus me-1"></i>Add rate</button>
+                }
+            </div>
+            <div class="card-body p-0">
+                <table class="table mb-0" data-collection="Rates">
+                    <thead class="thead-light"><tr><th>Effective from</th><th>Rate %</th><th>Tax base ratio</th><th></th></tr></thead>
+                    <tbody>
+                        <tr class="collection-empty"><td colspan="4" class="text-center text-muted py-3">No rate yet.</td></tr>
+                        @for (int i = 0; i < Model.Rates.Count; i++)
+                        {
+                            <tr class="collection-row">
+                                <td><input type="date" name="Rates[@i].EffectiveFrom" value="@Model.Rates[i].EffectiveFrom?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required></td>
+                                <td><input type="number" name="Rates[@i].RatePercent" value="@Model.Rates[i].RatePercent" step="0.0001" min="0" max="100" class="form-control" required></td>
+                                <td><input type="number" name="Rates[@i].TaxBaseRatio" value="@Model.Rates[i].TaxBaseRatio" step="0.00000001" min="0" max="1" class="form-control" required></td>
+                                <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </fieldset>
+    <partial name="Partials/_FormButtons" model='new FormButtonsModel(Model.CanSave, Url.Action("Index")!)' />
+</form>
+
+<template data-collection-template="Rates">
+    <tr class="collection-row">
+        <td><input type="date" name="Rates[__i__].EffectiveFrom" class="form-control" required></td>
+        <td><input type="number" name="Rates[__i__].RatePercent" step="0.0001" min="0" max="100" class="form-control" required></td>
+        <td><input type="number" name="Rates[__i__].TaxBaseRatio" value="1" step="0.00000001" min="0" max="1" class="form-control" required></td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+    </tr>
+</template>
+
+@section Scripts {
+    <script>
+        // Show the VAT treatment or the income tax article depending on the type.
+        (function () {
+            var type = document.getElementById('tax-type');
+            function toggle() {
+                document.querySelectorAll('[data-tax-type]').forEach(function (el) {
+                    el.hidden = el.dataset.taxType !== type.value;
+                });
+            }
+            type.addEventListener('change', toggle);
+            toggle();
+        })();
+    </script>
+}

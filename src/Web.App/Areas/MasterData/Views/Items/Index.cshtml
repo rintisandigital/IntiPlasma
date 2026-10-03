@@ -1,0 +1,53 @@
+@model ListViewModel<Application.Items.ItemResponse>
+@{
+    ViewData["Title"] = "Items";
+    ViewData["Menu"] = MenuCodes.MasterItems;
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Items", "DOC, feed, OVK and products", MenuCodes.MasterItems, "Add Item")' />
+
+<div class="card">
+    <div class="card-header">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-5">
+                <input type="search" name="search" value="@Model.Search" class="form-control" placeholder="Search code or name">
+            </div>
+            <div class="col-md-3">
+                <select name="category" class="form-select" asp-items='Model.FilterOptions["category"]'>
+                    <option value="">All categories</option>
+                </select>
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="ti ti-filter me-1"></i>Filter</button>
+                <a asp-action="Index" class="btn btn-light">Reset</a>
+            </div>
+        </form>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr><th>Code</th><th>Name</th><th>Category</th><th>Base unit</th><th>Tax</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Items.ItemResponse item in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@item.Code</td>
+                            <td>@item.Name</td>
+                            <td>@EnumOptions.Label(item.Category)</td>
+                            <td>@item.BaseUomCode</td>
+                            <td>@(item.TaxCode ?? "—")</td>
+                            <td><partial name="Partials/_StatusBadge" model='item.IsActive ? "Active" : "Inactive"' /></td>
+                            <td class="text-end"><a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="7" class="text-center text-muted py-4">No items found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="Partials/_Pagination" model="PaginationModel.From(Model.Rows)" />
+    </div>
+</div>

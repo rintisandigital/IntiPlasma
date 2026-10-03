@@ -13,6 +13,16 @@ public static class MenuCodes
     public const string AdminMenus = "admin.menus";
     public const string AdminApiRoles = "admin.api-roles";
     public const string AdminBranches = "admin.branches";
+
+    public const string MasterUoms = "master.uoms";
+    public const string MasterTaxCodes = "master.tax-codes";
+    public const string MasterItems = "master.items";
+    public const string MasterWarehouses = "master.warehouses";
+    public const string MasterVendors = "master.vendors";
+    public const string MasterCustomers = "master.customers";
+    public const string PartnershipFarmers = "partnership.farmers";
+    public const string PartnershipCoops = "partnership.coops";
+    public const string PartnershipContracts = "partnership.contracts";
 }
 
 /// <summary>
@@ -45,17 +55,17 @@ public static class MenuCatalog
                 code, group, name, null, route, menus.Count(m => m.ParentCode == group) * 10 + 10, supports, released));
 
         Group("master", "Master Data", "ti ti-database", 20);
-        Page("master", "master.uoms", "Units of Measure", "/MasterData/Uoms", Crud, false);
-        Page("master", "master.tax-codes", "Tax Codes", "/MasterData/TaxCodes", Crud, false);
-        Page("master", "master.items", "Items", "/MasterData/Items", Crud, false);
-        Page("master", "master.warehouses", "Warehouses", "/MasterData/Warehouses", Crud, false);
-        Page("master", "master.vendors", "Vendors", "/MasterData/Vendors", Crud, false);
-        Page("master", "master.customers", "Customers", "/MasterData/Customers", Crud, false);
+        Page("master", "master.uoms", "Units of Measure", "/MasterData/Uoms", CreateEditExport, true);
+        Page("master", "master.tax-codes", "Tax Codes", "/MasterData/TaxCodes", CreateEditExport, true);
+        Page("master", "master.items", "Items", "/MasterData/Items", CreateEditExport, true);
+        Page("master", "master.warehouses", "Warehouses", "/MasterData/Warehouses", CreateEditExport, true);
+        Page("master", "master.vendors", "Vendors", "/MasterData/Vendors", CreateEditExport, true);
+        Page("master", "master.customers", "Customers", "/MasterData/Customers", CreateEditExport, true);
 
         Group("partnership", "Partnership", "ti ti-users-group", 30);
-        Page("partnership", "partnership.farmers", "Farmers", "/Partnership/Farmers", Crud, false);
-        Page("partnership", "partnership.coops", "Coops", "/Partnership/Coops", Crud, false);
-        Page("partnership", "partnership.contracts", "Contracts", "/Partnership/Contracts", Crud, false);
+        Page("partnership", "partnership.farmers", "Farmers", "/Partnership/Farmers", CreateEditExport, true);
+        Page("partnership", "partnership.coops", "Coops", "/Partnership/Coops", CreateEditExport, true);
+        Page("partnership", "partnership.contracts", "Contracts", "/Partnership/Contracts", CreateEditExport, true);
 
         Group("procurement", "Procurement", "ti ti-shopping-cart", 40);
         Page("procurement", "procurement.purchase-orders", "Purchase Orders", "/Procurement/PurchaseOrders", Crud, false);

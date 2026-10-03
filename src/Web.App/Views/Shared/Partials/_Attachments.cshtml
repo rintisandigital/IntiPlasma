@@ -1,0 +1,38 @@
+@* Attachments of a form: list (preview/download), drop zone upload (JPEG/PNG/WEBP/PDF, max 10 MB, at most 20)
+   and remove. Every attachment is posted as a hidden "Documents" value. Script: ~/js/attachments.js. *@
+@model AttachmentsModel
+<div class="attachments" data-upload-url="@Url.Action("Upload", "Attachments", new { area = "" })"
+     data-file-url="@Url.Action("File", "Attachments", new { area = "" })" data-field="@Model.FieldName"
+     data-max="@Model.MaxAttachments">
+    <ul class="list-unstyled mb-2 attachment-list">
+        @foreach (Application.Documents.AttachmentResponse attachment in Model.Attachments)
+        {
+            <li class="d-flex align-items-center gap-2 py-1 border-bottom attachment-item">
+                <input type="hidden" name="@Model.FieldName" value="@attachment.Id" />
+                <i class="ti @(attachment.Kind == "Photo" ? "ti-photo" : "ti-file-type-pdf") text-primary"></i>
+                <a href="@Url.Action("File", "Attachments", new { area = "", id = attachment.Id })" target="_blank" class="text-truncate">@attachment.FileName</a>
+                <span class="text-muted fs-12 ms-auto">@Fmt.Number(attachment.SizeBytes / 1024m, 0) KB</span>
+                <a href="@Url.Action("File", "Attachments", new { area = "", id = attachment.Id, download = true })" class="btn btn-sm btn-light" title="Download"><i class="ti ti-download"></i></a>
+                @if (Model.Editable)
+                {
+                    <button type="button" class="btn btn-sm btn-light attachment-remove" title="Remove"><i class="ti ti-x"></i></button>
+                }
+            </li>
+        }
+    </ul>
+    @if (Model.Attachments.Count == 0 && !Model.Editable)
+    {
+        <p class="text-muted mb-0">No attachments.</p>
+    }
+    @if (Model.Editable)
+    {
+        <label class="attachment-drop d-flex flex-column align-items-center justify-content-center border border-dashed rounded p-3 text-center text-muted"
+               style="cursor: pointer; border-style: dashed !important;">
+            <i class="ti ti-cloud-upload fs-24 text-primary"></i>
+            <span>Drop files here or click to upload</span>
+            <span class="fs-12">JPEG, PNG, WEBP or PDF · max 10 MB each · at most @Model.MaxAttachments files</span>
+            <input type="file" class="d-none attachment-input" multiple accept="image/jpeg,image/png,image/webp,application/pdf">
+        </label>
+        <div class="attachment-progress text-muted fs-12 mt-1"></div>
+    }
+</div>

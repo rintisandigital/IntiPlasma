@@ -1,0 +1,217 @@
+@model ContractFormViewModel
+@using Domain.Partnership.Contracts
+@{
+    ViewData["Title"] = Model.IsNew ? "Add Contract" : $"Contract {Model.Code}";
+    ViewData["Menu"] = MenuCodes.PartnershipContracts;
+    string itemLookup = Url.Action("Items", "Lookup", new { area = "" })!;
+    string cancelUrl = Model.IsNew ? Url.Action("Index")! : Url.Action("Details", new { id = Model.Id })!;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel(Model.IsNew ? "Add Contract" : $"Contract {Model.Code}", "Saved as a draft; activate it from the contract page to use it for new cycles")' />
+
+<form asp-action="@(Model.IsNew ? "Create" : "Edit")" method="post">
+    @if (Model.IsNew)
+    {
+        <form-token />
+    }
+    else
+    {
+        <input type="hidden" asp-for="Id" />
+        <input type="hidden" asp-for="Code" />
+        <input type="hidden" asp-for="BranchId" />
+        <input type="hidden" asp-for="Scheme" />
+    }
+
+    <div class="card">
+        <div class="card-header"><h5 class="card-title mb-0">1. Terms</h5></div>
+        <div class="card-body">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label asp-for="Code" class="form-label"></label> <span class="text-danger">*</span>
+                    <input asp-for="Code" class="form-control text-uppercase" disabled="@(!Model.IsNew)">
+                    <span asp-validation-for="Code" class="text-danger fs-13"></span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label asp-for="Name" class="form-label"></label> <span class="text-danger">*</span>
+                    <input asp-for="Name" class="form-control">
+                    <span asp-validation-for="Name" class="text-danger fs-13"></span>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label asp-for="BranchId" class="form-label"></label> <span class="text-danger">*</span>
+                    <select asp-for="BranchId" class="form-select" asp-items="Model.Branches" disabled="@(!Model.IsNew)">
+                        <option value="">—</option>
+                    </select>
+                    <span asp-validation-for="BranchId" class="text-danger fs-13"></span>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label asp-for="Scheme" class="form-label"></label> <span class="text-danger">*</span>
+                    <select asp-for="Scheme" id="contract-scheme" class="form-select" asp-items="EnumOptions.For(Model.Scheme)" disabled="@(!Model.IsNew)"></select>
+                    <span asp-validation-for="Scheme" class="text-danger fs-13"></span>
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label asp-for="ValidFrom" class="form-label"></label> <span class="text-danger">*</span>
+                    <input asp-for="ValidFrom" type="date" class="form-control">
+                    <span asp-validation-for="ValidFrom" class="text-danger fs-13"></span>
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label asp-for="ValidTo" class="form-label"></label>
+                    <input asp-for="ValidTo" type="date" class="form-control">
+                    <span asp-validation-for="ValidTo" class="text-danger fs-13"></span>
+                </div>
+                <div class="col-md-2 mb-3" id="profit-share" hidden="@(Model.Scheme != ContractScheme.ProfitSharing)">
+                    <label asp-for="PlasmaProfitSharePercent" class="form-label"></label> <span class="text-danger">*</span>
+                    <input asp-for="PlasmaProfitSharePercent" type="number" step="0.0001" min="0" max="100" class="form-control">
+                    <span asp-validation-for="PlasmaProfitSharePercent" class="text-danger fs-13"></span>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label asp-for="IncomeTaxCodeId" class="form-label"></label>
+                    <select asp-for="IncomeTaxCodeId" class="form-select" asp-items="Model.IncomeTaxCodes">
+                        <option value="">— None —</option>
+                    </select>
+                </div>
+                <div class="col-12 mb-3">
+                    <label asp-for="Notes" class="form-label"></label>
+                    <textarea asp-for="Notes" rows="2" class="form-control"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <h5 class="card-title mb-0">2. Sapronak contract prices</h5>
+            <button type="button" class="btn btn-sm btn-outline-primary" data-collection-add="InputPrices"><i class="ti ti-plus me-1"></i>Add item</button>
+        </div>
+        <div class="card-body p-0">
+            <table class="table mb-0" data-collection="InputPrices">
+                <thead class="thead-light"><tr><th style="width: 60%">Item (DOC, feed, OVK)</th><th>Price per base unit (Rp)</th><th></th></tr></thead>
+                <tbody>
+                    <tr class="collection-empty"><td colspan="3" class="text-center text-muted py-3">No contract price yet.</td></tr>
+                    @for (int i = 0; i < Model.InputPrices.Count; i++)
+                    {
+                        <tr class="collection-row">
+                            <td>
+                                <input type="hidden" name="InputPrices[@i].ItemLabel" value="@Model.InputPrices[i].ItemLabel">
+                                <select name="InputPrices[@i].ItemId" class="form-select" data-lookup="@itemLookup" required>
+                                    <option value="@Model.InputPrices[i].ItemId" selected>@(Model.InputPrices[i].ItemLabel ?? Model.InputPrices[i].ItemId?.ToString())</option>
+                                </select>
+                            </td>
+                            <td><input type="number" name="InputPrices[@i].Price" value="@Model.InputPrices[i].Price" step="0.01" min="0.01" class="form-control text-end" required></td>
+                            <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <h5 class="card-title mb-0">3. Guaranteed live bird prices</h5>
+            <button type="button" class="btn btn-sm btn-outline-primary" data-collection-add="LiveBirdPrices"><i class="ti ti-plus me-1"></i>Add range</button>
+        </div>
+        <div class="card-body p-0">
+            <table class="table mb-0" data-collection="LiveBirdPrices">
+                <thead class="thead-light"><tr><th>Average weight from (kg)</th><th>To (kg)</th><th>Price per kg (Rp)</th><th></th></tr></thead>
+                <tbody>
+                    <tr class="collection-empty"><td colspan="4" class="text-center text-muted py-3">No price range yet.</td></tr>
+                    @for (int i = 0; i < Model.LiveBirdPrices.Count; i++)
+                    {
+                        <tr class="collection-row">
+                            <td><input type="number" name="LiveBirdPrices[@i].MinWeightKg" value="@Model.LiveBirdPrices[i].MinWeightKg" step="0.001" min="0" class="form-control text-end" required></td>
+                            <td><input type="number" name="LiveBirdPrices[@i].MaxWeightKg" value="@Model.LiveBirdPrices[i].MaxWeightKg" step="0.001" min="0" class="form-control text-end" required></td>
+                            <td><input type="number" name="LiveBirdPrices[@i].PricePerKg" value="@Model.LiveBirdPrices[i].PricePerKg" step="0.01" min="0.01" class="form-control text-end" required></td>
+                            <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <h5 class="card-title mb-0">4. Bonuses and deductions</h5>
+            <button type="button" class="btn btn-sm btn-outline-primary" data-collection-add="Incentives"><i class="ti ti-plus me-1"></i>Add rule</button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table mb-0" data-collection="Incentives">
+                    <thead class="thead-light"><tr><th>Name</th><th>Kind</th><th>Metric</th><th>From</th><th>To</th><th>Amount (Rp)</th><th>Basis</th><th></th></tr></thead>
+                    <tbody>
+                        <tr class="collection-empty"><td colspan="8" class="text-center text-muted py-3">No bonus or deduction rule.</td></tr>
+                        @for (int i = 0; i < Model.Incentives.Count; i++)
+                        {
+                            IncentiveInput incentive = Model.Incentives[i];
+                            <tr class="collection-row">
+                                <td><input name="Incentives[@i].Name" value="@incentive.Name" maxlength="100" class="form-control" required></td>
+                                <td><select name="Incentives[@i].Kind" class="form-select" asp-items="EnumOptions.For(incentive.Kind)"></select></td>
+                                <td><select name="Incentives[@i].Metric" class="form-select" asp-items="EnumOptions.For(incentive.Metric)"></select></td>
+                                <td><input type="number" name="Incentives[@i].RangeFrom" value="@incentive.RangeFrom" step="0.0001" class="form-control text-end"></td>
+                                <td><input type="number" name="Incentives[@i].RangeTo" value="@incentive.RangeTo" step="0.0001" class="form-control text-end"></td>
+                                <td><input type="number" name="Incentives[@i].Amount" value="@incentive.Amount" step="0.01" min="0.01" class="form-control text-end" required></td>
+                                <td><select name="Incentives[@i].Basis" class="form-select" asp-items="EnumOptions.For(incentive.Basis)"></select></td>
+                                <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-muted fs-13 px-3 py-2 mb-0">Range is inclusive and optional (empty = no bound). Metric "None" always applies.</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h5 class="card-title mb-0">5. Attachments</h5></div>
+        <div class="card-body"><partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, true)" /></div>
+    </div>
+
+    <partial name="Partials/_FormButtons" model='new FormButtonsModel(true, cancelUrl, "Save Draft")' />
+</form>
+
+<template data-collection-template="InputPrices">
+    <tr class="collection-row">
+        <td>
+            <select name="InputPrices[__i__].ItemId" class="form-select" data-lookup="@itemLookup" required>
+                <option value="">Search item…</option>
+            </select>
+        </td>
+        <td><input type="number" name="InputPrices[__i__].Price" step="0.01" min="0.01" class="form-control text-end" required></td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+    </tr>
+</template>
+
+<template data-collection-template="LiveBirdPrices">
+    <tr class="collection-row">
+        <td><input type="number" name="LiveBirdPrices[__i__].MinWeightKg" step="0.001" min="0" class="form-control text-end" required></td>
+        <td><input type="number" name="LiveBirdPrices[__i__].MaxWeightKg" step="0.001" min="0" class="form-control text-end" required></td>
+        <td><input type="number" name="LiveBirdPrices[__i__].PricePerKg" step="0.01" min="0.01" class="form-control text-end" required></td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+    </tr>
+</template>
+
+<template data-collection-template="Incentives">
+    <tr class="collection-row">
+        <td><input name="Incentives[__i__].Name" maxlength="100" class="form-control" required></td>
+        <td><select name="Incentives[__i__].Kind" class="form-select" asp-items="EnumOptions.For<IncentiveKind>(null)"></select></td>
+        <td><select name="Incentives[__i__].Metric" class="form-select" asp-items="EnumOptions.For<IncentiveMetric>(null)"></select></td>
+        <td><input type="number" name="Incentives[__i__].RangeFrom" step="0.0001" class="form-control text-end"></td>
+        <td><input type="number" name="Incentives[__i__].RangeTo" step="0.0001" class="form-control text-end"></td>
+        <td><input type="number" name="Incentives[__i__].Amount" step="0.01" min="0.01" class="form-control text-end" required></td>
+        <td><select name="Incentives[__i__].Basis" class="form-select" asp-items="EnumOptions.For<IncentiveBasis>(null)"></select></td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+    </tr>
+</template>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            // The profit share only applies to the profit sharing scheme.
+            var scheme = document.getElementById('contract-scheme');
+            var share = document.getElementById('profit-share');
+            function toggle() { share.hidden = scheme.value !== 'ProfitSharing'; }
+            scheme.addEventListener('change', toggle);
+        })();
+    </script>
+}

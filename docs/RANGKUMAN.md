@@ -1,7 +1,7 @@
 # Rangkuman Proyek — Aplikasi Peternakan Ayam Broiler Inti-Plasma
 
 > Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4), 2026-10-01 (Fase 5–8) dan 2026-10-02 (Fase 9 — lampiran dokumen; Fase W0 — fondasi WebApp).
-> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§16 (API) dan [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (WebApp, realisasi W0 di §10, W1 di §12). Fase API 0–9, W0 dan W1 selesai; berikutnya **Fase W2** (ekspor Excel/PDF & master data).
+> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§16 (API) dan [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (WebApp, realisasi W0 di §10, W1 di §12, W2 di §13). Fase API 0–9 dan W0–W2 selesai; berikutnya **Fase W3** (Finance Setup).
 
 ---
 
@@ -166,6 +166,13 @@
 - Administrasi di Web.App: Users (password awal, akses, role API, aktif/nonaktif, reset password, **hapus dengan backup `identity.user_old`**), Menu Access (matriks), Branch Access, Menus, API Roles, Branches.
 - ⚠️ Setelah migrate, user non-Administrator perlu diberi Akses Menu dulu sebelum bisa login ke Web.App.
 
+### Fase W2 — Ekspor & Master Data ✅ (detail: PLAN-WEBAPP §13)
+- **Fondasi ekspor**: Excel (ClosedXML, nilai bertipe + autofilter) & PDF list (QuestPDF Community, kop + "Page x of y"), mengikuti filter halaman, batas 50.000 baris, nama file `{nama}_{cabang}_{waktu}`; hanya dengan hak Export (termasuk cetak PDF).
+- Layar **Master Data** (UoM, Tax Codes + tarif, Items + konversi, Warehouses, Vendors, Customers) dan **Partnership** (Farmers, Coops, Contracts Draft → Active → Inactive + **PDF kontrak**).
+- Komponen bersama: lampiran (upload AJAX, pratinjau), lookup Tom-Select (item, peternak), tabel baris dinamis, filter cabang (`branch=all`).
+- Master & partnership tanpa Delete (nonaktifkan lewat flag Active); form kontrak satu halaman bersection. Tidak ada migration baru.
+- ⚠️ Culture request Web.App kini **en-US** (binding input angka/tanggal HTML5); tampilan tetap format id-ID lewat `DisplayFormatter`.
+
 ## 5. Alur Akuntansi yang Sudah Berjalan
 
 | Transaksi | Jurnal otomatis |
@@ -212,17 +219,20 @@ Semua event di katalog kini sudah dipakai.
 - Di .NET 10 kelas `Program` top-level bersifat public: project yang mereferensikan Web.Api **dan** Web.App harus memakai `Web.Api.Program` / `Web.App.Program` secara eksplisit.
 - Browser tidak mengirim fragment (`#…`) ke server: deep link mainboard dibawa ke `ReturnUrl` oleh JavaScript halaman login.
 - FluentValidation `ErrorCode` bukan nama property → error validasi command tampil di validation summary; validasi per field memakai DataAnnotations view model.
+- Model binding MVC memakai culture request: dengan id-ID, nilai `1234.5` dari `input type=number` salah dibaca → culture request Web.App en-US, format tampilan lewat `DisplayFormatter`.
+- `step` input angka harus mengikuti skala kolom DB: Dapper mengembalikan `60.0000` (numeric 7,4) dan validasi browser `step="0.01"` menolaknya saat edit.
+- Tag helper `asp-menu` hanya bekerja pada elemen yang terdaftar di `HtmlTargetElement` (a, button, form, li, ul, div) — elemen lain diam-diam tetap dirender.
 - Folder lampiran relatif terhadap `AppContext.BaseDirectory` (folder `bin`) → di dev Web.App menunjuk `../../../../Web.Api/bin/Debug/net10.0/uploads`; di container keduanya `/app/uploads`.
 
 ## 7. Cara Kerja & Verifikasi
 
 - Setiap fase: domain + unit test invariant → command/query + validator → EF config + migration → endpoint + permission → **verifikasi end-to-end** ke PostgreSQL lokal pada database sementara `intiplasma_verify` (dibuat & dihapus otomatis; database `intiplasma` milik user tidak disentuh).
 - User yang melakukan **commit & migrate** setelah tiap fase.
-- Status test saat ini: **250 test lulus** (143 domain, 60 application, 14 arsitektur, 18 integration Web.Api, 15 integration Web.App).
+- Status test saat ini: **282 test lulus** (143 domain, 60 application, 14 arsitektur, 18 integration Web.Api, 47 integration Web.App).
 - Integration test (Testcontainers) **sudah bisa dijalankan** di mesin dev (container runtime tersedia) — `dotnet test IntiPlasma.slnx`.
 - Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario, Fase 7: 32 skenario, Fase 8: 35 skenario, Fase 9: 79 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
 - ⚠️ Sejak W0 Web.Api tidak memproses outbox: verifikasi yang hanya menjalankan API perlu `BackgroundJobs__Enabled=true`.
-- Verifikasi WebApp (W0: 49 skenario, W1: 36 skenario + regresi W0) memakai **Playwright** (dipasang di scratchpad, bukan di repo) terhadap Web.App :5098 + Web.Api :5099 pada `intiplasma_verify`; interaksi halaman lewat frame `content-frame`.
+- Verifikasi WebApp (W0: 49 skenario, W1: 36 skenario, W2: 40 skenario + regresi W0) memakai **Playwright** (dipasang di scratchpad, bukan di repo) terhadap Web.App :5098 + Web.Api :5099 pada `intiplasma_verify`; interaksi halaman lewat frame `content-frame`.
 - Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`, `Phase8_ReportingClosing`, `Phase9_Attachments`, `PhaseW0_UserStatus`, `PhaseW1_AccessControl`.
 
 ## 8. Catatan Terbuka / Hutang Teknis

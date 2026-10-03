@@ -390,7 +390,7 @@ Use case Application/Domain baru dikerjakan & diuji dulu (unit test seperti fase
 - Layar §4.7: Menu Access, Branch Access, Users (create dengan pilihan Menu Access & Branch Access), Menus, API Roles, Branches.
 - Test arsitektur penegakan `[MenuAccess]`; integration test `BranchAccess` & migrasi data.
 
-### Fase W2 — Ekspor & Master Data
+### Fase W2 — Ekspor & Master Data ✅ (selesai 2026-10-03, realisasi §13)
 - Fondasi ekspor (§5): `ExportColumn<T>`, `PagedExportRunner`, Excel & PDF list, komponen kop/footer PDF, partial `_ExportButtons`.
 - Master: UoM, TaxCode (tarif ber-tanggal efektif + rasio DPP), Item (+ konversi satuan), Warehouse, Vendor (toleransi selisih), Customer (NPWP/NITKU, credit limit).
 - Partnership: Farmer, Coop, Contract (wizard skema PriceContract/ProfitSharing, harga jaminan per rentang bobot, bonus/potongan; Draft → Active → Inactive) + PDF kontrak.
@@ -667,3 +667,52 @@ Halaman "Change Password" tetap di menu user (`[AuthenticatedOnly]`), bukan bagi
 - ⚠️ Setelah migrate, user selain Administrator **belum punya Akses Menu** sehingga belum bisa login ke Web.App sampai admin memberinya profil (API tetap jalan sesuai role).
 - ⚠️ Skrip/klien yang memakai `PUT users/{id}/branches` harus beralih ke `branch-access-profiles` + `PUT users/{id}/access`.
 - Ekspor (CanExport) baru dipakai mulai W2; hak Export sudah bisa diatur di matriks.
+
+---
+
+## 13. Realisasi Fase W2 — Ekspor & Master Data (2026-10-03)
+
+Tidak ada perubahan Domain/Application/Web.Api dan **tidak ada migration baru** — seluruh W2 memakai use case yang sudah ada (Fase 1 & 9).
+
+### 13.1 Fondasi ekspor (§5) — `Web.App/Infrastructure/Export`
+| Komponen | Realisasi |
+|---|---|
+| Paket | `ClosedXML` 0.105.1, `QuestPDF` 2026.9.1; `QuestPDF.Settings.License = Community` di `AddWebApp`. |
+| `ExportColumn<T>(Header, Value, Format, Width)` | Format `Text/WholeNumber/Number/Money/Percent/Date/DateTime/Boolean`; `Width` relatif (lebar kolom Excel & PDF). |
+| `PagedExportRunner` | Mengambil data lewat query list yang sama (100 baris/halaman) dengan filter halaman; menolak bila total > `Export:MaxRows` (default 50.000, error `Export.TooManyRows`). |
+| `ExcelExporter` | Judul, filter, info cetak (perusahaan, cabang, dicetak oleh/pada), header tebal + freeze pane + autofilter, nilai bertipe (angka/tanggal asli, bukan teks). |
+| `PdfListExporter` + `PdfLayout` | A4 landscape, kop (perusahaan, judul, filter, cabang), header tabel berulang, footer "Printed by … · Page x of y"; angka/tanggal format id-ID. |
+| `ExportService` | `HeaderAsync`, `List` (→ `FileContentResult`), `Document(header, compose)` untuk dokumen tunggal; nama file `{name}_{cabang}_{yyyyMMdd-HHmm}.xlsx/pdf`; setiap ekspor di-log. |
+| `PageSupport` (scoped) | Helper controller: `CanAsync`, `BranchFilterAsync` (`branch=all` = semua cabang yang boleh diakses; kosong = cabang aktif header), `BranchOptionsAsync`, `AttachmentsAsync`, `ExportAsync`. |
+| UI | Partial `_ExportButtons` (Excel/PDF membawa query string halaman → isi file = list terfilter; hanya tampil dengan hak Export), `_ListHeader`, `_FormButtons`. Action `Export` & `Print` ber-`[MenuAccess(…, Export)]`. |
+
+### 13.2 Komponen bersama
+- **Lampiran**: `AttachmentsController` (`POST /Attachments/Upload` AJAX + header `X-CSRF-TOKEN`, `GET /Attachments/File/{id}?download=`), partial `_Attachments` + `attachments.js` (drop zone, pratinjau, hapus; id dikirim sebagai hidden `Documents`). Validasi tipe/ukuran tetap di `IAttachmentService` (JPEG/PNG/WEBP/PDF ≤ 10 MB, maks 20).
+- **Lookup Tom-Select**: `LookupController` (`/Lookup/Items?category=`, `/Lookup/Farmers?branchId=&type=`; maks 20, hanya yang aktif) + `lookup.js` (`select[data-lookup]`).
+- **Baris dinamis**: `collection.js` (`table[data-collection]` + `<template>`; indeks dinomori ulang saat submit) — dipakai konversi satuan, tarif pajak, harga kontrak, harga jaminan, bonus/potongan.
+- Partial `_TaxIdentityFields` (NPWP/NITKU/PKP) & `_BankAccountFields`; view model dasar `MasterFormViewModel` (Id, IsActive, Documents, `CanSave`).
+
+### 13.3 Layar
+| Area | Halaman |
+|---|---|
+| `MasterData` | UoM, Tax Codes (tarif ber-tanggal efektif + rasio DPP; field PPN/PPh mengikuti jenis), Items (filter kategori, konversi satuan), Warehouses (filter cabang & jenis; gudang kandang read-only info coop), Vendors (toleransi harga, NPWP, rekening, lampiran), Customers (credit limit, NPWP, lampiran). |
+| `Partnership` | Farmers (filter cabang & jenis; jenis/cabang hanya saat create; NIK, NPWP, rekening, lampiran; tautan ke coop), Coops (peternak via Tom-Select; kapasitas, tipe kandang, koordinat; info siklus berjalan; gudang `GK-{kode}` otomatis via outbox), Contracts (list + filter status; **Details** dengan Activate/Deactivate (`[WorkflowAction]` + konfirmasi), Edit hanya Draft, kelola lampiran di status apa pun (`SetDocumentsCommand`), **Print PDF** kontrak (`ContractPdf`: syarat, harga sapronak, harga jaminan, bonus/potongan, catatan, tanda tangan Inti/Plasma)). |
+
+Pola semua master: Index (View) → Export (Export) → Create (Create) → Edit GET (View; **read-only** bila tanpa hak Edit) → Edit POST (Edit).
+
+### 13.4 Penyesuaian dari rencana
+- **Hak master & partnership = Create/Edit/Export (tanpa Delete)** — tidak ada use case hapus; penonaktifan lewat flag Active (tabel §11.7 menulis `C E D X`).
+- Form kontrak = **satu form bersection** (1. Terms … 5. Attachments), bukan wizard multi-langkah; field bagi hasil hanya tampil untuk skema ProfitSharing.
+- ⚠️ **Culture request diubah ke en-US** (sebelumnya id-ID) agar model binding cocok dengan `input type=number/date` HTML5 (titik desimal). Format tampilan id-ID (W-16) tetap lewat `DisplayFormatter`; `app.js` DecimalOnly memakai titik.
+- Daftar Items tidak menampilkan konversi (query list memang tidak memuatnya; tampil di form).
+- `step` input angka mengikuti skala kolom DB (tarif pajak & bagi hasil `0.0001`), jika tidak nilai tersimpan seperti `60.0000` ditolak validasi browser saat edit.
+
+### 13.5 Perbaikan yang ditemukan saat verifikasi
+- Tag helper `asp-menu` belum menargetkan `<ul>` → tombol ekspor tampil untuk user tanpa hak Export (ditangkap integration test; aksi Export sendiri sudah 403).
+- `DisplayFormatter.Number(int/long)` ditambahkan (sebelumnya bilangan bulat tampil "1,00").
+- Test lama "master.uoms tersembunyi" diganti ke menu yang masih belum rilis (`procurement.purchase-orders`).
+
+### 13.6 Pengujian & verifikasi
+- **Test: 282 lulus** — Domain 143, Application 60, Arsitektur 14, Integration Web.Api 18, Integration Web.App 47 (+32): ekspor unit (Excel bertipe, PDF, format id-ID, pengumpul halaman & batas baris, parsing format), 18 halaman W2 terbuka, ekspor xlsx/pdf (content type, nama file, signature), tanpa hak Export → tombol hilang & 403, create UoM, upload + buka lampiran, lookup JSON.
+- **End-to-end W2 40/40** (Playwright, Web.App :5098 + Web.Api :5099, DB `intiplasma_verify` baru lalu di-drop): sidebar W2; cabang; UoM (+ duplikat ditolak); kode PPh 23 + tarif, edit ulang; item + konversi SAK=50 KG; gudang pusat; vendor + lampiran PDF (tersimpan, tampil saat edit); customer + credit limit; peternak plasma tanpa NIK ditolak lalu dibuat; coop via Tom-Select (koordinat desimal benar) + gudang `GK-…` dibuat outbox; kontrak bagi hasil (toggle field, harga sapronak via lookup, harga jaminan, bonus FCR) → Draft → edit → Activate (Edit hilang) → **PDF kontrak** (~48 KB) → lampiran pada kontrak aktif; ekspor Items/Vendors/Farmers/Contracts; tanpa error JS.
+- **Regresi**: E2E W0 49/49, header 15/15. (E2E W1 memerlukan data gaya lama hasil migrasi; cakupannya dijaga integration test W1.)

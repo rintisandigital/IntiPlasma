@@ -1,0 +1,35 @@
+@model ListViewModel<Application.Uoms.Get.UomResponse>
+@{
+    ViewData["Title"] = "Units of Measure";
+    ViewData["Menu"] = MenuCodes.MasterUoms;
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Units of Measure", "Units used by items and conversions", MenuCodes.MasterUoms, "Add Unit")' />
+
+<div class="card">
+    <div class="card-header">
+        <partial name="Partials/_FilterBar" model='new FilterBarModel(Model.Search, "Search code or name")' />
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr><th>Code</th><th>Name</th><th class="text-end"></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Uoms.Get.UomResponse uom in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@uom.Code</td>
+                            <td>@uom.Name</td>
+                            <td class="text-end"><a asp-action="Edit" asp-route-id="@uom.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="3" class="text-center text-muted py-4">No units found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

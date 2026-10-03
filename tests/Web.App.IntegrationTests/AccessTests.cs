@@ -41,7 +41,8 @@ public sealed partial class AccessTests(WebAppFactory factory)
 
         mainboard.ShouldContain($"data-menu-code=\"{MenuCodes.AdminUsers}\"");
         mainboard.ShouldContain($"data-menu-code=\"{MenuCodes.AdminMenuAccess}\"");
-        mainboard.ShouldNotContain("data-menu-code=\"master.uoms\""); // not released yet (W-25)
+        mainboard.ShouldContain($"data-menu-code=\"{MenuCodes.MasterUoms}\""); // released in W2
+        mainboard.ShouldNotContain("data-menu-code=\"procurement.purchase-orders\""); // not released yet (W-25)
         (await client.GetAsync(new Uri("/Admin/Users", UriKind.Relative))).StatusCode.ShouldBe(HttpStatusCode.OK);
         (await client.GetAsync(new Uri("/Admin/MenuAccess", UriKind.Relative))).StatusCode.ShouldBe(HttpStatusCode.OK);
     }

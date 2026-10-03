@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <PackageReference Include="AspNetCore.HealthChecks.UI.Client" />
+    <PackageReference Include="ClosedXML" />
+    <PackageReference Include="QuestPDF" />
     <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="Serilog.Sinks.Seq" />
   </ItemGroup>

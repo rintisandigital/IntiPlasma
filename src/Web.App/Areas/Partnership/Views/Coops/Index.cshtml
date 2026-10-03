@@ -1,0 +1,62 @@
+@model ListViewModel<Application.Coops.CoopResponse>
+@{
+    ViewData["Title"] = "Coops";
+    ViewData["Menu"] = MenuCodes.PartnershipCoops;
+    string? farmerId = Model.Filters.GetValueOrDefault("farmerId");
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Coops", "Farmer coops; each coop has its own coop warehouse", MenuCodes.PartnershipCoops, "Add Coop")' />
+
+<div class="card">
+    <div class="card-header">
+        <form method="get" class="row g-2 align-items-end">
+            @if (!string.IsNullOrEmpty(farmerId))
+            {
+                <input type="hidden" name="farmerId" value="@farmerId">
+            }
+            <div class="col-md-5">
+                <input type="search" name="search" value="@Model.Search" class="form-control" placeholder="Search coop or farmer">
+            </div>
+            <div class="col-md-3">
+                <select name="branch" class="form-select" asp-items="Model.BranchOptions"></select>
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="ti ti-filter me-1"></i>Filter</button>
+                <a asp-action="Index" class="btn btn-light">Reset</a>
+                @if (!string.IsNullOrEmpty(farmerId))
+                {
+                    <span class="badge bg-info align-self-center">One farmer</span>
+                }
+            </div>
+        </form>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr><th>Code</th><th>Name</th><th>Farmer</th><th>Branch</th><th class="text-end">Capacity</th><th>House type</th><th>Cycle</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Coops.CoopResponse coop in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@coop.Code</td>
+                            <td>@coop.Name</td>
+                            <td>@coop.FarmerCode — @coop.FarmerName <span class="text-muted fs-13">(@coop.FarmerType)</span></td>
+                            <td>@coop.BranchCode</td>
+                            <td class="text-end">@Fmt.Number(coop.Capacity)</td>
+                            <td>@EnumOptions.Label(coop.HouseType)</td>
+                            <td>@(coop.OpenCycleId is null ? "—" : "Running")</td>
+                            <td><partial name="Partials/_StatusBadge" model='coop.IsActive ? "Active" : "Inactive"' /></td>
+                            <td class="text-end"><a asp-action="Edit" asp-route-id="@coop.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="9" class="text-center text-muted py-4">No coops found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="Partials/_Pagination" model="PaginationModel.From(Model.Rows)" />
+    </div>
+</div>

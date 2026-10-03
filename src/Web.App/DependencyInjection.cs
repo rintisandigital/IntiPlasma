@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.Authorization;
 using Web.App.Infrastructure;
 using Web.App.Infrastructure.Auth;
 using Web.App.Infrastructure.Authorization;
+using Web.App.Infrastructure.Export;
 using Web.App.Infrastructure.Forms;
 using Web.App.Infrastructure.Formatting;
 using Web.App.Infrastructure.Navigation;
@@ -37,7 +38,7 @@ public static class DependencyInjection
 
         services.AddCookieAuthentication();
 
-        services.AddAppLocalization(configuration);
+        services.AddAppLocalization();
 
         services.AddScoped<IBranchContext, BranchContext>();
         services.AddScoped<IMainboardMenuProvider, DatabaseMainboardMenuProvider>();
@@ -46,6 +47,13 @@ public static class DependencyInjection
         services.AddHostedService<MenuCatalogSyncService>();
         services.AddScoped<IWorkflowActionService, DirectWorkflowActionService>();
         services.AddSingleton<DisplayFormatter>();
+
+        // Export (W-3): Excel with ClosedXML, PDF with QuestPDF under the Community license (W-6).
+        QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+        services.AddOptions<ExportOptions>().Bind(configuration.GetSection(ExportOptions.SectionName));
+        services.AddSingleton<PdfListExporter>();
+        services.AddScoped<ExportService>();
+        services.AddScoped<PageSupport>();
 
         return services;
     }
@@ -75,16 +83,17 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// English UI texts (W-10) with Indonesian number/date formatting (W-16) for every request.
+    /// English UI (W-10). The request culture is en-US so model binding reads what HTML5 inputs post
+    /// (<c>type="number"</c> → "1234.5", <c>type="date"</c> → "2026-10-03"); values are displayed in the
+    /// Indonesian format (W-16) by <see cref="DisplayFormatter"/> and the exporters, which use
+    /// <c>App:FormatCulture</c> explicitly.
     /// </summary>
-    private static void AddAppLocalization(this IServiceCollection services, IConfiguration configuration)
+    private static void AddAppLocalization(this IServiceCollection services)
     {
-        string formatCulture = configuration[$"{AppOptions.SectionName}:{nameof(AppOptions.FormatCulture)}"] ?? "id-ID";
-
         services.Configure<RequestLocalizationOptions>(options =>
         {
-            var culture = CultureInfo.GetCultureInfo(formatCulture);
-            var uiCulture = CultureInfo.GetCultureInfo("en-US");
+            var culture = CultureInfo.GetCultureInfo("en-US");
+            CultureInfo uiCulture = culture;
 
             options.DefaultRequestCulture = new RequestCulture(culture, uiCulture);
             options.SupportedCultures = [culture];

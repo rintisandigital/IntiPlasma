@@ -1,0 +1,41 @@
+@model ListViewModel<Application.Customers.CustomerResponse>
+@{
+    ViewData["Title"] = "Customers";
+    ViewData["Menu"] = MenuCodes.MasterCustomers;
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Customers", "Buyers of live birds", MenuCodes.MasterCustomers, "Add Customer")' />
+
+<div class="card">
+    <div class="card-header">
+        <partial name="Partials/_FilterBar" model='new FilterBarModel(Model.Search, "Search code or name")' />
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr><th>Code</th><th>Name</th><th>NPWP</th><th>Phone</th><th class="text-end">Term</th><th class="text-end">Credit limit</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Customers.CustomerResponse customer in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@customer.Code</td>
+                            <td>@customer.Name @if (customer.TaxIdentity.IsPkp) { <span class="badge bg-light text-dark ms-1">PKP</span> }</td>
+                            <td>@(customer.TaxIdentity.Npwp ?? "—")</td>
+                            <td>@(customer.Phone ?? "—")</td>
+                            <td class="text-end">@customer.PaymentTermDays days</td>
+                            <td class="text-end">@(customer.CreditLimit == 0 ? "No credit" : Fmt.Money(customer.CreditLimit))</td>
+                            <td><partial name="Partials/_StatusBadge" model='customer.IsActive ? "Active" : "Inactive"' /></td>
+                            <td class="text-end"><a asp-action="Edit" asp-route-id="@customer.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="8" class="text-center text-muted py-4">No customers found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="Partials/_Pagination" model="PaginationModel.From(Model.Rows)" />
+    </div>
+</div>
