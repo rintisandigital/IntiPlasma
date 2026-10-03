@@ -1,0 +1,143 @@
+@model JournalMappingFormViewModel
+@{
+    string eventLabel = AccountingEventLabels.Event(Model.EventType);
+    string scope = $" — {Model.BranchCode ?? "Default"}";
+    if (Model.IsNew)
+    {
+        scope = string.Empty;
+    }
+    ViewData["Title"] = Model.IsNew ? "Add Journal Mapping" : $"Mapping {Model.EventType}{scope}";
+    ViewData["Menu"] = MenuCodes.FinanceJournalMappings;
+    string accountLookup = Url.Action("Accounts", "Lookup", new { area = "" })!;
+    Domain.Finance.JournalMappings.AccountingEventDefinition? definition = Domain.Finance.JournalMappings.AccountingEvents.Find(Model.EventType);
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel(Model.IsNew ? "Add Journal Mapping" : $"{eventLabel}{scope}", "Each component posts Dr debit account / Cr credit account; empty components are not mapped")' />
+
+<form asp-action="@(Model.IsNew ? "Create" : "Edit")" method="post">
+    @if (Model.IsNew)
+    {
+        <form-token />
+    }
+    else
+    {
+        <input type="hidden" asp-for="Id" />
+        <input type="hidden" asp-for="EventType" />
+    }
+    <fieldset disabled="@(!Model.CanSave)">
+        <div class="card">
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                <div class="row">
+                    @if (Model.IsNew)
+                    {
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="EventType" class="form-label"></label> <span class="text-danger">*</span>
+                            <select asp-for="EventType" id="event-type" class="form-select" asp-items="Model.Events"
+                                    data-reload-url="@Url.Action("Create")"></select>
+                            <div class="form-text">Changing the event reloads its components.</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="BranchId" class="form-label"></label>
+                            <select asp-for="BranchId" class="form-select" asp-items="Model.Branches">
+                                <option value="">Company default (all branches)</option>
+                            </select>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Accounting event</label>
+                            <input class="form-control" value="@eventLabel" disabled>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Branch</label>
+                            <input class="form-control" value="@(Model.BranchCode ?? "Company default (all branches)")" disabled>
+                        </div>
+                    }
+                    <div class="col-12 mb-3">
+                        <label asp-for="Description" class="form-label"></label>
+                        <input asp-for="Description" class="form-control">
+                    </div>
+                    @if (!Model.IsNew)
+                    {
+                        <div class="col-12">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="IsActive" name="IsActive" value="true" checked="@(Model.IsActive == true)">
+                                <label class="form-check-label" for="IsActive">Active</label>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Components</h5></div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead class="thead-light"><tr><th style="width: 28%">Component</th><th style="width: 26%">Debit account</th><th style="width: 26%">Credit account</th><th>Cost center (debit)</th></tr></thead>
+                        <tbody>
+                            @for (int i = 0; i < Model.Lines.Count; i++)
+                            {
+                                MappingLineInput line = Model.Lines[i];
+                                Domain.Finance.JournalMappings.AccountingComponentDefinition? component = definition?.Components.FirstOrDefault(c => c.Code == line.Component);
+                                <tr>
+                                    <td>
+                                        <input type="hidden" name="Lines[@i].Component" value="@line.Component">
+                                        <div class="fw-semibold">@(component is null ? line.Component : AccountingEventLabels.Component(Model.EventType, component))</div>
+                                        <div class="text-muted fs-12">@line.Component</div>
+                                    </td>
+                                    <td>
+                                        <select name="Lines[@i].DebitAccountId" class="form-select" data-lookup="@accountLookup">
+                                            <option value="">—</option>
+                                            @if (line.DebitAccountId is not null)
+                                            {
+                                                <option value="@line.DebitAccountId" selected>@(line.DebitAccountLabel ?? line.DebitAccountId.ToString())</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select name="Lines[@i].CreditAccountId" class="form-select" data-lookup="@accountLookup">
+                                            <option value="">—</option>
+                                            @if (line.CreditAccountId is not null)
+                                            {
+                                                <option value="@line.CreditAccountId" selected>@(line.CreditAccountLabel ?? line.CreditAccountId.ToString())</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select name="Lines[@i].CostCenterId" class="form-select">
+                                            <option value="">—</option>
+                                            @foreach (SelectListItem costCenter in Model.CostCenters)
+                                            {
+                                                <option value="@costCenter.Value" selected="@(costCenter.Value == line.CostCenterId?.ToString())">@costCenter.Text</option>
+                                            }
+                                        </select>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </fieldset>
+    <partial name="Partials/_FormButtons" model='new FormButtonsModel(Model.CanSave, Url.Action("Index")!)' />
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    @if (Model.IsNew)
+    {
+        <script>
+            (function () {
+                // The components depend on the event: reload the form for the chosen event.
+                var select = document.getElementById('event-type');
+                select.addEventListener('change', function () {
+                    window.location = select.dataset.reloadUrl + '?eventType=' + encodeURIComponent(select.value);
+                });
+            })();
+        </script>
+    }
+}

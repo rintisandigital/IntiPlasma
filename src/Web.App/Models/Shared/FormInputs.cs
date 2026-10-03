@@ -62,7 +62,7 @@ public abstract class MasterFormViewModel
     public Guid? Id { get; set; }
 
     [Display(Name = "Active")]
-    public bool? IsActive { get; set; } = true;
+    public bool? IsActive { get; set; }
 
     public List<Guid> Documents { get; set; } = [];
 

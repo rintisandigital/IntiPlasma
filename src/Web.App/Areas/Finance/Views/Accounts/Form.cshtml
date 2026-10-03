@@ -1,0 +1,140 @@
+@model AccountFormViewModel
+@using Domain.Finance.Accounts
+@{
+    ViewData["Title"] = Model.IsNew ? "Add Account" : $"Account {Model.Code}";
+    ViewData["Menu"] = MenuCodes.FinanceAccounts;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel(Model.IsNew ? "Add Account" : $"Account {Model.Code}", "Code, type, parent, kind and normal balance cannot change after creation")' />
+
+<div class="row">
+    <div class="col-xl-8">
+        <form asp-action="@(Model.IsNew ? "Create" : "Edit")" method="post">
+            @if (Model.IsNew)
+            {
+                <form-token />
+            }
+            else
+            {
+                <input type="hidden" asp-for="Id" />
+                <input type="hidden" asp-for="Code" />
+                <input type="hidden" asp-for="Type" />
+                <input type="hidden" asp-for="ParentId" />
+                <input type="hidden" asp-for="NormalBalance" />
+                <input type="hidden" name="IsPostable" value="@(Model.IsPostable == true ? "true" : "false")" />
+            }
+            <fieldset disabled="@(!Model.CanSave)">
+                <div class="card">
+                    <div class="card-body">
+                        <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label asp-for="Code" class="form-label"></label> <span class="text-danger">*</span>
+                                <input asp-for="Code" class="form-control" disabled="@(!Model.IsNew)">
+                                <span asp-validation-for="Code" class="text-danger fs-13"></span>
+                            </div>
+                            <div class="col-md-8 mb-3">
+                                <label asp-for="Name" class="form-label"></label> <span class="text-danger">*</span>
+                                <input asp-for="Name" class="form-control">
+                                <span asp-validation-for="Name" class="text-danger fs-13"></span>
+                            </div>
+                            @if (Model.IsNew)
+                            {
+                                <div class="col-md-4 mb-3">
+                                    <label asp-for="Type" class="form-label"></label> <span class="text-danger">*</span>
+                                    <select asp-for="Type" id="account-type" class="form-select" asp-items="EnumOptions.For(Model.Type)">
+                                        <option value="">—</option>
+                                    </select>
+                                    <span asp-validation-for="Type" class="text-danger fs-13"></span>
+                                </div>
+                                <div class="col-md-8 mb-3">
+                                    <label asp-for="ParentId" class="form-label"></label>
+                                    <select asp-for="ParentId" id="account-parent" class="form-select">
+                                        <option value="">— Top level —</option>
+                                        @foreach (HeaderAccountOption header in Model.HeaderAccounts)
+                                        {
+                                            <option value="@header.Id" data-type="@header.Type" selected="@(header.Id == Model.ParentId)">@header.Label</option>
+                                        }
+                                    </select>
+                                    <div class="form-text">Only header accounts of the same type can be the parent.</div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label asp-for="NormalBalance" class="form-label"></label>
+                                    <select asp-for="NormalBalance" class="form-select" asp-items="EnumOptions.For(Model.NormalBalance)">
+                                        <option value="">Default of the type</option>
+                                    </select>
+                                    <div class="form-text">Change only for contra accounts.</div>
+                                </div>
+                                <div class="col-md-4 mb-3 d-flex align-items-center">
+                                    <div class="form-check form-switch mt-2">
+                                        <input class="form-check-input" type="checkbox" role="switch" id="IsPostable" name="IsPostable" value="true" checked="@(Model.IsPostable == true)">
+                                        <label class="form-check-label" for="IsPostable">Postable (detail) account</label>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Type</label>
+                                    <input class="form-control" value="@Model.Type" disabled>
+                                </div>
+                                <div class="col-md-8 mb-3">
+                                    <label class="form-label">Parent</label>
+                                    <input class="form-control" value="@(Model.ParentLabel ?? "— Top level —")" disabled>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Kind</label>
+                                    <input class="form-control" value="@(Model.IsPostable == true ? "Detail (postable)" : "Header")" disabled>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Normal balance</label>
+                                    <input class="form-control" value="@Model.NormalBalance" disabled>
+                                </div>
+                            }
+                            <div class="col-md-4 mb-3">
+                                <label asp-for="CashFlowCategory" class="form-label"></label>
+                                <select asp-for="CashFlowCategory" class="form-select" asp-items="EnumOptions.For(Model.CashFlowCategory)">
+                                    @if (Model.IsNew)
+                                    {
+                                        <option value="">Default of the type</option>
+                                    }
+                                </select>
+                            </div>
+                            @if (!Model.IsNew)
+                            {
+                                <div class="col-12">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" role="switch" id="IsActive" name="IsActive" value="true" checked="@(Model.IsActive == true)">
+                                        <label class="form-check-label" for="IsActive">Active</label>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </fieldset>
+            <partial name="Partials/_FormButtons" model='new FormButtonsModel(Model.CanSave, Url.Action("Index")!)' />
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    @if (Model.IsNew)
+    {
+        <script>
+            (function () {
+                // A parent must be a header account of the same type.
+                var type = document.getElementById('account-type');
+                var parent = document.getElementById('account-parent');
+                function filter() {
+                    parent.querySelectorAll('option[data-type]').forEach(function (option) {
+                        option.hidden = !!type.value && option.dataset.type !== type.value;
+                        if (option.hidden && option.selected) { parent.value = ''; }
+                    });
+                }
+                type.addEventListener('change', filter);
+                filter();
+            })();
+        </script>
+    }
+}

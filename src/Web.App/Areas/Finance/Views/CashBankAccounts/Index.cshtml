@@ -1,0 +1,57 @@
+@model ListViewModel<Application.Finance.CashBank.CashBankAccountResponse>
+@{
+    ViewData["Title"] = "Cash/Bank Accounts";
+    ViewData["Menu"] = MenuCodes.FinanceCashBankAccounts;
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Cash/Bank Accounts", "Cash boxes and bank accounts per branch, each with its own ledger account", MenuCodes.FinanceCashBankAccounts, "Add Account")' />
+
+<div class="card">
+    <div class="card-header">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <input type="search" name="search" value="@Model.Search" class="form-control" placeholder="Search code, name or account number">
+            </div>
+            <div class="col-md-3">
+                <select name="branch" class="form-select" asp-items="Model.BranchOptions"></select>
+            </div>
+            <div class="col-md-2">
+                <select name="type" class="form-select" asp-items='Model.FilterOptions["type"]'>
+                    <option value="">All types</option>
+                </select>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="ti ti-filter me-1"></i>Filter</button>
+                <a asp-action="Index" class="btn btn-light">Reset</a>
+            </div>
+        </form>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr><th>Code</th><th>Name</th><th>Type</th><th>Branch</th><th>Ledger account</th><th>Bank / number</th><th class="text-end">Balance</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Finance.CashBank.CashBankAccountResponse account in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@account.Code</td>
+                            <td>@account.Name</td>
+                            <td>@account.Type</td>
+                            <td>@account.BranchCode</td>
+                            <td>@account.AccountCode — @account.AccountName</td>
+                            <td>@(account.BankName is null ? "—" : $"{account.BankName} {account.AccountNumber}")</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(account.Balance)</td>
+                            <td><partial name="Partials/_StatusBadge" model='account.IsActive ? "Active" : "Inactive"' /></td>
+                            <td class="text-end"><a asp-action="Edit" asp-route-id="@account.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="9" class="text-center text-muted py-4">No cash/bank accounts found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

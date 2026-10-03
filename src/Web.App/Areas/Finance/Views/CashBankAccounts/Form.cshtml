@@ -1,0 +1,108 @@
+@model CashBankAccountFormViewModel
+@{
+    ViewData["Title"] = Model.IsNew ? "Add Cash/Bank Account" : $"Cash/Bank {Model.Code}";
+    ViewData["Menu"] = MenuCodes.FinanceCashBankAccounts;
+    string accountLookup = Url.Action("Accounts", "Lookup", new { area = "", type = "Asset" })!;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel(Model.IsNew ? "Add Cash/Bank Account" : $"Cash/Bank {Model.Code}", "Type, branch and ledger account cannot change after creation")' />
+
+<div class="row">
+    <div class="col-xl-8">
+        <form asp-action="@(Model.IsNew ? "Create" : "Edit")" method="post">
+            @if (Model.IsNew)
+            {
+                <form-token />
+            }
+            else
+            {
+                <input type="hidden" asp-for="Id" />
+                <input type="hidden" asp-for="Code" />
+                <input type="hidden" asp-for="Type" />
+                <input type="hidden" asp-for="BranchId" />
+                <input type="hidden" asp-for="AccountId" />
+            }
+            <fieldset disabled="@(!Model.CanSave)">
+                <div class="card">
+                    <div class="card-body">
+                        <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label asp-for="Code" class="form-label"></label> <span class="text-danger">*</span>
+                                <input asp-for="Code" class="form-control text-uppercase" disabled="@(!Model.IsNew)">
+                                <span asp-validation-for="Code" class="text-danger fs-13"></span>
+                            </div>
+                            <div class="col-md-8 mb-3">
+                                <label asp-for="Name" class="form-label"></label> <span class="text-danger">*</span>
+                                <input asp-for="Name" class="form-control">
+                                <span asp-validation-for="Name" class="text-danger fs-13"></span>
+                            </div>
+                            @if (Model.IsNew)
+                            {
+                                <div class="col-md-4 mb-3">
+                                    <label asp-for="Type" class="form-label"></label> <span class="text-danger">*</span>
+                                    <select asp-for="Type" class="form-select" asp-items="EnumOptions.For(Model.Type)"></select>
+                                </div>
+                                <div class="col-md-8 mb-3">
+                                    <label asp-for="BranchId" class="form-label"></label> <span class="text-danger">*</span>
+                                    <select asp-for="BranchId" class="form-select" asp-items="Model.Branches">
+                                        <option value="">—</option>
+                                    </select>
+                                    <span asp-validation-for="BranchId" class="text-danger fs-13"></span>
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label asp-for="AccountId" class="form-label"></label> <span class="text-danger">*</span>
+                                    <select asp-for="AccountId" class="form-select" data-lookup="@accountLookup">
+                                        <option value="">Search a postable asset account…</option>
+                                    </select>
+                                    <div class="form-text">Each cash/bank account needs its own ledger account (e.g. 1-1201 Bank Operasional).</div>
+                                    <span asp-validation-for="AccountId" class="text-danger fs-13"></span>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Type</label>
+                                    <input class="form-control" value="@Model.Type" disabled>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Branch</label>
+                                    <input class="form-control" value="@Model.BranchCode" disabled>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Balance</label>
+                                    <input class="form-control text-end" value="@(Model.Balance is { } balance ? Fmt.Money(balance) : "—")" disabled>
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <label class="form-label">Ledger account (COA)</label>
+                                    <input class="form-control" value="@Model.AccountLabel" disabled>
+                                </div>
+                            }
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="BankName" class="form-label"></label>
+                                <input asp-for="BankName" class="form-control">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="AccountNumber" class="form-label"></label>
+                                <input asp-for="AccountNumber" class="form-control">
+                            </div>
+                            @if (!Model.IsNew)
+                            {
+                                <div class="col-12">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" role="switch" id="IsActive" name="IsActive" value="true" checked="@(Model.IsActive == true)">
+                                        <label class="form-check-label" for="IsActive">Active</label>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </fieldset>
+            <partial name="Partials/_FormButtons" model='new FormButtonsModel(Model.CanSave, Url.Action("Index")!)' />
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

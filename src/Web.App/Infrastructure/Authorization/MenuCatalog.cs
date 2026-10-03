@@ -23,6 +23,12 @@ public static class MenuCodes
     public const string PartnershipFarmers = "partnership.farmers";
     public const string PartnershipCoops = "partnership.coops";
     public const string PartnershipContracts = "partnership.contracts";
+    public const string FinanceAccounts = "finance.accounts";
+    public const string FinanceCostCenters = "finance.cost-centers";
+    public const string FinanceFiscalPeriods = "finance.fiscal-periods";
+    public const string FinanceJournalTemplates = "finance.journal-templates";
+    public const string FinanceJournalMappings = "finance.journal-mappings";
+    public const string FinanceCashBankAccounts = "finance.cash-bank-accounts";
 }
 
 /// <summary>
@@ -37,7 +43,6 @@ public static class MenuCatalog
     private const MenuRights Crud = MenuRights.Create | MenuRights.Edit | MenuRights.Delete | MenuRights.Export;
     private const MenuRights CreateExport = MenuRights.Create | MenuRights.Export;
     private const MenuRights CreateEditExport = MenuRights.Create | MenuRights.Edit | MenuRights.Export;
-    private const MenuRights EditExport = MenuRights.Edit | MenuRights.Export;
 
     public static readonly IReadOnlyList<MenuDefinition> Definitions = Build();
 
@@ -91,12 +96,12 @@ public static class MenuCatalog
         Page("sales", "sales.receivables", "Receivable Ledger & Aging", "/Sales/Receivables", MenuRights.Export, false);
 
         Group("finance", "Finance", "ti ti-building-bank", 80);
-        Page("finance", "finance.accounts", "Chart of Accounts", "/Finance/Accounts", Crud, false);
-        Page("finance", "finance.cost-centers", "Cost Centers", "/Finance/CostCenters", Crud, false);
-        Page("finance", "finance.fiscal-periods", "Fiscal Periods", "/Finance/FiscalPeriods", EditExport, false);
-        Page("finance", "finance.journal-templates", "Journal Templates", "/Finance/JournalTemplates", Crud, false);
-        Page("finance", "finance.journal-mappings", "Auto Journal Mappings", "/Finance/JournalMappings", EditExport, false);
-        Page("finance", "finance.cash-bank-accounts", "Cash/Bank Accounts", "/Finance/CashBankAccounts", Crud, false);
+        Page("finance", "finance.accounts", "Chart of Accounts", "/Finance/Accounts", CreateEditExport, true);
+        Page("finance", "finance.cost-centers", "Cost Centers", "/Finance/CostCenters", CreateEditExport, true);
+        Page("finance", "finance.fiscal-periods", "Fiscal Periods", "/Finance/FiscalPeriods", CreateEditExport, true);
+        Page("finance", "finance.journal-templates", "Journal Templates", "/Finance/JournalTemplates", CreateEditExport, true);
+        Page("finance", "finance.journal-mappings", "Auto Journal Mappings", "/Finance/JournalMappings", CreateEditExport, true);
+        Page("finance", "finance.cash-bank-accounts", "Cash/Bank Accounts", "/Finance/CashBankAccounts", CreateEditExport, true);
         Page("finance", "finance.vendor-invoices", "Vendor Invoices", "/Finance/VendorInvoices", Crud, false);
         Page("finance", "finance.payment-vouchers", "Payment Vouchers", "/Finance/PaymentVouchers", Crud, false);
         Page("finance", "finance.cash-transactions", "Cash In/Out", "/Finance/CashTransactions", Crud, false);

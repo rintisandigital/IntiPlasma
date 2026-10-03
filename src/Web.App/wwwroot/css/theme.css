@@ -94,3 +94,27 @@ body.frame-page .page-header {
 .btn-link.dropdown-item {
     text-align: left;
 }
+
+/* ---- Tom-Select lookups ------------------------------------------------------------------------------ */
+
+/* Tom-Select copies the select's classes to its wrapper; the template already draws the box on .ts-control,
+   so the wrapper must not draw a second border/arrow. */
+.ts-wrapper.form-select,
+.ts-wrapper.form-control {
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    min-height: 0;
+}
+
+/* A single lookup with a value shows the value only (the template lacks Tom-Select's own rule for this). */
+.ts-wrapper.single.has-items .ts-control > input::placeholder {
+    color: transparent;
+}
+
+.ts-wrapper.single.has-items:not(.focus) .ts-control > input {
+    position: absolute;
+    width: 0;
+    opacity: 0;
+}

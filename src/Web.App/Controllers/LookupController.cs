@@ -1,9 +1,11 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Paging;
 using Application.Farmers;
+using Application.Finance.Accounts;
 using Application.Farmers.Get;
 using Application.Items;
 using Application.Items.Get;
+using Domain.Finance.Accounts;
 using Domain.MasterData.Farmers;
 using Domain.MasterData.Items;
 using Microsoft.AspNetCore.Mvc;
@@ -50,6 +52,23 @@ public sealed class LookupController : AppController
         return Json(result.IsFailure
             ? []
             : result.Value.Items.Where(f => f.IsActive).Select(f => new LookupItem(f.Id, $"{f.Code} — {f.Name} ({f.Type}, {f.BranchCode})")));
+    }
+
+    /// <summary>
+    /// Postable, active accounts of the chart of accounts (journal lines, mappings, cash/bank accounts).
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> Accounts(
+        string? q,
+        AccountType? type,
+        [FromServices] IQueryHandler<GetAccountsQuery, IReadOnlyList<AccountResponse>> query,
+        CancellationToken cancellationToken)
+    {
+        Result<IReadOnlyList<AccountResponse>> result = await query.Handle(new GetAccountsQuery(type, q, PostableOnly: true), cancellationToken);
+
+        return Json(result.IsFailure
+            ? []
+            : result.Value.Take(MaxResults).Select(a => new LookupItem(a.Id, $"{a.Code} — {a.Name}")));
     }
 
     public sealed record LookupItem(Guid Value, string Text);

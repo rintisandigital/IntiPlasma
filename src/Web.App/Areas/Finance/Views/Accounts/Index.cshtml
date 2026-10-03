@@ -1,0 +1,80 @@
+@model AccountListViewModel
+@{
+    ViewData["Title"] = "Chart of Accounts";
+    ViewData["Menu"] = MenuCodes.FinanceAccounts;
+    bool canCreate = await Rights.CanAsync(MenuCodes.FinanceAccounts, MenuRights.Create);
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Chart of Accounts", "Header accounts group detail accounts; only detail accounts receive postings", MenuCodes.FinanceAccounts, "Add Account")' />
+
+<div class="card">
+    <div class="card-header">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <input type="search" name="search" value="@Model.Search" class="form-control" placeholder="Search code or name">
+            </div>
+            <div class="col-md-2">
+                <select name="type" class="form-select" asp-items="Model.TypeOptions">
+                    <option value="">All types</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="status" class="form-select">
+                    <option value="">All statuses</option>
+                    <option value="active" selected="@(Model.Status == "active")">Active</option>
+                    <option value="inactive" selected="@(Model.Status == "inactive")">Inactive</option>
+                </select>
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="ti ti-filter me-1"></i>Filter</button>
+                <a asp-action="Index" class="btn btn-light">Reset</a>
+            </div>
+        </form>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0">
+                <thead class="thead-light">
+                    <tr><th>Code</th><th>Name</th><th>Type</th><th>Kind</th><th>Normal balance</th><th>Cash flow</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Finance.Accounts.AccountResponse account in Model.Accounts)
+                    {
+                        <tr class="@(account.IsPostable ? "" : "fw-semibold")">
+                            <td class="text-nowrap">@account.Code</td>
+                            <td style="padding-left: @((account.Level - 1) * 1.25 + 0.75)rem">
+                                @if (!account.IsPostable)
+                                {
+                                    <i class="ti ti-folder text-primary me-1"></i>
+                                }
+                                @account.Name
+                            </td>
+                            <td>@account.Type</td>
+                            <td>@(account.IsPostable ? "Detail" : "Header")</td>
+                            <td>
+                                @account.NormalBalance
+                                @if (AccountListViewModel.IsContra(account))
+                                {
+                                    <span class="badge bg-warning text-dark ms-1">Contra</span>
+                                }
+                            </td>
+                            <td>@account.CashFlowCategory</td>
+                            <td><partial name="Partials/_StatusBadge" model='account.IsActive ? "Active" : "Inactive"' /></td>
+                            <td class="text-end text-nowrap">
+                                @if (!account.IsPostable && canCreate)
+                                {
+                                    <a asp-action="Create" asp-route-parentId="@account.Id" class="btn btn-sm btn-light" title="Add sub-account"><i class="ti ti-plus"></i></a>
+                                }
+                                <a asp-action="Edit" asp-route-id="@account.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a>
+                            </td>
+                        </tr>
+                    }
+                    @if (Model.Accounts.Count == 0)
+                    {
+                        <tr><td colspan="8" class="text-center text-muted py-4">No accounts found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="px-3 py-2 text-muted fs-13">@Fmt.Number(Model.Accounts.Count) account(s)</div>
+    </div>
+</div>

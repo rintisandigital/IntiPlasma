@@ -1,0 +1,124 @@
+@model JournalTemplateFormViewModel
+@using Domain.Finance.Accounts
+@{
+    ViewData["Title"] = Model.IsNew ? "Add Journal Template" : $"Template {Model.Name}";
+    ViewData["Menu"] = MenuCodes.FinanceJournalTemplates;
+    string accountLookup = Url.Action("Accounts", "Lookup", new { area = "" })!;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel(Model.IsNew ? "Add Journal Template" : $"Template {Model.Name}", "Needs at least one debit and one credit line")' />
+
+<form asp-action="@(Model.IsNew ? "Create" : "Edit")" method="post">
+    @if (Model.IsNew)
+    {
+        <form-token />
+    }
+    else
+    {
+        <input type="hidden" asp-for="Id" />
+    }
+    <fieldset disabled="@(!Model.CanSave)">
+        <div class="card">
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                <div class="row">
+                    <div class="col-md-5 mb-3">
+                        <label asp-for="Name" class="form-label"></label> <span class="text-danger">*</span>
+                        <input asp-for="Name" class="form-control">
+                        <span asp-validation-for="Name" class="text-danger fs-13"></span>
+                    </div>
+                    <div class="col-md-7 mb-3">
+                        <label asp-for="Description" class="form-label"></label>
+                        <input asp-for="Description" class="form-control">
+                    </div>
+                    @if (!Model.IsNew)
+                    {
+                        <div class="col-12">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="IsActive" name="IsActive" value="true" checked="@(Model.IsActive == true)">
+                                <label class="form-check-label" for="IsActive">Active</label>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h5 class="card-title mb-0">Lines</h5>
+                @if (Model.CanSave)
+                {
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-collection-add="Lines"><i class="ti ti-plus me-1"></i>Add line</button>
+                }
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table mb-0" data-collection="Lines">
+                        <thead class="thead-light"><tr><th style="width: 38%">Account</th><th>Side</th><th>Cost center</th><th>Line description</th><th></th></tr></thead>
+                        <tbody>
+                            <tr class="collection-empty"><td colspan="5" class="text-center text-muted py-3">No line yet.</td></tr>
+                            @for (int i = 0; i < Model.Lines.Count; i++)
+                            {
+                                TemplateLineInput line = Model.Lines[i];
+                                <tr class="collection-row">
+                                    <td>
+                                        <input type="hidden" name="Lines[@i].AccountLabel" value="@line.AccountLabel">
+                                        <select name="Lines[@i].AccountId" class="form-select" data-lookup="@accountLookup" required>
+                                            @if (line.AccountId is not null)
+                                            {
+                                                <option value="@line.AccountId" selected>@(line.AccountLabel ?? line.AccountId.ToString())</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="">Search account…</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td><select name="Lines[@i].Side" class="form-select" asp-items="EnumOptions.For(line.Side)"></select></td>
+                                    <td>
+                                        <select name="Lines[@i].CostCenterId" class="form-select">
+                                            <option value="">—</option>
+                                            @foreach (SelectListItem costCenter in Model.CostCenters)
+                                            {
+                                                <option value="@costCenter.Value" selected="@(costCenter.Value == line.CostCenterId?.ToString())">@costCenter.Text</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td><input name="Lines[@i].Description" value="@line.Description" maxlength="250" class="form-control"></td>
+                                    <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </fieldset>
+    <partial name="Partials/_FormButtons" model='new FormButtonsModel(Model.CanSave, Url.Action("Index")!)' />
+</form>
+
+<template data-collection-template="Lines">
+    <tr class="collection-row">
+        <td>
+            <select name="Lines[__i__].AccountId" class="form-select" data-lookup="@accountLookup" required>
+                <option value="">Search account…</option>
+            </select>
+        </td>
+        <td><select name="Lines[__i__].Side" class="form-select" asp-items="EnumOptions.For<BalanceSide>(null)"></select></td>
+        <td>
+            <select name="Lines[__i__].CostCenterId" class="form-select">
+                <option value="">—</option>
+                @foreach (SelectListItem costCenter in Model.CostCenters)
+                {
+                    <option value="@costCenter.Value">@costCenter.Text</option>
+                }
+            </select>
+        </td>
+        <td><input name="Lines[__i__].Description" maxlength="250" class="form-control"></td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+    </tr>
+</template>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

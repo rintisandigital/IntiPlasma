@@ -1,0 +1,78 @@
+@model FiscalPeriodListViewModel
+@using Web.App.Areas.Finance.Controllers
+@{
+    ViewData["Title"] = "Fiscal Periods";
+    ViewData["Menu"] = MenuCodes.FinanceFiscalPeriods;
+    Application.Finance.FiscalPeriods.FiscalPeriodResponse? nextToClose = Model.Periods.FirstOrDefault(p => p.Status == "Open");
+    Application.Finance.FiscalPeriods.FiscalPeriodResponse? lastClosed = Model.Periods.LastOrDefault(p => p.Status == "Closed");
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Fiscal Periods", "Monthly periods are closed in order; closing December also closes the year", MenuCodes.FinanceFiscalPeriods)' />
+
+<div class="card">
+    <div class="card-header d-flex flex-wrap align-items-end justify-content-between gap-2">
+        <form method="get" class="d-flex gap-2 align-items-end">
+            <div>
+                <label class="form-label mb-1" for="year">Year</label>
+                <select id="year" name="year" class="form-select" onchange="this.form.submit()">
+                    @foreach (int year in Model.Years)
+                    {
+                        <option value="@year" selected="@(year == Model.Year)">@year</option>
+                    }
+                    @if (Model.Years.Count == 0)
+                    {
+                        <option value="">No fiscal year yet</option>
+                    }
+                </select>
+            </div>
+        </form>
+        @if (Model.CanOpenYear)
+        {
+            <form asp-action="OpenYear" method="post" class="d-flex gap-2 align-items-end" data-confirm="Open the fiscal year? Twelve monthly periods will be created.">
+                <div>
+                    <label class="form-label mb-1" for="open-year">Open fiscal year</label>
+                    <input id="open-year" name="year" type="number" min="2000" max="2100" step="1" value="@Model.SuggestedYear" class="form-control" style="width: 8rem" required>
+                </div>
+                <button type="submit" class="btn btn-primary"><i class="ti ti-calendar-plus me-1"></i>Open Year</button>
+            </form>
+        }
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr><th>Period</th><th>Start</th><th>End</th><th>Status</th><th>Closed at</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Finance.FiscalPeriods.FiscalPeriodResponse period in Model.Periods)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@FiscalPeriodsController.PeriodName(period.Year, period.Month)</td>
+                            <td>@Fmt.Date(period.StartDate)</td>
+                            <td>@Fmt.Date(period.EndDate)</td>
+                            <td><partial name="Partials/_StatusBadge" model="period.Status" /></td>
+                            <td>@(period.ClosedAtUtc is { } closedAt ? Fmt.DateTime(closedAt) : "—")</td>
+                            <td class="text-end text-nowrap">
+                                @if (Model.CanChangeStatus && period.Id == nextToClose?.Id)
+                                {
+                                    <a asp-action="Details" asp-route-id="@period.Id" class="btn btn-sm btn-outline-primary"><i class="ti ti-lock me-1"></i>Close…</a>
+                                }
+                                @if (Model.CanChangeStatus && period.Id == lastClosed?.Id)
+                                {
+                                    <form asp-action="Reopen" asp-route-id="@period.Id" method="post" class="d-inline"
+                                          data-confirm="Reopen @FiscalPeriodsController.PeriodName(period.Year, period.Month)? Postings dated in it will be allowed again.">
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="ti ti-lock-open me-1"></i>Reopen</button>
+                                    </form>
+                                }
+                                <a asp-action="Details" asp-route-id="@period.Id" class="btn btn-sm btn-light" title="Closing checklist"><i class="ti ti-list-check"></i></a>
+                            </td>
+                        </tr>
+                    }
+                    @if (Model.Periods.Count == 0)
+                    {
+                        <tr><td colspan="6" class="text-center text-muted py-4">No fiscal periods. Open a fiscal year to start posting.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

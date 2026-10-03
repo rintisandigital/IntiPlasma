@@ -396,7 +396,7 @@ Use case Application/Domain baru dikerjakan & diuji dulu (unit test seperti fase
 - Partnership: Farmer, Coop, Contract (wizard skema PriceContract/ProfitSharing, harga jaminan per rentang bobot, bonus/potongan; Draft → Active → Inactive) + PDF kontrak.
 - Komponen **Attachments** (Dropzone → `AttachmentController` → use case attachment; JPEG/PNG/WEBP/PDF ≤ 10 MB, maks 20) + endpoint lookup Tom-Select.
 
-### Fase W3 — Finance Setup
+### Fase W3 — Finance Setup ✅ (selesai 2026-10-03, realisasi §14)
 - COA bertingkat (tree, header vs postable, akun kontra, kategori arus kas), cost center, periode fiskal (buka/tutup + checklist), template jurnal, mapping jurnal otomatis, Master Kas/Bank. Ekspor COA.
 
 ### Fase W4 — Pengadaan & Gudang
@@ -716,3 +716,32 @@ Pola semua master: Index (View) → Export (Export) → Create (Create) → Edit
 - **Test: 282 lulus** — Domain 143, Application 60, Arsitektur 14, Integration Web.Api 18, Integration Web.App 47 (+32): ekspor unit (Excel bertipe, PDF, format id-ID, pengumpul halaman & batas baris, parsing format), 18 halaman W2 terbuka, ekspor xlsx/pdf (content type, nama file, signature), tanpa hak Export → tombol hilang & 403, create UoM, upload + buka lampiran, lookup JSON.
 - **End-to-end W2 40/40** (Playwright, Web.App :5098 + Web.Api :5099, DB `intiplasma_verify` baru lalu di-drop): sidebar W2; cabang; UoM (+ duplikat ditolak); kode PPh 23 + tarif, edit ulang; item + konversi SAK=50 KG; gudang pusat; vendor + lampiran PDF (tersimpan, tampil saat edit); customer + credit limit; peternak plasma tanpa NIK ditolak lalu dibuat; coop via Tom-Select (koordinat desimal benar) + gudang `GK-…` dibuat outbox; kontrak bagi hasil (toggle field, harga sapronak via lookup, harga jaminan, bonus FCR) → Draft → edit → Activate (Edit hilang) → **PDF kontrak** (~48 KB) → lampiran pada kontrak aktif; ekspor Items/Vendors/Farmers/Contracts; tanpa error JS.
 - **Regresi**: E2E W0 49/49, header 15/15. (E2E W1 memerlukan data gaya lama hasil migrasi; cakupannya dijaga integration test W1.)
+
+---
+
+## 14. Realisasi Fase W3 — Finance Setup (2026-10-03)
+
+Tidak ada perubahan Domain/Application/Web.Api dan **tidak ada migration baru** — layar memakai use case Fase 2/8 yang sudah ada. COA awal & mapping jurnal default sudah di-seed (`FinanceSeeder`).
+
+### 14.1 Layar (`Areas/Finance`)
+| Halaman | Realisasi |
+|---|---|
+| **Chart of Accounts** | Tree (indentasi per level, header bertanda folder, badge **Contra** bila saldo normal ≠ default tipe), filter tipe/status/cari, tombol "+" pada header → akun anak (tipe & induk terisi). Create: kode, nama, tipe, induk (hanya header bertipe sama — difilter JS), header vs detail, saldo normal (kosong = default tipe; isi hanya untuk akun kontra), kategori arus kas. Edit: hanya nama, kategori arus kas, aktif (kode/tipe/induk/jenis/saldo normal read-only). Ekspor COA Excel/PDF (nama berindentasi + level). |
+| **Cost Centers** | List, create, edit (nama, aktif), ekspor. |
+| **Fiscal Periods** | Per tahun (pilih tahun), **Open Year** (12 periode, hak Create, konfirmasi), status + waktu tutup. Halaman **checklist** (blocking vs warning, deskripsi English per kode cek, Refresh), **Close Period** (dinonaktifkan bila ada blocking; peringatan jurnal penutup tahun untuk Desember) & **Reopen** — keduanya `[WorkflowAction]` + konfirmasi. Di list, Close… hanya untuk periode terbuka pertama dan Reopen hanya untuk periode tertutup terakhir. Ekspor. |
+| **Journal Templates** | List (baris Dr/Cr), form dengan baris dinamis (akun via lookup, sisi, cost center, deskripsi), ekspor per baris. |
+| **Auto Journal Mappings** | Satu kartu per event katalog `AccountingEvents` (nama & komponen dalam English), default debit/kredit per komponen, status "Not configured", daftar override cabang. Form: baris tetap per komponen (debit/kredit via lookup, cost center); komponen kosong = tidak dipetakan, setengah terisi = error; **Add branch override** memulai dari akun default; ganti event memuat ulang komponen. Ekspor per komponen. |
+| **Cash/Bank Accounts** | Filter cabang/tipe/cari, saldo buku, create (kode, nama, tipe, cabang, akun COA aset postable via lookup, bank & no. rekening), edit (nama, bank, no. rekening, aktif; cabang/akun/saldo read-only), ekspor. |
+
+- Lookup baru `/Lookup/Accounts?q=&type=` (akun postable & aktif).
+- Menu: keenam halaman dirilis dengan hak **Create/Edit/Export** (tanpa Delete — tidak ada use case hapus; Fiscal Periods: Create = buka tahun, Edit = tutup/buka kembali).
+
+### 14.2 Perbaikan lintas fase
+- ⚠️ **Bug W2**: `MasterFormViewModel.IsActive` ber-default `true`, sehingga switch Active yang dimatikan (tidak terkirim) tidak pernah menonaktifkan master. Default dihapus (Edit GET selalu mengisi nilainya); dijaga integration test.
+- Form Edit akun: field read-only yang `[Required]` (Type) kini dikirim sebagai hidden — sebelumnya simpan gagal tanpa pesan (error properti tidak tampil di summary `ModelOnly`).
+- **Lookup Tom-Select**: dropdown menutup & melepas fokus setelah memilih (sebelumnya preload saat fokus membukanya lagi dan menutupi tombol Save); wrapper tidak lagi menggambar kotak/panah ganda; placeholder disembunyikan bila sudah ada nilai (`theme.css`).
+
+### 14.3 Pengujian & verifikasi
+- **Test: 300 lulus** — Domain 143, Application 60, Arsitektur 14, Integration Web.Api 18, Integration Web.App 65 (+18): 12 halaman finance terbuka, sidebar finance (menu belum rilis tersembunyi), COA seed + ekspor, cost center dibuat lalu dinonaktifkan, **master dinonaktifkan saat switch mati (regresi bug W2)**, buka tahun fiskal + checklist, lookup akun hanya akun postable.
+- **End-to-end W3 48/48** (Playwright, DB `intiplasma_verify` baru lalu di-drop): sidebar; tree COA; filter induk per tipe; akun header & anak via "+", akun kontra, kode duplikat ditolak, edit (nama/arus kas/nonaktif) + filter status; cost center create & nonaktif; buka tahun 2026, checklist English, tutup Januari → tombol di list (Close… Februari, Reopen Januari) → buka kembali; template (hanya debit ditolak, 3 baris, label akun & cost center saat edit, hapus baris); mapping (semua event ter-seed, edit default, override cabang dari default, komponen setengah terisi ditolak, komponen kosong tidak dipetakan, override ganda ditolak, ganti event memuat komponen); kas/bank (akun buku sendiri, saldo Rp 0,00, akun buku yang sama ditolak, edit + nonaktif); 7 ekspor; tanpa error JS.
+- **Regresi**: E2E W2 40/40, W0 49/49, header 15/15.

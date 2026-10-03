@@ -1,0 +1,76 @@
+@model FiscalPeriodChecklistViewModel
+@using Web.App.Areas.Finance.Controllers
+@{
+    Application.Finance.FiscalPeriods.PeriodClosingChecklist checklist = Model.Checklist;
+    string name = FiscalPeriodsController.PeriodName(checklist.Year, checklist.Month);
+    ViewData["Title"] = $"Period {name}";
+    ViewData["Menu"] = MenuCodes.FinanceFiscalPeriods;
+    bool isOpen = checklist.Status == "Open";
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">@name <partial name="Partials/_StatusBadge" model="checklist.Status" /></h4>
+            <h6>Closing checklist</h6>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="Index" asp-route-year="@checklist.Year" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+        <a asp-action="Details" asp-route-id="@checklist.FiscalPeriodId" class="btn btn-light"><i class="ti ti-refresh me-1"></i>Refresh</a>
+        @if (Model.CanChangeStatus && isOpen)
+        {
+            <form asp-action="Close" asp-route-id="@checklist.FiscalPeriodId" method="post"
+                  data-confirm="Close @name?@(checklist.Month == 12 ? " The year-end closing journal will be posted." : "")">
+                <button type="submit" class="btn btn-primary" disabled="@(!checklist.CanClose)"><i class="ti ti-lock me-1"></i>Close Period</button>
+            </form>
+        }
+        @if (Model.CanChangeStatus && !isOpen)
+        {
+            <form asp-action="Reopen" asp-route-id="@checklist.FiscalPeriodId" method="post"
+                  data-confirm="Reopen @name? Postings dated in it will be allowed again.">
+                <button type="submit" class="btn btn-outline-secondary"><i class="ti ti-lock-open me-1"></i>Reopen</button>
+            </form>
+        }
+    </div>
+</div>
+
+@if (isOpen)
+{
+    <div class="alert @(checklist.CanClose ? "alert-success" : "alert-warning")">
+        @(checklist.CanClose
+            ? "No blocking issue: the period can be closed. Review the warnings below first."
+            : "The period cannot be closed until the blocking issues are resolved.")
+        @if (checklist.Month == 12)
+        {
+            <div class="mt-1 fs-13">Closing December also posts the year-end closing journal (revenue and expenses to retained earnings).</div>
+        }
+    </div>
+}
+
+<div class="card">
+    <div class="card-body p-0">
+        <table class="table mb-0">
+            <thead class="thead-light"><tr><th style="width: 3rem"></th><th>Check</th><th>Severity</th><th class="text-end">Count</th></tr></thead>
+            <tbody>
+                @foreach (Application.Finance.FiscalPeriods.ClosingCheck check in checklist.Checks)
+                {
+                    <tr>
+                        <td>
+                            @if (check.Count == 0)
+                            {
+                                <i class="ti ti-circle-check text-success fs-18"></i>
+                            }
+                            else
+                            {
+                                <i class="ti @(check.Blocking ? "ti-circle-x text-danger" : "ti-alert-triangle text-warning") fs-18"></i>
+                            }
+                        </td>
+                        <td>@ClosingCheckLabels.For(check)</td>
+                        <td>@(check.Blocking ? "Blocking" : "Warning")</td>
+                        <td class="text-end">@Fmt.Number(check.Count)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

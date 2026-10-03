@@ -20,6 +20,9 @@
             maxOptions: 20,
             loadThrottle: 250,
             preload: 'focus',
+            closeAfterSelect: true,
+            // Leave the field after a choice; otherwise the focus preload reopens the list over the form buttons.
+            onItemAdd: function () { this.blur(); },
             load: function (query, callback) {
                 var separator = url.indexOf('?') >= 0 ? '&' : '?';
                 fetch(url + separator + 'q=' + encodeURIComponent(query), {

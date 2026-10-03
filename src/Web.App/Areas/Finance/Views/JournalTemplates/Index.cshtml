@@ -1,0 +1,42 @@
+@model ListViewModel<Application.Finance.JournalTemplates.JournalTemplateResponse>
+@{
+    ViewData["Title"] = "Journal Templates";
+    ViewData["Menu"] = MenuCodes.FinanceJournalTemplates;
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Journal Templates", "Reusable manual journal layouts (accounts and sides, no amounts)", MenuCodes.FinanceJournalTemplates, "Add Template")' />
+
+<div class="card">
+    <div class="card-header">
+        <partial name="Partials/_FilterBar" model='new FilterBarModel(Model.Search, "Search name")' />
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr><th>Name</th><th>Description</th><th>Lines</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Finance.JournalTemplates.JournalTemplateResponse template in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@template.Name</td>
+                            <td>@(template.Description ?? "—")</td>
+                            <td class="fs-13">
+                                @foreach (Application.Finance.JournalTemplates.JournalTemplateLineResponse line in template.Lines.OrderBy(l => l.LineNumber))
+                                {
+                                    <div><span class="badge @(line.Side == "Debit" ? "bg-info" : "bg-secondary") me-1">@(line.Side == "Debit" ? "Dr" : "Cr")</span>@line.AccountCode — @line.AccountName</div>
+                                }
+                            </td>
+                            <td><partial name="Partials/_StatusBadge" model='template.IsActive ? "Active" : "Inactive"' /></td>
+                            <td class="text-end"><a asp-action="Edit" asp-route-id="@template.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="5" class="text-center text-muted py-4">No journal templates found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

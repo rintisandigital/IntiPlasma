@@ -1,0 +1,71 @@
+@model IReadOnlyList<JournalMappingEventRow>
+@{
+    ViewData["Title"] = "Auto Journal Mappings";
+    ViewData["Menu"] = MenuCodes.FinanceJournalMappings;
+    bool canCreate = await Rights.CanAsync(MenuCodes.FinanceJournalMappings, MenuRights.Create);
+    int missing = Model.Count(r => r.Default is null);
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Auto Journal Mappings", "Accounts used by the journals that operational documents post automatically", MenuCodes.FinanceJournalMappings)' />
+
+@if (missing > 0)
+{
+    <div class="alert alert-warning">
+        @missing event(s) have no company default mapping: documents of those events cannot post their journal (the event waits in the outbox).
+    </div>
+}
+
+@foreach (JournalMappingEventRow row in Model)
+{
+    <div class="card">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div>
+                <h5 class="card-title mb-0">@AccountingEventLabels.Event(row.Event)</h5>
+                <span class="text-muted fs-13">@row.Event.Code</span>
+            </div>
+            <div class="d-flex gap-2">
+                @if (canCreate && row.Default is null)
+                {
+                    <a asp-action="Create" asp-route-eventType="@row.Event.Code" class="btn btn-sm btn-primary"><i class="ti ti-plus me-1"></i>Add default</a>
+                }
+                @if (canCreate && row.Default is not null)
+                {
+                    <a asp-action="Create" asp-route-eventType="@row.Event.Code" asp-route-fromDefault="true" class="btn btn-sm btn-outline-primary">
+                        <i class="ti ti-git-branch me-1"></i>Add branch override</a>
+                }
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-sm mb-0">
+                <thead class="thead-light"><tr><th style="width: 40%">Component</th><th>Default debit</th><th>Default credit</th></tr></thead>
+                <tbody>
+                    @foreach (Domain.Finance.JournalMappings.AccountingComponentDefinition component in row.Event.Components)
+                    {
+                        Application.Finance.JournalMappings.JournalMappingLineResponse? line = row.Default?.Lines.FirstOrDefault(l => l.Component == component.Code);
+                        <tr>
+                            <td>@AccountingEventLabels.Component(row.Event.Code, component)</td>
+                            <td>@(line?.DebitAccountCode ?? "—")</td>
+                            <td>@(line?.CreditAccountCode ?? "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-2 border-top">
+                @if (row.Default is not null)
+                {
+                    <a asp-action="Edit" asp-route-id="@row.Default.Id" class="btn btn-sm btn-light"><i class="ti ti-eye me-1"></i>Default</a>
+                    <partial name="Partials/_StatusBadge" model='row.Default.IsActive ? "Active" : "Inactive"' />
+                }
+                else
+                {
+                    <span class="badge bg-danger">Not configured</span>
+                }
+                @foreach (Application.Finance.JournalMappings.JournalMappingResponse branchMapping in row.Overrides)
+                {
+                    <a asp-action="Edit" asp-route-id="@branchMapping.Id" class="btn btn-sm btn-light">
+                        <i class="ti ti-git-branch me-1"></i>@branchMapping.BranchCode@(branchMapping.IsActive ? "" : " (inactive)")
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+}
