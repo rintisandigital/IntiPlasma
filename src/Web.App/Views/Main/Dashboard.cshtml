@@ -1,20 +1,140 @@
+@model DashboardViewModel
+@using System.Globalization
+@using Web.App.Infrastructure.Authorization
 @{
     ViewData["Title"] = "Dashboard";
     ViewData["Menu"] = "dashboard";
+    Application.Monitoring.DashboardSummaryResponse? s = Model.Summary;
+    string monthName = s is null ? "" : CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(s.AsOf.Month);
 }
-<partial name="Partials/_PageHeader" model='new PageHeaderModel("Dashboard", $"Welcome, {User.GetDisplayName()}")' />
+<partial name="Partials/_PageHeader" model='new PageHeaderModel("Dashboard", $"Welcome, {User.GetDisplayName()} — {Model.BranchName ?? "all branches"}, as of {(s is null ? "" : Fmt.Date(s.AsOf))}")' />
 
-<div class="card">
-    <div class="card-body">
-        <div class="d-flex align-items-center gap-3">
-            <span class="avatar-initials avatar-lg">@User.GetInitials()</span>
-            <div>
-                <h5 class="mb-1">@AppSettings.Value.Name — Admin Office</h5>
-                <p class="mb-0 text-muted">
-                    Modules appear in the sidebar as they are released. Use the branch selector in the header to
-                    choose the default branch of every page.
-                </p>
+@if (s is null)
+{
+    <div class="alert alert-warning">The dashboard figures could not be loaded.</div>
+    return;
+}
+
+<div class="row g-3 mb-3 dashboard-kpis">
+    @{
+        (string Label, string Value, string? Note, string Icon, string Menu, string Url)[] cards =
+        [
+            ("Cycles in production", Fmt.Number(s.ActiveCycles), $"{Fmt.Number(s.Population)} birds alive", "ti-egg", MenuCodes.ProductionCycles,
+                Url.Action("Index", "Cycles", new { area = "Production", status = "Active" })!),
+            ($"Harvest {monthName}", $"{Fmt.Number(s.HarvestedKgThisMonth, 0)} kg", $"{Fmt.Number(s.HarvestedBirdsThisMonth)} birds", "ti-truck-delivery",
+                MenuCodes.ProductionHarvests, Url.Action("Index", "Harvests", new { area = "Production" })!),
+            ($"Sales {monthName}", Fmt.Money(s.SalesThisMonth), "net of VAT, posted invoices", "ti-receipt", MenuCodes.SalesInvoices,
+                Url.Action("Index", "SalesInvoices", new { area = "Sales" })!),
+            ("Cash & bank", Fmt.Money(s.CashAndBank), "ledger balance", "ti-building-bank", MenuCodes.FinanceCashBankAccounts,
+                Url.Action("Index", "CashBankAccounts", new { area = "Finance" })!),
+            ("Receivables", Fmt.Money(s.Receivables), $"{Fmt.Money(s.ReceivablesOverdue)} overdue", "ti-cash", MenuCodes.SalesReceivables,
+                Url.Action("Index", "Receivables", new { area = "Sales" })!),
+            ("Payables", Fmt.Money(s.Payables), $"{Fmt.Money(s.PayablesOverdue)} overdue", "ti-file-invoice", MenuCodes.FinancePayables,
+                Url.Action("Index", "Payables", new { area = "Finance" })!),
+            ("Stock value", Fmt.Money(s.StockValue), "warehouses and coops, moving average", "ti-packages", MenuCodes.InventoryStock,
+                Url.Action("Index", "Stock", new { area = "Inventory" })!)
+        ];
+    }
+    @foreach (var card in cards)
+    {
+        <div class="col-sm-6 col-xl-3">
+            <div class="card mb-0 h-100 dashboard-kpi">
+                <div class="card-body d-flex align-items-start gap-3">
+                    <span class="avatar avatar-md bg-primary-transparent text-primary rounded"><i class="ti @card.Icon fs-20"></i></span>
+                    <div class="flex-fill">
+                        <div class="text-muted fs-13">@card.Label</div>
+                        <div class="fw-bold fs-18">@card.Value</div>
+                        <div class="text-muted fs-12">@card.Note</div>
+                    </div>
+                    <a href="@card.Url" asp-menu="@card.Menu" class="stretched-link" aria-label="Open @card.Label"></a>
+                </div>
+            </div>
+        </div>
+    }
+    <div class="col-sm-6 col-xl-3">
+        <div class="card mb-0 h-100 @(s.FailedEvents > 0 ? "border-danger" : "")">
+            <div class="card-body d-flex align-items-start gap-3">
+                <span class="avatar avatar-md rounded @(s.FailedEvents > 0 ? "bg-danger text-white" : "bg-success-transparent text-success")"><i class="ti @(s.FailedEvents > 0 ? "ti-alert-triangle" : "ti-circle-check") fs-20"></i></span>
+                <div class="flex-fill">
+                    <div class="text-muted fs-13">Failed background events</div>
+                    <div class="fw-bold fs-18" id="failed-events">@Fmt.Number(s.FailedEvents)</div>
+                    <div class="text-muted fs-12">@(s.FailedEvents > 0 ? "block closing the period" : "all processed")</div>
+                </div>
+                <a asp-area="Admin" asp-controller="FailedEvents" asp-action="Index" asp-menu="@MenuCodes.AdminFailedEvents" class="stretched-link" aria-label="Open failed events"></a>
             </div>
         </div>
     </div>
 </div>
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <div class="card h-100">
+            <div class="card-header"><h5 class="card-title mb-0">Sales and harvest — last 6 months</h5></div>
+            <div class="card-body"><canvas id="chart-trend" height="120"></canvas></div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="card h-100">
+            <div class="card-header"><h5 class="card-title mb-0">Waiting for action</h5></div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush dashboard-pending">
+                    @{
+                        (string Label, int Count, string Menu, string Url)[] pending =
+                        [
+                            ("Journals to approve", s.Pending.JournalsToApprove, MenuCodes.FinanceJournals,
+                                Url.Action("Index", "Journals", new { area = "Finance", status = "Draft", source = "Manual", branch = "all" })!),
+                            ("Journals to post", s.Pending.JournalsToPost, MenuCodes.FinanceJournals,
+                                Url.Action("Index", "Journals", new { area = "Finance", status = "Approved", branch = "all" })!),
+                            ("Payment vouchers to approve", s.Pending.PaymentVouchersToApprove, MenuCodes.FinancePaymentVouchers,
+                                Url.Action("Index", "PaymentVouchers", new { area = "Finance", status = "Draft", branch = "all" })!),
+                            ("Payment vouchers to pay", s.Pending.PaymentVouchersToPay, MenuCodes.FinancePaymentVouchers,
+                                Url.Action("Index", "PaymentVouchers", new { area = "Finance", status = "Approved", branch = "all" })!),
+                            ("Cash out to approve", s.Pending.CashOutToApprove, MenuCodes.FinanceCashTransactions,
+                                Url.Action("Index", "CashTransactions", new { area = "Finance", status = "Draft", direction = "Out", branch = "all" })!),
+                            ("Settlements to approve", s.Pending.SettlementsToApprove, MenuCodes.CostingSettlements,
+                                Url.Action("Index", "Settlements", new { area = "Costing", status = "Draft", branch = "all" })!),
+                            ("Closed plasma cycles to settle", s.Pending.ClosedCyclesToSettle, MenuCodes.CostingSettlements,
+                                Url.Action("Create", "Settlements", new { area = "Costing" })!)
+                        ];
+                    }
+                    @foreach (var item in pending)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center" asp-menu="@item.Menu">
+                            <a href="@item.Url">@item.Label</a>
+                            <span class="badge rounded-pill @(item.Count > 0 ? "bg-warning text-dark" : "bg-light text-muted")">@item.Count</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="assets/plugins/chartjs/chart.min.js"></script>
+    <script>
+        (function () {
+            if (!window.Chart) { return; }
+            var labels = [@Html.Raw(string.Join(",", s.Months.Select(m => $"'{CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedMonthName(m.Month)} {m.Year}'")))];
+            var sales = [@Html.Raw(string.Join(",", s.Months.Select(m => m.Sales.ToString(CultureInfo.InvariantCulture))))];
+            var kg = [@Html.Raw(string.Join(",", s.Months.Select(m => m.HarvestedKg.ToString(CultureInfo.InvariantCulture))))];
+            var primary = getComputedStyle(document.documentElement).getPropertyValue('--ip-primary').trim() || '#0984E3';
+            var money = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
+            new Chart(document.getElementById('chart-trend'), {
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { type: 'bar', label: 'Sales (Rp)', data: sales, backgroundColor: primary, yAxisID: 'y' },
+                        { type: 'line', label: 'Harvest (kg)', data: kg, borderColor: '#27ae60', backgroundColor: '#27ae60', yAxisID: 'y1', tension: 0.2 }
+                    ]
+                },
+                options: {
+                    scales: {
+                        y: { beginAtZero: true, ticks: { precision: 0, callback: function (v) { return money.format(v); } } },
+                        y1: { position: 'right', beginAtZero: true, ticks: { precision: 0 }, grid: { drawOnChartArea: false } }
+                    }
+                }
+            });
+        })();
+    </script>
+}

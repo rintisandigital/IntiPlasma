@@ -1,0 +1,56 @@
+@model ListViewModel<Application.Finance.Journals.JournalResponse>
+@{
+    ViewData["Title"] = "Journals";
+    ViewData["Menu"] = MenuCodes.FinanceJournals;
+    bool canCreate = await Rights.CanAsync(MenuCodes.FinanceJournals, MenuRights.Create);
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Journals</h4>
+            <h6>Manual journals (draft → approved by another user → posted) and the automatic journals of the documents</h6>
+        </div>
+    </div>
+    <partial name="Partials/_ExportButtons" model="MenuCodes.FinanceJournals" />
+    @if (canCreate)
+    {
+        <div class="page-btn">
+            <a asp-action="Create" class="btn btn-primary"><i class="ti ti-circle-plus me-1"></i>New Journal</a>
+        </div>
+    }
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <partial name="Partials/_DocumentFilter" model='new DocumentFilterModel(Model.Search, "Search number or description", Model.BranchOptions, Model.Filters, Model.FilterOptions["status"], [new FilterSelect("source", "All sources", Model.FilterOptions["source"])])' />
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr><th>Number</th><th>Date</th><th>Source</th><th>Description</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Finance.Journals.JournalResponse journal in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold text-nowrap">@(journal.Number ?? "(draft)")<div class="text-muted fs-12 fw-normal">@journal.BranchCode</div></td>
+                            <td>@Fmt.Date(journal.Date)</td>
+                            <td>@JournalSources.Label(journal.SourceType)</td>
+                            <td>@journal.Description</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(journal.TotalDebit)</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(journal.TotalCredit)</td>
+                            <td><partial name="Partials/_StatusBadge" model="journal.Status" /></td>
+                            <td class="text-end"><a asp-action="Details" asp-route-id="@journal.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="8" class="text-center text-muted py-4">No journals found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="Partials/_Pagination" model="PaginationModel.From(Model.Rows)" />
+    </div>
+</div>

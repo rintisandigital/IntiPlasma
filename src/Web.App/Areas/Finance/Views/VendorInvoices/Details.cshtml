@@ -123,3 +123,5 @@
 <partial name="Partials/_AttachmentsCard" model='new AttachmentsCardModel(Model.Attachments, Model.CanEdit && invoice.Status != "Cancelled" ? Url.Action("Documents", new { id = invoice.Id }) : null)' />
 
 <partial name="Partials/_ReasonModal" model='new ReasonModalModel("cancel-modal", "Cancel draft vendor invoice", Url.Action("Cancel", new { id = invoice.Id })!, "Cancel Invoice")' />
+
+@await Component.InvokeAsync("JournalPreview", new { sourceIds = new[] { invoice.Id }, emptyText = "No journal yet — the invoice is journaled when it is posted." })

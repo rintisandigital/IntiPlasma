@@ -20,6 +20,7 @@ public sealed partial class ExportService(
     IHttpContextAccessor httpContextAccessor,
     DisplayFormatter formatter,
     PdfListExporter pdfExporter,
+    ReportExporter reportExporter,
     ILogger<ExportService> logger)
 {
     public int MaxRows => exportOptions.Value.MaxRows;
@@ -59,6 +60,60 @@ public sealed partial class ExportService(
 
         return File(header, format, content);
     }
+
+    /// <summary>
+    /// A structured report (financial statements, ledgers, tax recap) as Excel or PDF.
+    /// </summary>
+    public FileContentResult Report(ExportFileFormat format, ExportHeader header, ReportDocument report)
+    {
+        ArgumentNullException.ThrowIfNull(header);
+        ArgumentNullException.ThrowIfNull(report);
+
+        byte[] content = format == ExportFileFormat.Excel
+            ? ReportExporter.Excel(header, report)
+            : reportExporter.Pdf(header, report);
+
+        Log(header, format, report.Tables.Sum(t => t.Rows.Count));
+
+        return File(header, format, content);
+    }
+
+    /// <summary>
+    /// A CSV file for import elsewhere (RFC 4180, comma separated, invariant numbers, ISO dates, UTF-8 with BOM) —
+    /// the same layout as the Web.Api tax exports.
+    /// </summary>
+    public FileContentResult Csv<T>(string title, string fileName, IEnumerable<T> rows, params (string Header, Func<T, object?> Value)[] columns)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+        ArgumentNullException.ThrowIfNull(columns);
+
+        var builder = new System.Text.StringBuilder();
+        builder.AppendLine(string.Join(',', columns.Select(c => CsvEscape(c.Header))));
+        int count = 0;
+        foreach (T row in rows)
+        {
+            builder.AppendLine(string.Join(',', columns.Select(c => CsvEscape(CsvFormat(c.Value(row))))));
+            count++;
+        }
+
+        LogExport(logger, httpContextAccessor.HttpContext?.User.GetDisplayName() ?? string.Empty, title, ExportFileFormat.Excel, count, "csv");
+
+        byte[] content = [.. System.Text.Encoding.UTF8.GetPreamble(), .. System.Text.Encoding.UTF8.GetBytes(builder.ToString())];
+        return new FileContentResult(content, "text/csv") { FileDownloadName = fileName };
+    }
+
+    private static string CsvFormat(object? value) => value switch
+    {
+        null => string.Empty,
+        DateOnly date => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+        decimal number => number.ToString("0.##", CultureInfo.InvariantCulture),
+        bool flag => flag ? "Y" : "N",
+        IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+        _ => value.ToString() ?? string.Empty
+    };
+
+    private static string CsvEscape(string value) =>
+        value.IndexOfAny([',', '"', '\n', '\r']) >= 0 ? $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\"" : value;
 
     /// <summary>
     /// A printed document (PO, invoice, contract, …) on portrait A4 with the shared letterhead and footer.

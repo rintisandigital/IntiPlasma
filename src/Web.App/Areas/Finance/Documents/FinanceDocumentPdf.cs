@@ -107,4 +107,62 @@ public static class FinanceDocumentPdf
             DocumentPdf.Signatures(column, cashIn ? ["Received by", "Approved by", "Paid by"] : ["Prepared by", "Approved by", "Received by"]);
         });
     }
+
+    private static readonly string[] JournalLineHeaders = ["#", "Account", "Cost center", "Description", "Debit", "Credit"];
+
+    /// <summary>
+    /// Journal voucher (bukti jurnal) of a manual or automatic journal: lines, totals and who prepared, approved and
+    /// posted it.
+    /// </summary>
+    public static void JournalVoucher(IContainer container, Application.Finance.Journals.JournalResponse journal, DisplayFormatter fmt)
+    {
+        ArgumentNullException.ThrowIfNull(journal);
+        ArgumentNullException.ThrowIfNull(fmt);
+
+        DocumentPdf.Compose(container, column =>
+        {
+            column.Item().Element(c => DocumentPdf.Fields(c,
+            [
+                ("Journal", journal.Number ?? "Not posted"),
+                ("Date", fmt.Date(journal.Date)),
+                ("Branch", journal.BranchCode),
+                ("Source", Models.JournalSources.Label(journal.SourceType)),
+                ("Description", journal.Description),
+                ("Status", EnumOptions.Label(journal.Status)),
+                ("Prepared by", journal.CreatedByName ?? (journal.Source == "Automatic" ? "System" : "—")),
+                ("Approved by", journal.ApprovedByName ?? "—"),
+                ("Posted by", journal.PostedByName ?? (journal.PostedAtUtc is null ? "—" : "System")),
+                ("Posted at", journal.PostedAtUtc is { } posted ? fmt.DateTime(posted) : "—")
+            ]));
+
+            column.Item().Table(table =>
+            {
+                table.ColumnsDefinition(c =>
+                {
+                    c.ConstantColumn(22);
+                    c.RelativeColumn(2.6f);
+                    c.RelativeColumn(1);
+                    c.RelativeColumn(2.2f);
+                    c.RelativeColumn(1.3f);
+                    c.RelativeColumn(1.3f);
+                });
+                DocumentPdf.Header(table, JournalLineHeaders);
+                foreach (Application.Finance.Journals.JournalLineResponse line in journal.Lines ?? [])
+                {
+                    table.Cell().Element(PdfLayout.Cell).Text(line.LineNumber.ToString(CultureInfo.InvariantCulture));
+                    table.Cell().Element(PdfLayout.Cell).Text($"{line.AccountCode} — {line.AccountName}");
+                    table.Cell().Element(PdfLayout.Cell).Text(line.CostCenterCode ?? string.Empty);
+                    table.Cell().Element(PdfLayout.Cell).Text(line.Description ?? string.Empty);
+                    table.Cell().Element(PdfLayout.Cell).AlignRight().Text(line.Debit == 0 ? string.Empty : fmt.Number(line.Debit));
+                    table.Cell().Element(PdfLayout.Cell).AlignRight().Text(line.Credit == 0 ? string.Empty : fmt.Number(line.Credit));
+                }
+
+                table.Cell().ColumnSpan(4).Element(PdfLayout.Cell).AlignRight().Text("Total").Bold();
+                table.Cell().Element(PdfLayout.Cell).AlignRight().Text(fmt.Number(journal.TotalDebit)).Bold();
+                table.Cell().Element(PdfLayout.Cell).AlignRight().Text(fmt.Number(journal.TotalCredit)).Bold();
+            });
+
+            DocumentPdf.Signatures(column, ["Prepared by", "Approved by", "Posted by"]);
+        });
+    }
 }

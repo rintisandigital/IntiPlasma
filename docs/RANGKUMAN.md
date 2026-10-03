@@ -1,7 +1,7 @@
 # Rangkuman Proyek — Aplikasi Peternakan Ayam Broiler Inti-Plasma
 
-> Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4), 2026-10-01 (Fase 5–8), 2026-10-02 (Fase 9 — lampiran dokumen; Fase W0 — fondasi WebApp) dan 2026-10-03 (Fase W1–W8).
-> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§16 (API) dan [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (WebApp, realisasi W0 di §10, W1 di §12, W2 di §13, W3 di §14, W4 di §15, W5 di §16, W6 di §17, W7 di §18, W8 di §20). Fase API 0–9 dan W0–W8 selesai; berikutnya **Fase W9** (Jurnal, Laporan, Tutup Buku, Pajak & Dashboard).
+> Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4), 2026-10-01 (Fase 5–8), 2026-10-02 (Fase 9 — lampiran dokumen; Fase W0 — fondasi WebApp), 2026-10-03 (Fase W1–W8) dan 2026-10-04 (Fase W9).
+> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§16 (API) dan [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (WebApp, realisasi W0 di §10, W1 di §12, W2 di §13, W3 di §14, W4 di §15, W5 di §16, W6 di §17, W7 di §18, W8 di §20, W9 di §22). Fase API 0–9 dan W0–W9 selesai; berikutnya **Fase W10** (Pengerasan).
 
 ---
 
@@ -204,6 +204,12 @@
 - **Plasma Settlements**: draft dari siklus plasma tertutup (lookup `SettleableCycles` atau tombol di siklus), info saldo hutang plasma + potongan, recalculate, approve checker, cancel (alasan), Pay → PV plasma, **PDF settlement dengan terbilang**, ekspor. Tidak ada migration baru.
 - ⚠️ Approve settlement di WebApp memakai hak Edit + maker-checker domain (API: `SettlementsApprove`).
 
+### Fase W9 — Jurnal, Laporan, Tutup Buku, Pajak & Dashboard ✅ (detail: PLAN-WEBAPP §21–§22)
+- **Journals**: jurnal manual (template, total/selisih langsung, draft → approve checker → post → reverse, hapus draft, **PDF journal voucher**) + jurnal otomatis (tautan ke dokumen sumber); kartu **Journal** di detail dokumen W4–W8 (`GetDocumentJournalsQuery`).
+- **Reports**: GL, Trial Balance, Laba Rugi, Neraca, Arus Kas, Profitabilitas, Rekap Pajak (PPN/PPh + CSV) — satu model `ReportDocument` untuk HTML, **Excel berstruktur** (lembar per tabel) dan PDF.
+- **Failed Events** (retry) + tautan dari checklist tutup periode; **Dashboard** KPI, daftar menunggu tindakan, grafik 6 bulan (`GetDashboardSummaryQuery`). Semua menu katalog kini dirilis. Tidak ada migration baru.
+- ⚠️ Perbaikan: definisi dead letter (event yang masih di-retry tidak lagi dihitung gagal).
+
 ## 5. Alur Akuntansi yang Sudah Berjalan
 
 | Transaksi | Jurnal otomatis |
@@ -258,22 +264,24 @@ Semua event di katalog kini sudah dipakai.
 - Aturan `step` bawaan jquery-validation menghitung jumlah desimal, bukan kelipatan → nilai DB `20.000000` gagal `step="0.001"` tanpa pesan; diganti di `wwwroot/js/validation-setup.js`.
 - Folder lampiran relatif terhadap `AppContext.BaseDirectory` (folder `bin`) → di dev Web.App menunjuk `../../../../Web.Api/bin/Debug/net10.0/uploads`; di container keduanya `/app/uploads`.
 - Route di `MenuCatalog` harus sama persis dengan nama controller area (mis. `/Sales/SalesOrders`, bukan `/Sales/Orders`) — sidebar tidak divalidasi saat build; test `Admin_Should_OpenEveryReleasedMenu` menjaganya.
+- Skrip E2E harus memakai **tanggal lokal** (`toLocaleDateString('sv-SE')`), bukan `toISOString()` (UTC): antara 00.00–07.00 WIB tanggal UTC masih kemarin sehingga dokumen "hari ini" tampak bertanggal salah.
+- Outbox menyimpan `error` pada setiap percobaan yang gagal; baru menjadi dead letter setelah `MaxAttempts` (processed_on_utc diisi). Query "gagal" wajib memakai keduanya.
 
 ## 7. Cara Kerja & Verifikasi
 
 - Setiap fase: domain + unit test invariant → command/query + validator → EF config + migration → endpoint + permission → **verifikasi end-to-end** ke PostgreSQL lokal pada database sementara `intiplasma_verify` (dibuat & dihapus otomatis; database `intiplasma` milik user tidak disentuh).
 - User yang melakukan **commit & migrate** setelah tiap fase.
-- Status test saat ini: **370 test lulus** (143 domain, 60 application, 14 arsitektur, 18 integration Web.Api, 135 integration Web.App).
+- Status test saat ini: **388 test lulus** (143 domain, 60 application, 14 arsitektur, 18 integration Web.Api, 153 integration Web.App).
 - Integration test (Testcontainers) **sudah bisa dijalankan** di mesin dev (container runtime tersedia) — `dotnet test IntiPlasma.slnx`.
 - Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario, Fase 7: 32 skenario, Fase 8: 35 skenario, Fase 9: 79 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
 - ⚠️ Sejak W0 Web.Api tidak memproses outbox: verifikasi yang hanya menjalankan API perlu `BackgroundJobs__Enabled=true`.
-- Verifikasi WebApp (W0: 49 skenario, W1: 36 skenario, W2: 40 skenario, W3: 48 skenario, W4: 51 skenario, W5: 42 skenario, W6: 42 skenario, W7: 62 skenario, W8: 44 skenario + regresi W0–W7) memakai **Playwright** (dipasang di scratchpad, bukan di repo) terhadap Web.App :5098 + Web.Api :5099 pada `intiplasma_verify`; interaksi halaman lewat frame `content-frame`.
+- Verifikasi WebApp (W0: 49 skenario, W1: 36 skenario, W2: 40 skenario, W3: 48 skenario, W4: 51 skenario, W5: 42 skenario, W6: 42 skenario, W7: 62 skenario, W8: 44 skenario, W9: 44 skenario + regresi W0–W8) memakai **Playwright** (dipasang di scratchpad, bukan di repo) terhadap Web.App :5098 + Web.Api :5099 pada `intiplasma_verify`; interaksi halaman lewat frame `content-frame`.
 - Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`, `Phase8_ReportingClosing`, `Phase9_Attachments`, `PhaseW0_UserStatus`, `PhaseW1_AccessControl`.
 
 ## 8. Catatan Terbuka / Hutang Teknis
 
 - Tarif & fasilitas pajak (PPN dibebaskan untuk DOC/pakan/ayam hidup, PPh) perlu dikonfirmasi konsultan pajak lalu diinput sebagai TaxCode.
-- Kegagalan jurnal otomatis kini terlihat lewat API `system/failed-events` (+ retry) dan memblokir tutup periode → tinggal layar di WebApp.
+- Kegagalan jurnal otomatis terlihat di layar **Failed Events** (W9, + retry) dan API `system/failed-events`; dead letter = `processed_on_utc` terisi **dan** `error` terisi (event yang masih di-retry otomatis dihitung *pending*).
 - `IdempotencyFilter` masih in-memory → tambah Redis sebelum scale-out.
 - XML Coretax (e-Faktur & e-Bupot) belum ada; baru rekap + CSV.
 - Satu admin tunggal tidak bisa menyelesaikan jurnal manual (maker-checker) → perlu user kedua.

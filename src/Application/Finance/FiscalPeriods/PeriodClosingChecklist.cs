@@ -34,7 +34,7 @@ internal static class PeriodClosingChecks
         ("PendingAutoJournals", "Event jurnal otomatis belum diproses (tunggu sebentar lalu cek lagi)", true,
             "SELECT COUNT(*) FROM infrastructure.outbox_messages WHERE processed_on_utc IS NULL"),
         ("FailedAutoJournals", "Jurnal otomatis gagal (dead letter) — perbaiki penyebabnya lalu coba ulang", true,
-            "SELECT COUNT(*) FROM infrastructure.outbox_messages WHERE error IS NOT NULL"),
+            "SELECT COUNT(*) FROM infrastructure.outbox_messages WHERE processed_on_utc IS NOT NULL AND error IS NOT NULL"),
         ("DraftSalesInvoices", "Invoice penjualan masih draft", false,
             "SELECT COUNT(*) FROM sales.sales_invoices WHERE status = 'Draft' AND invoice_date BETWEEN @Start AND @End"),
         ("UninvoicedDeliveries", "DO terkirim belum ditagih", false,

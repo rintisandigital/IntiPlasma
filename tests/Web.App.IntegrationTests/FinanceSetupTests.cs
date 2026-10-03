@@ -48,7 +48,7 @@ public sealed partial class FinanceSetupTests(WebAppFactory factory)
 
         mainboard.ShouldContain($"data-menu-code=\"{MenuCodes.FinanceAccounts}\"");
         mainboard.ShouldContain($"data-menu-code=\"{MenuCodes.FinanceCashBankAccounts}\"");
-        mainboard.ShouldNotContain("data-menu-code=\"finance.journals\""); // not released yet
+        mainboard.ShouldContain($"data-menu-code=\"{MenuCodes.FinanceJournals}\""); // released in W9
     }
 
     [Fact]

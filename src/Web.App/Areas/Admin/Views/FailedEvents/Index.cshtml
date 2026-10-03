@@ -1,0 +1,60 @@
+@model IReadOnlyList<Application.Monitoring.FailedEventResponse>
+@{
+    ViewData["Title"] = "Failed Events";
+    ViewData["Menu"] = MenuCodes.AdminFailedEvents;
+    bool canRetry = ViewData["CanRetry"] is true;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Failed Events</h4>
+            <h6>Background events (automatic journals, coop warehouses, …) that failed after all retries; they block closing the period</h6>
+        </div>
+    </div>
+    @if (canRetry && Model.Count > 0)
+    {
+        <form asp-action="Retry" method="post" data-confirm="Queue all @Model.Count failed events again? Fix the cause first (e.g. the journal mapping or the fiscal year).">
+            <button type="submit" class="btn btn-primary"><i class="ti ti-refresh me-1"></i>Retry All</button>
+        </form>
+    }
+</div>
+
+@if (Model.Count == 0)
+{
+    <div class="alert alert-success"><i class="ti ti-circle-check me-1"></i>No failed events — every background event has been processed.</div>
+}
+else
+{
+    <div class="alert alert-warning">
+        Fix the cause shown in the error first — typically a missing auto journal mapping (Finance → Auto Journal Mappings), a fiscal year
+        that is not open or a closed period (Finance → Fiscal Periods) — then retry.
+    </div>
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table mb-0">
+                    <thead class="thead-light"><tr><th>Event</th><th>Occurred</th><th class="text-end">Attempts</th><th>Error</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (Application.Monitoring.FailedEventResponse failed in Model)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@failed.Type</td>
+                                <td class="text-nowrap">@Fmt.DateTime(failed.OccurredOnUtc)</td>
+                                <td class="text-end">@failed.Attempts</td>
+                                <td><div class="text-danger fs-13" style="white-space: pre-line; max-height: 8rem; overflow: auto">@failed.Error</div></td>
+                                <td class="text-end">
+                                    @if (canRetry)
+                                    {
+                                        <form asp-action="Retry" asp-route-id="@failed.Id" method="post">
+                                            <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap"><i class="ti ti-refresh me-1"></i>Retry</button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}

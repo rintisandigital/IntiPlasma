@@ -1,0 +1,40 @@
+@* Journals of a business document (PLAN-WEBAPP §21.2), from JournalPreviewViewComponent. *@
+@model Web.App.ViewComponents.JournalPreviewModel
+<div class="card journal-preview">
+    <div class="card-header"><h5 class="card-title mb-0"><i class="ti ti-book me-1"></i>Journal</h5></div>
+    <div class="card-body p-0">
+        @if (Model.Journals.Count == 0)
+        {
+            <div class="text-muted p-3">@Model.EmptyText</div>
+        }
+        <div class="table-responsive">
+            @foreach (Application.Finance.Journals.JournalResponse journal in Model.Journals)
+            {
+                <table class="table table-sm mb-0">
+                    <thead class="thead-light">
+                        <tr>
+                            <th colspan="2">
+                                <a asp-area="Finance" asp-controller="Journals" asp-action="Details" asp-route-id="@journal.Id">@(journal.Number ?? "(draft)")</a>
+                                <span class="fw-normal text-muted ms-2">@Fmt.Date(journal.Date) · @journal.Description</span>
+                            </th>
+                            <th class="text-end">Debit</th><th class="text-end">Credit</th>
+                            <th class="text-end" style="width: 1%"><partial name="Partials/_StatusBadge" model="journal.Status" /></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (Application.Finance.Journals.JournalLineResponse line in journal.Lines ?? [])
+                        {
+                            <tr>
+                                <td class="@(line.Credit > 0 ? "ps-4" : "")">@line.AccountCode — @line.AccountName</td>
+                                <td class="text-muted">@(line.CostCenterCode ?? "")</td>
+                                <td class="text-end text-nowrap">@(line.Debit == 0 ? "" : Fmt.Money(line.Debit))</td>
+                                <td class="text-end text-nowrap">@(line.Credit == 0 ? "" : Fmt.Money(line.Credit))</td>
+                                <td></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+</div>

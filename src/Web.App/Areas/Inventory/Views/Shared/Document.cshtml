@@ -82,3 +82,5 @@
     <div class="card-header"><h5 class="card-title mb-0">Attachments</h5></div>
     <div class="card-body"><partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, false)" /></div>
 </div>
+
+@await Component.InvokeAsync("JournalPreview", new { sourceIds = new[] { document.Id } })

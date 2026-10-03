@@ -129,3 +129,5 @@
 }
 
 <partial name="Partials/_ReasonModal" model='new ReasonModalModel("cancel-modal", "Cancel draft invoice", Url.Action("Cancel", new { id = invoice.Id })!, "Cancel Invoice")' />
+
+@await Component.InvokeAsync("JournalPreview", new { sourceIds = Model.CreditNotes.Select(n => n.Id).Prepend(invoice.Id), emptyText = "No journal yet — the invoice is journaled when it is posted." })

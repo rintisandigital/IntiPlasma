@@ -70,7 +70,7 @@ public static class ExcelExporter
         return stream.ToArray();
     }
 
-    private static void Write(IXLCell cell, object? value, ExportFormat format)
+    internal static void Write(IXLCell cell, object? value, ExportFormat format)
     {
         switch (value)
         {

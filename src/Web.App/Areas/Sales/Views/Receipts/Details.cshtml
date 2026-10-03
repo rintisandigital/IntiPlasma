@@ -142,3 +142,5 @@
 </div>
 
 <partial name="Partials/_ReasonModal" model='new ReasonModalModel("void-modal", $"Void receipt {receipt.Number}", Url.Action("Void", new { id = receipt.Id })!, "Void Receipt", WithDate: true)' />
+
+@await Component.InvokeAsync("JournalPreview", new { sourceIds = (receipt.Applications ?? []).Select(a => a.Id).Prepend(receipt.Id) })

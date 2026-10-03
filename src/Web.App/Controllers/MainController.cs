@@ -1,8 +1,17 @@
+using Application.Abstractions.Messaging;
+using Application.Monitoring;
+using Application.Users.GetCurrent;
 using Microsoft.AspNetCore.Mvc;
+using SharedKernel;
 using Web.App.Infrastructure.Auth;
 using Web.App.Infrastructure.Authorization;
+using Web.App.Infrastructure.Formatting;
 
 namespace Web.App.Controllers;
+
+/// <param name="Summary">Null when the figures could not be loaded.</param>
+/// <param name="BranchName">The branch the figures are for (null = all accessible branches).</param>
+public sealed record DashboardViewModel(DashboardSummaryResponse? Summary, string? BranchName);
 
 /// <summary>
 /// The mainboard (header + sidebar + content iframe) and the dashboard shown in the iframe.
@@ -13,8 +22,21 @@ public sealed class MainController(IBranchContext branchContext) : AppController
     [HttpGet]
     public IActionResult Index() => View();
 
+    /// <summary>
+    /// Key figures of the branch selected in the header (PLAN-WEBAPP §21.2).
+    /// </summary>
     [HttpGet]
-    public IActionResult Dashboard() => View();
+    public async Task<IActionResult> Dashboard(
+        [FromServices] IQueryHandler<GetDashboardSummaryQuery, DashboardSummaryResponse> summaryQuery,
+        [FromServices] DisplayFormatter formatter,
+        CancellationToken cancellationToken)
+    {
+        CurrentUserBranch? branch = await branchContext.GetActiveBranchAsync(cancellationToken);
+        Result<DashboardSummaryResponse> summary = await summaryQuery.Handle(
+            new GetDashboardSummaryQuery(formatter.Today(), branch?.Id), cancellationToken);
+
+        return View(new DashboardViewModel(summary.IsSuccess ? summary.Value : null, branch?.Name));
+    }
 
     /// <summary>
     /// Selects the branch used as the default filter (AJAX from the header; empty = all branches).

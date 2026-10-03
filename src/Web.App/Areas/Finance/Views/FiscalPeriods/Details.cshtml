@@ -65,7 +65,17 @@
                                 <i class="ti @(check.Blocking ? "ti-circle-x text-danger" : "ti-alert-triangle text-warning") fs-18"></i>
                             }
                         </td>
-                        <td>@ClosingCheckLabels.For(check)</td>
+                        <td>
+                            @ClosingCheckLabels.For(check)
+                            @if (check.Count > 0 && check.Code == "FailedAutoJournals")
+                            {
+                                <a asp-area="Admin" asp-controller="FailedEvents" asp-action="Index" asp-menu="@MenuCodes.AdminFailedEvents" class="ms-2">Open failed events</a>
+                            }
+                            else if (check.Count > 0 && check.Code == "UnpostedJournals")
+                            {
+                                <a asp-controller="Journals" asp-action="Index" asp-route-branch="all" asp-route-source="Manual" asp-menu="@MenuCodes.FinanceJournals" class="ms-2">Open journals</a>
+                            }
+                        </td>
                         <td>@(check.Blocking ? "Blocking" : "Warning")</td>
                         <td class="text-end">@Fmt.Number(check.Count)</td>
                     </tr>

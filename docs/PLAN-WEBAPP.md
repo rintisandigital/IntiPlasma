@@ -414,7 +414,7 @@ Use case Application/Domain baru dikerjakan & diuji dulu (unit test seperti fase
 ### Fase W8 — HPP & Settlement Plasma ✅ (selesai 2026-10-03; rencana §19, realisasi §20)
 - HPP siklus (rincian & ekspor), settlement (draft & hitung ulang, rincian komponen, approve checker, **PDF settlement**, lanjut PV plasma).
 
-### Fase W9 — Jurnal, Laporan, Tutup Buku, Pajak & Dashboard
+### Fase W9 — Jurnal, Laporan, Tutup Buku, Pajak & Dashboard ✅ (selesai 2026-10-04; rencana §21, realisasi §22)
 - Jurnal manual (maker-checker, **PDF journal voucher**), daftar jurnal otomatis per dokumen, partial `_JournalPreview` di detail dokumen W4–W8.
 - Laporan: General Ledger, Trial Balance, Income Statement, Balance Sheet, Cash Flow, Profitability — Excel (builder berstruktur) & PDF.
 - Tutup periode & tahun (checklist), rekap pajak PPN/PPh (Excel/PDF + CSV yang sudah ada), monitoring event gagal + retry.
@@ -975,3 +975,83 @@ Tidak ada perubahan Domain/Application/Web.Api dan **tidak ada migration baru**;
 - Skema **ProfitSharing** tidak diuji end-to-end di W8 (perhitungannya dijaga unit test domain Fase 7); layar menampilkannya dengan tipe baris *Profit share*.
 - Saldo hutang plasma hanya dari settlement (rugi − potongan); potongan untuk hutang lain atau pelunasan tunai belum tercatat → sub-ledger piutang plasma tetap di backlog.
 - Settlement yang sudah Approved tidak bisa dibatalkan/direverse (belum ada use case); koreksi lewat jurnal manual (W9).
+
+---
+
+## 21. Rencana Fase W9 — Jurnal, Laporan, Tutup Buku, Pajak & Dashboard
+
+> Disusun 2026-10-03 saat W9 dimulai, dari use case Fase 2 & 8 (`Application/Finance/Journals|Reports|Tax|FiscalPeriods`, `Application/Monitoring`). Keputusan §21.5 memakai usulan default (pola W6–W8) dan bisa diubah.
+
+### 21.1 Backend yang dipakai & tambahan
+| Kebutuhan | Sudah ada | Tambahan W9 |
+|---|---|---|
+| Jurnal manual | `Create/Update/DeleteJournalCommand` (draft), `Approve` (pembuat ditolak), `Post` (periode terbuka, nomor), `Reverse` (tanggal + alasan), `GetJournalsQuery` (paged, sumber manual/otomatis), `GetJournalByIdQuery` | Nama pembuat/penyetuju/pemosting di respons (untuk PDF & detail) |
+| Jurnal per dokumen | — | **`GetDocumentJournalsQuery(SourceIds)`**: jurnal + baris per `source_id` (partial `_JournalPreview`) |
+| Laporan | GL, TB, Laba Rugi, Neraca, Arus Kas, Profitabilitas | — |
+| Pajak | Rekap PPN (keluaran, retur, masukan) & PPh dipotong per masa; CSV ada di Web.Api | Penulis CSV di Web.App (kolom sama dengan API) |
+| Tutup periode & tahun | Sudah di layar Fiscal Periods (W3: checklist, close/reopen, jurnal penutup Desember) | Tautan item checklist "event gagal" → layar Failed Events |
+| Event gagal | `GetFailedEventsQuery`, `RetryFailedEventsCommand` | — |
+| Dashboard | — | **`GetDashboardSummaryQuery(BranchId)`**: siklus aktif & populasi, panen bulan ini, piutang & hutang (total/jatuh tempo), nilai stok, saldo kas/bank, dokumen menunggu persetujuan, event gagal, tren 6 bulan (penjualan, panen kg) |
+
+### 21.2 Layar
+| Menu | Layar |
+|---|---|
+| **Journals** (`finance.journals`, C/E/D/X) | List (cabang/status/sumber/tanggal/cari) + ekspor; form jurnal manual (baris dinamis: akun via lookup, cost center, keterangan, debit/kredit, total & selisih langsung; isi dari **template**), edit/hapus draft, **Approve** (checker), **Post**, **Reverse** (modal tanggal + alasan), lampiran, tautan ke dokumen sumber (jurnal otomatis), **PDF journal voucher**. Edit = approve/post/reverse; Delete = hapus draft. |
+| `_JournalPreview` | Kartu "Journal" di detail BPB, transfer, retur (W4), siklus (W5, penyesuaian HPP), invoice/nota kredit/penerimaan (W6), VI/PV/kas/transfer bank (W7), settlement (W8); tampil bila punya hak View Journals. |
+| **Reports** (`reports.*`, View/Export) | General Ledger (akun via lookup, periode, cabang, cost center), Trial Balance, Income Statement, Balance Sheet, Cash Flow, Profitability (grouping), **Tax Recap** (PPN & PPh per masa + CSV). Ekspor Excel **berstruktur** (judul, bagian, subtotal, total; lembar per tabel) & PDF dari satu model `ReportDocument`. |
+| **Failed Events** (`admin.failed-events`, Edit) | Daftar event gagal (tipe, waktu, percobaan, error), **Retry** satu/semua. |
+| **Dashboard** | Kartu KPI + 2 grafik (Chart.js) sesuai cabang aktif; tautan ke layar terkait sesuai hak. |
+
+### 21.3 Pengujian
+- Integration test Web.App: halaman terbuka, jurnal manual draft → edit → approve pembuat ditolak → checker approve → post → reverse, PDF JV; jurnal otomatis tampil di detail dokumen; tiap laporan + ekspor xlsx/pdf (+ CSV pajak); retry event gagal; dashboard.
+- E2E W9 (Playwright) + regresi W0–W8.
+
+### 21.4 Urutan task
+1. Application: `GetDocumentJournalsQuery`, `GetDashboardSummaryQuery`, nama user di `JournalResponse`.
+2. Web.App: `ReportDocument` + renderer Excel/PDF + CSV; Journals; `_JournalPreview` di detail W4–W8; Reports & Tax; Failed Events; Dashboard; tautan checklist.
+3. Test, E2E, realisasi §22, RANGKUMAN.
+
+### 21.5 Keputusan (usulan default)
+| # | Topik | Keputusan |
+|---|-------|-----------|
+| 1 | Approve/post/reverse jurnal manual | Hak **Edit** + maker-checker domain (seperti PV/settlement). |
+| 2 | Visibilitas `_JournalPreview` | Hanya user dengan hak **View Journals**. |
+| 3 | Tutup periode/tahun | Tidak ada layar baru — memakai Fiscal Periods (W3). |
+| 4 | Excel laporan | Satu workbook, **satu lembar per tabel** (pajak: keluaran, retur, masukan, PPh). |
+| 5 | Dashboard | Satu query ringkas (Dapper), menghormati akses cabang; grafik 6 bulan terakhir. |
+
+---
+
+## 22. Realisasi Fase W9 — Jurnal, Laporan, Tutup Buku, Pajak & Dashboard (2026-10-04)
+
+**Tidak ada migration baru** dan tidak ada perubahan Domain. Semua menu katalog kini dirilis (tidak ada lagi menu "belum rilis").
+
+### 22.1 Application & perbaikan
+| Use case | Realisasi |
+|---|---|
+| `GetDocumentJournalsQuery` (baru) | Jurnal + baris per `source_id` (bisa beberapa id, mis. penerimaan + penerapan uang muka), dalam akses cabang. |
+| `GetDashboardSummaryQuery` (baru, `Application/Monitoring`) | Per tanggal & cabang (null = semua cabang yang boleh): siklus berjalan & populasi, panen bulan ini, penjualan bulan ini (DPP), piutang & hutang (jatuh tempo), nilai stok, saldo kas/bank, dokumen menunggu (jurnal approve/post, PV approve/bayar, kas keluar, settlement, siklus plasma tutup belum di-settle), event gagal, tren 6 bulan (penjualan, kg panen). |
+| `JournalResponse` (diperluas) | Nama pembuat, penyetuju, pemosting. |
+| ⚠️ **Perbaikan Fase 8 — definisi event gagal** | `GetFailedEventsQuery`, `RetryFailedEventsCommand`, checklist `FailedAutoJournals` dan dashboard sebelumnya menghitung `error IS NOT NULL` → event yang **masih dalam retry otomatis** ikut dianggap gagal. Kini dead letter = `processed_on_utc IS NOT NULL AND error IS NOT NULL` (sama dengan health check outbox); event yang masih dicoba ulang tetap terhitung sebagai *PendingAutoJournals*. |
+
+### 22.2 Layar
+| Menu | Realisasi |
+|---|---|
+| **Journals** (`finance.journals`) | List (cabang/status/sumber/tanggal/cari) + ekspor; form jurnal manual (cabang, tanggal, keterangan, baris dinamis akun via lookup + cost center + keterangan + debit/kredit, **total & selisih langsung** "Balanced"), **mulai dari template** (baris & sisi terisi), lampiran; detail (baris, pembuat/penyetuju/pemosting, status, tautan jurnal pembalik/asal); **Edit/Delete** draft, **Approve** (checker; pembuat ditolak domain), **Post** (nomor `JU/…`, periode harus terbuka), **Reverse** (modal tanggal + alasan → membuka jurnal pembalik), **PDF journal voucher**. Jurnal otomatis: label sumber + **Open source document** (BPB, transfer/BPB kandang — ditentukan lewat aksi `Source`, retur, VI, PV, invoice, penerimaan, settlement, siklus, kas; tutup tahun → Fiscal Periods). Hak: Create; Edit = edit draft/approve/post/reverse/lampiran; Delete = hapus draft; Export = list & PDF. |
+| **Kartu Journal** di dokumen | View component `JournalPreview` (tampil hanya bila punya hak View Journals) di detail BPB/transfer/retur (W4), tab Cost siklus tertutup (W5, penyesuaian HPP), invoice (+ nota kreditnya) & penerimaan (+ penerapan uang muka) (W6), VI/PV/kas (W7), settlement (W8); nomor jurnal menaut ke detail jurnal. |
+| **Reports** (`/Reports/*`, `ReportsController`) | Satu halaman generik: form parameter (tanggal, akun/peternak via lookup, cabang, cost center, grouping, masa pajak) → tabel berstruktur; **General Ledger** (saldo awal, mutasi + saldo berjalan, nomor jurnal tertaut), **Trial Balance** (± saldo nol, catatan seimbang), **Income Statement**, **Balance Sheet** (bagian per akun induk, laba tahun berjalan/tahun lalu belum ditutup, catatan seimbang), **Cash Flow** (metode langsung per kategori), **Profitability** (cycle/coop/farmer/branch; per cabang + laba buku besar & overhead), **Tax Recap** (PPN: ringkasan kurang/lebih bayar, keluaran, retur, masukan; PPh dipotong per kode & per dokumen) + **CSV** (kolom sama dengan Web.Api). Hak View/Export per laporan. |
+| Ekspor laporan | Model bersama `ReportDocument` (tabel, kolom berformat, baris *Detail/Section/Subtotal/Total* + indentasi, catatan) dirender ke **HTML, Excel (ClosedXML; satu lembar per tabel, judul & filter, angka asli, subtotal bergaris, total garis ganda) dan PDF** (`ReportExporter`); `ExportService.Report/Csv`. |
+| **Failed Events** (`admin.failed-events`) | Daftar dead letter (tipe, waktu, percobaan, error), petunjuk penyebab umum, **Retry** satu / **Retry All** (hak Edit). Checklist tutup periode menautkan "Failed auto journals" ke layar ini dan "Manual journals still draft/approved" ke Journals. |
+| **Dashboard** | 8 kartu KPI (tertaut sesuai hak) + daftar "Waiting for action" (7 jenis, tersembunyi tanpa hak) + grafik 6 bulan (penjualan batang, panen garis; Chart.js), mengikuti cabang aktif di header. |
+| Tutup periode & tahun | Tidak ada layar baru — Fiscal Periods (W3) sudah mencakup checklist, tutup/buka kembali dan jurnal penutup Desember. |
+
+### 22.3 Pengujian & verifikasi
+- **Test: 388 lulus** — Domain 143, Application 60, Arsitektur 14, Integration Web.Api 18, Integration Web.App 153 (+18): 14 halaman W9 terbuka; jurnal manual (tidak seimbang ditolak → draft → edit → approve pembuat ditolak → checker approve → post bernomor → GL menampilkan & menautkan jurnal → PDF JV & ekspor → reverse tanpa alasan ditolak → reversal Posted & asal Reversed → hapus draft); laporan TB/IS/BS/CF/Profitability + ekspor xlsx/pdf (Excel dibuka ulang: judul, baris Total tebal), PDF GL/BS, pajak (4 lembar Excel, PDF PPh, 4 CSV dengan header Web.Api); event gagal (tampil, dashboard menandai, retry); dashboard & kartu jurnal mengikuti hak (user tanpa Journals tidak melihat kartu/daftar jurnal). Ekspektasi lama "finance.journals belum rilis" (W1/W3) diganti: semua menu katalog dirilis.
+- **End-to-end W9 44/44** (Playwright, outbox di Web.App dengan interval 2 dtk, DB `intiplasma_verify` baru lalu di-drop): sidebar & semua menu 200; dashboard (kartu, daftar, grafik); template jurnal → jurnal dari template (baris terisi), selisih langsung, tidak seimbang ditolak domain, draft → edit → maker ditolak → checker approve → post `JU/…` → nama pembuat/penyetuju → PDF JV → reverse via modal → hapus draft → filter list; **dead letter nyata**: BPB bertanggal tahun lalu (tahun fiskal belum dibuka) → jurnal otomatis gagal 5× → Failed Events menampilkan penyebab, dashboard menandai → buka tahun fiskal → Retry All → jurnal BPB terposting, kartu Journal di BPB, detail jurnal otomatis tanpa tombol workflow, "Open source document" kembali ke BPB; GL (lookup akun, saldo penutup 0 setelah reversal, ekspor membawa parameter, tautan ke jurnal); 7 laporan tampil + Excel + PDF; periode lintas tahun di URL; 3 CSV pajak; tanpa dead letter & error JS. PDF journal voucher & neraca serta tampilan dashboard/jurnal/laba rugi diperiksa visual.
+- **Regresi** (satu DB baru, urutan header → W0 → W2 … W9): header 15/15, W0 49/49, W2 40/40, W3 48/48, W4 51/51, W5 42/42, W6 42/42, W7 61/62, W8 44/44, W9 44/44. Satu-satunya FAIL W7 ("Variance badge" di list Vendor Invoices) adalah artefak urutan skrip: W0 memilih "Branch Alpha" sebagai cabang aktif admin sehingga list default tersaring ke cabang itu; dengan `branch=all` badge tampil (diperiksa manual). Ekspektasi W2/W3 "journals belum rilis" diganti "journals dirilis".
+
+### 22.4 Catatan
+- ⚠️ Skrip E2E lama memakai tanggal **UTC** (`toISOString`) — antara pukul 00.00–07.00 WIB tanggalnya berbeda dari aplikasi (Asia/Jakarta) sehingga skenario bertanggal "hari ini" gagal. Semua skrip kini memakai tanggal lokal.
+- Skrip W9 membuka tahun fiskal sebelumnya; karena penutupan periode berurutan, jalankan W3 sebelum W9 pada DB verifikasi yang sama.
+- Kartu Journal pada dokumen yang jurnalnya diproses outbox bisa kosong beberapa detik setelah posting (ditampilkan "No journal yet").
+- Laporan memakai respons query yang sudah ada; batas jumlah baris laporan belum diterapkan (GL satu akun, TB per akun — ukuran wajar).

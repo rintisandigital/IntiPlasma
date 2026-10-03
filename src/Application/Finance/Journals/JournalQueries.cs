@@ -36,9 +36,15 @@ public sealed record JournalResponse
                j.created_by AS CreatedBy, j.approved_by AS ApprovedBy, j.approved_at_utc AS ApprovedAtUtc,
                j.posted_by AS PostedBy, j.posted_at_utc AS PostedAtUtc,
                j.reversal_of_id AS ReversalOfId, j.reversed_by_id AS ReversedById,
+               NULLIF(TRIM(CONCAT(cu.first_name, ' ', cu.last_name)), '') AS CreatedByName,
+               NULLIF(TRIM(CONCAT(au.first_name, ' ', au.last_name)), '') AS ApprovedByName,
+               NULLIF(TRIM(CONCAT(pu.first_name, ' ', pu.last_name)), '') AS PostedByName,
                j.documents AS Documents
         FROM finance.journal_entries j
         JOIN master.branches b ON b.id = j.branch_id
+        LEFT JOIN identity.users cu ON cu.id = j.created_by
+        LEFT JOIN identity.users au ON au.id = j.approved_by
+        LEFT JOIN identity.users pu ON pu.id = j.posted_by
         """;
 
     public Guid Id { get; init; }
@@ -81,6 +87,12 @@ public sealed record JournalResponse
     public Guid? ReversalOfId { get; init; }
 
     public Guid? ReversedById { get; init; }
+
+    public string? CreatedByName { get; init; }
+
+    public string? ApprovedByName { get; init; }
+
+    public string? PostedByName { get; init; }
 
     /// <summary>
     /// Only filled by the detail endpoint.

@@ -326,6 +326,10 @@ else
         {
             <div class="alert alert-light border">No cost yet.</div>
         }
+        @if (cycle.Status is "Closed" or "Settled")
+        {
+            @await Component.InvokeAsync("JournalPreview", new { sourceIds = new[] { cycle.Id }, emptyText = "No closing journal yet." })
+        }
     </div>
 
     <div class="tab-pane fade @Show("attachments")" id="tab-attachments" role="tabpanel">

@@ -156,3 +156,5 @@
 <partial name="Partials/_AttachmentsCard" model='new AttachmentsCardModel(Model.Attachments, Model.CanEdit && settlement.Status != "Cancelled" ? Url.Action("Documents", new { id = settlement.Id }) : null)' />
 
 <partial name="Partials/_ReasonModal" model='new ReasonModalModel("cancel-modal", $"Cancel settlement {settlement.Number}", Url.Action("Cancel", new { id = settlement.Id })!, "Cancel Settlement")' />
+
+@await Component.InvokeAsync("JournalPreview", new { sourceIds = new[] { settlement.Id }, emptyText = "No journal yet — the settlement is journaled when it is approved." })

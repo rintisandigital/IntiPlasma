@@ -8,7 +8,8 @@ namespace Application.Monitoring;
 
 /// <summary>
 /// Domain events that failed after all retries (dead letters), e.g. an automatic journal rejected because a mapping
-/// is missing or the period is closed. They block closing the period until retried successfully.
+/// is missing or the period is closed. They block closing the period until retried successfully. Events still being
+/// retried automatically (error set, not processed yet) are not failed yet: they count as pending.
 /// </summary>
 public sealed record GetFailedEventsQuery : IQuery<IReadOnlyList<FailedEventResponse>>;
 
@@ -33,7 +34,7 @@ internal sealed class GetFailedEventsQueryHandler(IDbConnectionFactory dbConnect
             SELECT id AS Id, regexp_replace(type, '^.*\.', '') AS Type, occurred_on_utc AS OccurredOnUtc,
                    attempts AS Attempts, left(error, {ErrorPreviewLength}) AS Error
             FROM infrastructure.outbox_messages
-            WHERE error IS NOT NULL
+            WHERE processed_on_utc IS NOT NULL AND error IS NOT NULL
             ORDER BY occurred_on_utc
             """,
             cancellationToken: cancellationToken));
@@ -53,7 +54,7 @@ internal sealed class RetryFailedEventsCommandHandler(IDbConnectionFactory dbCon
             """
             UPDATE infrastructure.outbox_messages
             SET processed_on_utc = NULL, attempts = 0, error = NULL
-            WHERE error IS NOT NULL AND (@EventId::uuid IS NULL OR id = @EventId)
+            WHERE processed_on_utc IS NOT NULL AND error IS NOT NULL AND (@EventId::uuid IS NULL OR id = @EventId)
             """,
             new { command.EventId },
             cancellationToken: cancellationToken));

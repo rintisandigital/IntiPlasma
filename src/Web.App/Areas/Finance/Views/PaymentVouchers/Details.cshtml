@@ -128,3 +128,5 @@
         </form>
     </div>
 </div>
+
+@await Component.InvokeAsync("JournalPreview", new { sourceIds = new[] { voucher.Id }, emptyText = "No journal yet — the voucher is journaled when it is paid." })

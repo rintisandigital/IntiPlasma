@@ -1,0 +1,203 @@
+@model Web.App.Reports.ReportPageViewModel
+@using Web.App.Reports
+@using Web.App.Infrastructure.Export
+@using Domain.Access
+@inject Web.App.Infrastructure.Authorization.IMenuRights Rights
+@{
+    ViewData["Title"] = Model.Title;
+    ViewData["Menu"] = Model.MenuCode;
+    bool canExport = await Rights.CanAsync(Model.MenuCode, MenuRights.Export);
+    var query = Context.Request.Query.Where(q => q.Key != "format").ToDictionary(q => q.Key, q => (object?)q.Value.ToString());
+    // The export must use the parameters shown in the form (defaults included), not only the ones in the URL.
+    foreach (ReportField field in Model.Fields.Where(f => f.Value is not null && !query.ContainsKey(f.Name)))
+    {
+        query[field.Name] = field.Value;
+    }
+    string ExportUrl(string format) => Url.Action(Model.ExportAction, new RouteValueDictionary(query) { ["format"] = format }) ?? "#";
+    bool Numeric(ExportFormat format) => format is ExportFormat.WholeNumber or ExportFormat.Number or ExportFormat.Money or ExportFormat.Percent;
+    string Cell(object? value, ExportFormat format) => value switch
+    {
+        null => "",
+        decimal number when format == ExportFormat.WholeNumber => Fmt.Number(number, 0),
+        decimal number => Fmt.Number(number),
+        int number => Fmt.Number(number),
+        DateOnly date => Fmt.Date(date),
+        bool flag => flag ? "Yes" : "No",
+        _ => value.ToString() ?? ""
+    };
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">@Model.Title</h4>
+            <h6>@Model.Subtitle</h6>
+        </div>
+    </div>
+    @if (canExport && Model.Report is not null)
+    {
+        <ul class="table-top-head">
+            <li><a href="@ExportUrl("xlsx")" target="_blank" title="Export to Excel" id="export-xlsx"><img src="assets/img/icons/excel.svg" alt="Excel"></a></li>
+            <li><a href="@ExportUrl("pdf")" target="_blank" title="Export to PDF" id="export-pdf"><img src="assets/img/icons/pdf.svg" alt="PDF"></a></li>
+        </ul>
+    }
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end" id="report-form">
+            @foreach (ReportField field in Model.Fields)
+            {
+                <div class="col-md-@field.Width">
+                    @if (field.Kind == ReportFieldKind.Checkbox)
+                    {
+                        <div class="form-check mt-4">
+                            <input class="form-check-input" type="checkbox" id="field-@field.Name" name="@field.Name" value="true" checked="@(field.Value == "true")">
+                            <label class="form-check-label" for="field-@field.Name">@field.Label</label>
+                        </div>
+                    }
+                    else
+                    {
+                        <label class="form-label" for="field-@field.Name">@field.Label @if (field.Required) { <span class="text-danger">*</span> }</label>
+                        @switch (field.Kind)
+                        {
+                            case ReportFieldKind.Date:
+                                <input type="date" id="field-@field.Name" name="@field.Name" value="@field.Value" class="form-control" required="@field.Required">
+                                break;
+                            case ReportFieldKind.Number:
+                                <input type="number" id="field-@field.Name" name="@field.Name" value="@field.Value" class="form-control" required>
+                                break;
+                            case ReportFieldKind.Lookup:
+                                <input type="hidden" name="@(field.Name.Replace("Id", "Label", StringComparison.Ordinal))" value="@field.LookupLabel" class="lookup-label">
+                                <select id="field-@field.Name" name="@field.Name" class="form-select report-lookup" data-lookup="@field.LookupUrl">
+                                    @if (field.Value is not null)
+                                    {
+                                        <option value="@field.Value" selected>@(field.LookupLabel ?? field.Value)</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="">Search…</option>
+                                    }
+                                </select>
+                                break;
+                            default:
+                                <select id="field-@field.Name" name="@field.Name" class="form-select" asp-items="field.Options">
+                                    @if (field.Name == "costCenterId")
+                                    {
+                                        <option value="">All cost centers</option>
+                                    }
+                                </select>
+                                break;
+                        }
+                    }
+                </div>
+            }
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="ti ti-report-search me-1"></i>Show</button>
+            </div>
+        </form>
+        @if (Model.CsvLinks is { Count: > 0 } links)
+        {
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                @foreach ((string label, string url) in links)
+                {
+                    <a href="@url" class="btn btn-sm btn-outline-secondary csv-link"><i class="ti ti-file-type-csv me-1"></i>@label</a>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@if (Model.Error is not null)
+{
+    <div class="alert alert-danger">@Model.Error</div>
+}
+else if (Model.Report is null)
+{
+    <div class="alert alert-light border">Choose the parameters and press Show.</div>
+}
+else
+{
+    foreach (ReportTable table in Model.Report.Tables)
+    {
+        <div class="card report-table">
+            @if (table.Title is not null)
+            {
+                <div class="card-header"><h5 class="card-title mb-0">@table.Title</h5></div>
+            }
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead class="thead-light">
+                            <tr>
+                                @foreach (ReportColumn column in table.Columns)
+                                {
+                                    <th class="@(Numeric(column.Format) ? "text-end" : "") text-nowrap">@column.Header</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (ReportRow row in table.Rows)
+                            {
+                                if (row.Kind == ReportRowKind.Section)
+                                {
+                                    <tr class="table-light"><td colspan="@table.Columns.Count" class="fw-semibold">@row.Cells[0]</td></tr>
+                                    continue;
+                                }
+
+                                string rowClass = row.Kind switch
+                                {
+                                    ReportRowKind.Total => "fw-bold border-top border-dark report-total",
+                                    ReportRowKind.Subtotal => "fw-semibold report-subtotal",
+                                    _ => ""
+                                };
+                                <tr class="@rowClass">
+                                    @for (int c = 0; c < table.Columns.Count; c++)
+                                    {
+                                        object? value = c < row.Cells.Count ? row.Cells[c] : null;
+                                        ReportColumn column = table.Columns[c];
+                                        string indent = c == 0 && row.Indent > 0 ? $"padding-left: {0.75 + row.Indent * 1.25}rem" : "";
+                                        <td class="@(Numeric(column.Format) ? "text-end text-nowrap" : "")" style="@indent">
+                                            @if (c == 0 && row.Link is not null)
+                                            {
+                                                <a href="@row.Link">@Cell(value, column.Format)</a>
+                                            }
+                                            else
+                                            {
+                                                @Cell(value, column.Format)
+                                            }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                            @if (table.Rows.Count == 0)
+                            {
+                                <tr><td colspan="@table.Columns.Count" class="text-center text-muted py-3">No records.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            @if (table.Notes is { Count: > 0 } notes)
+            {
+                <div class="card-footer text-muted fs-13">
+                    @foreach (string note in notes)
+                    {
+                        <div class="report-note @(note.StartsWith("WARNING", StringComparison.Ordinal) ? "text-danger fw-semibold" : "")">@note</div>
+                    }
+                </div>
+            }
+        </div>
+    }
+}
+
+@section Scripts {
+    <script>
+        // Keep a lookup's chosen label in the query string so the page shows it after Show.
+        document.querySelectorAll('select.report-lookup').forEach(function (select) {
+            select.addEventListener('change', function () {
+                var option = select.options[select.selectedIndex];
+                select.parentElement.querySelector('.lookup-label').value = option ? option.text : '';
+            });
+        });
+    </script>
+}

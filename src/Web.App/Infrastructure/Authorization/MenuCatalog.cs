@@ -35,6 +35,7 @@ public static class MenuCodes
     public const string FinanceBankTransfers = "finance.bank-transfers";
     public const string FinanceBankReconciliations = "finance.bank-reconciliations";
     public const string FinancePayables = "finance.payables";
+    public const string FinanceJournals = "finance.journals";
     public const string ProcurementPurchaseOrders = "procurement.purchase-orders";
     public const string InventoryGoodsReceipts = "inventory.goods-receipts";
     public const string InventoryStockTransfers = "inventory.stock-transfers";
@@ -52,6 +53,14 @@ public static class MenuCodes
     public const string SalesReceivables = "sales.receivables";
     public const string CostingCycleCosts = "costing.cycle-costs";
     public const string CostingSettlements = "costing.settlements";
+    public const string ReportsGeneralLedger = "reports.general-ledger";
+    public const string ReportsTrialBalance = "reports.trial-balance";
+    public const string ReportsIncomeStatement = "reports.income-statement";
+    public const string ReportsBalanceSheet = "reports.balance-sheet";
+    public const string ReportsCashFlow = "reports.cash-flow";
+    public const string ReportsProfitability = "reports.profitability";
+    public const string ReportsTax = "reports.tax";
+    public const string AdminFailedEvents = "admin.failed-events";
 }
 
 /// <summary>
@@ -131,20 +140,20 @@ public static class MenuCatalog
         Page("finance", MenuCodes.FinanceBankTransfers, "Bank Transfers", "/Finance/BankTransfers", CreateExport, true);
         Page("finance", MenuCodes.FinanceBankReconciliations, "Bank Reconciliations", "/Finance/BankReconciliations", CreateEditExport, true);
         Page("finance", MenuCodes.FinancePayables, "Payable Ledger & Aging", "/Finance/Payables", MenuRights.Export, true);
-        Page("finance", "finance.journals", "Journals", "/Finance/Journals", Crud, false);
+        Page("finance", MenuCodes.FinanceJournals, "Journals", "/Finance/Journals", Crud, true);
 
         Group("costing", "Costing", "ti ti-calculator", 90);
         Page("costing", MenuCodes.CostingCycleCosts, "Cycle Cost", "/Costing/CycleCosts", MenuRights.Export, true);
         Page("costing", MenuCodes.CostingSettlements, "Plasma Settlements", "/Costing/Settlements", CreateEditExport, true);
 
         Group("reports", "Reports", "ti ti-report-analytics", 100);
-        Page("reports", "reports.general-ledger", "General Ledger", "/Reports/GeneralLedger", MenuRights.Export, false);
-        Page("reports", "reports.trial-balance", "Trial Balance", "/Reports/TrialBalance", MenuRights.Export, false);
-        Page("reports", "reports.income-statement", "Income Statement", "/Reports/IncomeStatement", MenuRights.Export, false);
-        Page("reports", "reports.balance-sheet", "Balance Sheet", "/Reports/BalanceSheet", MenuRights.Export, false);
-        Page("reports", "reports.cash-flow", "Cash Flow", "/Reports/CashFlow", MenuRights.Export, false);
-        Page("reports", "reports.profitability", "Profitability", "/Reports/Profitability", MenuRights.Export, false);
-        Page("reports", "reports.tax", "Tax Recap", "/Reports/Tax", MenuRights.Export, false);
+        Page("reports", "reports.general-ledger", "General Ledger", "/Reports/GeneralLedger", MenuRights.Export, true);
+        Page("reports", "reports.trial-balance", "Trial Balance", "/Reports/TrialBalance", MenuRights.Export, true);
+        Page("reports", "reports.income-statement", "Income Statement", "/Reports/IncomeStatement", MenuRights.Export, true);
+        Page("reports", "reports.balance-sheet", "Balance Sheet", "/Reports/BalanceSheet", MenuRights.Export, true);
+        Page("reports", "reports.cash-flow", "Cash Flow", "/Reports/CashFlow", MenuRights.Export, true);
+        Page("reports", "reports.profitability", "Profitability", "/Reports/Profitability", MenuRights.Export, true);
+        Page("reports", "reports.tax", "Tax Recap", "/Reports/Tax", MenuRights.Export, true);
 
         Group("admin", "Administration", "ti ti-settings", 110);
         Page("admin", MenuCodes.AdminUsers, "Users", "/Admin/Users", Crud, true);
@@ -153,7 +162,7 @@ public static class MenuCatalog
         Page("admin", MenuCodes.AdminMenus, "Menus", "/Admin/Menus", MenuRights.Edit, true);
         Page("admin", MenuCodes.AdminApiRoles, "API Roles", "/Admin/ApiRoles", CreateEditExport, true);
         Page("admin", MenuCodes.AdminBranches, "Branches", "/Admin/Branches", CreateEditExport, true);
-        Page("admin", "admin.failed-events", "Failed Events", "/Admin/FailedEvents", MenuRights.Edit, false);
+        Page("admin", MenuCodes.AdminFailedEvents, "Failed Events", "/Admin/FailedEvents", MenuRights.Edit, true);
 
         return menus;
     }

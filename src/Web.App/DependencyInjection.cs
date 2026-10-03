@@ -52,6 +52,7 @@ public static class DependencyInjection
         QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
         services.AddOptions<ExportOptions>().Bind(configuration.GetSection(ExportOptions.SectionName));
         services.AddSingleton<PdfListExporter>();
+        services.AddSingleton<ReportExporter>();
         services.AddScoped<ExportService>();
         services.AddScoped<PageSupport>();
         services.AddScoped<ItemOptions>();
