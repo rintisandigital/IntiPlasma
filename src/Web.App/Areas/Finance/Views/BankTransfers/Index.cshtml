@@ -1,0 +1,40 @@
+@model ListViewModel<Application.Finance.CashBank.BankTransferResponse>
+@{
+    ViewData["Title"] = "Bank Transfers";
+    ViewData["Menu"] = MenuCodes.FinanceBankTransfers;
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Bank Transfers", "Money moved between cash/bank accounts of a branch (e.g. petty cash replenishment)", MenuCodes.FinanceBankTransfers, "New Transfer")' />
+
+<div class="card">
+    <div class="card-header">
+        <partial name="Partials/_DocumentFilter" model='new DocumentFilterModel(Model.Search, "Search transfer number", Model.BranchOptions, Model.Filters, null)' />
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr><th>Number</th><th>Date</th><th>Branch</th><th>From</th><th>To</th><th>Reference</th><th class="text-end">Amount</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Finance.CashBank.BankTransferResponse transfer in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@transfer.Number</td>
+                            <td>@Fmt.Date(transfer.Date)</td>
+                            <td>@transfer.BranchCode</td>
+                            <td>@transfer.FromCode — @transfer.FromName</td>
+                            <td>@transfer.ToCode — @transfer.ToName</td>
+                            <td>@(transfer.Reference ?? "—") @if (!string.IsNullOrWhiteSpace(transfer.Notes)) { <div class="text-muted fs-12">@transfer.Notes</div> }</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(transfer.Amount)</td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="7" class="text-center text-muted py-4">No transfers found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="Partials/_Pagination" model="PaginationModel.From(Model.Rows)" />
+    </div>
+</div>

@@ -1,0 +1,54 @@
+@model BankTransferFormViewModel
+@{
+    ViewData["Title"] = "New Transfer";
+    ViewData["Menu"] = MenuCodes.FinanceBankTransfers;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel("New Transfer", "Both accounts must belong to the same branch; the transfer is posted immediately")' />
+
+<form asp-action="Create" method="post">
+    <form-token />
+    <div class="card">
+        <div class="card-body">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+            <div class="row">
+                <div class="col-md-5 mb-3">
+                    <label asp-for="FromCashBankAccountId" class="form-label"></label> <span class="text-danger">*</span>
+                    <select asp-for="FromCashBankAccountId" class="form-select" asp-items="Model.CashBankAccounts">
+                        <option value="">—</option>
+                    </select>
+                    <span asp-validation-for="FromCashBankAccountId" class="text-danger fs-13"></span>
+                </div>
+                <div class="col-md-5 mb-3">
+                    <label asp-for="ToCashBankAccountId" class="form-label"></label> <span class="text-danger">*</span>
+                    <select asp-for="ToCashBankAccountId" class="form-select" asp-items="Model.CashBankAccounts">
+                        <option value="">—</option>
+                    </select>
+                    <span asp-validation-for="ToCashBankAccountId" class="text-danger fs-13"></span>
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label asp-for="Date" class="form-label"></label> <span class="text-danger">*</span>
+                    <input asp-for="Date" type="date" class="form-control">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label asp-for="Amount" class="form-label"></label> <span class="text-danger">*</span>
+                    <input asp-for="Amount" type="number" min="0.01" step="0.01" class="form-control text-end">
+                    <span asp-validation-for="Amount" class="text-danger fs-13"></span>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label asp-for="Reference" class="form-label"></label>
+                    <input asp-for="Reference" class="form-control">
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label asp-for="Notes" class="form-label"></label>
+                    <input asp-for="Notes" class="form-control">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <partial name="Partials/_FormButtons" model='new FormButtonsModel(true, Url.Action("Index")!, "Post Transfer")' />
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

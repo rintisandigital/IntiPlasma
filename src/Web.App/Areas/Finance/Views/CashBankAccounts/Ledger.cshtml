@@ -1,0 +1,82 @@
+@model CashBankLedgerViewModel
+@using System.Globalization
+@{
+    Application.Finance.CashBank.CashBankAccountResponse account = Model.Account;
+    ViewData["Title"] = $"Cash/Bank Book {account.Code}";
+    ViewData["Menu"] = MenuCodes.FinanceCashBankAccounts;
+    bool canExport = await Rights.CanAsync(MenuCodes.FinanceCashBankAccounts, MenuRights.Export);
+    bool canTransfer = await Rights.CanAsync(MenuCodes.FinanceBankTransfers, MenuRights.Create);
+    string Iso(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Cash/Bank Book — @account.Code</h4>
+            <h6>@account.Name · @account.BranchCode · ledger @account.AccountCode — @account.AccountName</h6>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="Index" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+        @if (canTransfer)
+        {
+            <a asp-controller="BankTransfers" asp-action="Create" asp-route-fromId="@account.Id" class="btn btn-outline-primary"><i class="ti ti-arrows-exchange me-1"></i>Transfer</a>
+        }
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <input type="hidden" name="id" value="@account.Id">
+            <div class="col-md-3"><label class="form-label" for="from">From</label><input id="from" type="date" name="from" value="@Iso(Model.From)" class="form-control"></div>
+            <div class="col-md-3"><label class="form-label" for="to">To</label><input id="to" type="date" name="to" value="@Iso(Model.To)" class="form-control"></div>
+            <div class="col-md-2"><button type="submit" class="btn btn-primary w-100"><i class="ti ti-search me-1"></i>Show</button></div>
+        </form>
+    </div>
+</div>
+
+@if (Model.Ledger is { } ledger)
+{
+    <div class="card">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <span class="text-muted fs-13">@Fmt.Date(ledger.From) – @Fmt.Date(ledger.To)</span>
+            @if (canExport)
+            {
+                <div class="d-flex gap-2">
+                    <a asp-action="LedgerExport" asp-route-format="xlsx" asp-route-id="@account.Id" asp-route-from="@Iso(ledger.From)" asp-route-to="@Iso(ledger.To)" target="_blank" class="btn btn-sm btn-outline-success">Excel</a>
+                    <a asp-action="LedgerExport" asp-route-format="pdf" asp-route-id="@account.Id" asp-route-from="@Iso(ledger.From)" asp-route-to="@Iso(ledger.To)" target="_blank" class="btn btn-sm btn-outline-danger">PDF</a>
+                </div>
+            }
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="thead-light"><tr><th>Date</th><th>Journal</th><th>Source</th><th>Description</th><th class="text-end">In</th><th class="text-end">Out</th><th class="text-end">Balance</th></tr></thead>
+                    <tbody>
+                        <tr class="table-light fw-semibold"><td>@Fmt.Date(ledger.From)</td><td colspan="5">Opening balance</td><td class="text-end">@Fmt.Money(ledger.OpeningBalance)</td></tr>
+                        @foreach (Application.Finance.CashBank.CashBankLedgerLine line in ledger.Lines)
+                        {
+                            <tr>
+                                <td>@Fmt.Date(line.Date)</td>
+                                <td>@line.Number</td>
+                                <td>@(line.SourceType is null ? "Manual" : EnumOptions.Label(line.SourceType))</td>
+                                <td>@line.Description</td>
+                                <td class="text-end">@(line.In == 0 ? "" : Fmt.Money(line.In))</td>
+                                <td class="text-end">@(line.Out == 0 ? "" : Fmt.Money(line.Out))</td>
+                                <td class="text-end">@Fmt.Money(line.Balance)</td>
+                            </tr>
+                        }
+                        @if (ledger.Lines.Count == 0)
+                        {
+                            <tr><td colspan="7" class="text-center text-muted py-3">No movement in this period.</td></tr>
+                        }
+                        <tr class="table-light fw-semibold">
+                            <td>@Fmt.Date(ledger.To)</td><td colspan="3">Closing balance</td>
+                            <td class="text-end">@Fmt.Money(ledger.TotalIn)</td><td class="text-end">@Fmt.Money(ledger.TotalOut)</td><td class="text-end">@Fmt.Money(ledger.ClosingBalance)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}

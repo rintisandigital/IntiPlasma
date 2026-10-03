@@ -1,0 +1,125 @@
+@model VendorInvoiceDetailsViewModel
+@{
+    Application.Finance.Payables.VendorInvoiceResponse invoice = Model.Invoice;
+    string title = invoice.Number is null ? $"Draft vendor invoice {invoice.VendorInvoiceNumber}" : $"Vendor invoice {invoice.Number}";
+    ViewData["Title"] = title;
+    ViewData["Menu"] = MenuCodes.FinanceVendorInvoices;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">@title <partial name="Partials/_StatusBadge" model="invoice.Status" /></h4>
+            <h6>@invoice.VendorName · @invoice.BranchCode</h6>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="Index" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+        @if (Model.CanEdit && Model.IsDraft)
+        {
+            <form asp-action="Post" asp-route-id="@invoice.Id" method="post" data-confirm="Post vendor invoice @invoice.VendorInvoiceNumber? The payable will be opened.">
+                <button type="submit" class="btn btn-success"><i class="ti ti-check me-1"></i>Post</button>
+            </form>
+            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancel-modal"><i class="ti ti-ban me-1"></i>Cancel</button>
+        }
+        @if (Model.CanPay && Model.IsPayable)
+        {
+            <a asp-controller="PaymentVouchers" asp-action="Create" asp-route-payeeId="@invoice.VendorId" asp-route-documentId="@invoice.Id" class="btn btn-primary"><i class="ti ti-cash me-1"></i>Pay</a>
+        }
+    </div>
+</div>
+
+@if (invoice.Status == "Cancelled" && invoice.CancellationReason is not null)
+{
+    <div class="alert alert-danger">Cancelled: @invoice.CancellationReason</div>
+}
+@if (invoice.PriceVarianceApprovalReason is not null)
+{
+    <div class="alert alert-warning">Posted with a price difference above tolerance: @invoice.PriceVarianceApprovalReason</div>
+}
+
+@if (Model.CanEdit && Model.IsDraft && Model.VarianceBlocked is not null)
+{
+    <div class="card border-warning">
+        <div class="card-body">
+            <div class="text-warning fw-semibold mb-2"><i class="ti ti-alert-triangle me-1"></i>@Model.VarianceBlocked</div>
+            <form asp-action="PostWithVariance" asp-route-id="@invoice.Id" method="post" class="row g-2 align-items-end">
+                <div class="col-md-9">
+                    <label class="form-label" for="variance-reason">Reason for accepting the price difference <span class="text-danger">*</span></label>
+                    <input id="variance-reason" name="reason" maxlength="500" class="form-control" required>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-warning w-100"><i class="ti ti-shield-check me-1"></i>Post with variance</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Vendor's invoice no.</div><div class="fw-semibold">@invoice.VendorInvoiceNumber</div></div>
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Tax invoice no.</div><div class="fw-semibold">@(invoice.TaxInvoiceNumber ?? "—")</div></div>
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Price tolerance</div><div class="fw-semibold">@Fmt.Number(invoice.MaxPriceDeviationPercent, 2)%</div></div>
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Invoice date</div><div class="fw-semibold">@Fmt.Date(invoice.InvoiceDate)</div></div>
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Due date</div><div class="fw-semibold">@Fmt.Date(invoice.DueDate)</div></div>
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Posted at</div><div class="fw-semibold">@(invoice.PostedAtUtc is { } p ? Fmt.DateTime(p) : "—")</div></div>
+                    @if (!string.IsNullOrWhiteSpace(invoice.Notes))
+                    {
+                        <div class="col-12"><div class="text-muted fs-13">Notes</div><div style="white-space: pre-line">@invoice.Notes</div></div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-7 fw-normal">Subtotal</dt><dd class="col-5 text-end">@Fmt.Money(invoice.Subtotal)</dd>
+                    <dt class="col-7 fw-normal">Goods received value</dt><dd class="col-5 text-end">@Fmt.Money(invoice.GoodsValue)</dd>
+                    <dt class="col-7 fw-normal">Price difference</dt><dd class="col-5 text-end @(Model.HasVariance ? "text-warning fw-semibold" : "")">@Fmt.Money(invoice.PriceVariance)</dd>
+                    <dt class="col-7 fw-normal">VAT</dt><dd class="col-5 text-end">@Fmt.Money(invoice.VatAmount)</dd>
+                    <dt class="col-7 fw-normal">PPh withheld @(invoice.IncomeTaxCode is null ? "" : $"({invoice.IncomeTaxCode} {Fmt.Number(invoice.IncomeTaxRatePercent, 2)}%)")</dt><dd class="col-5 text-end">− @Fmt.Money(invoice.IncomeTaxAmount)</dd>
+                    <dt class="col-7">Total payable</dt><dd class="col-5 text-end fw-bold">@Fmt.Money(invoice.Total)</dd>
+                    <dt class="col-7 fw-normal">Paid</dt><dd class="col-5 text-end">@Fmt.Money(invoice.PaidAmount)</dd>
+                    <dt class="col-7">Outstanding</dt><dd class="col-5 text-end fw-bold">@Fmt.Money(invoice.Outstanding)</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h5 class="card-title mb-0">Lines</h5></div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead class="thead-light"><tr><th>#</th><th>Receipt / PO</th><th>Item</th><th class="text-end">Qty</th><th class="text-end">PO price</th><th class="text-end">Invoice price</th><th class="text-end">Deviation</th><th class="text-end">Amount</th><th>VAT</th><th class="text-end">VAT amount</th></tr></thead>
+                <tbody>
+                    @foreach (Application.Finance.Payables.VendorInvoiceLineResponse line in invoice.Lines ?? [])
+                    {
+                        <tr>
+                            <td>@line.LineNumber</td>
+                            <td>@line.GoodsReceiptNumber <div class="text-muted fs-12">@line.PurchaseOrderNumber</div></td>
+                            <td>@line.ItemCode — @line.ItemName</td>
+                            <td class="text-end text-nowrap">@Fmt.Number(line.Quantity, 2) @line.UomCode</td>
+                            <td class="text-end">@Fmt.Number(line.OrderUnitPrice)</td>
+                            <td class="text-end">@Fmt.Number(line.UnitPrice)</td>
+                            <td class="text-end @(line.PriceDeviationPercent > invoice.MaxPriceDeviationPercent || line.PriceDeviationPercent < -invoice.MaxPriceDeviationPercent ? "text-warning fw-semibold" : "")">@Fmt.Number(line.PriceDeviationPercent, 2)%</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(line.Amount)</td>
+                            <td>@(line.TaxCode ?? "—")</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(line.VatAmount)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<partial name="Partials/_AttachmentsCard" model='new AttachmentsCardModel(Model.Attachments, Model.CanEdit && invoice.Status != "Cancelled" ? Url.Action("Documents", new { id = invoice.Id }) : null)' />
+
+<partial name="Partials/_ReasonModal" model='new ReasonModalModel("cancel-modal", "Cancel draft vendor invoice", Url.Action("Cancel", new { id = invoice.Id })!, "Cancel Invoice")' />

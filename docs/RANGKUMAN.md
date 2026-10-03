@@ -1,7 +1,7 @@
 # Rangkuman Proyek — Aplikasi Peternakan Ayam Broiler Inti-Plasma
 
 > Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4), 2026-10-01 (Fase 5–8) dan 2026-10-02 (Fase 9 — lampiran dokumen; Fase W0 — fondasi WebApp).
-> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§16 (API) dan [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (WebApp, realisasi W0 di §10, W1 di §12, W2 di §13, W3 di §14, W4 di §15, W5 di §16, W6 di §17). Fase API 0–9 dan W0–W6 selesai; berikutnya **Fase W7** (AP, Kas & Bank).
+> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§16 (API) dan [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (WebApp, realisasi W0 di §10, W1 di §12, W2 di §13, W3 di §14, W4 di §15, W5 di §16, W6 di §17, W7 di §18). Fase API 0–9 dan W0–W7 selesai; berikutnya **Fase W8** (HPP & Settlement Plasma).
 
 ---
 
@@ -193,6 +193,12 @@
 - Tambahan Application: `GetCustomerCreditQuery` (exposure kredit). Helper **terbilang** Rupiah (W-17). Tidak ada migration baru.
 - ⚠️ Credit override di WebApp memakai hak Edit Sales Orders + alasan wajib (API: permission `SalesCreditOverride`).
 
+### Fase W7 — AP, Kas & Bank ✅ (detail: PLAN-WEBAPP §18)
+- **Vendor Invoices** (baris BPB belum ditagih, post; di atas toleransi → *post with variance* + alasan), **Payment Vouchers** vendor & plasma (maker-checker: approve oleh user lain, pay dengan tanggal aktual, **PDF PV dengan terbilang**), **Cash In/Out** (BKM langsung post; BKK approve oleh user lain, **PDF voucher**), **Bank Transfers**, **buku kas/bank** (dari Cash/Bank Accounts), **Bank Reconciliations** (impor CSV, dua kolom, auto-match ±3 hari & match manual, complete), **Payable Ledger & Aging** (ekspor). Tidak ada migration baru.
+- Komponen bersama: `_DocumentFilter`, `_ReasonModal`, `_AttachmentsCard`, `DocumentLists`, `DocumentPdf`.
+- ⚠️ Selisih harga VI di WebApp memakai hak Edit Vendor Invoices + alasan wajib (API: `payables:approve-variance`).
+- ⚠️ Perbaikan bug W6: route menu Sales Orders/Delivery Orders/Sales Invoices di sidebar sebelumnya 404; kini ada test yang memastikan semua menu rilis terbuka.
+
 ## 5. Alur Akuntansi yang Sudah Berjalan
 
 | Transaksi | Jurnal otomatis |
@@ -246,16 +252,17 @@ Semua event di katalog kini sudah dipakai.
 - Tom-Select dengan `preload: 'focus'` membuka lagi dropdown setelah memilih → `closeAfterSelect` + `blur()`; template tidak punya CSS Tom-Select untuk wrapper `form-select` & placeholder single-select (diatur di `theme.css`).
 - Aturan `step` bawaan jquery-validation menghitung jumlah desimal, bukan kelipatan → nilai DB `20.000000` gagal `step="0.001"` tanpa pesan; diganti di `wwwroot/js/validation-setup.js`.
 - Folder lampiran relatif terhadap `AppContext.BaseDirectory` (folder `bin`) → di dev Web.App menunjuk `../../../../Web.Api/bin/Debug/net10.0/uploads`; di container keduanya `/app/uploads`.
+- Route di `MenuCatalog` harus sama persis dengan nama controller area (mis. `/Sales/SalesOrders`, bukan `/Sales/Orders`) — sidebar tidak divalidasi saat build; test `Admin_Should_OpenEveryReleasedMenu` menjaganya.
 
 ## 7. Cara Kerja & Verifikasi
 
 - Setiap fase: domain + unit test invariant → command/query + validator → EF config + migration → endpoint + permission → **verifikasi end-to-end** ke PostgreSQL lokal pada database sementara `intiplasma_verify` (dibuat & dihapus otomatis; database `intiplasma` milik user tidak disentuh).
 - User yang melakukan **commit & migrate** setelah tiap fase.
-- Status test saat ini: **346 test lulus** (143 domain, 60 application, 14 arsitektur, 18 integration Web.Api, 111 integration Web.App).
+- Status test saat ini: **363 test lulus** (143 domain, 60 application, 14 arsitektur, 18 integration Web.Api, 128 integration Web.App).
 - Integration test (Testcontainers) **sudah bisa dijalankan** di mesin dev (container runtime tersedia) — `dotnet test IntiPlasma.slnx`.
 - Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario, Fase 7: 32 skenario, Fase 8: 35 skenario, Fase 9: 79 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
 - ⚠️ Sejak W0 Web.Api tidak memproses outbox: verifikasi yang hanya menjalankan API perlu `BackgroundJobs__Enabled=true`.
-- Verifikasi WebApp (W0: 49 skenario, W1: 36 skenario, W2: 40 skenario, W3: 48 skenario, W4: 51 skenario, W5: 42 skenario, W6: 42 skenario + regresi W0) memakai **Playwright** (dipasang di scratchpad, bukan di repo) terhadap Web.App :5098 + Web.Api :5099 pada `intiplasma_verify`; interaksi halaman lewat frame `content-frame`.
+- Verifikasi WebApp (W0: 49 skenario, W1: 36 skenario, W2: 40 skenario, W3: 48 skenario, W4: 51 skenario, W5: 42 skenario, W6: 42 skenario, W7: 62 skenario + regresi W0) memakai **Playwright** (dipasang di scratchpad, bukan di repo) terhadap Web.App :5098 + Web.Api :5099 pada `intiplasma_verify`; interaksi halaman lewat frame `content-frame`.
 - Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`, `Phase8_ReportingClosing`, `Phase9_Attachments`, `PhaseW0_UserStatus`, `PhaseW1_AccessControl`.
 
 ## 8. Catatan Terbuka / Hutang Teknis

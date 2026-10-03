@@ -1,0 +1,142 @@
+@model VendorInvoiceFormViewModel
+@using System.Globalization
+@{
+    ViewData["Title"] = "New Vendor Invoice";
+    ViewData["Menu"] = MenuCodes.FinanceVendorInvoices;
+    string Inv(decimal value) => value.ToString("0.######", CultureInfo.InvariantCulture);
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel("New Vendor Invoice", "Match the vendor bill to received goods (3-way match); prices exclude VAT")' />
+
+<div class="card">
+    <div class="card-body">
+        <form method="get" asp-action="Create" class="row g-2 align-items-end" id="pick-form">
+            <div class="col-md-6">
+                <label class="form-label" for="vendor-select">Vendor <span class="text-danger">*</span></label>
+                <select id="vendor-select" name="vendorId" class="form-select" data-lookup="@Url.Action("Vendors", "Lookup", new { area = "" })"
+                        onchange="if (this.value) { this.form.submit(); }">
+                    <option value="">Search vendor…</option>
+                    @if (Model.VendorId is not null)
+                    {
+                        <option value="@Model.VendorId" selected>@Model.VendorLabel</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="branch-select">Branch <span class="text-danger">*</span></label>
+                <select id="branch-select" name="branchId" class="form-select" asp-items="Model.Branches" onchange="this.form.submit()"></select>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (Model.VendorId is not null && Model.BranchId is not null)
+{
+    <form asp-action="Create" method="post" id="invoice-form">
+        <form-token />
+        <input type="hidden" asp-for="VendorId" />
+        <input type="hidden" asp-for="BranchId" />
+        <div class="card">
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="VendorInvoiceNumber" class="form-label"></label> <span class="text-danger">*</span>
+                        <input asp-for="VendorInvoiceNumber" class="form-control">
+                        <span asp-validation-for="VendorInvoiceNumber" class="text-danger fs-13"></span>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="TaxInvoiceNumber" class="form-label"></label>
+                        <input asp-for="TaxInvoiceNumber" class="form-control">
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label asp-for="InvoiceDate" class="form-label"></label> <span class="text-danger">*</span>
+                        <input asp-for="InvoiceDate" type="date" class="form-control">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label asp-for="IncomeTaxCodeId" class="form-label"></label>
+                        <select asp-for="IncomeTaxCodeId" class="form-select" asp-items="Model.IncomeTaxCodes">
+                            <option value="">None</option>
+                        </select>
+                    </div>
+                    <div class="col-12 mb-3">
+                        <label asp-for="Notes" class="form-label"></label>
+                        <input asp-for="Notes" class="form-control">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Received, not yet billed</h5></div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead class="thead-light">
+                            <tr><th></th><th>Receipt</th><th>PO</th><th>Item</th><th class="text-end">Not billed</th><th style="width: 13%">Bill qty</th><th class="text-end">PO price</th><th style="width: 15%">Invoice price</th><th class="text-end">Amount</th></tr>
+                        </thead>
+                        <tbody>
+                            @for (int i = 0; i < Model.Receipts.Count; i++)
+                            {
+                                Application.Finance.Payables.UninvoicedReceiptLineResponse receipt = Model.Receipts[i];
+                                BillLineInput? input = Model.Lines.FirstOrDefault(l => l.GoodsReceiptId == receipt.GoodsReceiptId && l.GoodsReceiptLineNumber == receipt.GoodsReceiptLineNumber);
+                                <tr class="bill-line">
+                                    <td>
+                                        <input type="hidden" name="Lines[@i].GoodsReceiptId" value="@receipt.GoodsReceiptId">
+                                        <input type="hidden" name="Lines[@i].GoodsReceiptLineNumber" value="@receipt.GoodsReceiptLineNumber">
+                                        <input type="checkbox" name="Lines[@i].Selected" value="true" class="form-check-input line-selected" checked="@(input?.Selected == true)" aria-label="Bill this line">
+                                    </td>
+                                    <td>@receipt.GoodsReceiptNumber <div class="text-muted fs-12">@Fmt.Date(receipt.ReceiptDate)</div></td>
+                                    <td>@receipt.PurchaseOrderNumber</td>
+                                    <td>@receipt.ItemCode — @receipt.ItemName</td>
+                                    <td class="text-end text-nowrap">@Fmt.Number(receipt.UninvoicedQuantity, 2) @receipt.UomCode</td>
+                                    <td><input type="number" name="Lines[@i].Quantity" value="@(input?.Quantity is { } q ? Inv(q) : "")" min="0" step="any" max="@Inv(receipt.UninvoicedQuantity)" class="form-control form-control-sm text-end line-qty"></td>
+                                    <td class="text-end text-nowrap">@Fmt.Number(receipt.OrderUnitPrice)</td>
+                                    <td><input type="number" name="Lines[@i].UnitPrice" value="@(input?.UnitPrice is { } p ? Inv(p) : "")" min="0" step="any" class="form-control form-control-sm text-end line-price" data-po-price="@Inv(receipt.OrderUnitPrice)"></td>
+                                    <td class="text-end text-nowrap line-amount">—</td>
+                                </tr>
+                            }
+                            @if (Model.Receipts.Count == 0)
+                            {
+                                <tr><td colspan="9" class="text-center text-muted py-3">Nothing received from this vendor in this branch is waiting to be billed.</td></tr>
+                            }
+                        </tbody>
+                        <tfoot><tr><th colspan="8" class="text-end">Subtotal (excl. VAT; VAT follows the purchase order)</th><th class="text-end text-nowrap" id="invoice-subtotal">—</th></tr></tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Attachments (vendor invoice, tax invoice)</h5></div>
+            <div class="card-body"><partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, true)" /></div>
+        </div>
+
+        <partial name="Partials/_FormButtons" model='new FormButtonsModel(Model.Receipts.Count > 0, Url.Action("Index")!, "Save Draft")' />
+    </form>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            var form = document.getElementById('invoice-form');
+            if (!form) { return; }
+            var money = new Intl.NumberFormat('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            function recalc() {
+                var total = 0;
+                form.querySelectorAll('tr.bill-line').forEach(function (row) {
+                    var selected = row.querySelector('.line-selected').checked;
+                    var price = row.querySelector('.line-price');
+                    var amount = selected ? (parseFloat(row.querySelector('.line-qty').value) || 0) * (parseFloat(price.value) || 0) : 0;
+                    row.querySelector('.line-amount').textContent = selected ? money.format(amount) : '—';
+                    price.classList.toggle('border-warning', selected && price.value !== '' && parseFloat(price.value) !== parseFloat(price.dataset.poPrice));
+                    total += amount;
+                });
+                document.getElementById('invoice-subtotal').textContent = 'Rp ' + money.format(total);
+            }
+            form.addEventListener('input', recalc);
+            form.addEventListener('change', recalc);
+            recalc();
+        })();
+    </script>
+}

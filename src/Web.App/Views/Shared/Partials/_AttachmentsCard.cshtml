@@ -1,0 +1,20 @@
+@* Attachments card of a document's detail page; editable (with a Save button posting "documents" to SaveUrl) when
+   the user may edit and the document is not cancelled/voided. *@
+@model AttachmentsCardModel
+<div class="card">
+    <div class="card-header"><h5 class="card-title mb-0">Attachments</h5></div>
+    <div class="card-body">
+        @if (Model.SaveUrl is not null)
+        {
+            <form action="@Model.SaveUrl" method="post">
+                @Html.AntiForgeryToken()
+                <partial name="Partials/_Attachments" model='new AttachmentsModel(Model.Attachments, true, "documents")' />
+                <button type="submit" class="btn btn-sm btn-primary mt-2"><i class="ti ti-device-floppy me-1"></i>Save attachments</button>
+            </form>
+        }
+        else
+        {
+            <partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, false)" />
+        }
+    </div>
+</div>

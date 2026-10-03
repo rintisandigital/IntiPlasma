@@ -1,0 +1,126 @@
+@model PaymentVoucherDetailsViewModel
+@{
+    Application.Finance.Payables.PaymentVoucherResponse voucher = Model.Voucher;
+    ViewData["Title"] = $"PV {voucher.Number}";
+    ViewData["Menu"] = MenuCodes.FinancePaymentVouchers;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">PV @voucher.Number <partial name="Partials/_StatusBadge" model="voucher.Status" /></h4>
+            <h6>@voucher.PayeeName @(Model.IsPlasma ? "(plasma)" : "") · @voucher.BranchCode</h6>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="Index" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+        @if (Model.CanPrint)
+        {
+            <a asp-action="Print" asp-route-id="@voucher.Id" target="_blank" class="btn btn-outline-danger"><i class="ti ti-file-type-pdf me-1"></i>Voucher PDF</a>
+        }
+        @if (Model.CanEdit && Model.IsDraft)
+        {
+            <form asp-action="Approve" asp-route-id="@voucher.Id" method="post" data-confirm="Approve PV @voucher.Number? The maker cannot approve their own voucher.">
+                <button type="submit" class="btn btn-success"><i class="ti ti-check me-1"></i>Approve</button>
+            </form>
+        }
+        @if (Model.CanEdit && Model.IsApproved)
+        {
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#pay-modal"><i class="ti ti-cash me-1"></i>Pay</button>
+        }
+        @if (Model.CanEdit && (Model.IsDraft || Model.IsApproved))
+        {
+            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancel-modal"><i class="ti ti-ban me-1"></i>Cancel</button>
+        }
+    </div>
+</div>
+
+@if (voucher.Status == "Cancelled" && voucher.CancellationReason is not null)
+{
+    <div class="alert alert-danger">Cancelled: @voucher.CancellationReason</div>
+}
+@if (Model.IsDraft)
+{
+    <div class="alert alert-info">Waiting for approval by another user (maker-checker).</div>
+}
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Payment date</div><div class="fw-semibold">@Fmt.Date(voucher.PaymentDate)</div></div>
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Pay from</div><div class="fw-semibold">@voucher.CashBankCode — @voucher.CashBankName</div></div>
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Reference</div><div class="fw-semibold">@(voucher.Reference ?? "—")</div></div>
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Payee</div><div class="fw-semibold">@voucher.PayeeCode — @voucher.PayeeName</div></div>
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Approved at</div><div class="fw-semibold">@(voucher.ApprovedAtUtc is { } a ? Fmt.DateTime(a) : "—")</div></div>
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Paid at</div><div class="fw-semibold">@(voucher.PaidAtUtc is { } p ? Fmt.DateTime(p) : "—")</div></div>
+                    @if (!string.IsNullOrWhiteSpace(voucher.Notes))
+                    {
+                        <div class="col-12"><div class="text-muted fs-13">Notes</div><div style="white-space: pre-line">@voucher.Notes</div></div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="text-muted fs-13">Amount</div>
+                <div class="fs-4 fw-bold">@Fmt.Money(voucher.Amount)</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h5 class="card-title mb-0">@(Model.IsPlasma ? "Settlements paid" : "Invoices paid")</h5></div>
+    <div class="card-body p-0">
+        <table class="table mb-0">
+            <thead class="thead-light"><tr><th>Document</th><th>Reference</th><th>Date</th><th class="text-end">Amount</th></tr></thead>
+            <tbody>
+                @foreach (Application.Finance.Payables.PaymentAllocationResponse allocation in voucher.Allocations ?? [])
+                {
+                    <tr>
+                        <td>
+                            @if (allocation.DocumentType == "VendorInvoice")
+                            {
+                                <a asp-controller="VendorInvoices" asp-action="Details" asp-route-id="@allocation.DocumentId">@(allocation.Number ?? "—")</a>
+                            }
+                            else
+                            {
+                                @(allocation.Number ?? "—")
+                            }
+                        </td>
+                        <td>@allocation.Reference</td>
+                        <td>@Fmt.Date(allocation.DocumentDate)</td>
+                        <td class="text-end">@Fmt.Money(allocation.Amount)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<partial name="Partials/_AttachmentsCard" model='new AttachmentsCardModel(Model.Attachments, Model.CanEdit && voucher.Status != "Cancelled" ? Url.Action("Documents", new { id = voucher.Id }) : null)' />
+
+<partial name="Partials/_ReasonModal" model='new ReasonModalModel("cancel-modal", $"Cancel PV {voucher.Number}", Url.Action("Cancel", new { id = voucher.Id })!, "Cancel Voucher")' />
+
+<div class="modal fade" id="pay-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form asp-action="Pay" asp-route-id="@voucher.Id" method="post" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Pay PV @voucher.Number</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label for="pay-date" class="form-label">Actual payment date <span class="text-danger">*</span></label>
+                <input id="pay-date" name="date" type="date" value="@voucher.PaymentDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required>
+                <div class="form-text">The payment is journaled on this date (Dr payable — Cr @voucher.CashBankCode).</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Back</button>
+                <button type="submit" class="btn btn-primary">Pay @Fmt.Money(voucher.Amount)</button>
+            </div>
+        </form>
+    </div>
+</div>

@@ -1,0 +1,97 @@
+@model CashTransactionDetailsViewModel
+@{
+    Application.Finance.CashBank.CashTransactionResponse transaction = Model.Transaction;
+    string kind = Model.IsIn ? "Cash in" : "Cash out";
+    string title = transaction.Number is null ? $"{kind} (draft)" : $"{kind} {transaction.Number}";
+    ViewData["Title"] = title;
+    ViewData["Menu"] = MenuCodes.FinanceCashTransactions;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">@title <partial name="Partials/_StatusBadge" model="transaction.Status" /></h4>
+            <h6>@transaction.CashBankCode — @transaction.CashBankName · @transaction.BranchCode</h6>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="Index" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+        @if (Model.CanPrint)
+        {
+            <a asp-action="Print" asp-route-id="@transaction.Id" target="_blank" class="btn btn-outline-danger"><i class="ti ti-file-type-pdf me-1"></i>Voucher PDF</a>
+        }
+        @if (Model.CanEdit && Model.NeedsApproval)
+        {
+            <form asp-action="Approve" asp-route-id="@transaction.Id" method="post" data-confirm="Approve this cash-out? The maker cannot approve their own transaction.">
+                <button type="submit" class="btn btn-success"><i class="ti ti-check me-1"></i>Approve</button>
+            </form>
+        }
+        @if (Model.CanEdit && Model.CanBePosted)
+        {
+            <form asp-action="Post" asp-route-id="@transaction.Id" method="post" data-confirm="Post this transaction? It will be numbered and journaled.">
+                <button type="submit" class="btn btn-primary"><i class="ti ti-send me-1"></i>Post</button>
+            </form>
+        }
+        @if (Model.CanEdit && Model.CanBeCancelled)
+        {
+            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancel-modal"><i class="ti ti-ban me-1"></i>Cancel</button>
+        }
+    </div>
+</div>
+
+@if (transaction.Status == "Cancelled" && transaction.CancellationReason is not null)
+{
+    <div class="alert alert-danger">Cancelled: @transaction.CancellationReason</div>
+}
+@if (Model.NeedsApproval)
+{
+    <div class="alert alert-info">Cash-out waiting for approval by another user (maker-checker).</div>
+}
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Date</div><div class="fw-semibold">@Fmt.Date(transaction.Date)</div></div>
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Reference</div><div class="fw-semibold">@(transaction.Reference ?? "—")</div></div>
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">@(transaction.PostedAtUtc is null ? "Approved at" : "Posted at")</div><div class="fw-semibold">@((transaction.PostedAtUtc ?? transaction.ApprovedAtUtc) is { } at ? Fmt.DateTime(at) : "—")</div></div>
+                    <div class="col-12"><div class="text-muted fs-13">Description</div><div>@transaction.Description</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="text-muted fs-13">@(Model.IsIn ? "Total received" : "Total paid")</div>
+                <div class="fs-4 fw-bold">@Fmt.Money(transaction.Amount)</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h5 class="card-title mb-0">Lines (@(Model.IsIn ? "credited" : "debited"))</h5></div>
+    <div class="card-body p-0">
+        <table class="table mb-0">
+            <thead class="thead-light"><tr><th>#</th><th>Account</th><th>Cost center</th><th>Description</th><th class="text-end">Amount</th></tr></thead>
+            <tbody>
+                @foreach (Application.Finance.CashBank.CashTransactionLineResponse line in transaction.Lines ?? [])
+                {
+                    <tr>
+                        <td>@line.LineNumber</td>
+                        <td>@line.AccountCode — @line.AccountName</td>
+                        <td>@(line.CostCenterCode ?? "—")</td>
+                        <td>@line.Description</td>
+                        <td class="text-end">@Fmt.Money(line.Amount)</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot><tr><th colspan="4" class="text-end">Total</th><th class="text-end">@Fmt.Money(transaction.Amount)</th></tr></tfoot>
+        </table>
+    </div>
+</div>
+
+<partial name="Partials/_AttachmentsCard" model='new AttachmentsCardModel(Model.Attachments, Model.CanEdit && transaction.Status != "Cancelled" ? Url.Action("Documents", new { id = transaction.Id }) : null)' />
+
+<partial name="Partials/_ReasonModal" model='new ReasonModalModel("cancel-modal", $"Cancel {kind.ToLowerInvariant()}", Url.Action("Cancel", new { id = transaction.Id })!, "Cancel Transaction")' />

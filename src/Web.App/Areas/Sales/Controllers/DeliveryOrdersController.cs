@@ -63,7 +63,7 @@ public sealed class DeliveryOrdersController(
             Rows = result.Value,
             Search = search,
             BranchOptions = branchFilter.Options,
-            Filters = SalesLists.DateFilters(from, to),
+            Filters = DocumentLists.DateFilters(from, to),
             FilterOptions = new Dictionary<string, IReadOnlyList<SelectListItem>> { ["status"] = EnumOptions.For(status) }
         });
     }
@@ -76,7 +76,7 @@ public sealed class DeliveryOrdersController(
         BranchFilter branchFilter = await support.BranchFilterAsync(branch);
 
         return await support.ExportAsync(format, "Delivery Orders", "delivery-orders",
-            SalesLists.Filters(branchFilter, status?.ToString(), from, to, formatter), Columns,
+            DocumentLists.Filters(branchFilter, status?.ToString(), from, to, formatter), Columns,
             (paging, ct) => deliveriesQuery.Handle(new GetDeliveryOrdersQuery(paging, branchFilter.BranchId, null, null, status, from, to), ct),
             search, cancellationToken);
     }

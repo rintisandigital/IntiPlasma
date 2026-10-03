@@ -408,7 +408,7 @@ Use case Application/Domain baru dikerjakan & diuji dulu (unit test seperti fase
 ### Fase W6 — Penjualan & AR ✅ (selesai 2026-10-03, realisasi §17)
 - SO (approve, approve-over-limit dengan alasan + tampilan exposure), DO (**PDF delivery note**), Sales Invoice (Draft → post, **PDF invoice**), penerimaan customer (**PDF receipt**), uang muka, void, nota kredit (**PDF**), kartu piutang & aging (ekspor).
 
-### Fase W7 — AP, Kas & Bank
+### Fase W7 — AP, Kas & Bank ✅ (selesai 2026-10-03, realisasi §18)
 - Vendor Invoice (3-way match, `post-with-variance`), Payment Voucher vendor & plasma (maker-checker, **PDF PV**), kas masuk/keluar (**PDF**), transfer kas/bank, buku kas/bank, rekonsiliasi bank (impor CSV, tampilan dua kolom, auto/manual match), kartu & aging hutang (ekspor).
 
 ### Fase W8 — HPP & Settlement Plasma
@@ -827,3 +827,37 @@ Tidak ada migration baru. Satu tambahan Application: **`GetCustomerCreditQuery`*
 - **Test: 346 lulus** — Domain 143, Application 60, Arsitektur 14, Integration Web.Api 18, Integration Web.App 111 (+28): 16 kasus terbilang; 11 halaman penjualan terbuka; alur panen → SO ditolak limit → approve over limit → DO → invoice draft → post (total 4 jt) → nota kredit (outstanding 3,9 jt) → receipt 3 jt + uang muka 0,5 jt (Partially paid) → apply advance (outstanding 0,4 jt) → ledger & aging → 4 PDF + ekspor aging → void ditolak untuk receipt dengan uang muka terpakai → receipt kedua (Paid) → void (outstanding kembali 0,4 jt).
 - **End-to-end W6 42/42**: setup + siklus dipanen (100 ekor / 200 kg); SO (total estimasi langsung), panel kredit, approve ditolak → approve over limit (alasan, badge); DO (tanpa centang ditolak, panen tampil, SO Delivered, PDF); invoice (DO terpilih otomatis, draft → post bernomor, PDF); nota kredit (outstanding 3,9 jt, PDF); receipt (alokasi otomatis, total langsung, uang muka, PDF), apply advance, void tersembunyi, receipt kedua "Full" → Paid → void → terbuka lagi; aging & ledger (Credit Note, Receipt Void, saldo akhir 400.000) + ekspor; cancel SO draft; **siklus ditutup setelah panennya terjual lewat UI**; 5 ekspor list; jurnal otomatis tanpa dead letter; tanpa error JS.
 - **Regresi**: E2E W5 42/42, W4 51/51, W3 48/48, W2 40/40, W0 49/49, header 15/15.
+
+---
+
+## 18. Realisasi Fase W7 — AP, Kas & Bank (2026-10-03)
+
+Tidak ada perubahan Domain/Application/Web.Api dan **tidak ada migration baru**; layar memakai use case Fase 6–7.
+
+### 18.1 Layar (`Areas/Finance`)
+| Halaman | Realisasi |
+|---|---|
+| **Vendor Invoices** | List (cabang/status/tanggal/cari no. internal atau no. faktur vendor) + ekspor, badge "Variance". Form: pilih vendor (lookup) + cabang → baris BPB yang belum ditagih (dicentang, qty & harga PO terisi, subtotal langsung, harga ≠ PO disorot), no. faktur vendor & faktur pajak, PPh opsional (kode pajak IncomeTax), lampiran → **draft**. Detail: ringkasan (subtotal, nilai barang, selisih harga, PPN, PPh, total, dibayar, outstanding), baris dengan % deviasi vs toleransi vendor. **Post**; bila ditolak (`PriceVarianceAboveTolerance`) muncul form **Post with variance** dengan alasan wajib. Cancel draft (alasan), lampiran, tombol **Pay** ke PV. |
+| **Payment Vouchers** | List + ekspor; tombol **Pay Vendor** / **Pay Plasma**. Form: pilih penerima (vendor atau peternak plasma via lookup) → dokumen terbuka (invoice terposting dari aging hari ini, atau settlement Approved/PartiallyPaid) dengan alokasi per dokumen + "Full", akun kas/bank, referensi, total langsung → draft bernomor. Detail: **Approve** (checker, domain menolak pembuat), **Pay** (modal tanggal aktual), Cancel (alasan), lampiran, **PDF PV dengan terbilang**. |
+| **Cash In/Out** | List (filter arah kas masuk/keluar) + ekspor; tombol **Cash In** / **Cash Out**. Form: akun kas/bank, tanggal, keterangan, referensi, baris akun COA (lookup) + cost center + keterangan + jumlah (tabel dinamis, total langsung), lampiran → draft. Kas masuk langsung **Post** (BKM); kas keluar **Approve** oleh user lain lalu **Post** (BKK). Cancel (alasan), **PDF voucher kas dengan terbilang**. |
+| **Bank Transfers** | List + ekspor, form (dari/ke kas/bank, tanggal, jumlah, referensi, catatan; akun sama ditolak) → langsung terposting. |
+| **Cash/Bank Book** | Tombol buku di Cash/Bank Accounts (W3) → saldo awal, mutasi (jurnal, sumber, keterangan, masuk/keluar, saldo berjalan), saldo akhir; ekspor Excel/PDF; tombol Transfer. |
+| **Bank Reconciliations** | List (cabang, rekening) + ekspor; mulai (rekening bank, tanggal & saldo rekening koran). Halaman kerja: kartu saldo rekening koran (bisa diubah), saldo buku, belum clear, **selisih**, baris belum cocok; impor CSV (upload file atau tempel), tambah baris manual; **dua kolom**: rekening koran (cocokkan manual lewat dropdown mutasi buku — jumlah sama ✓ dan tanggal terdekat di atas, unmatch, hapus baris) dan mutasi buku yang belum clear; **Auto-match** (±3 hari); **Complete** aktif bila semua cocok & selisih 0; ekspor baris rekening koran Excel/PDF. |
+| **Payable Ledger & Aging** | Tab Aging (per tanggal, cabang, vendor opsional; bucket per vendor & invoice) dan Vendor ledger (saldo awal, invoice/pembayaran, saldo berjalan, saldo akhir); ekspor Excel/PDF. |
+
+- Hak menu: VI/PV/Cash **Create/Edit/Export** (Edit = post, post with variance, approve, pay, cancel, lampiran; draft tidak bisa diubah — batal lalu buat ulang, jadi tanpa Delete), Bank Transfers **Create/Export**, Bank Reconciliations **Create/Edit/Export**, Payables **Export**. Buku kas/bank mengikuti hak View/Export Cash/Bank Accounts.
+- ⚠️ **Selisih harga VI**: di API memakai permission `payables:approve-variance`; di WebApp cukup hak **Edit** Vendor Invoices + alasan wajib (sama dengan credit override W6), sampai approval terpusat tersedia.
+- PV plasma sudah bisa dipakai, tetapi settlement baru punya layar di W8 (sementara dibuat lewat Web.Api).
+
+### 18.2 Komponen & perbaikan
+- Komponen bersama baru: partial `Partials/_DocumentFilter` (menggantikan `_SalesFilter`, + select tambahan `FilterSelect`), `Partials/_ReasonModal` (dipindah dari area Sales), `Partials/_AttachmentsCard`; helper `DocumentLists` (filter tanggal & deskripsi ekspor) dan `DocumentPdf` (blok cetak dokumen: field, tabel, total, terbilang, tanda tangan — dipakai `SalesDocumentPdf` & `FinanceDocumentPdf`); `FinanceOptions` (kas/bank, kode PPh).
+- ⚠️ **Perbaikan bug W6**: route katalog menu Sales Orders/Delivery Orders/Sales Invoices menunjuk `/Sales/Orders`, `/Sales/Deliveries`, `/Sales/Invoices` (404 dari sidebar) → diperbaiki ke `/Sales/SalesOrders`, `/Sales/DeliveryOrders`, `/Sales/SalesInvoices` (route diperbarui otomatis oleh sinkronisasi katalog saat startup). Test baru memastikan **setiap menu rilis** membuka halaman 200.
+
+### 18.3 Pengujian & verifikasi
+- **Test: 363 lulus** — Domain 143, Application 60, Arsitektur 14, Integration Web.Api 18, Integration Web.App 128 (+17): 14 halaman W7 terbuka; semua route menu rilis terbuka; alur BPB → VI draft dibatalkan (alasan wajib) → VI di atas toleransi (post ditolak → post with variance) → PV (pembuat ditolak approve, checker approve) → paid, invoice Paid → ledger & aging → PDF PV + ekspor; kas masuk (BKM), kas keluar (maker-checker, BKK), baris tanpa akun ditolak, transfer (akun sama ditolak), buku kas/bank + ekspor, rekonsiliasi (impor CSV, complete ditolak saat ada baris belum cocok, tambah/hapus baris, complete) + PDF. `WebAppFactory.CreateUserAsync` kini menerima profil Akses Cabang.
+- **End-to-end W7 62/62** (Playwright, outbox berjalan di Web.App): semua menu sidebar terbuka (termasuk route Sales yang diperbaiki); setup (bank + kas kecil, peternak plasma, user checker lewat layar Users); PO 150 KG → BPB; VI (baris BPB terisi, subtotal & sorotan harga, post ditolak → variance + alasan, badge); PV dari tombol Pay (alokasi terisi), approve oleh pembuat ditolak, checker approve, pay via modal, invoice Paid, PDF; VI kedua sisa 50 KG tanpa variance; PV draft dibatalkan; form PV plasma; kas masuk BKM, kas keluar 2 baris (maker-checker) BKK + PDF, baris tanpa akun ditolak, cancel, filter arah; transfer; **jurnal otomatis VI/PV/BKM/BKK/transfer terposting**, saldo bank −800.000 di buku kas/bank + Excel; rekonsiliasi: impor CSV 5 baris (`;`, header), auto-match 3, match manual baris bertanggal −10 hari, hapus biaya admin, selisih −6.500 → koreksi saldo → 0 → Complete + PDF; aging & ledger vendor (outstanding 400.000) + ekspor; 5 ekspor list; tanpa dead letter; tanpa error JS.
+- **Regresi**: E2E W6 42/42, W5 42/42, W4 51/51, W3 48/48 (ekspektasi "vendor-invoices belum rilis" disesuaikan), W2 40/40, W0 49/49, header 15/15.
+
+### 18.4 Catatan
+- Rekonsiliasi hanya menawarkan rekening bertipe **Bank**. Biaya admin bank yang ada di rekening koran tetapi belum dibukukan perlu dicatat lewat Cash Out dulu agar bisa dicocokkan.
+- Draft VI/PV/kas tidak bisa diedit (tidak ada use case update) — batalkan lalu buat ulang.

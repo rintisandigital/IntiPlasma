@@ -1,0 +1,39 @@
+@model BankReconciliationFormViewModel
+@{
+    ViewData["Title"] = "New Reconciliation";
+    ViewData["Menu"] = MenuCodes.FinanceBankReconciliations;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel("New Reconciliation", "Take the statement date and closing balance from the bank statement (rekening koran)")' />
+
+<form asp-action="Create" method="post">
+    <form-token />
+    <div class="card">
+        <div class="card-body">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+            <div class="row">
+                <div class="col-md-5 mb-3">
+                    <label asp-for="CashBankAccountId" class="form-label"></label> <span class="text-danger">*</span>
+                    <select asp-for="CashBankAccountId" class="form-select" asp-items="Model.CashBankAccounts">
+                        <option value="">—</option>
+                    </select>
+                    <span asp-validation-for="CashBankAccountId" class="text-danger fs-13"></span>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label asp-for="StatementDate" class="form-label"></label> <span class="text-danger">*</span>
+                    <input asp-for="StatementDate" type="date" class="form-control">
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label asp-for="StatementBalance" class="form-label"></label> <span class="text-danger">*</span>
+                    <input asp-for="StatementBalance" type="number" step="0.01" class="form-control text-end">
+                    <span asp-validation-for="StatementBalance" class="text-danger fs-13"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <partial name="Partials/_FormButtons" model='new FormButtonsModel(true, Url.Action("Index")!, "Start Reconciliation")' />
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

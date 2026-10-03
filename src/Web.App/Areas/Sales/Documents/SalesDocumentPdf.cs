@@ -23,9 +23,9 @@ public static class SalesDocumentPdf
         ArgumentNullException.ThrowIfNull(delivery);
         ArgumentNullException.ThrowIfNull(fmt);
 
-        Compose(container, column =>
+        DocumentPdf.Compose(container, column =>
         {
-            column.Item().Element(c => Fields(c,
+            column.Item().Element(c => DocumentPdf.Fields(c,
             [
                 ("Customer", $"{delivery.CustomerName} ({delivery.CustomerCode})"),
                 ("Delivery note", delivery.Number),
@@ -47,7 +47,7 @@ public static class SalesDocumentPdf
                     c.RelativeColumn(1.2f);
                     c.RelativeColumn(0.9f);
                 });
-                Header(table, DeliveryHeaders);
+                DocumentPdf.Header(table, DeliveryHeaders);
                 foreach (DeliveryOrderLineResponse line in delivery.Lines ?? [])
                 {
                     table.Cell().Element(PdfLayout.Cell).Text(line.LineNumber.ToString(CultureInfo.InvariantCulture));
@@ -65,8 +65,8 @@ public static class SalesDocumentPdf
                 table.Cell().Element(PdfLayout.Cell).Text(string.Empty);
             });
 
-            Notes(column, delivery.Notes);
-            Signatures(column, ["Issued by", "Driver", "Received by (customer)"]);
+            DocumentPdf.Notes(column, delivery.Notes);
+            DocumentPdf.Signatures(column, ["Issued by", "Driver", "Received by (customer)"]);
         });
     }
 
@@ -75,9 +75,9 @@ public static class SalesDocumentPdf
         ArgumentNullException.ThrowIfNull(invoice);
         ArgumentNullException.ThrowIfNull(fmt);
 
-        Compose(container, column =>
+        DocumentPdf.Compose(container, column =>
         {
-            column.Item().Element(c => Fields(c,
+            column.Item().Element(c => DocumentPdf.Fields(c,
             [
                 ("Bill to", $"{invoice.CustomerName} ({invoice.CustomerCode})"),
                 ("Invoice", invoice.Number ?? "DRAFT"),
@@ -100,7 +100,7 @@ public static class SalesDocumentPdf
                     c.RelativeColumn(1.5f);
                     c.RelativeColumn(0.8f);
                 });
-                Header(table, InvoiceHeaders);
+                DocumentPdf.Header(table, InvoiceHeaders);
                 foreach (SalesInvoiceLineResponse line in invoice.Lines ?? [])
                 {
                     table.Cell().Element(PdfLayout.Cell).Text(line.LineNumber.ToString(CultureInfo.InvariantCulture));
@@ -114,7 +114,7 @@ public static class SalesDocumentPdf
                 }
             });
 
-            Totals(column,
+            DocumentPdf.Totals(column,
             [
                 ("Subtotal", invoice.Subtotal, false),
                 ("VAT", invoice.VatAmount, false),
@@ -123,9 +123,9 @@ public static class SalesDocumentPdf
                 ("Credited", invoice.CreditedAmount, false),
                 ("Outstanding", invoice.Outstanding, true)
             ]);
-            InWords(column, invoice.Total);
-            Notes(column, invoice.Notes);
-            Signatures(column, ["Finance", "Received by (customer)"]);
+            DocumentPdf.InWords(column, invoice.Total);
+            DocumentPdf.Notes(column, invoice.Notes);
+            DocumentPdf.Signatures(column, ["Finance", "Received by (customer)"]);
         });
     }
 
@@ -134,9 +134,9 @@ public static class SalesDocumentPdf
         ArgumentNullException.ThrowIfNull(note);
         ArgumentNullException.ThrowIfNull(fmt);
 
-        Compose(container, column =>
+        DocumentPdf.Compose(container, column =>
         {
-            column.Item().Element(c => Fields(c,
+            column.Item().Element(c => DocumentPdf.Fields(c,
             [
                 ("Customer", note.CustomerName),
                 ("Credit note", note.Number),
@@ -145,14 +145,14 @@ public static class SalesDocumentPdf
                 ("Branch", note.BranchCode),
                 ("Reason", note.Reason)
             ]));
-            Totals(column,
+            DocumentPdf.Totals(column,
             [
                 ("Reduction (excl. VAT)", note.Subtotal, false),
                 ("VAT correction", note.VatAmount, false),
                 ("Total credited", note.Total, true)
             ]);
-            InWords(column, note.Total);
-            Signatures(column, ["Finance", "Customer"]);
+            DocumentPdf.InWords(column, note.Total);
+            DocumentPdf.Signatures(column, ["Finance", "Customer"]);
         });
     }
 
@@ -161,9 +161,9 @@ public static class SalesDocumentPdf
         ArgumentNullException.ThrowIfNull(receipt);
         ArgumentNullException.ThrowIfNull(fmt);
 
-        Compose(container, column =>
+        DocumentPdf.Compose(container, column =>
         {
-            column.Item().Element(c => Fields(c,
+            column.Item().Element(c => DocumentPdf.Fields(c,
             [
                 ("Received from", $"{receipt.CustomerName} ({receipt.CustomerCode})"),
                 ("Receipt", receipt.Number),
@@ -184,7 +184,7 @@ public static class SalesDocumentPdf
                         c.RelativeColumn(1.5f);
                         c.RelativeColumn(1.5f);
                     });
-                    Header(table, ["Invoice", "Invoice date", "Amount"]);
+                    DocumentPdf.Header(table, ["Invoice", "Invoice date", "Amount"]);
                     foreach (CustomerReceiptAllocationResponse allocation in allocations)
                     {
                         table.Cell().Element(PdfLayout.Cell).Text(allocation.InvoiceNumber);
@@ -194,104 +194,14 @@ public static class SalesDocumentPdf
                 });
             }
 
-            Totals(column,
+            DocumentPdf.Totals(column,
             [
                 ("Advance (uang muka)", receipt.AdvanceAmount, false),
                 ("Total received", receipt.Amount, true)
             ]);
-            InWords(column, receipt.Amount);
-            Notes(column, receipt.Notes);
-            Signatures(column, ["Received by", "Customer"]);
+            DocumentPdf.InWords(column, receipt.Amount);
+            DocumentPdf.Notes(column, receipt.Notes);
+            DocumentPdf.Signatures(column, ["Received by", "Customer"]);
         });
     }
-
-    private static void Compose(IContainer container, Action<ColumnDescriptor> content)
-    {
-        ArgumentNullException.ThrowIfNull(container);
-        container.Column(column =>
-        {
-            column.Spacing(10);
-            content(column);
-        });
-    }
-
-    private static void Fields(IContainer container, IReadOnlyList<(string Label, string Value)> fields) =>
-        container.Table(table =>
-        {
-            table.ColumnsDefinition(c =>
-            {
-                c.ConstantColumn(95);
-                c.RelativeColumn();
-                c.ConstantColumn(95);
-                c.RelativeColumn();
-            });
-
-            foreach ((string label, string value) in fields)
-            {
-                table.Cell().PaddingVertical(1).Text(label).SemiBold();
-                table.Cell().PaddingVertical(1).Text(value);
-            }
-        });
-
-    private static void Header(TableDescriptor table, IEnumerable<string> titles) =>
-        table.Header(h =>
-        {
-            foreach (string title in titles)
-            {
-                h.Cell().Element(PdfLayout.HeaderCell).Text(title).Bold();
-            }
-        });
-
-    private static void Totals(ColumnDescriptor column, IReadOnlyList<(string Label, decimal Value, bool Bold)> totals) =>
-        column.Item().AlignRight().Width(260).Table(table =>
-        {
-            table.ColumnsDefinition(c =>
-            {
-                c.RelativeColumn();
-                c.RelativeColumn();
-            });
-
-            foreach ((string label, decimal value, bool bold) in totals)
-            {
-                TextBlockDescriptor l = table.Cell().PaddingVertical(2).Text(label);
-                TextBlockDescriptor v = table.Cell().PaddingVertical(2).AlignRight().Text($"Rp {value.ToString("N2", CultureInfo.GetCultureInfo("id-ID"))}");
-                if (bold)
-                {
-                    l.Bold();
-                    v.Bold();
-                }
-            }
-        });
-
-    private static void InWords(ColumnDescriptor column, decimal amount) =>
-        column.Item().Background(PdfLayout.HeaderFill).Padding(6).Text(text =>
-        {
-            text.Span("Terbilang: ").SemiBold();
-            text.Span(Terbilang.Rupiah(amount)).Italic();
-        });
-
-    private static void Notes(ColumnDescriptor column, string? notes)
-    {
-        if (string.IsNullOrWhiteSpace(notes))
-        {
-            return;
-        }
-
-        column.Item().Text("Notes").Bold().FontSize(10);
-        column.Item().Text(notes);
-    }
-
-    private static void Signatures(ColumnDescriptor column, IReadOnlyList<string> signers) =>
-        column.Item().PaddingTop(25).Row(row =>
-        {
-            foreach (string signer in signers)
-            {
-                row.RelativeItem().AlignCenter().Column(sign =>
-                {
-                    sign.Item().AlignCenter().Text(signer).SemiBold();
-                    sign.Item().Height(50);
-                    sign.Item().AlignCenter().Text("(____________________)");
-                });
-            }
-        });
 }

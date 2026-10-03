@@ -11,16 +11,19 @@ using Web.App.Controllers;
 using Web.App.Infrastructure;
 using Web.App.Infrastructure.Authorization;
 using Web.App.Infrastructure.Export;
+using Web.App.Infrastructure.Formatting;
 
 namespace Web.App.Areas.Finance.Controllers;
 
 /// <summary>
-/// Cash and bank accounts per branch, each linked to its own postable asset account of the chart of accounts.
+/// Cash and bank accounts per branch, each linked to its own postable asset account of the chart of accounts, and
+/// their cash/bank book.
 /// </summary>
 [Area("Finance")]
 [MenuAccess(MenuCodes.FinanceCashBankAccounts)]
 public sealed class CashBankAccountsController(
     PageSupport support,
+    DisplayFormatter formatter,
     IQueryHandler<GetCashBankAccountsQuery, IReadOnlyList<CashBankAccountResponse>> accountsQuery) : AppController
 {
     private const string MenuCode = MenuCodes.FinanceCashBankAccounts;
@@ -36,6 +39,17 @@ public sealed class CashBankAccountsController(
         new("Account number", a => a.AccountNumber, Width: 1.5f),
         new("Balance", a => a.Balance, ExportFormat.Money, 1.3f),
         new("Active", a => a.IsActive, ExportFormat.Boolean, 0.6f)
+    ];
+
+    private static readonly ExportColumn<CashBankLedgerLine>[] LedgerColumns =
+    [
+        new("Date", l => l.Date, ExportFormat.Date, 1),
+        new("Journal", l => l.Number, Width: 1.5f),
+        new("Source", l => l.SourceType, Width: 1.2f),
+        new("Description", l => l.Description, Width: 3),
+        new("In", l => l.In, ExportFormat.Money, 1.3f),
+        new("Out", l => l.Out, ExportFormat.Money, 1.3f),
+        new("Balance", l => l.Balance, ExportFormat.Money, 1.4f)
     ];
 
     [HttpGet]
@@ -153,6 +167,65 @@ public sealed class CashBankAccountsController(
         }
 
         return View("Form", model);
+    }
+
+    /// <summary>
+    /// Buku kas/bank: opening balance, posted movements with a running balance and the closing balance.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> Ledger(
+        Guid id,
+        DateOnly? from,
+        DateOnly? to,
+        [FromServices] IQueryHandler<GetCashBankLedgerQuery, CashBankLedgerResponse> ledgerQuery,
+        CancellationToken cancellationToken)
+    {
+        CashBankAccountResponse? account = await FindAsync(id, cancellationToken);
+
+        if (account is null)
+        {
+            return NotFound();
+        }
+
+        DateOnly today = formatter.Today();
+        DateOnly start = from ?? new DateOnly(today.Year, today.Month, 1);
+        DateOnly end = to ?? today;
+        Result<CashBankLedgerResponse> ledger = await ledgerQuery.Handle(new GetCashBankLedgerQuery(id, start, end), cancellationToken);
+
+        if (ledger.IsFailure)
+        {
+            NotifyError(ledger.Error.Description);
+        }
+
+        return View(new CashBankLedgerViewModel { Account = account, From = start, To = end, Ledger = ledger.IsSuccess ? ledger.Value : null });
+    }
+
+    [HttpGet]
+    [MenuAccess(MenuCode, MenuRights.Export)]
+    public async Task<IActionResult> LedgerExport(
+        string? format,
+        Guid id,
+        DateOnly from,
+        DateOnly to,
+        [FromServices] IQueryHandler<GetCashBankLedgerQuery, CashBankLedgerResponse> ledgerQuery,
+        CancellationToken cancellationToken)
+    {
+        Result<CashBankLedgerResponse> result = await ledgerQuery.Handle(new GetCashBankLedgerQuery(id, from, to), cancellationToken);
+
+        if (result.IsFailure)
+        {
+            NotifyError(result.Error.Description);
+            return RedirectToAction(nameof(Ledger), new { id, from, to });
+        }
+
+        CashBankLedgerResponse ledger = result.Value;
+        return await support.ExportAsync(format, "Cash/Bank Book", $"cash-bank-book-{ledger.Code}",
+            [
+                $"Account: {ledger.Code} — {ledger.Name} ({ledger.AccountCode})",
+                $"Period: {formatter.Date(from)} – {formatter.Date(to)}",
+                $"Opening: Rp {formatter.Number(ledger.OpeningBalance)} · Closing: Rp {formatter.Number(ledger.ClosingBalance)}"
+            ],
+            LedgerColumns, ledger.Lines);
     }
 
     private async Task<CashBankAccountResponse?> FindAsync(Guid id, CancellationToken cancellationToken) =>

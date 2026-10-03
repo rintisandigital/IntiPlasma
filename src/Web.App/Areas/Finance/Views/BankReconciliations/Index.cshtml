@@ -1,0 +1,51 @@
+@model BankReconciliationListViewModel
+@{
+    ViewData["Title"] = "Bank Reconciliations";
+    ViewData["Menu"] = MenuCodes.FinanceBankReconciliations;
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Bank Reconciliations", "Match bank statements with the ledger of each bank account", MenuCodes.FinanceBankReconciliations, "New Reconciliation")' />
+
+<div class="card">
+    <div class="card-header">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <select name="branch" class="form-select" asp-items="Model.BranchOptions"></select>
+            </div>
+            <div class="col-md-4">
+                <select name="cashBankAccountId" class="form-select" asp-items="Model.CashBankAccounts">
+                    <option value="">All bank accounts</option>
+                </select>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="ti ti-filter me-1"></i>Filter</button>
+                <a asp-action="Index" class="btn btn-light">Reset</a>
+            </div>
+        </form>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr><th>Bank account</th><th>Statement date</th><th class="text-end">Statement balance</th><th>Status</th><th>Completed at</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Finance.CashBank.BankReconciliationSummary reconciliation in Model.Rows)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@reconciliation.CashBankCode</td>
+                            <td>@Fmt.Date(reconciliation.StatementDate)</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(reconciliation.StatementBalance)</td>
+                            <td><partial name="Partials/_StatusBadge" model="reconciliation.Status" /></td>
+                            <td>@(reconciliation.CompletedAtUtc is { } c ? Fmt.DateTime(c) : "—")</td>
+                            <td class="text-end"><a asp-action="Details" asp-route-id="@reconciliation.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Count == 0)
+                    {
+                        <tr><td colspan="6" class="text-center text-muted py-4">No reconciliations found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

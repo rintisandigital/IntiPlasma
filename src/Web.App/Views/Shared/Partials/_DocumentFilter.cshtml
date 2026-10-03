@@ -1,4 +1,8 @@
-@model SalesFilterModel
+@* Filter bar of document lists: search, branch, optional status and extra selects, date range. *@
+@model DocumentFilterModel
+@{
+    bool compact = Model.StatusOptions is not null || Model.Selects is { Count: > 0 };
+}
 <form method="get" class="row g-2 align-items-end">
     <div class="col-md-3">
         <input type="search" name="search" value="@Model.Search" class="form-control" placeholder="@Model.Placeholder">
@@ -14,10 +18,18 @@
             </select>
         </div>
     }
-    <div class="col-md-@(Model.StatusOptions is null ? "2" : "1")">
+    @foreach (FilterSelect select in Model.Selects ?? [])
+    {
+        <div class="col-md-2">
+            <select name="@select.Name" class="form-select" asp-items="select.Options">
+                <option value="">@select.AllLabel</option>
+            </select>
+        </div>
+    }
+    <div class="col-md-@(compact ? "1" : "2")">
         <input type="date" name="from" value="@Model.Filters.GetValueOrDefault("from")" class="form-control" title="From date">
     </div>
-    <div class="col-md-@(Model.StatusOptions is null ? "2" : "1")">
+    <div class="col-md-@(compact ? "1" : "2")">
         <input type="date" name="to" value="@Model.Filters.GetValueOrDefault("to")" class="form-control" title="To date">
     </div>
     <div class="col-md-3 d-flex gap-2">

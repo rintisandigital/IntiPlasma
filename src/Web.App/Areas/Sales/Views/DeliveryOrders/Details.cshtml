@@ -94,4 +94,4 @@
     <div class="card-body"><partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, false)" /></div>
 </div>
 
-<partial name="_ReasonModal" model='new ReasonModalModel("cancel-modal", $"Cancel DO {delivery.Number}", Url.Action("Cancel", new { id = delivery.Id })!, "Cancel DO")' />
+<partial name="Partials/_ReasonModal" model='new ReasonModalModel("cancel-modal", $"Cancel DO {delivery.Number}", Url.Action("Cancel", new { id = delivery.Id })!, "Cancel DO")' />

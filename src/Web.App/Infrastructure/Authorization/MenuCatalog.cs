@@ -29,6 +29,12 @@ public static class MenuCodes
     public const string FinanceJournalTemplates = "finance.journal-templates";
     public const string FinanceJournalMappings = "finance.journal-mappings";
     public const string FinanceCashBankAccounts = "finance.cash-bank-accounts";
+    public const string FinanceVendorInvoices = "finance.vendor-invoices";
+    public const string FinancePaymentVouchers = "finance.payment-vouchers";
+    public const string FinanceCashTransactions = "finance.cash-transactions";
+    public const string FinanceBankTransfers = "finance.bank-transfers";
+    public const string FinanceBankReconciliations = "finance.bank-reconciliations";
+    public const string FinancePayables = "finance.payables";
     public const string ProcurementPurchaseOrders = "procurement.purchase-orders";
     public const string InventoryGoodsReceipts = "inventory.goods-receipts";
     public const string InventoryStockTransfers = "inventory.stock-transfers";
@@ -103,9 +109,9 @@ public static class MenuCatalog
         Page("production", "production.harvests", "Harvests", "/Production/Harvests", CreateEditExport, true);
 
         Group("sales", "Sales", "ti ti-receipt", 70);
-        Page("sales", "sales.orders", "Sales Orders", "/Sales/Orders", CreateEditExport, true);
-        Page("sales", "sales.deliveries", "Delivery Orders", "/Sales/Deliveries", CreateEditExport, true);
-        Page("sales", "sales.invoices", "Sales Invoices", "/Sales/Invoices", CreateEditExport, true);
+        Page("sales", "sales.orders", "Sales Orders", "/Sales/SalesOrders", CreateEditExport, true);
+        Page("sales", "sales.deliveries", "Delivery Orders", "/Sales/DeliveryOrders", CreateEditExport, true);
+        Page("sales", "sales.invoices", "Sales Invoices", "/Sales/SalesInvoices", CreateEditExport, true);
         Page("sales", "sales.credit-notes", "Credit Notes", "/Sales/CreditNotes", CreateExport, true);
         Page("sales", "sales.receipts", "Customer Receipts", "/Sales/Receipts", CreateEditExport, true);
         Page("sales", "sales.receivables", "Receivable Ledger & Aging", "/Sales/Receivables", MenuRights.Export, true);
@@ -117,12 +123,12 @@ public static class MenuCatalog
         Page("finance", "finance.journal-templates", "Journal Templates", "/Finance/JournalTemplates", CreateEditExport, true);
         Page("finance", "finance.journal-mappings", "Auto Journal Mappings", "/Finance/JournalMappings", CreateEditExport, true);
         Page("finance", "finance.cash-bank-accounts", "Cash/Bank Accounts", "/Finance/CashBankAccounts", CreateEditExport, true);
-        Page("finance", "finance.vendor-invoices", "Vendor Invoices", "/Finance/VendorInvoices", Crud, false);
-        Page("finance", "finance.payment-vouchers", "Payment Vouchers", "/Finance/PaymentVouchers", Crud, false);
-        Page("finance", "finance.cash-transactions", "Cash In/Out", "/Finance/CashTransactions", Crud, false);
-        Page("finance", "finance.bank-transfers", "Bank Transfers", "/Finance/BankTransfers", CreateEditExport, false);
-        Page("finance", "finance.bank-reconciliations", "Bank Reconciliations", "/Finance/BankReconciliations", CreateEditExport, false);
-        Page("finance", "finance.payables", "Payable Ledger & Aging", "/Finance/Payables", MenuRights.Export, false);
+        Page("finance", MenuCodes.FinanceVendorInvoices, "Vendor Invoices", "/Finance/VendorInvoices", CreateEditExport, true);
+        Page("finance", MenuCodes.FinancePaymentVouchers, "Payment Vouchers", "/Finance/PaymentVouchers", CreateEditExport, true);
+        Page("finance", MenuCodes.FinanceCashTransactions, "Cash In/Out", "/Finance/CashTransactions", CreateEditExport, true);
+        Page("finance", MenuCodes.FinanceBankTransfers, "Bank Transfers", "/Finance/BankTransfers", CreateExport, true);
+        Page("finance", MenuCodes.FinanceBankReconciliations, "Bank Reconciliations", "/Finance/BankReconciliations", CreateEditExport, true);
+        Page("finance", MenuCodes.FinancePayables, "Payable Ledger & Aging", "/Finance/Payables", MenuRights.Export, true);
         Page("finance", "finance.journals", "Journals", "/Finance/Journals", Crud, false);
 
         Group("costing", "Costing", "ti ti-calculator", 90);

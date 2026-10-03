@@ -141,4 +141,4 @@
     <div class="card-body"><partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, false)" /></div>
 </div>
 
-<partial name="_ReasonModal" model='new ReasonModalModel("void-modal", $"Void receipt {receipt.Number}", Url.Action("Void", new { id = receipt.Id })!, "Void Receipt", WithDate: true)' />
+<partial name="Partials/_ReasonModal" model='new ReasonModalModel("void-modal", $"Void receipt {receipt.Number}", Url.Action("Void", new { id = receipt.Id })!, "Void Receipt", WithDate: true)' />

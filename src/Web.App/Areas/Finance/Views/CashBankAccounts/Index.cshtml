@@ -43,7 +43,10 @@
                             <td>@(account.BankName is null ? "—" : $"{account.BankName} {account.AccountNumber}")</td>
                             <td class="text-end text-nowrap">@Fmt.Money(account.Balance)</td>
                             <td><partial name="Partials/_StatusBadge" model='account.IsActive ? "Active" : "Inactive"' /></td>
-                            <td class="text-end"><a asp-action="Edit" asp-route-id="@account.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                            <td class="text-end text-nowrap">
+                                <a asp-action="Ledger" asp-route-id="@account.Id" class="btn btn-sm btn-light" title="Cash/bank book"><i class="ti ti-book"></i></a>
+                                <a asp-action="Edit" asp-route-id="@account.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a>
+                            </td>
                         </tr>
                     }
                     @if (Model.Rows.Items.Count == 0)

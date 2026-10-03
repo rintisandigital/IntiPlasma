@@ -67,7 +67,7 @@ public sealed class SalesOrdersController(
             Rows = result.Value,
             Search = search,
             BranchOptions = branchFilter.Options,
-            Filters = SalesLists.DateFilters(from, to),
+            Filters = DocumentLists.DateFilters(from, to),
             FilterOptions = new Dictionary<string, IReadOnlyList<SelectListItem>> { ["status"] = EnumOptions.For(status) }
         });
     }
@@ -80,7 +80,7 @@ public sealed class SalesOrdersController(
         BranchFilter branchFilter = await support.BranchFilterAsync(branch);
 
         return await support.ExportAsync(format, "Sales Orders", "sales-orders",
-            SalesLists.Filters(branchFilter, status?.ToString(), from, to, formatter), Columns,
+            DocumentLists.Filters(branchFilter, status?.ToString(), from, to, formatter), Columns,
             (paging, ct) => ordersQuery.Handle(new GetSalesOrdersQuery(paging, branchFilter.BranchId, null, status, from, to), ct),
             search, cancellationToken);
     }

@@ -1,0 +1,48 @@
+@model ListViewModel<Application.Finance.Payables.VendorInvoiceResponse>
+@{
+    ViewData["Title"] = "Vendor Invoices";
+    ViewData["Menu"] = MenuCodes.FinanceVendorInvoices;
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Vendor Invoices", "Vendor bills matched to received goods; posting opens the payable", MenuCodes.FinanceVendorInvoices, "New Vendor Invoice")' />
+
+<div class="card">
+    <div class="card-header">
+        <partial name="Partials/_DocumentFilter" model='new DocumentFilterModel(Model.Search, "Search number or vendor invoice no.", Model.BranchOptions, Model.Filters, Model.FilterOptions["status"])' />
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr><th>Number</th><th>Vendor invoice</th><th>Date</th><th>Due</th><th>Vendor</th><th class="text-end">Total</th><th class="text-end">Outstanding</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Finance.Payables.VendorInvoiceResponse invoice in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@(invoice.Number ?? "(draft)")</td>
+                            <td>@invoice.VendorInvoiceNumber</td>
+                            <td>@Fmt.Date(invoice.InvoiceDate)</td>
+                            <td>@Fmt.Date(invoice.DueDate)</td>
+                            <td>@invoice.VendorName <span class="text-muted fs-12">@invoice.BranchCode</span></td>
+                            <td class="text-end text-nowrap">@Fmt.Money(invoice.Total)</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(invoice.Outstanding)</td>
+                            <td>
+                                <partial name="Partials/_StatusBadge" model="invoice.Status" />
+                                @if (invoice.PriceVarianceApprovalReason is not null)
+                                {
+                                    <span class="badge bg-warning text-dark" title="@invoice.PriceVarianceApprovalReason">Variance</span>
+                                }
+                            </td>
+                            <td class="text-end"><a asp-action="Details" asp-route-id="@invoice.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="9" class="text-center text-muted py-4">No vendor invoices found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="Partials/_Pagination" model="PaginationModel.From(Model.Rows)" />
+    </div>
+</div>

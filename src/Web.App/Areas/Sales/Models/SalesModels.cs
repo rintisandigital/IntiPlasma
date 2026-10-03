@@ -324,15 +324,3 @@ public sealed class ReceivablesViewModel
 
     public ReceivableAgingResponse? Aging { get; init; }
 }
-
-/// <summary>
-/// Filter bar of the sales lists: search, branch, optional status and date range.
-/// </summary>
-public sealed record SalesFilterModel(
-    string? Search,
-    string Placeholder,
-    IReadOnlyList<SelectListItem> BranchOptions,
-    IReadOnlyDictionary<string, string?> Filters,
-    IReadOnlyList<SelectListItem>? StatusOptions);
-
-public sealed record ReasonModalModel(string Id, string Title, string Action, string SubmitText, bool WithDate = false);

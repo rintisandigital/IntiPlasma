@@ -11,3 +11,8 @@ public sealed record AttachmentsModel(IReadOnlyList<AttachmentResponse> Attachme
 {
     public int MaxAttachments => DocumentList.MaxDocuments;
 }
+
+/// <summary>
+/// Model of <c>_AttachmentsCard</c>: read-only when <see cref="SaveUrl"/> is null.
+/// </summary>
+public sealed record AttachmentsCardModel(IReadOnlyList<AttachmentResponse> Attachments, string? SaveUrl);

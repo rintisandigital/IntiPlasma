@@ -53,14 +53,15 @@ public sealed class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifeti
     /// <summary>
     /// Adds a user directly in the database. By default the user has Full Access (menus) and no branch profile.
     /// </summary>
-    public async Task<User> CreateUserAsync(string email, string password, bool active = true, Guid? menuAccessProfileId = null)
+    public async Task<User> CreateUserAsync(
+        string email, string password, bool active = true, Guid? menuAccessProfileId = null, Guid? branchAccessProfileId = null)
     {
         using IServiceScope scope = Services.CreateScope();
         ApplicationDbContext dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         IPasswordHasher hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
         var user = User.Create(email, "Test", "User", hasher.Hash(password));
-        user.SetAccess(menuAccessProfileId ?? MenuAccessProfile.FullAccessId, null, null);
+        user.SetAccess(menuAccessProfileId ?? MenuAccessProfile.FullAccessId, branchAccessProfileId, null);
         if (!active)
         {
             user.Deactivate();

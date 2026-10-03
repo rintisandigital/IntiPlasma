@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc.Rendering;
 using SharedKernel;
 
 namespace Web.App.Models.Shared;
@@ -40,3 +41,24 @@ public sealed record DocumentAction(
     string Style = "btn-primary",
     bool Post = true,
     string? Confirm = null);
+
+/// <summary>
+/// Model of <c>_DocumentFilter</c>, the filter bar of document lists: search, branch, optional status, extra
+/// selects and a date range (submitted as <c>?search=&amp;branch=&amp;status=&amp;from=&amp;to=</c>).
+/// </summary>
+public sealed record DocumentFilterModel(
+    string? Search,
+    string Placeholder,
+    IReadOnlyList<SelectListItem> BranchOptions,
+    IReadOnlyDictionary<string, string?> Filters,
+    IReadOnlyList<SelectListItem>? StatusOptions,
+    IReadOnlyList<FilterSelect>? Selects = null);
+
+/// <param name="Name">Query string parameter.</param>
+/// <param name="AllLabel">Text of the empty option (no filter).</param>
+public sealed record FilterSelect(string Name, string AllLabel, IReadOnlyList<SelectListItem> Options);
+
+/// <summary>
+/// Model of <c>_ReasonModal</c>: asks the reason of a cancel/void action (and a date when <see cref="WithDate"/>).
+/// </summary>
+public sealed record ReasonModalModel(string Id, string Title, string Action, string SubmitText, bool WithDate = false);

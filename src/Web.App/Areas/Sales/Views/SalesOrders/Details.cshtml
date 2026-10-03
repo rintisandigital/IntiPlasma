@@ -143,4 +143,4 @@
     </div>
 </div>
 
-<partial name="_ReasonModal" model='new ReasonModalModel("cancel-modal", $"Cancel SO {order.Number}", Url.Action("Cancel", new { id = order.Id })!, "Cancel SO")' />
+<partial name="Partials/_ReasonModal" model='new ReasonModalModel("cancel-modal", $"Cancel SO {order.Number}", Url.Action("Cancel", new { id = order.Id })!, "Cancel SO")' />

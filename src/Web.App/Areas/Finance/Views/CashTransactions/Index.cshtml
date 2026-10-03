@@ -1,0 +1,59 @@
+@model ListViewModel<Application.Finance.CashBank.CashTransactionResponse>
+@{
+    ViewData["Title"] = "Cash In/Out";
+    ViewData["Menu"] = MenuCodes.FinanceCashTransactions;
+    bool canCreate = await Rights.CanAsync(MenuCodes.FinanceCashTransactions, MenuRights.Create);
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Cash In/Out</h4>
+            <h6>Kas masuk &amp; kas keluar against income/expense accounts; cash-out needs approval by another user</h6>
+        </div>
+    </div>
+    <partial name="Partials/_ExportButtons" model="MenuCodes.FinanceCashTransactions" />
+    @if (canCreate)
+    {
+        <div class="page-btn d-flex gap-2">
+            <a asp-action="Create" asp-route-direction="In" class="btn btn-success"><i class="ti ti-circle-plus me-1"></i>Cash In</a>
+            <a asp-action="Create" asp-route-direction="Out" class="btn btn-primary"><i class="ti ti-circle-minus me-1"></i>Cash Out</a>
+        </div>
+    }
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <partial name="Partials/_DocumentFilter" model='new DocumentFilterModel(Model.Search, "Search number or description", Model.BranchOptions, Model.Filters, Model.FilterOptions["status"], [new FilterSelect("direction", "In & out", Model.FilterOptions["direction"])])' />
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr><th>Number</th><th>Date</th><th></th><th>Cash/bank</th><th>Description</th><th>Reference</th><th class="text-end">Amount</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Finance.CashBank.CashTransactionResponse transaction in Model.Rows.Items)
+                    {
+                        bool cashIn = transaction.Direction == "In";
+                        <tr>
+                            <td class="fw-semibold">@(transaction.Number ?? "(draft)")</td>
+                            <td>@Fmt.Date(transaction.Date)</td>
+                            <td><span class="badge @(cashIn ? "bg-success" : "bg-primary")">@(cashIn ? "In" : "Out")</span></td>
+                            <td>@transaction.CashBankCode <span class="text-muted fs-12">@transaction.BranchCode</span></td>
+                            <td>@transaction.Description</td>
+                            <td>@(transaction.Reference ?? "—")</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(transaction.Amount)</td>
+                            <td><partial name="Partials/_StatusBadge" model="transaction.Status" /></td>
+                            <td class="text-end"><a asp-action="Details" asp-route-id="@transaction.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="9" class="text-center text-muted py-4">No cash transactions found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="Partials/_Pagination" model="PaginationModel.From(Model.Rows)" />
+    </div>
+</div>

@@ -1,0 +1,158 @@
+@model PaymentVoucherFormViewModel
+@using System.Globalization
+@{
+    string title = Model.IsPlasma ? "New Plasma Payment" : "New Vendor Payment";
+    ViewData["Title"] = title;
+    ViewData["Menu"] = MenuCodes.FinancePaymentVouchers;
+    string lookup = Model.IsPlasma
+        ? Url.Action("Farmers", "Lookup", new { area = "", type = "Plasma" })!
+        : Url.Action("Vendors", "Lookup", new { area = "" })!;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel(title, Model.IsPlasma ? "Pay approved settlements of a plasma farmer" : "Pay posted invoices of a vendor; the voucher must be approved by another user before it is paid")' />
+
+<div class="card">
+    <div class="card-body">
+        <form method="get" asp-action="Create" class="row g-2 align-items-end">
+            <input type="hidden" name="payeeType" value="@Model.PayeeType">
+            <div class="col-md-8">
+                <label class="form-label" for="payee-select">@(Model.IsPlasma ? "Plasma farmer" : "Vendor") <span class="text-danger">*</span></label>
+                <select id="payee-select" name="payeeId" class="form-select" data-lookup="@lookup" onchange="if (this.value) { this.form.submit(); }">
+                    <option value="">@(Model.IsPlasma ? "Search plasma farmer…" : "Search vendor…")</option>
+                    @if (Model.PayeeId is not null)
+                    {
+                        <option value="@Model.PayeeId" selected>@Model.PayeeLabel</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                @if (Model.IsPlasma)
+                {
+                    <a asp-action="Create" class="btn btn-link px-0">Pay a vendor instead</a>
+                }
+                else
+                {
+                    <a asp-action="Create" asp-route-payeeType="Farmer" class="btn btn-link px-0">Pay a plasma farmer instead</a>
+                }
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (Model.PayeeId is not null)
+{
+    <form asp-action="Create" method="post" id="voucher-form">
+        <form-token />
+        <input type="hidden" asp-for="PayeeType" />
+        <input type="hidden" asp-for="PayeeId" />
+        <div class="card">
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label asp-for="CashBankAccountId" class="form-label"></label> <span class="text-danger">*</span>
+                        <select asp-for="CashBankAccountId" class="form-select" asp-items="Model.CashBankAccounts">
+                            <option value="">—</option>
+                        </select>
+                        <div class="form-text">The voucher belongs to the account's branch; documents of that branch only.</div>
+                        <span asp-validation-for="CashBankAccountId" class="text-danger fs-13"></span>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label asp-for="PaymentDate" class="form-label"></label> <span class="text-danger">*</span>
+                        <input asp-for="PaymentDate" type="date" class="form-control">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="Reference" class="form-label"></label>
+                        <input asp-for="Reference" class="form-control">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="Notes" class="form-label"></label>
+                        <input asp-for="Notes" class="form-control">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">@(Model.IsPlasma ? "Approved settlements" : "Open invoices")</h5></div>
+            <div class="card-body p-0">
+                <table class="table mb-0">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>@(Model.IsPlasma ? "Settlement" : "Invoice")</th><th>@(Model.IsPlasma ? "Cycle" : "Vendor invoice")</th><th>Branch</th><th>Date</th>
+                            @if (!Model.IsPlasma)
+                            {
+                                <th>Due</th><th class="text-end">Days overdue</th>
+                            }
+                            <th class="text-end">Outstanding</th><th style="width: 20%">Pay now</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < Model.OpenDocuments.Count; i++)
+                        {
+                            OpenPayable document = Model.OpenDocuments[i];
+                            PayableAllocationInput? input = Model.Allocations.FirstOrDefault(a => a.DocumentId == document.DocumentId);
+                            string outstanding = document.Outstanding.ToString(CultureInfo.InvariantCulture);
+                            <tr>
+                                <td class="fw-semibold">@document.Number</td>
+                                <td>@document.Reference</td>
+                                <td>@document.BranchCode</td>
+                                <td>@Fmt.Date(document.Date)</td>
+                                @if (!Model.IsPlasma)
+                                {
+                                    <td>@(document.DueDate is { } due ? Fmt.Date(due) : "—")</td>
+                                    <td class="text-end @(document.DaysOverdue > 0 ? "text-danger" : "")">@(document.DaysOverdue > 0 ? document.DaysOverdue.ToString(CultureInfo.InvariantCulture) : "—")</td>
+                                }
+                                <td class="text-end text-nowrap">@Fmt.Money(document.Outstanding)</td>
+                                <td>
+                                    <input type="hidden" name="Allocations[@i].DocumentId" value="@document.DocumentId">
+                                    <div class="input-group input-group-sm">
+                                        <input type="number" name="Allocations[@i].Amount" value="@input?.Amount?.ToString("0.##", CultureInfo.InvariantCulture)"
+                                               min="0" step="0.01" max="@outstanding" class="form-control text-end allocation">
+                                        <button type="button" class="btn btn-light pay-full" data-amount="@outstanding" title="Pay the outstanding">Full</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        @if (Model.OpenDocuments.Count == 0)
+                        {
+                            <tr><td colspan="8" class="text-center text-muted py-3">@(Model.IsPlasma ? "No approved settlement left to pay." : "No open invoice of this vendor.")</td></tr>
+                        }
+                    </tbody>
+                    <tfoot><tr><th colspan="@(Model.IsPlasma ? 5 : 7)" class="text-end">Total to pay</th><th class="text-end text-nowrap" id="voucher-total">—</th></tr></tfoot>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Attachments</h5></div>
+            <div class="card-body"><partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, true)" /></div>
+        </div>
+
+        <partial name="Partials/_FormButtons" model='new FormButtonsModel(Model.OpenDocuments.Count > 0, Url.Action("Index")!, "Save Draft")' />
+    </form>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            var form = document.getElementById('voucher-form');
+            if (!form) { return; }
+            var money = new Intl.NumberFormat('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            function recalc() {
+                var total = 0;
+                form.querySelectorAll('.allocation').forEach(function (input) { total += parseFloat(input.value) || 0; });
+                document.getElementById('voucher-total').textContent = 'Rp ' + money.format(total);
+            }
+            form.addEventListener('input', recalc);
+            form.addEventListener('click', function (e) {
+                var button = e.target.closest('.pay-full');
+                if (button) {
+                    button.parentElement.querySelector('.allocation').value = button.dataset.amount;
+                    recalc();
+                }
+            });
+            recalc();
+        })();
+    </script>
+}

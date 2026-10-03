@@ -1,0 +1,148 @@
+@model CashTransactionFormViewModel
+@using System.Globalization
+@{
+    string title = Model.IsIn ? "New Cash In" : "New Cash Out";
+    ViewData["Title"] = title;
+    ViewData["Menu"] = MenuCodes.FinanceCashTransactions;
+    string accountLookup = Url.Action("Accounts", "Lookup", new { area = "" })!;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel(title, Model.IsIn ? "Money received into a cash/bank account; each line credits its account" : "Money paid from a cash/bank account; each line debits its account. Needs approval by another user")' />
+
+<form asp-action="Create" method="post" id="cash-form">
+    <form-token />
+    <input type="hidden" asp-for="Direction" />
+    <div class="card">
+        <div class="card-body">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label asp-for="CashBankAccountId" class="form-label"></label> <span class="text-danger">*</span>
+                    <select asp-for="CashBankAccountId" class="form-select" asp-items="Model.CashBankAccounts">
+                        <option value="">—</option>
+                    </select>
+                    <span asp-validation-for="CashBankAccountId" class="text-danger fs-13"></span>
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label asp-for="Date" class="form-label"></label> <span class="text-danger">*</span>
+                    <input asp-for="Date" type="date" class="form-control">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label asp-for="Reference" class="form-label"></label>
+                    <input asp-for="Reference" class="form-control">
+                </div>
+                <div class="col-md-3 mb-3 d-flex align-items-end">
+                    <span class="badge fs-13 @(Model.IsIn ? "bg-success" : "bg-primary")">@(Model.IsIn ? "Cash in (BKM)" : "Cash out (BKK)")</span>
+                </div>
+                <div class="col-12 mb-3">
+                    <label asp-for="Description" class="form-label"></label> <span class="text-danger">*</span>
+                    <input asp-for="Description" class="form-control">
+                    <span asp-validation-for="Description" class="text-danger fs-13"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <h5 class="card-title mb-0">@(Model.IsIn ? "Credit lines (income / other accounts)" : "Debit lines (expense / other accounts)")</h5>
+            <button type="button" class="btn btn-sm btn-outline-primary" data-collection-add="Lines"><i class="ti ti-plus me-1"></i>Add line</button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table mb-0" data-collection="Lines">
+                    <thead class="thead-light"><tr><th style="width: 34%">Account</th><th>Cost center</th><th>Line description</th><th style="width: 16%">Amount</th><th></th></tr></thead>
+                    <tbody>
+                        <tr class="collection-empty"><td colspan="5" class="text-center text-muted py-3">No line yet.</td></tr>
+                        @for (int i = 0; i < Model.Lines.Count; i++)
+                        {
+                            CashLineInput line = Model.Lines[i];
+                            <tr class="collection-row">
+                                <td>
+                                    <input type="hidden" name="Lines[@i].AccountLabel" value="@line.AccountLabel" class="account-label">
+                                    <select name="Lines[@i].AccountId" class="form-select account-select" data-lookup="@accountLookup">
+                                        @if (line.AccountId is not null)
+                                        {
+                                            <option value="@line.AccountId" selected>@(line.AccountLabel ?? line.AccountId.ToString())</option>
+                                        }
+                                        else
+                                        {
+                                            <option value="">Search account…</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="Lines[@i].CostCenterId" class="form-select">
+                                        <option value="">—</option>
+                                        @foreach (SelectListItem costCenter in Model.CostCenters)
+                                        {
+                                            <option value="@costCenter.Value" selected="@(costCenter.Value == line.CostCenterId?.ToString())">@costCenter.Text</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td><input name="Lines[@i].Description" value="@line.Description" maxlength="250" class="form-control"></td>
+                                <td><input type="number" name="Lines[@i].Amount" value="@line.Amount?.ToString("0.##", CultureInfo.InvariantCulture)" min="0" step="0.01" class="form-control text-end line-amount"></td>
+                                <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot><tr><th colspan="3" class="text-end">Total</th><th class="text-end text-nowrap" id="cash-total">—</th><th></th></tr></tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h5 class="card-title mb-0">Attachments (receipts, bills)</h5></div>
+        <div class="card-body"><partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, true)" /></div>
+    </div>
+
+    <partial name="Partials/_FormButtons" model='new FormButtonsModel(true, Url.Action("Index")!, "Save Draft")' />
+</form>
+
+<template data-collection-template="Lines">
+    <tr class="collection-row">
+        <td>
+            <input type="hidden" name="Lines[__i__].AccountLabel" class="account-label">
+            <select name="Lines[__i__].AccountId" class="form-select account-select" data-lookup="@accountLookup">
+                <option value="">Search account…</option>
+            </select>
+        </td>
+        <td>
+            <select name="Lines[__i__].CostCenterId" class="form-select">
+                <option value="">—</option>
+                @foreach (SelectListItem costCenter in Model.CostCenters)
+                {
+                    <option value="@costCenter.Value">@costCenter.Text</option>
+                }
+            </select>
+        </td>
+        <td><input name="Lines[__i__].Description" maxlength="250" class="form-control"></td>
+        <td><input type="number" name="Lines[__i__].Amount" min="0" step="0.01" class="form-control text-end line-amount"></td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+    </tr>
+</template>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            var form = document.getElementById('cash-form');
+            var money = new Intl.NumberFormat('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            function recalc() {
+                var total = 0;
+                form.querySelectorAll('.line-amount').forEach(function (input) { total += parseFloat(input.value) || 0; });
+                document.getElementById('cash-total').textContent = 'Rp ' + money.format(total);
+            }
+            form.addEventListener('input', recalc);
+            form.addEventListener('click', function () { setTimeout(recalc, 0); });
+            // Keep the chosen account's label so a re-rendered form (validation error) still shows it.
+            form.addEventListener('change', function (e) {
+                if (e.target.classList.contains('account-select')) {
+                    var option = e.target.options[e.target.selectedIndex];
+                    e.target.closest('td').querySelector('.account-label').value = option ? option.text : '';
+                }
+            });
+            recalc();
+        })();
+    </script>
+}

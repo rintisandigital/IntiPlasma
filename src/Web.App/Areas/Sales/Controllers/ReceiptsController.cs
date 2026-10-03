@@ -65,7 +65,7 @@ public sealed class ReceiptsController(
             Rows = result.Value,
             Search = search,
             BranchOptions = branchFilter.Options,
-            Filters = SalesLists.DateFilters(from, to)
+            Filters = DocumentLists.DateFilters(from, to)
         });
     }
 
@@ -77,7 +77,7 @@ public sealed class ReceiptsController(
         BranchFilter branchFilter = await support.BranchFilterAsync(branch);
 
         return await support.ExportAsync(format, "Customer Receipts", "customer-receipts",
-            SalesLists.Filters(branchFilter, null, from, to, formatter), Columns,
+            DocumentLists.Filters(branchFilter, null, from, to, formatter), Columns,
             (paging, ct) => receiptsQuery.Handle(new GetCustomerReceiptsQuery(paging, branchFilter.BranchId, null, from, to), ct),
             search, cancellationToken);
     }

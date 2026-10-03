@@ -1,0 +1,63 @@
+@model ListViewModel<Application.Finance.Payables.PaymentVoucherResponse>
+@{
+    ViewData["Title"] = "Payment Vouchers";
+    ViewData["Menu"] = MenuCodes.FinancePaymentVouchers;
+    bool canCreate = await Rights.CanAsync(MenuCodes.FinancePaymentVouchers, MenuRights.Create);
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Payment Vouchers</h4>
+            <h6>Payments to vendors and plasma farmers: draft → approved by another user → paid</h6>
+        </div>
+    </div>
+    <partial name="Partials/_ExportButtons" model="MenuCodes.FinancePaymentVouchers" />
+    @if (canCreate)
+    {
+        <div class="page-btn d-flex gap-2">
+            <a asp-action="Create" class="btn btn-primary"><i class="ti ti-circle-plus me-1"></i>Pay Vendor</a>
+            <a asp-action="Create" asp-route-payeeType="Farmer" class="btn btn-outline-primary"><i class="ti ti-circle-plus me-1"></i>Pay Plasma</a>
+        </div>
+    }
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <partial name="Partials/_DocumentFilter" model='new DocumentFilterModel(Model.Search, "Search number or reference", Model.BranchOptions, Model.Filters, Model.FilterOptions["status"])' />
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr><th>Number</th><th>Date</th><th>Payee</th><th>Cash/bank</th><th>Reference</th><th class="text-end">Amount</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Finance.Payables.PaymentVoucherResponse voucher in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@voucher.Number</td>
+                            <td>@Fmt.Date(voucher.PaymentDate)</td>
+                            <td>
+                                @voucher.PayeeName
+                                @if (voucher.PayeeType == "Farmer")
+                                {
+                                    <span class="badge bg-light text-dark">Plasma</span>
+                                }
+                            </td>
+                            <td>@voucher.CashBankCode</td>
+                            <td>@(voucher.Reference ?? "—")</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(voucher.Amount)</td>
+                            <td><partial name="Partials/_StatusBadge" model="voucher.Status" /></td>
+                            <td class="text-end"><a asp-action="Details" asp-route-id="@voucher.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="8" class="text-center text-muted py-4">No payment vouchers found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="Partials/_Pagination" model="PaginationModel.From(Model.Rows)" />
+    </div>
+</div>
