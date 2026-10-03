@@ -1,0 +1,66 @@
+@model ListViewModel<Application.Costing.CycleCostRowResponse>
+@{
+    ViewData["Title"] = "Cycle Cost";
+    ViewData["Menu"] = MenuCodes.CostingCycleCosts;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Cycle Cost (HPP)</h4>
+            <h6>Sapronak consumed per cycle at moving average: final cost once closed, running estimate before</h6>
+        </div>
+    </div>
+    <partial name="Partials/_ExportButtons" model="MenuCodes.CostingCycleCosts" />
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <partial name="Partials/_DocumentFilter" model='new DocumentFilterModel(Model.Search, "Search cycle, coop or farmer", Model.BranchOptions, Model.Filters, Model.FilterOptions["status"])' />
+        <div class="form-text">The date range filters on the chick-in date.</div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Cycle</th><th>Coop / farmer</th><th>Status</th><th class="text-end">Harvested</th><th class="text-end">DOC</th><th class="text-end">Feed</th>
+                        <th class="text-end">OVK</th><th class="text-end">Total cost</th><th class="text-end">Cost / kg</th><th class="text-end">Recognized</th><th class="text-end">Plasma income</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Costing.CycleCostRowResponse row in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold text-nowrap">
+                                @row.CycleNumber
+                                <div class="text-muted fs-12 fw-normal">@row.BranchCode · @(row.ChickInDate is { } chickIn ? Fmt.Date(chickIn) : "not started")</div>
+                            </td>
+                            <td>
+                                @row.CoopCode — @row.CoopName
+                                <div class="text-muted fs-12">@row.FarmerName · @(row.Scheme is null ? "Inti" : SettlementLines.Scheme(row.Scheme))</div>
+                            </td>
+                            <td>
+                                <partial name="Partials/_StatusBadge" model="row.Status" />
+                                <div><span class="badge @(row.IsFinal ? "bg-success" : "bg-light text-dark")">@(row.IsFinal ? "Final" : "Running")</span></div>
+                            </td>
+                            <td class="text-end text-nowrap">@Fmt.Number(row.HarvestedBirds)<div class="text-muted fs-12">@Fmt.Number(row.HarvestedWeightKg) kg</div></td>
+                            <td class="text-end text-nowrap">@Fmt.Money(row.DocCost)</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(row.FeedCost)</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(row.OvkCost)</td>
+                            <td class="text-end text-nowrap fw-semibold">@Fmt.Money(row.TotalCost)</td>
+                            <td class="text-end text-nowrap">@(row.CostPerKg is { } perKg ? Fmt.Money(perKg) : "—")</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(row.RecognizedCost)</td>
+                            <td class="text-end text-nowrap">@(row.PlasmaIncome is { } income ? Fmt.Money(income) : "—")</td>
+                            <td class="text-end"><a asp-action="Details" asp-route-id="@row.CycleId" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="12" class="text-center text-muted py-4">No cycles found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <partial name="Partials/_Pagination" model="PaginationModel.From(Model.Rows)" />
+    </div>
+</div>

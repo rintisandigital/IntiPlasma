@@ -50,6 +50,14 @@
                 <button type="submit" class="btn btn-outline-secondary"><i class="ti ti-lock me-1"></i>Close Cycle</button>
             </form>
         }
+        @if (Model.Settlement is { } settlement)
+        {
+            <a asp-area="Costing" asp-controller="Settlements" asp-action="Details" asp-route-id="@settlement.Id" class="btn btn-outline-primary"><i class="ti ti-receipt me-1"></i>Settlement @settlement.Number</a>
+        }
+        else if (Model.IsSettleable && Model.CanCreateSettlement)
+        {
+            <a asp-area="Costing" asp-controller="Settlements" asp-action="Create" asp-route-cycleId="@cycle.Id" class="btn btn-primary"><i class="ti ti-calculator me-1"></i>Create Settlement</a>
+        }
     </div>
 </div>
 
@@ -307,6 +315,10 @@ else
                             <dt class="col-7 fw-normal">Plasma income</dt><dd class="col-5 text-end">@Fmt.Money(income)</dd>
                         }
                     </dl>
+                    @if (Model.CanViewCost)
+                    {
+                        <a asp-area="Costing" asp-controller="CycleCosts" asp-action="Details" asp-route-id="@cycle.Id" class="btn btn-sm btn-outline-primary mt-2"><i class="ti ti-calculator me-1"></i>Open cycle cost</a>
+                    }
                 </div></div></div>
             </div>
         }

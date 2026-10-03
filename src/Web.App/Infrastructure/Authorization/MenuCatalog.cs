@@ -50,6 +50,8 @@ public static class MenuCodes
     public const string SalesCreditNotes = "sales.credit-notes";
     public const string SalesReceipts = "sales.receipts";
     public const string SalesReceivables = "sales.receivables";
+    public const string CostingCycleCosts = "costing.cycle-costs";
+    public const string CostingSettlements = "costing.settlements";
 }
 
 /// <summary>
@@ -132,8 +134,8 @@ public static class MenuCatalog
         Page("finance", "finance.journals", "Journals", "/Finance/Journals", Crud, false);
 
         Group("costing", "Costing", "ti ti-calculator", 90);
-        Page("costing", "costing.cycle-costs", "Cycle Cost", "/Costing/CycleCosts", MenuRights.Export, false);
-        Page("costing", "costing.settlements", "Plasma Settlements", "/Costing/Settlements", CreateEditExport, false);
+        Page("costing", MenuCodes.CostingCycleCosts, "Cycle Cost", "/Costing/CycleCosts", MenuRights.Export, true);
+        Page("costing", MenuCodes.CostingSettlements, "Plasma Settlements", "/Costing/Settlements", CreateEditExport, true);
 
         Group("reports", "Reports", "ti ti-report-analytics", 100);
         Page("reports", "reports.general-ledger", "General Ledger", "/Reports/GeneralLedger", MenuRights.Export, false);

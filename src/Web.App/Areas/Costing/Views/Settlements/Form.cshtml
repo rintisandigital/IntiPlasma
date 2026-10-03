@@ -1,0 +1,97 @@
+@model SettlementFormViewModel
+@{
+    string title = Model.IsRecalculation ? $"Recalculate Settlement {Model.Number}" : "New Settlement";
+    ViewData["Title"] = title;
+    ViewData["Menu"] = MenuCodes.CostingSettlements;
+    Application.Cycles.CycleResponse? cycle = Model.Cycle;
+    string cancelUrl = Model.IsRecalculation ? Url.Action("Details", new { id = Model.Id })! : Url.Action("Index")!;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel(title, "The plasma income is calculated from the closed cycle by its contract scheme; a loss becomes the plasma debt")' />
+
+@if (!Model.IsRecalculation)
+{
+    <div class="card">
+        <div class="card-body">
+            <form method="get" asp-action="Create" class="row g-2 align-items-end">
+                <div class="col-md-8">
+                    <label class="form-label" for="cycle-select">Closed plasma cycle <span class="text-danger">*</span></label>
+                    <select id="cycle-select" name="cycleId" class="form-select" data-lookup="@Url.Action("SettleableCycles", "Lookup", new { area = "" })"
+                            onchange="if (this.value) { this.form.submit(); }">
+                        <option value="">Search cycle, coop or farmer…</option>
+                        @if (cycle is not null)
+                        {
+                            <option value="@cycle.Id" selected>@LookupController.CycleLabel(cycle)</option>
+                        }
+                    </select>
+                    <div class="form-text">Only closed cycles of plasma farmers without a settlement are listed.</div>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+@if (cycle is not null)
+{
+    <form asp-action="@(Model.IsRecalculation ? "Recalculate" : "Create")" asp-route-id="@Model.Id" method="post" id="settlement-form">
+        @if (!Model.IsRecalculation)
+        {
+            <form-token />
+        }
+        <input type="hidden" asp-for="CycleId" />
+        <div class="card">
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                <div class="row">
+                    <div class="col-md-3 mb-3"><div class="text-muted fs-13">Cycle</div><div class="fw-semibold">@cycle.Number <partial name="Partials/_StatusBadge" model="cycle.Status" /></div></div>
+                    <div class="col-md-3 mb-3"><div class="text-muted fs-13">Coop</div><div class="fw-semibold">@cycle.CoopCode — @cycle.CoopName</div></div>
+                    <div class="col-md-3 mb-3"><div class="text-muted fs-13">Plasma farmer</div><div class="fw-semibold">@cycle.FarmerCode — @cycle.FarmerName</div></div>
+                    <div class="col-md-3 mb-3"><div class="text-muted fs-13">Contract / closed</div><div class="fw-semibold">@(cycle.ContractCode ?? "—") · @(cycle.ClosedDate is { } closed ? Fmt.Date(closed) : "not closed")</div></div>
+                </div>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="SettlementDate" class="form-label"></label> <span class="text-danger">*</span>
+                        <input asp-for="SettlementDate" type="date" class="form-control">
+                        <span asp-validation-for="SettlementDate" class="text-danger fs-13"></span>
+                        <div class="form-text">Not before the closing date; the journal is posted on this date.</div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="DebtDeduction" class="form-label"></label> <span class="text-danger">*</span>
+                        <input asp-for="DebtDeduction" type="number" min="0" step="0.01" class="form-control text-end">
+                        <span asp-validation-for="DebtDeduction" class="text-danger fs-13"></span>
+                        @if (Model.FarmerDebt is { } debt)
+                        {
+                            <div class="form-text" id="farmer-debt">
+                                Plasma debt from earlier settlements: <strong>@Fmt.Money(debt.Balance)</strong>
+                                (losses @Fmt.Money(debt.Deficits) − deducted @Fmt.Money(debt.Deducted)).
+                                @if (debt.Balance > 0)
+                                {
+                                    <a href="#" class="ms-1" onclick="document.getElementById('DebtDeduction').value = '@debt.Balance.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)'; return false;">Use it</a>
+                                }
+                            </div>
+                        }
+                        <div class="form-text">At most the income after tax; a loss settlement cannot deduct.</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="Notes" class="form-label"></label>
+                        <textarea asp-for="Notes" rows="3" class="form-control"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Attachments (signed slip, supporting documents)</h5></div>
+            <div class="card-body"><partial name="Partials/_Attachments" model="new AttachmentsModel(Model.Attachments, true)" /></div>
+        </div>
+
+        <partial name="Partials/_FormButtons" model='new FormButtonsModel(true, cancelUrl, Model.IsRecalculation ? "Recalculate" : "Calculate Draft")' />
+    </form>
+}
+else if (Model.CycleId is not null)
+{
+    <div class="alert alert-warning">The cycle was not found or you have no access to its branch.</div>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

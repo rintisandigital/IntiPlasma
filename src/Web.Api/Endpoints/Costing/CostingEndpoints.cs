@@ -1,6 +1,8 @@
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Paging;
 using Application.Costing;
 using Domain.Costing.PlasmaSettlements;
+using Domain.Partnership.Cycles;
 using Domain.Roles;
 using SharedKernel;
 using Web.Api.Extensions;
@@ -28,6 +30,37 @@ internal sealed class CostingEndpoints : IEndpoint
         .WithTags(Tags.CycleCost)
         .HasPermission(Permissions.CostingRead);
 
+        app.MapGet("costing/cycle-costs", async (
+            string? search,
+            int? page,
+            int? pageSize,
+            Guid? branchId,
+            CycleStatus? status,
+            DateOnly? from,
+            DateOnly? to,
+            IQueryHandler<GetCycleCostsQuery, PagedList<CycleCostRowResponse>> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<PagedList<CycleCostRowResponse>> result = await handler.Handle(
+                new GetCycleCostsQuery(new PageRequest(page, pageSize, search), branchId, status, from, to), cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .WithTags(Tags.CycleCost)
+        .HasPermission(Permissions.CostingRead);
+
+        app.MapGet("costing/farmers/{farmerId:guid}/plasma-debt", async (
+            Guid farmerId,
+            IQueryHandler<GetFarmerPlasmaDebtQuery, FarmerPlasmaDebtResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<FarmerPlasmaDebtResponse> result = await handler.Handle(new GetFarmerPlasmaDebtQuery(farmerId), cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .WithTags(Tags.PlasmaSettlements)
+        .HasPermission(Permissions.CostingRead);
+
         MapSettlements(app.MapGroup("costing/settlements").WithTags(Tags.PlasmaSettlements));
     }
 
@@ -38,11 +71,14 @@ internal sealed class CostingEndpoints : IEndpoint
             Guid? farmerId,
             Guid? cycleId,
             PlasmaSettlementStatus? status,
+            string? search,
+            DateOnly? from,
+            DateOnly? to,
             IQueryHandler<GetPlasmaSettlementsQuery, IReadOnlyList<PlasmaSettlementResponse>> handler,
             CancellationToken cancellationToken) =>
         {
             Result<IReadOnlyList<PlasmaSettlementResponse>> result = await handler.Handle(
-                new GetPlasmaSettlementsQuery(branchId, farmerId, cycleId, status), cancellationToken);
+                new GetPlasmaSettlementsQuery(branchId, farmerId, cycleId, status, search, from, to), cancellationToken);
 
             return result.Match(Results.Ok, CustomResults.Problem);
         })

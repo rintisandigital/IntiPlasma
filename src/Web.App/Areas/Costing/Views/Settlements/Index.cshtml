@@ -1,0 +1,60 @@
+@model ListViewModel<Application.Costing.PlasmaSettlementResponse>
+@{
+    ViewData["Title"] = "Plasma Settlements";
+    ViewData["Menu"] = MenuCodes.CostingSettlements;
+    bool canCreate = await Rights.CanAsync(MenuCodes.CostingSettlements, MenuRights.Create);
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Plasma Settlements</h4>
+            <h6>Partnership results of closed plasma cycles: draft → approved by another user → paid by payment voucher</h6>
+        </div>
+    </div>
+    <partial name="Partials/_ExportButtons" model="MenuCodes.CostingSettlements" />
+    @if (canCreate)
+    {
+        <div class="page-btn">
+            <a asp-action="Create" class="btn btn-primary"><i class="ti ti-circle-plus me-1"></i>New Settlement</a>
+        </div>
+    }
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <partial name="Partials/_DocumentFilter" model='new DocumentFilterModel(Model.Search, "Search number, cycle or farmer", Model.BranchOptions, Model.Filters, Model.FilterOptions["status"])' />
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Number</th><th>Date</th><th>Cycle</th><th>Farmer</th><th class="text-end">Gross income</th><th class="text-end">Net payable</th>
+                        <th class="text-end">Loss</th><th class="text-end">Outstanding</th><th>Status</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Costing.PlasmaSettlementResponse settlement in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold text-nowrap">@settlement.Number</td>
+                            <td>@Fmt.Date(settlement.SettlementDate)</td>
+                            <td class="text-nowrap">@settlement.CycleNumber<div class="text-muted fs-12">@settlement.CoopCode · @settlement.BranchCode</div></td>
+                            <td>@settlement.FarmerName<div class="text-muted fs-12">@SettlementLines.Scheme(settlement.Scheme)</div></td>
+                            <td class="text-end text-nowrap @(settlement.GrossIncome < 0 ? "text-danger" : "")">@Fmt.Money(settlement.GrossIncome)</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(settlement.NetPayable)</td>
+                            <td class="text-end text-nowrap">@(settlement.Deficit > 0 ? Fmt.Money(settlement.Deficit) : "—")</td>
+                            <td class="text-end text-nowrap">@Fmt.Money(settlement.Outstanding)</td>
+                            <td><partial name="Partials/_StatusBadge" model="settlement.Status" /></td>
+                            <td class="text-end"><a asp-action="Details" asp-route-id="@settlement.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="10" class="text-center text-muted py-4">No settlements found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

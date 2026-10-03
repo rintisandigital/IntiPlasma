@@ -1,7 +1,9 @@
 using System.Data.Common;
+using System.Text.Json;
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Paging;
 using Dapper;
 using Domain.Costing.PlasmaSettlements;
 using Domain.Partnership.Cycles;
@@ -16,11 +18,17 @@ namespace Application.Costing;
 /// </summary>
 public sealed record GetCycleCostQuery(Guid CycleId) : IQuery<CycleCostResponse>;
 
+/// <param name="Search">Matches the settlement number, cycle number and farmer code/name.</param>
+/// <param name="From">Settlement date from (inclusive).</param>
+/// <param name="To">Settlement date to (inclusive).</param>
 public sealed record GetPlasmaSettlementsQuery(
     Guid? BranchId,
     Guid? FarmerId,
     Guid? CycleId,
-    PlasmaSettlementStatus? Status) : IQuery<IReadOnlyList<PlasmaSettlementResponse>>;
+    PlasmaSettlementStatus? Status,
+    string? Search = null,
+    DateOnly? From = null,
+    DateOnly? To = null) : IQuery<IReadOnlyList<PlasmaSettlementResponse>>;
 
 /// <summary>
 /// Slip settlement: the calculation lines and totals of one settlement.
@@ -70,13 +78,20 @@ public sealed record PlasmaSettlementResponse
                s.debt_deduction AS DebtDeduction, s.net_payable AS NetPayable, s.deficit AS Deficit, s.paid_amount AS PaidAmount,
                (s.net_payable - s.paid_amount) AS Outstanding, s.approved_at_utc AS ApprovedAtUtc,
                s.cancellation_reason AS CancellationReason,
+               co.code AS CoopCode, co.name AS CoopName, c.chick_in_date AS ChickInDate, c.closed_date AS ClosedDate,
+               c.status AS CycleStatus, NULLIF(TRIM(CONCAT(cu.first_name, ' ', cu.last_name)), '') AS CreatedByName,
+               NULLIF(TRIM(CONCAT(au.first_name, ' ', au.last_name)), '') AS ApprovedByName,
+               COALESCE(s.modified_at_utc, s.created_at_utc) AS CalculatedAtUtc,
                s.documents AS Documents
         FROM costing.plasma_settlements s
         JOIN master.branches b ON b.id = s.branch_id
         JOIN partnership.production_cycles c ON c.id = s.cycle_id
+        JOIN master.coops co ON co.id = c.coop_id
         JOIN master.farmers f ON f.id = s.farmer_id
         JOIN partnership.contracts k ON k.id = s.contract_id
         LEFT JOIN master.tax_codes t ON t.id = s.income_tax_code_id
+        LEFT JOIN identity.users cu ON cu.id = s.created_by
+        LEFT JOIN identity.users au ON au.id = s.approved_by
         """;
 
     public Guid Id { get; init; }
@@ -137,10 +152,34 @@ public sealed record PlasmaSettlementResponse
 
     public string? CancellationReason { get; init; }
 
+    public string CoopCode { get; init; }
+
+    public string CoopName { get; init; }
+
+    public DateOnly? ChickInDate { get; init; }
+
+    public DateOnly? ClosedDate { get; init; }
+
+    public string CycleStatus { get; init; }
+
+    public string? CreatedByName { get; init; }
+
+    public string? ApprovedByName { get; init; }
+
+    /// <summary>
+    /// When the figures were last calculated (created or recalculated).
+    /// </summary>
+    public DateTime CalculatedAtUtc { get; init; }
+
     /// <summary>
     /// Only filled by the detail endpoint.
     /// </summary>
     public IReadOnlyList<PlasmaSettlementLineResponse>? Lines { get; init; }
+
+    /// <summary>
+    /// The cycle's performance frozen at closing (detail endpoint only).
+    /// </summary>
+    public CyclePerformance? Performance { get; init; }
 }
 
 public sealed record PlasmaSettlementLineResponse(
@@ -226,6 +265,10 @@ internal sealed class GetPlasmaSettlementsQueryHandler(IDbConnectionFactory dbCo
               AND (@FarmerId::uuid IS NULL OR s.farmer_id = @FarmerId)
               AND (@CycleId::uuid IS NULL OR s.cycle_id = @CycleId)
               AND (@Status::text IS NULL OR s.status = @Status)
+              AND (@From::date IS NULL OR s.settlement_date >= @From)
+              AND (@To::date IS NULL OR s.settlement_date <= @To)
+              AND (@Search::text IS NULL OR s.number ILIKE @Search OR c.number ILIKE @Search
+                   OR f.code ILIKE @Search OR f.name ILIKE @Search)
             ORDER BY s.settlement_date DESC, s.number DESC;
             """;
 
@@ -238,7 +281,10 @@ internal sealed class GetPlasmaSettlementsQueryHandler(IDbConnectionFactory dbCo
                 query.BranchId,
                 query.FarmerId,
                 query.CycleId,
-                Status = query.Status?.ToString()
+                Status = query.Status?.ToString(),
+                query.From,
+                query.To,
+                Search = new PageRequest(null, null, query.Search).SearchPattern
             },
             cancellationToken: cancellationToken));
 
@@ -249,6 +295,9 @@ internal sealed class GetPlasmaSettlementsQueryHandler(IDbConnectionFactory dbCo
 internal sealed class GetPlasmaSettlementByIdQueryHandler(IDbConnectionFactory dbConnectionFactory, IBranchAccess branchAccess)
     : IQueryHandler<GetPlasmaSettlementByIdQuery, PlasmaSettlementResponse>
 {
+    // The closing performance is stored as camelCase JSON (see the production cycle's EF configuration).
+    private static readonly JsonSerializerOptions PerformanceJson = new(JsonSerializerDefaults.Web);
+
     public async Task<Result<PlasmaSettlementResponse>> Handle(GetPlasmaSettlementByIdQuery query, CancellationToken cancellationToken)
     {
         await using DbConnection connection = await dbConnectionFactory.OpenConnectionAsync(cancellationToken);
@@ -263,6 +312,11 @@ internal sealed class GetPlasmaSettlementByIdQueryHandler(IDbConnectionFactory d
             FROM costing.plasma_settlement_lines l
             WHERE l.plasma_settlement_id = @PlasmaSettlementId
             ORDER BY l.line_number;
+
+            SELECT c.closing_performance::text
+            FROM costing.plasma_settlements s
+            JOIN partnership.production_cycles c ON c.id = s.cycle_id
+            WHERE s.id = @PlasmaSettlementId;
             """;
 
         await using SqlMapper.GridReader multi = await connection.QueryMultipleAsync(
@@ -280,6 +334,13 @@ internal sealed class GetPlasmaSettlementByIdQueryHandler(IDbConnectionFactory d
             return Result.Failure<PlasmaSettlementResponse>(access.Error);
         }
 
-        return settlement with { Lines = [.. await multi.ReadAsync<PlasmaSettlementLineResponse>()] };
+        List<PlasmaSettlementLineResponse> lines = [.. await multi.ReadAsync<PlasmaSettlementLineResponse>()];
+        string? performance = await multi.ReadSingleOrDefaultAsync<string?>();
+
+        return settlement with
+        {
+            Lines = lines,
+            Performance = performance is null ? null : JsonSerializer.Deserialize<CyclePerformance>(performance, PerformanceJson)
+        };
     }
 }

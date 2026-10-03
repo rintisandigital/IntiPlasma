@@ -1,0 +1,113 @@
+@model CycleCostDetailsViewModel
+@{
+    Application.Costing.CycleCostResponse cost = Model.Cost;
+    Application.Cycles.CycleResponse cycle = Model.Cycle;
+    ViewData["Title"] = $"Cycle Cost {cost.CycleNumber}";
+    ViewData["Menu"] = MenuCodes.CostingCycleCosts;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Cycle Cost @cost.CycleNumber <partial name="Partials/_StatusBadge" model="cost.Status" /></h4>
+            <h6>@cycle.CoopCode — @cycle.CoopName · @cycle.FarmerName (@(Model.IsPlasma ? "plasma" : "inti")) · @cycle.BranchCode</h6>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="Index" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+        <a asp-area="Production" asp-controller="Cycles" asp-action="Details" asp-route-id="@cycle.Id" class="btn btn-outline-primary"><i class="ti ti-egg me-1"></i>Open cycle</a>
+        @if (Model.Settlement is { } settlement)
+        {
+            <a asp-controller="Settlements" asp-action="Details" asp-route-id="@settlement.Id" class="btn btn-outline-primary"><i class="ti ti-receipt me-1"></i>Settlement @settlement.Number</a>
+        }
+        else if (Model.IsSettleable && Model.CanCreateSettlement)
+        {
+            <a asp-controller="Settlements" asp-action="Create" asp-route-cycleId="@cycle.Id" class="btn btn-primary"><i class="ti ti-calculator me-1"></i>Create Settlement</a>
+        }
+        @if (Model.CanPrint)
+        {
+            <a asp-action="DetailsExport" asp-route-id="@cycle.Id" asp-route-format="xlsx" target="_blank" class="btn btn-outline-success"><i class="ti ti-file-spreadsheet me-1"></i>Excel</a>
+            <a asp-action="DetailsExport" asp-route-id="@cycle.Id" asp-route-format="pdf" target="_blank" class="btn btn-outline-danger"><i class="ti ti-file-type-pdf me-1"></i>PDF</a>
+        }
+    </div>
+</div>
+
+@if (!cost.IsFinal)
+{
+    <div class="alert alert-info">Running cost: sapronak consumed so far. Sapronak still lying in the coop is not part of the cost; the cost per kg uses the estimated live weight (harvested kg + birds left × latest body weight). The cost is frozen when the cycle is closed.</div>
+}
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Sapronak consumed</h5></div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead class="thead-light"><tr><th>Item</th><th>Category</th><th class="text-end">Quantity</th><th class="text-end">Cost</th><th class="text-end">Cost per unit</th></tr></thead>
+                        <tbody>
+                            @foreach (Application.Costing.ConsumedInputResponse input in cost.Inputs)
+                            {
+                                <tr>
+                                    <td>
+                                        @if (Model.CoopWarehouseId is { } warehouseId)
+                                        {
+                                            <a asp-area="Inventory" asp-controller="Stock" asp-action="Card" asp-route-warehouseId="@warehouseId" asp-route-itemId="@input.ItemId"
+                                               asp-route-from="@cycle.ChickInDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" title="Coop stock card">@input.ItemCode</a>
+                                        }
+                                        else
+                                        {
+                                            @input.ItemCode
+                                        }
+                                    </td>
+                                    <td>@EnumOptions.Label(input.Category)</td>
+                                    <td class="text-end">@Fmt.Number(input.Quantity, 3)</td>
+                                    <td class="text-end">@Fmt.Money(input.Cost)</td>
+                                    <td class="text-end">@(input.Quantity == 0 ? "—" : Fmt.Money(decimal.Round(input.Cost / input.Quantity, 2)))</td>
+                                </tr>
+                            }
+                            @if (cost.Inputs.Count == 0)
+                            {
+                                <tr><td colspan="5" class="text-center text-muted py-3">No sapronak consumed yet.</td></tr>
+                            }
+                        </tbody>
+                        <tfoot><tr><th colspan="3" class="text-end">Total</th><th class="text-end">@Fmt.Money(cost.Inputs.Sum(i => i.Cost))</th><th></th></tr></tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header"><h6 class="mb-0">@(cost.IsFinal ? "Final cost" : "Running cost (estimate)")</h6></div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-7 fw-normal">DOC</dt><dd class="col-5 text-end">@Fmt.Money(cost.DocCost)</dd>
+                    <dt class="col-7 fw-normal">Feed</dt><dd class="col-5 text-end">@Fmt.Money(cost.FeedCost)</dd>
+                    <dt class="col-7 fw-normal">OVK</dt><dd class="col-5 text-end">@Fmt.Money(cost.OvkCost)</dd>
+                    <dt class="col-7">Total</dt><dd class="col-5 text-end fw-bold">@Fmt.Money(cost.TotalCost)</dd>
+                    <dt class="col-7 fw-normal">Harvested</dt><dd class="col-5 text-end">@Fmt.Number(cost.HarvestedBirds) / @Fmt.Number(cost.HarvestedWeightKg) kg</dd>
+                    @if (!cost.IsFinal)
+                    {
+                        <dt class="col-7 fw-normal">Estimated live weight</dt><dd class="col-5 text-end">@Fmt.Number(cost.LiveWeightKg) kg</dd>
+                    }
+                    <dt class="col-7 fw-normal">Cost per kg</dt><dd class="col-5 text-end">@(cost.CostPerKg is { } perKg ? Fmt.Money(perKg) : "—")</dd>
+                    <dt class="col-7 fw-normal">Cost per bird</dt><dd class="col-5 text-end">@(cost.CostPerBird is { } perBird ? Fmt.Money(perBird) : "—")</dd>
+                    <dt class="col-7 fw-normal">Recognized on invoices</dt><dd class="col-5 text-end">@Fmt.Money(cost.RecognizedCost)</dd>
+                    @if (cost.Adjustment is { } adjustment)
+                    {
+                        <dt class="col-7 fw-normal">Closing adjustment</dt><dd class="col-5 text-end">@Fmt.Money(adjustment)</dd>
+                    }
+                    @if (cost.PlasmaIncome is { } income)
+                    {
+                        <dt class="col-7 fw-normal">Plasma income</dt><dd class="col-5 text-end">@Fmt.Money(income)</dd>
+                        <dt class="col-7">Total incl. plasma</dt><dd class="col-5 text-end fw-bold">@Fmt.Money(cost.TotalCostWithPlasma ?? cost.TotalCost)</dd>
+                    }
+                </dl>
+            </div>
+        </div>
+        @if (Model.IsPlasma && Model.Settlement is null && !Model.IsSettleable)
+        {
+            <div class="alert alert-light border">The settlement can be created once the cycle is closed.</div>
+        }
+    </div>
+</div>

@@ -107,6 +107,7 @@ public sealed class CyclesController(
         [FromServices] IQueryHandler<GetCyclePerformanceQuery, CyclePerformanceResponse> performanceQuery,
         [FromServices] IQueryHandler<GetCycleCostQuery, CycleCostResponse> costQuery,
         [FromServices] IQueryHandler<GetDailyRecordingsQuery, IReadOnlyList<DailyRecordingResponse>> recordingsQuery,
+        [FromServices] IQueryHandler<GetPlasmaSettlementsQuery, IReadOnlyList<PlasmaSettlementResponse>> settlementsQuery,
         CancellationToken cancellationToken)
     {
         Result<CycleResponse> result = await cycleQuery.Handle(new GetCycleByIdQuery(id), cancellationToken);
@@ -121,6 +122,13 @@ public sealed class CyclesController(
         Result<CyclePerformanceResponse> performance = await performanceQuery.Handle(new GetCyclePerformanceQuery(id), cancellationToken);
         Result<CycleCostResponse> cost = await costQuery.Handle(new GetCycleCostQuery(id), cancellationToken);
         Result<IReadOnlyList<DailyRecordingResponse>> recordings = await recordingsQuery.Handle(new GetDailyRecordingsQuery(id, null, null), cancellationToken);
+        PlasmaSettlementResponse? settlement = null;
+        if (cycle.ContractId is not null && cycle.Status is nameof(CycleStatus.Closed) or nameof(CycleStatus.Settled))
+        {
+            Result<IReadOnlyList<PlasmaSettlementResponse>> settlements = await settlementsQuery.Handle(
+                new GetPlasmaSettlementsQuery(null, null, id, null), cancellationToken);
+            settlement = settlements.IsSuccess ? settlements.Value.FirstOrDefault(s => s.Status != "Cancelled") : null;
+        }
 
         return View(new CycleDetailsViewModel
         {
@@ -136,7 +144,10 @@ public sealed class CyclesController(
             CanRecord = await support.CanAsync(MenuCodes.ProductionRecordings, MenuRights.Create),
             CanHarvest = await support.CanAsync(MenuCodes.ProductionHarvests, MenuRights.Create),
             CanPrint = await support.CanAsync(MenuCode, MenuRights.Export),
-            CanTransfer = await support.CanAsync(MenuCodes.InventoryStockTransfers, MenuRights.Create)
+            CanTransfer = await support.CanAsync(MenuCodes.InventoryStockTransfers, MenuRights.Create),
+            Settlement = settlement is null ? null : (settlement.Id, settlement.Number),
+            CanCreateSettlement = await support.CanAsync(MenuCodes.CostingSettlements, MenuRights.Create),
+            CanViewCost = await support.CanAsync(MenuCodes.CostingCycleCosts, MenuRights.View)
         });
     }
 

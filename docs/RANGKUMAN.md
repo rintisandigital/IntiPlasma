@@ -1,7 +1,7 @@
 # Rangkuman Proyek — Aplikasi Peternakan Ayam Broiler Inti-Plasma
 
-> Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4), 2026-10-01 (Fase 5–8) dan 2026-10-02 (Fase 9 — lampiran dokumen; Fase W0 — fondasi WebApp).
-> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§16 (API) dan [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (WebApp, realisasi W0 di §10, W1 di §12, W2 di §13, W3 di §14, W4 di §15, W5 di §16, W6 di §17, W7 di §18). Fase API 0–9 dan W0–W7 selesai; berikutnya **Fase W8** (HPP & Settlement Plasma).
+> Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4), 2026-10-01 (Fase 5–8), 2026-10-02 (Fase 9 — lampiran dokumen; Fase W0 — fondasi WebApp) dan 2026-10-03 (Fase W1–W8).
+> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§16 (API) dan [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (WebApp, realisasi W0 di §10, W1 di §12, W2 di §13, W3 di §14, W4 di §15, W5 di §16, W6 di §17, W7 di §18, W8 di §20). Fase API 0–9 dan W0–W8 selesai; berikutnya **Fase W9** (Jurnal, Laporan, Tutup Buku, Pajak & Dashboard).
 
 ---
 
@@ -199,6 +199,11 @@
 - ⚠️ Selisih harga VI di WebApp memakai hak Edit Vendor Invoices + alasan wajib (API: `payables:approve-variance`).
 - ⚠️ Perbaikan bug W6: route menu Sales Orders/Delivery Orders/Sales Invoices di sidebar sebelumnya 404; kini ada test yang memastikan semua menu rilis terbuka.
 
+### Fase W8 — HPP & Settlement Plasma ✅ (detail: PLAN-WEBAPP §19–§20)
+- **Cycle Cost**: list HPP lintas siklus (`GetCycleCostsQuery`: final dari `closing_cost`, berjalan dari kartu stok kandang) + rincian per item, ekspor list & rincian.
+- **Plasma Settlements**: draft dari siklus plasma tertutup (lookup `SettleableCycles` atau tombol di siklus), info saldo hutang plasma + potongan, recalculate, approve checker, cancel (alasan), Pay → PV plasma, **PDF settlement dengan terbilang**, ekspor. Tidak ada migration baru.
+- ⚠️ Approve settlement di WebApp memakai hak Edit + maker-checker domain (API: `SettlementsApprove`).
+
 ## 5. Alur Akuntansi yang Sudah Berjalan
 
 | Transaksi | Jurnal otomatis |
@@ -258,11 +263,11 @@ Semua event di katalog kini sudah dipakai.
 
 - Setiap fase: domain + unit test invariant → command/query + validator → EF config + migration → endpoint + permission → **verifikasi end-to-end** ke PostgreSQL lokal pada database sementara `intiplasma_verify` (dibuat & dihapus otomatis; database `intiplasma` milik user tidak disentuh).
 - User yang melakukan **commit & migrate** setelah tiap fase.
-- Status test saat ini: **363 test lulus** (143 domain, 60 application, 14 arsitektur, 18 integration Web.Api, 128 integration Web.App).
+- Status test saat ini: **370 test lulus** (143 domain, 60 application, 14 arsitektur, 18 integration Web.Api, 135 integration Web.App).
 - Integration test (Testcontainers) **sudah bisa dijalankan** di mesin dev (container runtime tersedia) — `dotnet test IntiPlasma.slnx`.
 - Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario, Fase 7: 32 skenario, Fase 8: 35 skenario, Fase 9: 79 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
 - ⚠️ Sejak W0 Web.Api tidak memproses outbox: verifikasi yang hanya menjalankan API perlu `BackgroundJobs__Enabled=true`.
-- Verifikasi WebApp (W0: 49 skenario, W1: 36 skenario, W2: 40 skenario, W3: 48 skenario, W4: 51 skenario, W5: 42 skenario, W6: 42 skenario, W7: 62 skenario + regresi W0) memakai **Playwright** (dipasang di scratchpad, bukan di repo) terhadap Web.App :5098 + Web.Api :5099 pada `intiplasma_verify`; interaksi halaman lewat frame `content-frame`.
+- Verifikasi WebApp (W0: 49 skenario, W1: 36 skenario, W2: 40 skenario, W3: 48 skenario, W4: 51 skenario, W5: 42 skenario, W6: 42 skenario, W7: 62 skenario, W8: 44 skenario + regresi W0–W7) memakai **Playwright** (dipasang di scratchpad, bukan di repo) terhadap Web.App :5098 + Web.Api :5099 pada `intiplasma_verify`; interaksi halaman lewat frame `content-frame`.
 - Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`, `Phase8_ReportingClosing`, `Phase9_Attachments`, `PhaseW0_UserStatus`, `PhaseW1_AccessControl`.
 
 ## 8. Catatan Terbuka / Hutang Teknis
@@ -278,7 +283,8 @@ Semua event di katalog kini sudah dipakai.
 - PPh vendor selalu ke akun mapping `IncomeTaxWithheld` (default Hutang PPh 23); PPh 22/4(2) perlu override.
 - Exposure credit limit memuat semua penerimaan customer ke memori (uang muka belum diterapkan) — perlu query SQL bila datanya besar.
 - Biaya siklus baru sapronak; biaya lain/overhead (listrik, tenaga kerja, penyusutan kandang inti) belum dialokasikan ke siklus.
-- Belum ada sub-ledger piutang plasma per peternak: potongan hutang di settlement hanya dibatasi pendapatan − PPh, belum dicek terhadap saldo piutangnya.
+- Belum ada sub-ledger piutang plasma per peternak: potongan hutang di settlement hanya dibatasi pendapatan − PPh. Sejak W8 form settlement menampilkan saldo hutang plasma **dari data settlement** (rugi − potongan, `GetFarmerPlasmaDebtQuery`) sebagai informasi; hutang/pelunasan dari sumber lain belum tercatat.
+- Settlement plasma yang sudah Approved belum bisa dibatalkan/direverse (koreksi lewat jurnal manual).
 - Lampiran: storage lokal hanya untuk satu instance (perlu S3/MinIO sebelum scale-out); batas 10 MB & tipe file masih konstanta; belum ada thumbnail/kompresi; `PUT …/documents` pada PV *paid* & PV plasma belum diuji end-to-end.
 - Web.App: key ring Data Protection belum dipersist/dibagi → sesi cookie & token antiforgery tidak valid setelah container di-restart atau antar replika (W10). Bila Web.App mati, event outbox (jurnal otomatis, gudang kandang) tertunda sampai Web.App hidup lagi.
 - Siklus lama yang ditutup sebelum Fase 7 tidak punya `ClosingCost`; invoice lama punya `costAmount` 0 (tidak ada penyesuaian HPP untuk siklus tersebut).

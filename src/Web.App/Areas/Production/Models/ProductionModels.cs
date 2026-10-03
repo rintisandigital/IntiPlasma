@@ -109,6 +109,17 @@ public sealed class CycleDetailsViewModel
 
     public bool CanTransfer { get; init; }
 
+    /// <summary>
+    /// The plasma cycle's active settlement (id, number), if any.
+    /// </summary>
+    public (Guid Id, string Number)? Settlement { get; init; }
+
+    public bool CanCreateSettlement { get; init; }
+
+    public bool CanViewCost { get; init; }
+
+    public bool IsSettleable => Cycle.Status == "Closed" && Cycle.ContractId is not null && Settlement is null;
+
     public bool IsPlanned => Cycle.Status == "Planned";
 
     public bool IsRecordable => Cycle.Status is "Active" or "Harvesting";

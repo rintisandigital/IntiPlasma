@@ -411,7 +411,7 @@ Use case Application/Domain baru dikerjakan & diuji dulu (unit test seperti fase
 ### Fase W7 — AP, Kas & Bank ✅ (selesai 2026-10-03, realisasi §18)
 - Vendor Invoice (3-way match, `post-with-variance`), Payment Voucher vendor & plasma (maker-checker, **PDF PV**), kas masuk/keluar (**PDF**), transfer kas/bank, buku kas/bank, rekonsiliasi bank (impor CSV, tampilan dua kolom, auto/manual match), kartu & aging hutang (ekspor).
 
-### Fase W8 — HPP & Settlement Plasma
+### Fase W8 — HPP & Settlement Plasma ✅ (selesai 2026-10-03; rencana §19, realisasi §20)
 - HPP siklus (rincian & ekspor), settlement (draft & hitung ulang, rincian komponen, approve checker, **PDF settlement**, lanjut PV plasma).
 
 ### Fase W9 — Jurnal, Laporan, Tutup Buku, Pajak & Dashboard
@@ -861,3 +861,117 @@ Tidak ada perubahan Domain/Application/Web.Api dan **tidak ada migration baru**;
 ### 18.4 Catatan
 - Rekonsiliasi hanya menawarkan rekening bertipe **Bank**. Biaya admin bank yang ada di rekening koran tetapi belum dibukukan perlu dicatat lewat Cash Out dulu agar bisa dicocokkan.
 - Draft VI/PV/kas tidak bisa diedit (tidak ada use case update) — batalkan lalu buat ulang.
+
+---
+
+## 19. Rencana Detail Fase W8 — HPP & Settlement Plasma
+
+> Disusun 2026-10-03 dari kode Fase 7 (`Application/Costing`, `Domain/Costing/PlasmaSettlements`, `Web.Api/Endpoints/Costing`) dan pola layar W5–W7. Keputusan §19.8 disepakati 2026-10-03; realisasi di §20.
+
+### 19.1 Ruang lingkup & hasil akhir
+- Area baru **`Areas/Costing`** dengan dua menu yang sudah ada di katalog (saat ini belum rilis): `costing.cycle-costs` (**Cycle Cost**, hak Export) dan `costing.settlements` (**Plasma Settlements**, hak Create/Edit/Export).
+- Alur lengkap lewat UI: siklus plasma ditutup (W5) → **settlement draft** → hitung ulang → **approve oleh checker** (jurnal otomatis, siklus `Settled`) → **Pay** → PV plasma (W7) → settlement Paid. Rugi menjadi piutang plasma dan bisa dipotong di settlement siklus berikutnya.
+- **PDF settlement** (slip perhitungan hasil) dengan terbilang (W-17), ekspor list settlement serta list & rincian HPP.
+
+### 19.2 Backend yang dipakai (Fase 7) & celahnya
+| Kebutuhan | Sudah ada | Celah untuk WebApp |
+|---|---|---|
+| HPP per siklus | `GetCycleCostQuery` (input terpakai per item, DOC/pakan/OVK, total, HPP/kg & /ekor, HPP diakui di invoice, penyesuaian tutup siklus, pendapatan plasma) — sudah dipakai tab **Cost** detail siklus (W5) | Belum ada **query list lintas siklus** untuk halaman Cycle Cost & ekspornya |
+| List settlement | `GetPlasmaSettlementsQuery(branch, farmer, cycle, status)` → `IReadOnlyList`, tanpa paging | Tanpa cari & filter tanggal |
+| Detail settlement | `GetPlasmaSettlementByIdQuery` (+ baris perhitungan) | Kandang, tanggal chick-in/tutup, kinerja penutupan (FCR, IP, deplesi, BW), nama pembuat/penyetuju belum ikut — dibutuhkan slip & PDF |
+| Buat / hitung ulang / approve / batal | `Create…`, `Recalculate…` (hanya Draft), `Approve…` (pembuat ditolak, periode fiskal dicek), `Cancel…` (hanya Draft, alasan) | — |
+| Lampiran | `ApplyDocumentsAsync` saat create/recalculate; `SetDocumentsCommand` (`AttachmentOwnerTypes.PlasmaSettlement`) | — |
+| Pembayaran | PV plasma (W7): `/Finance/PaymentVouchers/Create?payeeType=Farmer&payeeId=&documentId=` | — |
+| Potongan hutang | Validasi domain: 0 ≤ potongan ≤ pendapatan − PPh | **Tidak ada saldo piutang plasma per peternak** (RANGKUMAN §8) — admin tidak tahu berapa yang perlu dipotong |
+| Siklus yang bisa di-settle | — | Lookup siklus plasma `Closed` tanpa settlement aktif |
+
+### 19.3 Application (tambahan; satu file per use case, boleh dipakai Web.Api)
+1. **`GetCycleCostsQuery`** (paged, Dapper) — filter cabang, status siklus, periode chick-in, cari (siklus/kandang/peternak). Kolom: siklus, kandang, peternak, skema (Inti/PriceContract/ProfitSharing), status, populasi awal, panen (ekor, kg), biaya DOC/pakan/OVK/total (final dari `closing_cost` jsonb untuk siklus tertutup; berjalan = Σ −nilai `stock_ledger_entries` tipe ChickIn/Usage/UsageReversal), HPP/kg final, HPP diakui (Σ `cost_amount` baris invoice terposting), penyesuaian, pendapatan plasma (settlement disetujui), penanda *Final/Running*. Logika harus identik dengan `CycleCosting` → diuji silang terhadap `GetCycleCostQuery`.
+2. **`GetPlasmaSettlementsQuery`** diperluas: `Search` (no. settlement/siklus/peternak), `From`/`To` tanggal settlement (opsional; `null` = perilaku sekarang). Endpoint API & `PaymentVouchersController` menyesuaikan konstruktor. Ekspor memakai overload `PageSupport.ExportAsync` untuk list tanpa paging.
+3. **`GetPlasmaSettlementByIdQuery`** diperluas: kandang, tanggal chick-in & tutup, ringkasan `ClosingPerformance` (populasi, ekor & kg panen, BW rata-rata, FCR, deplesi %, IP, umur), nama pembuat & penyetuju.
+4. **`GetSettleableCyclesQuery`** (lookup) — siklus plasma `Closed`, cabang dalam akses, belum punya settlement non-Cancelled.
+5. **`GetFarmerPlasmaDebtQuery`** — saldo piutang plasma peternak **dari data settlement**: Σ `deficit` − Σ `debt_deduction` settlement yang disetujui. Hanya informasi di form, bukan sub-ledger penuh.
+- Unit test Application: lookup tidak menawarkan siklus inti/belum tutup/sudah di-settle; saldo hutang plasma; list HPP = `GetCycleCostQuery` untuk siklus berjalan & tertutup.
+
+### 19.4 Web.App — layar (`Areas/Costing`)
+| Halaman | Rencana |
+|---|---|
+| **Cycle Cost** (`/Costing/CycleCosts`) | List `GetCycleCostsQuery` (filter cabang/status/periode/cari, badge Final/Running) + ekspor Excel/PDF. **Detail** per siklus (`GetCycleCostQuery`): kartu ringkasan (DOC, pakan, OVK, total, HPP/kg & /ekor, diakui di invoice, penyesuaian, pendapatan plasma, total biaya termasuk plasma), tabel input terpakai per item, tautan ke siklus (W5), kartu stok gudang kandang (W4) & settlement; ekspor rincian Excel/PDF. |
+| **Plasma Settlements** (`/Costing/Settlements`) | List (cabang/status/tanggal/cari) + ekspor: no., tanggal, siklus, peternak, skema, pendapatan kotor, PPh, potongan, dibayarkan, rugi, dibayar, outstanding, status. |
+| **New Settlement** | Pilih siklus via lookup `SettleableCycles` (atau dari tombol di detail siklus), tanggal (default hari ini, ≥ tanggal tutup), potongan hutang (+ info saldo piutang plasma bila #2 disetujui), catatan, lampiran → **draft** bernomor `STL/…`. Error domain tampil apa adanya (`NoLiveBirdPrice`, `NoInputPrice`, `InvalidDebtDeduction`, `BeforeClosing`). |
+| **Detail / slip** | Header (siklus, kandang, peternak, kontrak & skema, tanggal tutup), **kinerja penutupan** (FCR, IP, deplesi, BW), **rincian komponen** dikelompokkan per tipe baris (Live bird value per truk, Sapronak charge per item, Profit share, Bonus, Penalty) dengan qty × harga = jumlah, lalu pendapatan kotor → PPh (kode & tarif) → potongan hutang → **dibayarkan**, atau **rugi → piutang plasma**; dibayar & outstanding. Aksi `[WorkflowAction]`: **Recalculate** (Draft; tanggal/potongan/catatan, menghitung ulang dari data siklus terkini), **Approve** (Draft; checker), **Cancel** (Draft; modal alasan), **Pay** → PV plasma (Approved/PartiallyPaid), lampiran (selain Cancelled), **Print PDF**. |
+| **PDF settlement** | `CostingDocumentPdf` memakai `DocumentPdf` (W7): kop, data siklus & kinerja, tabel komponen, ringkasan, **terbilang** jumlah dibayarkan (atau rugi), tanda tangan (Prepared by / Approved by / Plasma). |
+| **Integrasi layar lain** | Detail siklus (W5): tombol **Create Settlement** (siklus plasma Closed tanpa settlement, hak Create settlement) atau tautan ke settlement; tab Cost → "Open cycle cost". Detail PV plasma: tautan balik ke settlement. |
+
+- Hak menu: Cycle Cost **Export**; Plasma Settlements **Create/Edit/Export** (Create = buat draft; Edit = recalculate, approve, cancel, lampiran; tanpa Delete — batal lalu buat ulang).
+- Lookup baru: `/Lookup/SettleableCycles` (saldo hutang plasma dirender server di form — tanpa lookup terpisah).
+- `MenuCatalog`: kedua menu costing dirilis.
+
+### 19.5 Data uji & verifikasi
+- **PriceContract**: kontrak dengan harga jaminan per rentang BW + harga sapronak (DOC, pakan, OVK) + bonus FCR + PPh 23 → siklus plasma → panen 2 truk BW berbeda → jual (W6) → tutup → settlement (2 baris ayam, sapronak per item, bonus, PPh) → approve oleh checker → jurnal `PlasmaSettlement` terposting → PV plasma sebagian lalu lunas (PartiallyPaid → Paid).
+- **Rugi**: harga sapronak kontrak tinggi → gross negatif → `Deficit` (net 0, langsung Paid saat approve) → siklus berikutnya peternak yang sama: settlement dengan **potongan hutang** (melebihi batas ditolak).
+- **ProfitSharing**: % × (penjualan − nota kredit − biaya final); laba negatif → bagian 0.
+- Penolakan: siklus inti / belum tutup tidak muncul di lookup; tanggal < tanggal tutup; kontrak tanpa harga untuk BW/sapronak; approve oleh pembuat; approve di periode tertutup/tahun fiskal belum dibuka; recalculate/cancel tidak tersedia setelah approve.
+- **Integration test Web.App** (±15): halaman terbuka, menu rilis 200, draft → recalculate → approve (checker) → PV, cancel dengan alasan, PDF `%PDF`, ekspor Cycle Cost & settlement, tombol aksi hilang tanpa hak Edit/Export.
+- **E2E W8** (Playwright, DB `intiplasma_verify` baru lalu di-drop, outbox di Web.App) + regresi E2E W0–W7.
+
+### 19.6 Urutan task
+1. Application: perluas `GetPlasmaSettlementsQuery` & `GetPlasmaSettlementByIdQuery`; tambah `GetCycleCostsQuery`, `GetSettleableCyclesQuery` (+ `GetFarmerPlasmaDebtQuery`); sesuaikan endpoint API & `PaymentVouchersController`; unit test.
+2. Web.App: `Areas/Costing` (model, `CycleCostsController`, `SettlementsController`), lookup, view list/detail/form/recalculate (memakai `_DocumentFilter`, `_ReasonModal`, `_AttachmentsCard`).
+3. PDF settlement + ekspor Cycle Cost (list & rincian) + ekspor settlement.
+4. Integrasi tombol di detail siklus & detail PV; rilis menu.
+5. Integration test, E2E W8 + regresi, realisasi §20, update RANGKUMAN.
+- **Tidak ada migration** yang diperkirakan (semua kolom sudah ada sejak `Phase7_CostingSettlement`).
+
+### 19.7 Risiko & catatan teknis
+- Siklus yang ditutup sebelum Fase 7 tidak punya `ClosingCost` → list menampilkan biaya kartu stok bertanda "Running" walau siklus tertutup (RANGKUMAN §8).
+- Recalculate membaca ulang data siklus (panen, nota kredit, input terpakai): hasil bisa berubah bila ada nota kredit baru setelah draft dibuat — tampilkan waktu hitung terakhir di detail.
+- Approve sudah menolak periode tertutup/tidak ada sebelum jurnal masuk outbox → pesan tampil di atas halaman, bukan dead letter.
+- Settlement yang sudah Approved tidak bisa dibatalkan (tidak ada use case reversal) — keterbatasan; koreksi lewat jurnal manual (W9).
+
+### 19.8 Keputusan (disepakati 2026-10-03)
+| # | Topik | Keputusan |
+|---|-------|--------|
+| 1 | Halaman Cycle Cost | **Query list baru `GetCycleCostsQuery`** (lintas siklus + ekspor) dan detail per siklus, bukan sekadar tautan ke tab Cost detail siklus. |
+| 2 | Info saldo piutang plasma di form | **Ya**, `GetFarmerPlasmaDebtQuery` berbasis data settlement (rugi − potongan), sebagai informasi; sub-ledger penuh tetap di backlog. |
+| 3 | Pratinjau sebelum draft | **Tidak** — draft sudah berfungsi sebagai pratinjau (bisa dihitung ulang/dibatalkan; nomor hanya dipakai bila validasi lolos). |
+| 4 | Approve | Hak **Edit** + maker-checker domain (seperti PV/kas W7), sampai approval terpusat tersedia. |
+| 5 | List settlement | Tetap **tanpa paging** (±1 per siklus plasma), filter cari/tanggal di SQL; pindah ke `PagedList` bila volume membesar. |
+
+---
+
+## 20. Realisasi Fase W8 — HPP & Settlement Plasma (2026-10-03)
+
+**Tidak ada migration baru** dan tidak ada perubahan Domain; semua kolom sudah ada sejak `Phase7_CostingSettlement`.
+
+### 20.1 Application & Web.Api
+| Use case | Realisasi |
+|---|---|
+| `GetCycleCostsQuery` (baru, paged, Dapper) | HPP lintas siklus: biaya final dari `closing_cost` (jsonb) untuk siklus tertutup, selain itu biaya berjalan dari kartu stok gudang kandang (ChickIn/Usage/UsageReversal) — logika sama dengan `CycleCosting` (HPP/kg berjalan = biaya / (kg panen + sisa ekor × BW recording terakhir)); HPP diakui di invoice, penyesuaian, pendapatan plasma, penanda Final. Filter cabang, status, periode chick-in, cari siklus/kandang/peternak. |
+| `GetSettleableCyclesQuery` (baru) | Siklus plasma `Closed` tanpa settlement non-Cancelled, dalam akses cabang (lookup). |
+| `GetFarmerPlasmaDebtQuery` (baru) | Saldo hutang plasma dari settlement disetujui: Σ rugi − Σ potongan (minimal 0). |
+| `GetPlasmaSettlementsQuery` (diperluas) | Parameter opsional `Search`, `From`, `To` (pemanggil lama tidak berubah). |
+| `GetPlasmaSettlementByIdQuery` / `PlasmaSettlementResponse` (diperluas) | Kandang, tanggal chick-in & tutup, status siklus, nama pembuat & penyetuju, waktu hitung terakhir (`CalculatedAtUtc`), `Performance` (kinerja penutupan, detail saja). |
+| Web.Api | `GET costing/cycle-costs`, `GET costing/farmers/{farmerId}/plasma-debt`; `GET costing/settlements` menerima `search`, `from`, `to`. |
+
+### 20.2 Layar (`Areas/Costing`)
+| Halaman | Realisasi |
+|---|---|
+| **Cycle Cost** | List (cabang/status/periode chick-in/cari; badge Final/Running; DOC, pakan, OVK, total, HPP/kg, diakui, pendapatan plasma) + ekspor Excel/PDF. Detail: tabel sapronak terpakai per item (kode item → kartu stok gudang kandang mulai tanggal chick-in, biaya per unit), kartu ringkasan (berjalan/final, estimasi bobot hidup, penyesuaian, pendapatan plasma, total termasuk plasma), tombol ke siklus, ke settlement atau **Create Settlement**; ekspor rincian Excel/PDF (ringkasan di header ekspor). |
+| **Plasma Settlements** | List (cabang/status/tanggal/cari; pendapatan kotor, dibayarkan, rugi, outstanding) + ekspor. **New Settlement**: pilih siklus lewat lookup (halaman dimuat ulang) atau dari tombol di siklus/HPP; tanggal, potongan hutang dengan info **saldo hutang plasma** + tautan "Use it", catatan, lampiran → draft. **Detail/slip**: data siklus & kontrak, kartu kinerja penutupan, ringkasan (pendapatan kotor → PPh → potongan → dibayarkan / rugi → hutang plasma, dibayar, outstanding), rincian dikelompokkan per tipe dengan subtotal; **Recalculate** (form yang sama), **Approve** (checker), **Cancel** (modal alasan), **Pay** → form PV plasma terisi, lampiran, **PDF**. |
+| **PDF settlement** | `CostingDocumentPdf`: kop, data siklus & kontrak, kinerja penutupan, rincian per tipe, total (PPh & potongan, atau rugi), terbilang jumlah dibayarkan/rugi, catatan rugi, tanda tangan Prepared/Approved/Plasma. |
+| Integrasi | Detail siklus (W5): tombol **Create Settlement** (siklus plasma Closed tanpa settlement) / tautan settlement, tab Cost → "Open cycle cost". Detail PV: nomor settlement menaut ke slip. |
+
+- Hak menu: Cycle Cost **View/Export**; Plasma Settlements **Create/Edit/Export** (Edit = recalculate, approve, cancel, lampiran). Kedua menu dirilis di `MenuCatalog` (`MenuCodes.CostingCycleCosts`, `MenuCodes.CostingSettlements`).
+- Penyesuaian dari rencana: lookup `/Lookup/FarmerPlasmaDebt` tidak dibuat — saldo hutang dirender server saat form dimuat (pemilihan siklus memuat ulang halaman).
+
+### 20.3 Pengujian & verifikasi
+- **Test: 370 lulus** — Domain 143, Application 60, Arsitektur 14, Integration Web.Api 18, Integration Web.App 135 (+7): 5 halaman costing terbuka; alur siklus plasma (kontrak harga) → HPP berjalan (Rp 3.500/kg) = rincian → tutup → HPP final + ekspor → lookup & form (saldo hutang) → draft dibatalkan (alasan wajib) → draft baru (3,2 jt) → recalculate (potongan berlebih ditolak, potongan 200 rb) → approve pembuat ditolak, checker approve → siklus Settled & hilang dari lookup → PV plasma sebagian → PartiallyPaid, PV menaut ke slip → PDF & ekspor; user hanya View: tombol aksi/PDF tidak tampil, Print/Approve/Cycle Cost ditolak (403).
+- Query baru berbasis Dapper diuji lewat integration test (PostgreSQL Testcontainers), bukan unit test InMemory.
+- **End-to-end W8 44/44** (Playwright, Web.App :5098 dengan outbox + Web.Api :5099, DB `intiplasma_verify` baru lalu di-drop): sidebar & semua menu 200; setup lewat UI (kode PPh 21 2%, peternak plasma dengan 2 kandang, kontrak harga: DOC 8.000, pakan 9.000, harga ayam 0,5–1,5 kg 18.000 & 1,5–2,5 kg 20.000, bonus FCR ≤ 2 Rp 100/kg; user checker); 2 siklus (DOC langsung ke kandang, pakan via gudang pusat + transfer, recording, panen); HPP berjalan Rp 1,9 jt / 11.176,47 per kg → jual & tutup → Final + ekspor; tombol Create Settlement di siklus, tanggal sebelum tutup ditolak, draft dibatalkan; **K2 rugi** −340.000 (pembuat tidak bisa approve, checker approve → Paid tanpa pembayaran, siklus Settled); **K1** menampilkan hutang 340.000, pendapatan 1.127.000, PPh 21 22.540, potongan berlebih ditolak, "Use it" → net 764.460, PDF draft, checker approve; jurnal `PlasmaSettlement` kedua settlement terposting oleh outbox; Pay → PV terisi → checker approve → paid → settlement Paid, tautan balik; list & filter status, HPP menampilkan pendapatan plasma; ekspor; tanpa dead letter & error JS. PDF settlement untung & rugi diperiksa visual.
+- **Regresi**: E2E W7 62/62, W6 42/42, W5 42/42, W4 51/51, W3 48/48, W2 40/40, W0 49/49, header 15/15.
+
+### 20.4 Catatan
+- Skema **ProfitSharing** tidak diuji end-to-end di W8 (perhitungannya dijaga unit test domain Fase 7); layar menampilkannya dengan tipe baris *Profit share*.
+- Saldo hutang plasma hanya dari settlement (rugi − potongan); potongan untuk hutang lain atau pelunasan tunai belum tercatat → sub-ledger piutang plasma tetap di backlog.
+- Settlement yang sudah Approved tidak bisa dibatalkan/direverse (belum ada use case); koreksi lewat jurnal manual (W9).

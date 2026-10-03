@@ -86,6 +86,10 @@
                             {
                                 <a asp-controller="VendorInvoices" asp-action="Details" asp-route-id="@allocation.DocumentId">@(allocation.Number ?? "—")</a>
                             }
+                            else if (allocation.DocumentType == "PlasmaSettlement")
+                            {
+                                <a asp-area="Costing" asp-controller="Settlements" asp-action="Details" asp-route-id="@allocation.DocumentId">@(allocation.Number ?? "—")</a>
+                            }
                             else
                             {
                                 @(allocation.Number ?? "—")

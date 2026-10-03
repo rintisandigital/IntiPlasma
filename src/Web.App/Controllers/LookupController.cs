@@ -6,6 +6,7 @@ using Application.Contracts.Get;
 using Application.Coops;
 using Application.Coops.Get;
 using Application.Coops.GetById;
+using Application.Costing;
 using Application.Cycles;
 using Application.Cycles.Get;
 using Application.Customers;
@@ -309,6 +310,23 @@ public sealed class LookupController : AppController
             .OrderByDescending(o => o.OrderDate)
             .Take(MaxResults)
             .Select(o => new LookupItem(o.Id, $"{o.Number} — {o.CustomerName} ({o.BranchCode}, {o.Birds - o.DeliveredBirds:#,##0} birds open)")));
+    }
+
+    /// <summary>
+    /// Closed plasma cycles without an active settlement.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> SettleableCycles(
+        string? q,
+        [FromServices] IQueryHandler<GetSettleableCyclesQuery, IReadOnlyList<SettleableCycleResponse>> query,
+        CancellationToken cancellationToken)
+    {
+        Result<IReadOnlyList<SettleableCycleResponse>> result = await query.Handle(new GetSettleableCyclesQuery(q), cancellationToken);
+
+        return Json(result.IsFailure
+            ? []
+            : result.Value.Take(MaxResults).Select(c => new LookupItem(
+                c.CycleId, $"{c.CycleNumber} — {c.CoopCode} · {c.FarmerName} ({c.BranchCode}, {EnumLabel(c.Scheme)})")));
     }
 
     public static string CycleLabel(CycleResponse cycle)
