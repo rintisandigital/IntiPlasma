@@ -218,6 +218,15 @@
 - UI: font Nunito di-host sendiri (template memanggil Google Fonts), `style.min.css`, aset ber-fingerprint, **sidebar tablet diperbaiki** (sebelumnya tidak bisa dibuka < 992 px), kontras AA & nama aksesibel (axe 0 critical/serious kecuali tombol primer), peringatan sesi habis. Panduan pengguna `docs/user-guide/`.
 - Migration **`PhaseW10_Hardening`**.
 
+### Audit Integrasi & Data Dummy (2026-10-04)
+- **Data dummy** (`src/Infrastructure/Database/DemoData/`, panduan [DEMO-DATA.md](DEMO-DATA.md)): `dotnet run --project src/Web.Api -- --Seed:DemoData=true` pada DB tanpa cabang (bukan Production). Seluruh data dibuat lewat command handler asli dengan impersonasi user (admin = maker, `checker@intiplasma.local` = checker), dan outbox diproses inline. Simulasi berjalan harian selama 95 hari: 2 cabang, 8 siklus di semua status (Planned → Settled), ±720 command. Tidak ada migration.
+- Hasil verifikasi pada `intiplasma_verify`:
+  - outbox 0 gagal; Dr = Cr;
+  - nilai stok = GL persediaan; GRNI = 0;
+  - 55 menu + 28 halaman detail Web.App terbuka berisi data;
+  - user `staff.bdg` hanya melihat data BDG.
+- Hasil audit: semua modul API & WebApp lengkap dan terhubung (lihat celah di §8).
+
 ## 5. Alur Akuntansi yang Sudah Berjalan
 
 | Transaksi | Jurnal otomatis |
@@ -312,6 +321,15 @@ Semua event di katalog kini sudah dipakai.
 - Bila Web.App mati, event outbox (jurnal otomatis, gudang kandang) tertunda sampai Web.App hidup lagi. (Key ring Data Protection sudah di PostgreSQL sejak W10.)
 - Audit log tanpa retensi/purge otomatis. Tombol primer `#0984E3` belum memenuhi kontras AA (keputusan W10).
 - Siklus lama yang ditutup sebelum Fase 7 tidak punya `ClosingCost`; invoice lama punya `costAmount` 0 (tidak ada penyesuaian HPP untuk siklus tersebut).
+- **Temuan audit 2026-10-04** (belum diperbaiki):
+  - **Tutup siklus** juga tidak mengecek periode fiskal; jurnal `CycleCostAdjustment` bisa jatuh ke dead letter. Ini menambah butir BPB/transfer/retur di bawah.
+  - Tutup tahun mengabaikan **override mapping cabang** untuk `YearEndClosing.NetIncome` (`YearEndClosing.cs` hanya memfilter `BranchId == null`).
+  - Endpoint sinkronisasi `?modifiedSince=` untuk mobile (PLAN §decision #4) belum dibuat.
+  - Belum ada endpoint API untuk: kredit customer, siklus siap-settle, jurnal per dokumen, dashboard, ganti password sendiri, audit log, detail/cancel nota kredit, dan detail transfer bank.
+  - Hak **Export** bisa diberikan untuk menu Users, Menu Access, Branch Access, API Roles, Branches & Feed Mutations, tetapi menu-menu itu tidak punya fitur ekspor.
+  - Transfer bank & nota kredit tidak punya halaman detail, sehingga jurnal otomatisnya tidak bertautan ke dokumen sumber (`JournalSources.Route`).
+  - Kode mati `GetUserByEmailQuery`.
+  - Value object `Quantity` (PLAN §2.4) tidak pernah dibuat.
 - BPB, transfer & retur bisa diposting walau tahun fiskal belum dibuka; jurnal otomatisnya menjadi dead letter (`FiscalPeriods.NotFoundForDate`) dan memblokir tutup periode → buka tahun fiskal dulu. Pertimbangkan validasi periode saat posting dokumen gudang (seperti VI/PV).
 
 ## 9. Langkah Berikutnya — Backlog setelah Fase 8

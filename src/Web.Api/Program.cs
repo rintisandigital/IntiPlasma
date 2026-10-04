@@ -45,6 +45,13 @@ else if (app.Configuration.GetValue<bool>("Database:SeedOnStartup"))
     await app.SeedDatabaseAsync();
 }
 
+if (app.Configuration.GetValue<bool>("Seed:DemoData") && !app.Environment.IsProduction())
+{
+    // Dummy data for demos and manual testing (docs/DEMO-DATA.md), e.g. `dotnet run -- --Seed:DemoData=true`.
+    // Only on a database without branches; never in Production.
+    await app.SeedDemoDataAsync();
+}
+
 app.MapAppHealthChecks();
 
 app.UseRequestContextLogging();
