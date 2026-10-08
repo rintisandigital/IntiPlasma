@@ -336,6 +336,7 @@ Semua event di katalog kini sudah dipakai.
 
 Seluruh fase rencana awal (0–8) selesai di sisi API. Kandidat berikutnya (urutan bisa disepakati):
 - **Klien**: MVC WebApp Admin Office (keputusan #4) — rencana di [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (Fase W0–W10; aplikasi langsung via Infrastructure, mainboard + iframe, Akses Menu & Akses Cabang per user, background job di Web.App, ekspor ClosedXML/QuestPDF, UI English) — dan mobile app PPL (recording offline sudah siap di API).
+- **Mobile app PPL & Manager** — rencana di [PLAN-MOBILE.md](PLAN-MOBILE.md) (Fase M0–M10; MAUI Blazor Hybrid via Web.Api + JWT, Android dulu, UI Bahasa Indonesia dari template `docs/html-template-mobile`, recording & stok ayam harian per rentang bobot (offline, informasi Sales; WebApp Production → Live Bird Stock), request pengiriman pakan tanpa approval, breed standard, **modul approval berjenjang** untuk farmer/kandang baru, perubahan NIK/rekening, aktivasi kontrak, revisi recording & mutasi pakan). Semua keputusan M-1 s.d. M-39 disepakati 2026-10-08; berikutnya Fase M0.
 - **Pajak**: ekspor XML Coretax (e-Faktur & e-Bupot) setelah format dikonfirmasi konsultan pajak; input tarif final PPN/PPh.
 - **Akuntansi lanjutan**: hutang non-PO (jasa) & nota debit vendor; transaksi antar cabang (akun antar-cabang); alokasi overhead ke siklus; sub-ledger piutang plasma per peternak; aset tetap & penyusutan.
 - **Operasional/infra**: Redis untuk idempotency & cache (multi-instance), integration test per modul (Testcontainers sudah jalan), observabilitas (Seq/OTel).
