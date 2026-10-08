@@ -8,6 +8,7 @@
     <Project Path="src/Application/Application.csproj" />
     <Project Path="src/Domain/Domain.csproj" />
     <Project Path="src/Infrastructure/Infrastructure.csproj" />
+    <Project Path="src/MobileApp/MobileApp.csproj" Id="02d212a2-6d85-4916-8db2-ddd6b71c56f9" />
     <Project Path="src/SharedKernel/SharedKernel.csproj" />
     <Project Path="src/Web.Api/Web.Api.csproj" />
     <Project Path="src/Web.App/Web.App.csproj" Id="e26f26b0-269d-4600-ae17-dd564df6978e" />
