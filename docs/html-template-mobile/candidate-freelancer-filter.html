@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!-- Mirrored from findee-ruddy.vercel.app/findee/candidate-freelancer-filter.html by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 05 Oct 2026 07:35:32 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, viewport-fit=cover">
+    <!-- font -->
+    <link rel="stylesheet" href="fonts/fonts.css">
+    <!-- Icons -->
+    <link rel="stylesheet" href="fonts/font-icons.css">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet"type="text/css" href="css/nouislider.min.css"/>
+    <link rel="stylesheet" href="css/swiper-bundle.min.css">
+    <link rel="stylesheet"type="text/css" href="css/styles.css"/>
+
+    <!-- Favicon and Touch Icons  -->
+    <link rel="shortcut icon" href="images/logo/168.png" />
+    <link rel="apple-touch-icon-precomposed" href="images/logo/168.png" />
+    <title>Candidates Filters</title>
+    <script>
+        if (localStorage.toggled === "dark-theme") {
+            document.documentElement.classList.add('dark-theme');
+        }
+    </script>
+
+</head>
+
+<body>
+    <!-- preloade -->
+    <div class="preload preload-container">
+        <div class="logo-img">
+            <img src="images/logo/logo-light.png" alt="">
+        </div>
+        
+    </div>
+    <!-- /preload -->
+    <div class="header-avt fixed-top">
+        <div class="left">
+            <a href="javascript:void(0);" class="icon back-btn text-caption-1">
+                Cancel
+            </a>
+        </div>
+        <h4>Candidates Filters</h4>
+        <a href="saved.html#Saved-Candidates" class="text-caption-1 text-Primary">Save</a>
+    </div>
+    <div class="app-content style-4 ">
+        <div class="tf-container">
+            <form action="https://findee-ruddy.vercel.app/findee/search-result.html#Candidates">
+                <div class="d-grid gap-16 mb-36">
+                    <div class="">
+                        <div class="text-button text-OnSurface fw-6 mb-12">Categories</div>
+                        <div class="nice-select tf-select" tabindex="0">
+                            <span class="current text-body text-OnSurface">All categories</span>
+                            <ul class="list">
+                                <li data-value="All categories" class="option selected">All categories</li>
+                                <li data-value="Categories 1" class="option">Categories 1</li>
+                                <li data-value="Categories 2" class="option">Categories 2</li>
+                                <li data-value="Other" class="option">Other</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="">
+                        <div class="text-button text-OnSurface fw-6 mb-20">
+                            Radius: 
+                            <span id="price-min-value" class="text-Primary"></span> - <span id="price-max-value" class="text-Primary"></span>
+                            <span class="text-Primary"> Years Old</span>
+                        </div>
+                        <div class="">
+                            <div id="price-value-range"></div>
+                        </div>
+                    </div>
+                    <div class="">
+                        <div class="text-button text-OnSurface fw-6 mb-12">Gender</div>
+                        <div class="nice-select tf-select" tabindex="0">
+                            <span class="current text-body text-OnSurface">Male</span>
+                            <ul class="list">
+                                <li data-value="Male" class="option selected">Male</li>
+                                <li data-value="Female" class="option">Female</li>
+                                <li data-value="Other" class="option">Other</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="">
+                        <div class="text-button text-OnSurface fw-6 mb-12">Experrience</div>
+                        <div class="nice-select tf-select" tabindex="0">
+                            <span class="current text-body text-OnSurface">< 1 year experience</span>
+                            <ul class="list">
+                                <li data-value="< 1 year experience" class="option selected">< 1 year experience</li>
+                                <li data-value="1-5 year experience" class="option">1-5 year experience</li>
+                                <li data-value="5-10 year experience" class="option">5-10 year experience</li>
+                                <li data-value=">10 year experience" class="option">>10 year experience</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="">
+                        <div class="text-button text-OnSurface fw-6 mb-12">Qualification</div>
+                        <div class="nice-select tf-select" tabindex="0">
+                            <span class="current text-body text-OnSurface">Certificate</span>
+                            <ul class="list">
+                                <li data-value="Certificate" class="option selected">Certificate</li>
+                                <li data-value="Certificate 1" class="option">Certificate 1</li>
+                                <li data-value="Certificate 2" class="option">Certificate 2</li>
+                                <li data-value="Other" class="option">Other</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="">
+                        <div class="text-button text-OnSurface fw-6 mb-12">Nationality </div>
+                        <div class="nice-select tf-select" tabindex="0">
+                            <span class="current text-body text-OnSurface">Viet Nam</span>
+                            <ul class="list">
+                                <li data-value="Viet Nam" class="option selected">Viet Nam</li>
+                                <li data-value="Rusia" class="option">Rusia</li>
+                                <li data-value="USA" class="option">USA</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="tf-btn round-full Login">Find Candidates</button>
+            </form>
+        </div>
+
+    </div>
+
+   
+    
+    <script type="text/javascript" src="js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="js/jquery.min.js"></script>
+    <script type="text/javascript" src="js/lazysize.min.js"></script>
+    <script type="text/javascript" src="js/jquery.nice-select.min.js"></script>
+    <script type="text/javascript" src="js/nouislider.min.js"></script>
+    <script type="text/javascript" src="js/rangle-slider.js"></script>
+    <script type="text/javascript" src="js/main.js"></script>
+
+</body>
+
+<!-- Mirrored from findee-ruddy.vercel.app/findee/candidate-freelancer-filter.html by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 05 Oct 2026 07:35:32 GMT -->
+</html>

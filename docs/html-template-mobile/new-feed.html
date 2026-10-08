@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+
+
+<!-- Mirrored from findee-ruddy.vercel.app/findee/new-feed.html by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 05 Oct 2026 07:35:34 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, viewport-fit=cover">
+    <!-- font -->
+    <link rel="stylesheet" href="fonts/fonts.css">
+    <!-- Icons -->
+    <link rel="stylesheet" href="fonts/font-icons.css">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="css/nouislider.min.css" />
+    <link rel="stylesheet" href="css/swiper-bundle.min.css">
+    <link rel="stylesheet" type="text/css" href="css/styles.css" />
+
+    <!-- Favicon and Touch Icons  -->
+    <link rel="shortcut icon" href="images/logo/168.png" />
+    <link rel="apple-touch-icon-precomposed" href="images/logo/168.png" />
+    <title>New feed</title>
+    <!-- Apply dark theme early to avoid white flash -->
+    <script>
+        if (localStorage.toggled === "dark-theme") {
+            document.documentElement.classList.add('dark-theme');
+        }
+    </script>
+
+</head>
+
+<body>
+    <!-- preloade -->
+    <div class="preload preload-container">
+        <div class="logo-img">
+            <img src="images/logo/logo-light.png" alt="">
+        </div>
+        
+    </div>
+    <!-- /preload -->
+    <div class="header-avt fixed-top">
+        <a href="index.html" class="icon">
+            <img src="images/logo/logo-1.svg" alt="">
+        </a>
+        <h4>New Feed</h4>
+        <div></div>
+    </div>
+    <div class="app-content style-2">
+        <div class="tf-container">
+            <div class="new-feed-top mb-16">
+                <div class="message-box-bottom">
+                    <div class="avatar avt-status avt-40">
+                        <img src="images/avt/avt-3.png" alt="">
+                    </div>
+                    <input type="text" class="search-field" placeholder="Comment">
+                    <div class="box-left">
+                        <label for="image" class="image-add">
+                            <input type="file" class="upload-file" id="image" name="filename">
+                        </label>
+                        <label for="paperclip">
+                            <input type="file" class="upload-file paperclip" id="paperclip" name="filename">
+                        </label>
+                        <a href="#" class="calendarblank d-flex">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M16.25 2.5H14.375V1.875C14.375 1.70924 14.3092 1.55027 14.1919 1.43306C14.0747 1.31585 13.9158 1.25 13.75 1.25C13.5842 1.25 13.4253 1.31585 13.3081 1.43306C13.1908 1.55027 13.125 1.70924 13.125 1.875V2.5H6.875V1.875C6.875 1.70924 6.80915 1.55027 6.69194 1.43306C6.57473 1.31585 6.41576 1.25 6.25 1.25C6.08424 1.25 5.92527 1.31585 5.80806 1.43306C5.69085 1.55027 5.625 1.70924 5.625 1.875V2.5H3.75C3.41848 2.5 3.10054 2.6317 2.86612 2.86612C2.6317 3.10054 2.5 3.41848 2.5 3.75V16.25C2.5 16.5815 2.6317 16.8995 2.86612 17.1339C3.10054 17.3683 3.41848 17.5 3.75 17.5H16.25C16.5815 17.5 16.8995 17.3683 17.1339 17.1339C17.3683 16.8995 17.5 16.5815 17.5 16.25V3.75C17.5 3.41848 17.3683 3.10054 17.1339 2.86612C16.8995 2.6317 16.5815 2.5 16.25 2.5ZM5.625 3.75V4.375C5.625 4.54076 5.69085 4.69973 5.80806 4.81694C5.92527 4.93415 6.08424 5 6.25 5C6.41576 5 6.57473 4.93415 6.69194 4.81694C6.80915 4.69973 6.875 4.54076 6.875 4.375V3.75H13.125V4.375C13.125 4.54076 13.1908 4.69973 13.3081 4.81694C13.4253 4.93415 13.5842 5 13.75 5C13.9158 5 14.0747 4.93415 14.1919 4.81694C14.3092 4.69973 14.375 4.54076 14.375 4.375V3.75H16.25V6.25H3.75V3.75H5.625ZM16.25 16.25H3.75V7.5H16.25V16.25Z" fill="#121212"/>
+                            </svg>
+                        </a>
+                        <div class="line"></div>
+                        <a href="javascript:void(0);" class="btn-message">
+                            <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                <g clip-path="url(#clip0_4311_26746)">
+                                <path d="M17.4754 3.64523C17.5055 3.53832 17.5066 3.42531 17.4785 3.31784C17.4505 3.21036 17.3943 3.11231 17.3157 3.03377C17.2372 2.95522 17.1391 2.89903 17.0317 2.87098C16.9242 2.84292 16.8112 2.84401 16.7043 2.87414L1.70427 7.42258C1.5818 7.45714 1.47281 7.52826 1.39185 7.62642C1.31089 7.72459 1.26182 7.84513 1.2512 7.97193C1.24059 8.09874 1.26893 8.22576 1.33244 8.33602C1.39595 8.44629 1.4916 8.53454 1.60661 8.58898L8.29567 11.7562C8.4259 11.8179 8.53078 11.9228 8.59255 12.053L11.7605 18.7413C11.815 18.8563 11.9032 18.952 12.0135 19.0155C12.1237 19.079 12.2508 19.1073 12.3776 19.0967C12.5044 19.0861 12.6249 19.037 12.7231 18.9561C12.8212 18.8751 12.8924 18.7661 12.9269 18.6437L17.4754 3.64523Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M8.46973 11.8795L12.4994 7.84985" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                </g>
+                                <defs>
+                                <clipPath id="clip0_4311_26746">
+                                <rect width="20" height="20" fill="white" transform="translate(0 0.349854)"/>
+                                </clipPath>
+                                </defs>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="new-feed-post save-item box-post mb-16">
+                <div class="post-user mb-12">
+                    <div class="avatar avt-status avt-40">
+                        <img src="images/avt/avt-3.png" alt="">
+                    </div>
+                    <div class="flex-grow-1">
+                        <a href="#" class="name d-flex text-button-small text-OnSurface mb-4">Kaiya Siphron</a>
+                        <div class="infor">
+                            <div class="sub text-caption-2">CEO at Findee</div>
+                            <div class="dot"></div>
+                            <div class="time text-caption-2">2 hours ago</div>
+                        </div>
+                    </div>
+                    <div class="right">
+                        <a class="save-post d-flex bookmark-save-icon">
+                            <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                <path d="M14.375 2.84985H5.625C5.29348 2.84985 4.97554 2.98155 4.74112 3.21597C4.5067 3.45039 4.375 3.76833 4.375 4.09985V17.8499C4.37506 17.9614 4.40496 18.0709 4.46161 18.167C4.51826 18.263 4.59959 18.3422 4.69716 18.3963C4.79473 18.4503 4.90498 18.4773 5.01648 18.4743C5.12798 18.4714 5.23666 18.4387 5.33125 18.3795L10 15.4616L14.6695 18.3795C14.7641 18.4385 14.8727 18.471 14.9841 18.4739C15.0955 18.4767 15.2056 18.4497 15.303 18.3957C15.4005 18.3417 15.4817 18.2626 15.5383 18.1666C15.5949 18.0706 15.6249 17.9613 15.625 17.8499V4.09985C15.625 3.76833 15.4933 3.45039 15.2589 3.21597C15.0245 2.98155 14.7065 2.84985 14.375 2.84985Z" fill="#2748DB"/>
+                            </svg>
+                        </a>
+                        <a class="right-icon more-option" data-bs-target="#more-option" data-bs-toggle="offcanvas" aria-controls="offcanvasRight">
+                            <svg width="24" height="20" viewBox="0 0 24 20" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                <path d="M12 11C12.5523 11 13 10.5523 13 10C13 9.44772 12.5523 9 12 9C11.4477 9 11 9.44772 11 10C11 10.5523 11.4477 11 12 11Z" stroke="#121212" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M12 5C12.5523 5 13 4.55228 13 4C13 3.44772 12.5523 3 12 3C11.4477 3 11 3.44772 11 4C11 4.55228 11.4477 5 12 5Z" stroke="#121212" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M12 17C12.5523 17 13 16.5523 13 16C13 15.4477 12.5523 15 12 15C11.4477 15 11 15.4477 11 16C11 16.5523 11.4477 17 12 17Z" stroke="#121212" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+                <div class="text-caption-1 text-OnSurface mb-12">
+                    Lorem ipsum dolor sit amet consectetur. Cursus nunc pharetra arcu quam turpis risus amet turpis. Facilisis elementum tincidunt pellentesque sed rutrum enim.
+                </div>
+                <div class="mb-12">
+                    <img class="w-100" src="images/post/post-1.jpg" alt="">
+                </div>
+                <div class="like-share mb-16">
+                    <div class="like-share-infor d-flex align-items-center justify-content-between mb-8">
+                        <div class="text-caption-2 likes">213 Likes</div>
+                        <div class="d-flex gap-16">
+                            <div class="text-caption-2 comments">48 Comments</div>
+                            <div class="text-caption-2 shares">6 Shares</div>
+                        </div>
+                    </div>
+                    <div class="like-share-button">
+                        <a href="#" class="link">
+                            <i class="icon icon-like"></i>
+                            <span class="text-caption-1">Like</span>
+                        </a>
+                        <a href="#" class="link">
+                            <i class="icon icon-cmt"></i>
+                            <span class="text-caption-1">Comment</span>
+                        </a>
+                        <a href="#" class="link">
+                            <i class="icon icon-shareFat"></i>
+                            <span class="text-caption-1">Share</span>
+                        </a>
+                    </div>
+                </div>
+                <div class="post-comment">
+                    <div class="nice-select tf-select style-default mb-12" tabindex="0">
+                        <div class="d-flex align-items-center gap-8">
+                            <span class="current text-caption-1 text-OnSurface">All Comments</span>
+                            <div class="current-icon">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                    <path d="M16.6925 7.94229L10.4425 14.1923C10.3845 14.2504 10.3156 14.2965 10.2397 14.328C10.1638 14.3594 10.0825 14.3756 10.0003 14.3756C9.91821 14.3756 9.83688 14.3594 9.76101 14.328C9.68514 14.2965 9.61621 14.2504 9.55816 14.1923L3.30816 7.94229C3.19088 7.82502 3.125 7.66596 3.125 7.5001C3.125 7.33425 3.19088 7.17519 3.30816 7.05792C3.42544 6.94064 3.5845 6.87476 3.75035 6.87476C3.9162 6.87476 4.07526 6.94064 4.19253 7.05792L10.0003 12.8665L15.8082 7.05792C15.8662 6.99985 15.9352 6.95378 16.011 6.92236C16.0869 6.89093 16.1682 6.87476 16.2503 6.87476C16.3325 6.87476 16.4138 6.89093 16.4897 6.92236C16.5655 6.95378 16.6345 6.99985 16.6925 7.05792C16.7506 7.11598 16.7967 7.18492 16.8281 7.26079C16.8595 7.33666 16.8757 7.41798 16.8757 7.5001C16.8757 7.58223 16.8595 7.66354 16.8281 7.73941C16.7967 7.81528 16.7506 7.88422 16.6925 7.94229Z" fill="#121212"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <ul class="list">
+                            <li data-value="All Comments" class="option selected">All Comments</li>
+                            <li data-value="New" class="option">New</li>
+                            <li data-value="Old" class="option">Old</li>
+                        </ul>
+                    </div>
+                    <div class="post-comment-item">
+                        <div class="user d-flex gap-12 mb-8">
+                            <div class="avatar avt-status avt-40">
+                                <img src="images/avt/avt-1.png" alt="">
+                            </div>
+                            <div class="flex-grow-1">
+                                <a href="#" class="name link d-flex text-button-small text-OnSurface mb-4">Corey Schleifer</a>
+                                <div class="sub text-caption-2">CEO at Findee</div>
+                            </div>
+                        </div>
+                        <div class="desc text-caption-1 text-OnSurface">
+                            I am interested in this recruitment. Please give me JD
+                        </div>
+                    </div>
+                    <div class="post-comment-item">
+                        <div class="user d-flex gap-12 mb-8">
+                            <div class="avatar avt-status avt-40">
+                                <img src="images/avt/avt-2.png" alt="">
+                            </div>
+                            <div class="flex-grow-1">
+                                <a href="#" class="name link d-flex text-button-small text-OnSurface mb-4">Leo Kenter</a>
+                                <div class="sub text-caption-2">CEO at Findee</div>
+                            </div>
+                        </div>
+                        <div class="desc text-caption-1 text-OnSurface">
+                            I am interested in this recruitment. Please give me JD
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="new-feed-post mb-16">
+                <div class="text-button-small text-OnSurface mb-12">People You May Know</div>
+                <div class="grid-2 gap-12">
+                    <div class="candidates-item">
+                        <div class="image">
+                            <img class="round-full" src="images/avt/avt-1.png" alt="">
+                        </div>
+                        <a href="#" class="text-caption-2 text-Primary sub">Solutions Architect</a>
+                        <a href="candidates-detail.html" class="link text-button-small text-OnSurface name">Ms Howard</a>
+                        <a href="#" class="connections">
+                            <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                <g clip-path="url(#clip0_4432_2237)">
+                                <path d="M10.3338 5.31396H12.3338C12.7716 5.31396 13.205 5.40018 13.6094 5.5677C14.0139 5.73522 14.3813 5.98075 14.6908 6.29028C15.0004 6.5998 15.2459 6.96727 15.4134 7.37169C15.5809 7.77611 15.6672 8.20956 15.6672 8.6473C15.6672 9.08504 15.5809 9.51849 15.4134 9.92291C15.2459 10.3273 15.0004 10.6948 14.6908 11.0043C14.3813 11.3138 14.0139 11.5594 13.6094 11.7269C13.205 11.8944 12.7716 11.9806 12.3338 11.9806H10.3338M6.33382 11.9806H4.33382C3.89608 11.9806 3.46263 11.8944 3.05821 11.7269C2.65379 11.5594 2.28633 11.3138 1.9768 11.0043C1.35168 10.3792 1.00049 9.53135 1.00049 8.6473C1.00049 7.76324 1.35168 6.9154 1.9768 6.29028C2.60192 5.66515 3.44977 5.31396 4.33382 5.31396H6.33382" stroke="#64666C" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M5.6665 8.64746H10.9998" stroke="#64666C" stroke-linecap="round" stroke-linejoin="round"/>
+                                </g>
+                                <defs>
+                                <clipPath id="clip0_4432_2237">
+                                <rect width="16" height="16" fill="white" transform="translate(0.333496 0.647461)"/>
+                                </clipPath>
+                                </defs>
+                            </svg>
+                            <div class="text-caption-2 text-Secondary">10 connections</div>
+                        </a>
+                        <a href="candidates-detail.html" class="tf-btn style-1 text-button-small round-full">Connect</a>
+                    </div>
+                    <div class="candidates-item">
+                        <div class="image">
+                            <img class="round-full" src="images/avt/avt-2.png" alt="">
+                        </div>
+                        <a href="#" class="text-caption-2 text-Primary sub">Cloud Engineer</a>
+                        <a href="candidates-detail.html" class="link text-button-small text-OnSurface name">Ms. Henry</a>
+                        <a href="#" class="connections">
+                            <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                <g clip-path="url(#clip0_4432_2237)">
+                                <path d="M10.3338 5.31396H12.3338C12.7716 5.31396 13.205 5.40018 13.6094 5.5677C14.0139 5.73522 14.3813 5.98075 14.6908 6.29028C15.0004 6.5998 15.2459 6.96727 15.4134 7.37169C15.5809 7.77611 15.6672 8.20956 15.6672 8.6473C15.6672 9.08504 15.5809 9.51849 15.4134 9.92291C15.2459 10.3273 15.0004 10.6948 14.6908 11.0043C14.3813 11.3138 14.0139 11.5594 13.6094 11.7269C13.205 11.8944 12.7716 11.9806 12.3338 11.9806H10.3338M6.33382 11.9806H4.33382C3.89608 11.9806 3.46263 11.8944 3.05821 11.7269C2.65379 11.5594 2.28633 11.3138 1.9768 11.0043C1.35168 10.3792 1.00049 9.53135 1.00049 8.6473C1.00049 7.76324 1.35168 6.9154 1.9768 6.29028C2.60192 5.66515 3.44977 5.31396 4.33382 5.31396H6.33382" stroke="#64666C" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M5.6665 8.64746H10.9998" stroke="#64666C" stroke-linecap="round" stroke-linejoin="round"/>
+                                </g>
+                                <defs>
+                                <clipPath id="clip0_4432_2237">
+                                <rect width="16" height="16" fill="white" transform="translate(0.333496 0.647461)"/>
+                                </clipPath>
+                                </defs>
+                            </svg>
+                            <div class="text-caption-2 text-Secondary">18 connections</div>
+                        </a>
+                        <a href="candidates-detail.html" class="tf-btn style-1 text-button-small round-full">Connect</a>
+                    </div>
+                    <div class="candidates-item">
+                        <div class="image">
+                            <img class="round-full" src="images/avt/avt-1.png" alt="">
+                        </div>
+                        <a href="#" class="text-caption-2 text-Primary sub">Solutions Architect</a>
+                        <a href="candidates-detail.html" class="link text-button-small text-OnSurface name">Ms Howard</a>
+                        <a href="#" class="connections">
+                            <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                <g clip-path="url(#clip0_4432_2237)">
+                                <path d="M10.3338 5.31396H12.3338C12.7716 5.31396 13.205 5.40018 13.6094 5.5677C14.0139 5.73522 14.3813 5.98075 14.6908 6.29028C15.0004 6.5998 15.2459 6.96727 15.4134 7.37169C15.5809 7.77611 15.6672 8.20956 15.6672 8.6473C15.6672 9.08504 15.5809 9.51849 15.4134 9.92291C15.2459 10.3273 15.0004 10.6948 14.6908 11.0043C14.3813 11.3138 14.0139 11.5594 13.6094 11.7269C13.205 11.8944 12.7716 11.9806 12.3338 11.9806H10.3338M6.33382 11.9806H4.33382C3.89608 11.9806 3.46263 11.8944 3.05821 11.7269C2.65379 11.5594 2.28633 11.3138 1.9768 11.0043C1.35168 10.3792 1.00049 9.53135 1.00049 8.6473C1.00049 7.76324 1.35168 6.9154 1.9768 6.29028C2.60192 5.66515 3.44977 5.31396 4.33382 5.31396H6.33382" stroke="#64666C" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M5.6665 8.64746H10.9998" stroke="#64666C" stroke-linecap="round" stroke-linejoin="round"/>
+                                </g>
+                                <defs>
+                                <clipPath id="clip0_4432_2237">
+                                <rect width="16" height="16" fill="white" transform="translate(0.333496 0.647461)"/>
+                                </clipPath>
+                                </defs>
+                            </svg>
+                            <div class="text-caption-2 text-Secondary">10 connections</div>
+                        </a>
+                        <a href="candidates-detail.html" class="tf-btn style-1 text-button-small round-full">Connect</a>
+                    </div>
+                    <div class="candidates-item">
+                        <div class="image">
+                            <img class="round-full" src="images/avt/avt-2.png" alt="">
+                        </div>
+                        <a href="#" class="text-caption-2 text-Primary sub">Cloud Engineer</a>
+                        <a href="candidates-detail.html" class="link text-button-small text-OnSurface name">Ms. Henry</a>
+                        <a href="#" class="connections">
+                            <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                <g clip-path="url(#clip0_4432_2237)">
+                                <path d="M10.3338 5.31396H12.3338C12.7716 5.31396 13.205 5.40018 13.6094 5.5677C14.0139 5.73522 14.3813 5.98075 14.6908 6.29028C15.0004 6.5998 15.2459 6.96727 15.4134 7.37169C15.5809 7.77611 15.6672 8.20956 15.6672 8.6473C15.6672 9.08504 15.5809 9.51849 15.4134 9.92291C15.2459 10.3273 15.0004 10.6948 14.6908 11.0043C14.3813 11.3138 14.0139 11.5594 13.6094 11.7269C13.205 11.8944 12.7716 11.9806 12.3338 11.9806H10.3338M6.33382 11.9806H4.33382C3.89608 11.9806 3.46263 11.8944 3.05821 11.7269C2.65379 11.5594 2.28633 11.3138 1.9768 11.0043C1.35168 10.3792 1.00049 9.53135 1.00049 8.6473C1.00049 7.76324 1.35168 6.9154 1.9768 6.29028C2.60192 5.66515 3.44977 5.31396 4.33382 5.31396H6.33382" stroke="#64666C" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M5.6665 8.64746H10.9998" stroke="#64666C" stroke-linecap="round" stroke-linejoin="round"/>
+                                </g>
+                                <defs>
+                                <clipPath id="clip0_4432_2237">
+                                <rect width="16" height="16" fill="white" transform="translate(0.333496 0.647461)"/>
+                                </clipPath>
+                                </defs>
+                            </svg>
+                            <div class="text-caption-2 text-Secondary">18 connections</div>
+                        </a>
+                        <a href="candidates-detail.html" class="tf-btn style-1 text-button-small round-full">Connect</a>
+                    </div>
+                </div>
+            </div>
+            <div class="new-feed-post save-item box-post mb-16">
+                <div class="post-user mb-12">
+                    <div class="avatar avt-status avt-40">
+                        <img src="images/avt/avt-2.png" alt="">
+                    </div>
+                    <div class="flex-grow-1">
+                        <a href="#" class="name d-flex text-button-small text-OnSurface mb-4">Randy Aminoff</a>
+                        <div class="infor">
+                            <div class="sub text-caption-2">CEO at Findee</div>
+                            <div class="dot"></div>
+                            <div class="time text-caption-2">2 hours ago</div>
+                        </div>
+                    </div>
+                    <div class="right">
+                        <a class="save-post d-flex bookmark-save-icon">
+                            <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                <path d="M14.375 2.84985H5.625C5.29348 2.84985 4.97554 2.98155 4.74112 3.21597C4.5067 3.45039 4.375 3.76833 4.375 4.09985V17.8499C4.37506 17.9614 4.40496 18.0709 4.46161 18.167C4.51826 18.263 4.59959 18.3422 4.69716 18.3963C4.79473 18.4503 4.90498 18.4773 5.01648 18.4743C5.12798 18.4714 5.23666 18.4387 5.33125 18.3795L10 15.4616L14.6695 18.3795C14.7641 18.4385 14.8727 18.471 14.9841 18.4739C15.0955 18.4767 15.2056 18.4497 15.303 18.3957C15.4005 18.3417 15.4817 18.2626 15.5383 18.1666C15.5949 18.0706 15.6249 17.9613 15.625 17.8499V4.09985C15.625 3.76833 15.4933 3.45039 15.2589 3.21597C15.0245 2.98155 14.7065 2.84985 14.375 2.84985Z" fill="#2748DB"/>
+                            </svg>
+                        </a>
+                        <a class="right-icon more-option" data-bs-target="#more-option" data-bs-toggle="offcanvas" aria-controls="offcanvasRight">
+                            <svg width="24" height="20" viewBox="0 0 24 20" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                <path d="M12 11C12.5523 11 13 10.5523 13 10C13 9.44772 12.5523 9 12 9C11.4477 9 11 9.44772 11 10C11 10.5523 11.4477 11 12 11Z" stroke="#121212" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M12 5C12.5523 5 13 4.55228 13 4C13 3.44772 12.5523 3 12 3C11.4477 3 11 3.44772 11 4C11 4.55228 11.4477 5 12 5Z" stroke="#121212" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M12 17C12.5523 17 13 16.5523 13 16C13 15.4477 12.5523 15 12 15C11.4477 15 11 15.4477 11 16C11 16.5523 11.4477 17 12 17Z" stroke="#121212" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+                <div class="text-caption-1 text-OnSurface mb-12">
+                    Lorem ipsum dolor sit amet consectetur. Cursus nunc pharetra arcu quam turpis risus amet turpis. Facilisis elementum tincidunt pellentesque sed rutrum enim.
+                </div>
+                <div class="mb-12">
+                    <img class="w-100" src="images/post/post-1.jpg" alt="">
+                </div>
+                <div class="like-share mb-16">
+                    <div class="like-share-infor d-flex align-items-center justify-content-between mb-8">
+                        <div class="text-caption-2 likes">213 Likes</div>
+                        <div class="d-flex gap-16">
+                            <div class="text-caption-2 comments">48 Comments</div>
+                            <div class="text-caption-2 shares">6 Shares</div>
+                        </div>
+                    </div>
+                    <div class="like-share-button">
+                        <a href="#" class="link">
+                            <i class="icon icon-like"></i>
+                            <span class="text-caption-1">Like</span>
+                        </a>
+                        <a href="#" class="link">
+                            <i class="icon icon-cmt"></i>
+                            <span class="text-caption-1">Comment</span>
+                        </a>
+                        <a href="#" class="link">
+                            <i class="icon icon-shareFat"></i>
+                            <span class="text-caption-1">Share</span>
+                        </a>
+                    </div>
+                </div>
+                <div class="post-comment">
+                    <div class="nice-select tf-select style-default mb-12" tabindex="0">
+                        <div class="d-flex align-items-center gap-8">
+                            <span class="current text-caption-1 text-OnSurface">All Comments</span>
+                            <div class="current-icon">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                    <path d="M16.6925 7.94229L10.4425 14.1923C10.3845 14.2504 10.3156 14.2965 10.2397 14.328C10.1638 14.3594 10.0825 14.3756 10.0003 14.3756C9.91821 14.3756 9.83688 14.3594 9.76101 14.328C9.68514 14.2965 9.61621 14.2504 9.55816 14.1923L3.30816 7.94229C3.19088 7.82502 3.125 7.66596 3.125 7.5001C3.125 7.33425 3.19088 7.17519 3.30816 7.05792C3.42544 6.94064 3.5845 6.87476 3.75035 6.87476C3.9162 6.87476 4.07526 6.94064 4.19253 7.05792L10.0003 12.8665L15.8082 7.05792C15.8662 6.99985 15.9352 6.95378 16.011 6.92236C16.0869 6.89093 16.1682 6.87476 16.2503 6.87476C16.3325 6.87476 16.4138 6.89093 16.4897 6.92236C16.5655 6.95378 16.6345 6.99985 16.6925 7.05792C16.7506 7.11598 16.7967 7.18492 16.8281 7.26079C16.8595 7.33666 16.8757 7.41798 16.8757 7.5001C16.8757 7.58223 16.8595 7.66354 16.8281 7.73941C16.7967 7.81528 16.7506 7.88422 16.6925 7.94229Z" fill="#121212"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <ul class="list">
+                            <li data-value="All Comments" class="option selected">All Comments</li>
+                            <li data-value="New" class="option">New</li>
+                            <li data-value="Old" class="option">Old</li>
+                        </ul>
+                    </div>
+                    <div class="post-comment-item">
+                        <div class="user d-flex gap-12 mb-8">
+                            <div class="avatar avt-status avt-40">
+                                <img src="images/avt/avt-1.png" alt="">
+                            </div>
+                            <div class="flex-grow-1">
+                                <a href="#" class="name link d-flex text-button-small text-OnSurface mb-4">Corey Schleifer</a>
+                                <div class="sub text-caption-2">CEO at Findee</div>
+                            </div>
+                        </div>
+                        <div class="desc text-caption-1 text-OnSurface">
+                            I am interested in this recruitment. Please give me JD
+                        </div>
+                    </div>
+                    <div class="post-comment-item">
+                        <div class="user d-flex gap-12 mb-8">
+                            <div class="avatar avt-status avt-40">
+                                <img src="images/avt/avt-2.png" alt="">
+                            </div>
+                            <div class="flex-grow-1">
+                                <a href="#" class="name link d-flex text-button-small text-OnSurface mb-4">Leo Kenter</a>
+                                <div class="sub text-caption-2">CEO at Findee</div>
+                            </div>
+                        </div>
+                        <div class="desc text-caption-1 text-OnSurface">
+                            I am interested in this recruitment. Please give me JD
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="new-feed-post">
+                <div class="text-button-small text-OnSurface mb-12">Company You May Follow</div>
+                <div class="grid-2 gap-12">
+                    <div class="candidates-item">
+                        <div class="image">
+                            <img src="images/companies/companies-1.png" alt="">
+                        </div>
+                        <a href="company-detail.html" class="link text-button-small text-OnSurface name">Findee Company</a>
+                        <a href="#" class="connections">
+                            <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                <g clip-path="url(#clip0_4432_2237)">
+                                <path d="M10.3338 5.31396H12.3338C12.7716 5.31396 13.205 5.40018 13.6094 5.5677C14.0139 5.73522 14.3813 5.98075 14.6908 6.29028C15.0004 6.5998 15.2459 6.96727 15.4134 7.37169C15.5809 7.77611 15.6672 8.20956 15.6672 8.6473C15.6672 9.08504 15.5809 9.51849 15.4134 9.92291C15.2459 10.3273 15.0004 10.6948 14.6908 11.0043C14.3813 11.3138 14.0139 11.5594 13.6094 11.7269C13.205 11.8944 12.7716 11.9806 12.3338 11.9806H10.3338M6.33382 11.9806H4.33382C3.89608 11.9806 3.46263 11.8944 3.05821 11.7269C2.65379 11.5594 2.28633 11.3138 1.9768 11.0043C1.35168 10.3792 1.00049 9.53135 1.00049 8.6473C1.00049 7.76324 1.35168 6.9154 1.9768 6.29028C2.60192 5.66515 3.44977 5.31396 4.33382 5.31396H6.33382" stroke="#64666C" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M5.6665 8.64746H10.9998" stroke="#64666C" stroke-linecap="round" stroke-linejoin="round"/>
+                                </g>
+                                <defs>
+                                <clipPath id="clip0_4432_2237">
+                                <rect width="16" height="16" fill="white" transform="translate(0.333496 0.647461)"/>
+                                </clipPath>
+                                </defs>
+                            </svg>
+                            <div class="text-caption-2 text-Secondary">10k Followers</div>
+                        </a>
+                        <a href="company-detail.html" class="tf-btn style-1 text-button-small round-full">Connect</a>
+                    </div>
+                    <div class="candidates-item">
+                        <div class="image">
+                            <img src="images/companies/companies-2.png" alt="">
+                        </div>
+                        <a href="company-detail.html" class="link text-button-small text-OnSurface name">Constru Company</a>
+                        <a href="#" class="connections">
+                            <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                <g clip-path="url(#clip0_4432_2237)">
+                                <path d="M10.3338 5.31396H12.3338C12.7716 5.31396 13.205 5.40018 13.6094 5.5677C14.0139 5.73522 14.3813 5.98075 14.6908 6.29028C15.0004 6.5998 15.2459 6.96727 15.4134 7.37169C15.5809 7.77611 15.6672 8.20956 15.6672 8.6473C15.6672 9.08504 15.5809 9.51849 15.4134 9.92291C15.2459 10.3273 15.0004 10.6948 14.6908 11.0043C14.3813 11.3138 14.0139 11.5594 13.6094 11.7269C13.205 11.8944 12.7716 11.9806 12.3338 11.9806H10.3338M6.33382 11.9806H4.33382C3.89608 11.9806 3.46263 11.8944 3.05821 11.7269C2.65379 11.5594 2.28633 11.3138 1.9768 11.0043C1.35168 10.3792 1.00049 9.53135 1.00049 8.6473C1.00049 7.76324 1.35168 6.9154 1.9768 6.29028C2.60192 5.66515 3.44977 5.31396 4.33382 5.31396H6.33382" stroke="#64666C" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M5.6665 8.64746H10.9998" stroke="#64666C" stroke-linecap="round" stroke-linejoin="round"/>
+                                </g>
+                                <defs>
+                                <clipPath id="clip0_4432_2237">
+                                <rect width="16" height="16" fill="white" transform="translate(0.333496 0.647461)"/>
+                                </clipPath>
+                                </defs>
+                            </svg>
+                            <div class="text-caption-2 text-Secondary">10k Followers</div>
+                        </a>
+                        <a href="company-detail.html" class="tf-btn style-1 text-button-small round-full">Connect</a>
+                    </div>
+                    <div class="candidates-item">
+                        <div class="image">
+                            <img src="images/companies/companies-1.png" alt="">
+                        </div>
+                        <a href="company-detail.html" class="link text-button-small text-OnSurface name">Findee Company</a>
+                        <a href="#" class="connections">
+                            <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                <g clip-path="url(#clip0_4432_2237)">
+                                <path d="M10.3338 5.31396H12.3338C12.7716 5.31396 13.205 5.40018 13.6094 5.5677C14.0139 5.73522 14.3813 5.98075 14.6908 6.29028C15.0004 6.5998 15.2459 6.96727 15.4134 7.37169C15.5809 7.77611 15.6672 8.20956 15.6672 8.6473C15.6672 9.08504 15.5809 9.51849 15.4134 9.92291C15.2459 10.3273 15.0004 10.6948 14.6908 11.0043C14.3813 11.3138 14.0139 11.5594 13.6094 11.7269C13.205 11.8944 12.7716 11.9806 12.3338 11.9806H10.3338M6.33382 11.9806H4.33382C3.89608 11.9806 3.46263 11.8944 3.05821 11.7269C2.65379 11.5594 2.28633 11.3138 1.9768 11.0043C1.35168 10.3792 1.00049 9.53135 1.00049 8.6473C1.00049 7.76324 1.35168 6.9154 1.9768 6.29028C2.60192 5.66515 3.44977 5.31396 4.33382 5.31396H6.33382" stroke="#64666C" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M5.6665 8.64746H10.9998" stroke="#64666C" stroke-linecap="round" stroke-linejoin="round"/>
+                                </g>
+                                <defs>
+                                <clipPath id="clip0_4432_2237">
+                                <rect width="16" height="16" fill="white" transform="translate(0.333496 0.647461)"/>
+                                </clipPath>
+                                </defs>
+                            </svg>
+                            <div class="text-caption-2 text-Secondary">10k Followers</div>
+                        </a>
+                        <a href="company-detail.html" class="tf-btn style-1 text-button-small round-full">Connect</a>
+                    </div>
+                    <div class="candidates-item">
+                        <div class="image">
+                            <img src="images/companies/companies-2.png" alt="">
+                        </div>
+                        <a href="company-detail.html" class="link text-button-small text-OnSurface name">Constru Company</a>
+                        <a href="#" class="connections">
+                            <svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                <g clip-path="url(#clip0_4432_2237)">
+                                <path d="M10.3338 5.31396H12.3338C12.7716 5.31396 13.205 5.40018 13.6094 5.5677C14.0139 5.73522 14.3813 5.98075 14.6908 6.29028C15.0004 6.5998 15.2459 6.96727 15.4134 7.37169C15.5809 7.77611 15.6672 8.20956 15.6672 8.6473C15.6672 9.08504 15.5809 9.51849 15.4134 9.92291C15.2459 10.3273 15.0004 10.6948 14.6908 11.0043C14.3813 11.3138 14.0139 11.5594 13.6094 11.7269C13.205 11.8944 12.7716 11.9806 12.3338 11.9806H10.3338M6.33382 11.9806H4.33382C3.89608 11.9806 3.46263 11.8944 3.05821 11.7269C2.65379 11.5594 2.28633 11.3138 1.9768 11.0043C1.35168 10.3792 1.00049 9.53135 1.00049 8.6473C1.00049 7.76324 1.35168 6.9154 1.9768 6.29028C2.60192 5.66515 3.44977 5.31396 4.33382 5.31396H6.33382" stroke="#64666C" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M5.6665 8.64746H10.9998" stroke="#64666C" stroke-linecap="round" stroke-linejoin="round"/>
+                                </g>
+                                <defs>
+                                <clipPath id="clip0_4432_2237">
+                                <rect width="16" height="16" fill="white" transform="translate(0.333496 0.647461)"/>
+                                </clipPath>
+                                </defs>
+                            </svg>
+                            <div class="text-caption-2 text-Secondary">10k Followers</div>
+                        </a>
+                        <a href="company-detail.html" class="tf-btn style-1 text-button-small round-full">Connect</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="menubar-footer footer-fixed">
+        <ul class="inner-bar">
+            <li class="">
+                <a href="index.html">
+                    <div class="icon">
+                        <i class="icon-home-line"></i>
+                    </div>
+                    <div class="text-caption-3 text">Home</div>
+                </a>
+            </li>
+            <li class="active">
+                <a href="new-feed.html">
+                    <div class="icon">
+                        <i class="icon-new-fill"></i>
+                    </div>
+                    <div class="text-caption-3 text">New Feed</div>
+                </a>
+            </li>
+            <li class="">
+                <a data-bs-target="#saved" data-bs-toggle="modal">
+                    <div class="icon">
+                        <i class="icon-bookmarks-line"></i>
+                    </div>
+                    <div class="text-caption-3 text">Saved</div>
+                </a>
+            </li>
+            <li class="">
+                <a data-bs-target="#profile" data-bs-toggle="modal">
+                    <div class="icon">
+                        <i class="icon-user-line"></i>
+                    </div>
+                    <div class="text-caption-3 text">Profile</div>
+                </a>
+            </li>
+            <li class="">
+                <a href="setting-profile.html">
+                    <div class="icon">
+                        <i class="icon-setting"></i>
+                    </div>
+                    <div class="text-caption-3 text">Settings</div>
+                </a>
+            </li>
+        </ul>
+
+    </div>
+    <div class="offcanvas offcanvas-bottom more-option" id="more-option">
+        <div class="overflow-auto">
+            <div class="more-option-wrap">
+                <a href="#" class="item" data-bs-toggle="offcanvas">
+                    <i class="icon icon-save"></i>
+                    <div class="text-caption-1 text-OnSurface">Save</div>
+                </a>
+                <a href="#" class="item" data-bs-toggle="offcanvas">
+                    <i class="icon icon-share"></i>
+                    <div class="text-caption-1 text-OnSurface">Share via</div>
+                </a>
+                <a href="#" class="item" data-bs-toggle="offcanvas">
+                    <i class="icon icon-eyeSlash"></i>
+                    <div class="text-caption-1 text-OnSurface">Unfollow</div>
+                </a>
+                <a href="#" class="item" data-bs-toggle="offcanvas">
+                    <i class="icon icon-xCircle"></i>
+                    <div class="text-caption-1 text-OnSurface">I don't want to see this</div>
+                </a>
+                <a href="#" class="item" data-bs-toggle="offcanvas">
+                    <i class="icon icon-flag"></i>
+                    <div class="text-caption-1 text-OnSurface">Report post</div>
+                </a>
+            </div>
+        </div>
+    </div>
+    <!-- profile  -->
+    <div class="modal modalCentered fade modal-profile" id="profile">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <h3 class="mb-16 text-OnSurface">Choose your job type</h3>
+                <div class="flat-check-list d-flex gap-20 mb-40">
+                    <a href="employer-profile.html" class="job-type-item w-100">
+                        <div class="image">
+                            <img src="images/icon/employer.png" alt="">
+                        </div>
+                        <h4>Employer</h4>
+                    </a>
+                    <a href="profile.html" class="job-type-item w-100">
+                        <div class="image">
+                            <img src="images/icon/candidates.png" alt="">
+                        </div>
+                        <h4>Candidates</h4>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- /profile  -->
+    <!-- saved  -->
+    <div class="modal modalCentered fade modal-profile" id="saved">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <h3 class="mb-16 text-OnSurface">Choose your job type</h3>
+                <div class="flat-check-list d-flex gap-20 mb-40">
+                    <a href="saved.html#Saved-Jobs" class="job-type-item w-100">
+                        <div class="image">
+                            <img src="images/icon/employer.png" alt="">
+                        </div>
+                        <h4>Employer</h4>
+                    </a>
+                    <a href="saved.html#Saved-Candidates" class="job-type-item w-100">
+                        <div class="image">
+                            <img src="images/icon/candidates.png" alt="">
+                        </div>
+                        <h4>Candidates</h4>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- /saved  -->
+
+    <script type="text/javascript" src="js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="js/jquery.min.js"></script>
+    <script type="text/javascript" src="js/lazysize.min.js"></script>
+    <script type="text/javascript" src="js/countto.js"></script>
+    <script type="text/javascript" src="js/swiper-bundle.min.js"></script>
+    <script type="text/javascript" src="js/carousel.js"></script>
+    <script type="text/javascript" src="js/jquery.nice-select.min.js"></script>
+    <script type="text/javascript" src="js/main.js"></script>
+
+
+
+</body>
+
+
+<!-- Mirrored from findee-ruddy.vercel.app/findee/new-feed.html by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 05 Oct 2026 07:35:36 GMT -->
+</html>

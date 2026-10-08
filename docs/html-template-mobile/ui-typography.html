@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+
+
+<!-- Mirrored from findee-ruddy.vercel.app/findee/ui-typography.html by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 05 Oct 2026 07:35:54 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, viewport-fit=cover">
+    <!-- font -->
+    <link rel="stylesheet" href="fonts/fonts.css">
+    <!-- Icons -->
+    <link rel="stylesheet" href="fonts/font-icons.css">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="css/nouislider.min.css" />
+    <link rel="stylesheet" href="css/swiper-bundle.min.css">
+    <link rel="stylesheet" type="text/css" href="css/styles.css" />
+
+    <!-- Favicon and Touch Icons  -->
+    <link rel="shortcut icon" href="images/logo/168.png" />
+    <link rel="apple-touch-icon-precomposed" href="images/logo/168.png" />
+    <title>Typography</title>
+    <script>
+        if (localStorage.toggled === "dark-theme") {
+            document.documentElement.classList.add('dark-theme');
+        }
+    </script>
+
+</head>
+
+<body>
+    <!-- preloade -->
+    <div class="preload preload-container">
+        <div class="logo-img">
+            <img src="images/logo/logo-light.png" alt="">
+        </div>
+        
+    </div>
+    <!-- /preload -->
+    <div class="header-avt fixed-top">
+        <a href="javascript:void(0);" class="icon back-btn">
+            <svg width="24" height="25" viewBox="0 0 24 25" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                <path d="M15.398 19.9524C15.4532 20.0039 15.4976 20.066 15.5283 20.135C15.5591 20.204 15.5756 20.2784 15.5769 20.354C15.5783 20.4295 15.5644 20.5045 15.5361 20.5746C15.5078 20.6446 15.4657 20.7082 15.4123 20.7616C15.3588 20.8151 15.2952 20.8572 15.2252 20.8855C15.1551 20.9137 15.0801 20.9276 15.0046 20.9263C14.9291 20.925 14.8546 20.9084 14.7856 20.8777C14.7166 20.847 14.6545 20.8026 14.603 20.7474L7.10298 13.2474C6.99764 13.1419 6.93848 12.9989 6.93848 12.8499C6.93848 12.7008 6.99764 12.5578 7.10298 12.4524L14.603 4.95236C14.7096 4.853 14.8506 4.79891 14.9964 4.80148C15.1421 4.80405 15.2811 4.86308 15.3842 4.96614C15.4873 5.0692 15.5463 5.20824 15.5489 5.35397C15.5514 5.49969 15.4973 5.64073 15.398 5.74736L8.29642 12.8499L15.398 19.9524Z" fill="#121212"></path>
+            </svg>
+        </a>
+        <h4>Typography</h4>
+        <div></div>
+    </div>
+
+    <div class="app-content pb-32">
+        <div class="tf-container">
+            <div class="card mt-20">
+                <div class="card-header">
+                    <h4>Typography</h4>
+                    <p class="text-5 mt-4">The Use tags <code>h1 to h6 </code> for get desire heading.</p>
+                </div>
+                <div class="card-body mt-20">
+                    <h1>H1 - Heading</h1>
+                    <h2 class="mt-10">H2 - Heading</h2>
+                    <h3 class="mt-10">H3 - Heading</h3>
+                    <h4 class="mt-10">H4 - Heading</h4>
+                    <h5 class="mt-10">H5 - Heading</h5>
+                    <h6 class="mt-10">H6 - Heading</h6>
+                </div>
+            </div>
+            <div class="card mt-20">
+                <div class="card-header">
+                    <h4>Paragraph with justify</h4>
+                    <p class="text-5 mt-4">Use tag <code>text-justify</code> for get desire paragraph</p>
+                </div>
+                <div class="card-body mt-20">
+                    <p class="text-justify text-dark">Mauris consectetur, lacus sit amet malesuada convallis, quam erat
+                        laoreet turpis, eget dapibus magna erat et turpis. Quisque malesuada nunc justo, laoreet egestas
+                        orci commodo ac. Cras finibus metus in nisi pellentesque, at luctus ex consectetur. Nunc
+                        hendrerit sollicitudin commodo.</p>
+                </div>
+            </div>
+            <div class="card mt-20">
+                <div class="card-header">
+                    <h4>Alignment text</h4>
+                    <p class="text-5 mt-4">Use tags <code>text-start, text-center, text-end</code> for get desire text.
+                    </p>
+                </div>
+                <div class="card-body mt-20">
+                    <p class="text-start text-dark">Left aligned text on all viewport sizes.</p>
+                    <p class="text-center mt-20 text-dark">Left aligned text on all viewport sizes.</p>
+                    <p class="text-end mt-20 text-dark">Left aligned text on all viewport sizes.</p>
+                </div>
+            </div>
+            <div class="card mt-20">
+                <div class="card-header">
+                    <h4>View port text</h4>
+                    <p class="text-5 mt-4">Use tags
+                        <code>text-sm-start, text-md-start, text-lg-start, text-xl-start</code> for get desire text.
+                    </p>
+                </div>
+                <div class="card-body mt-20">
+                    <p class="text-dark">Left aligned text on viewports sized SM (small) or wider.</p>
+                    <p class="mt-20 text-dark">Left aligned text on viewports sized MD (medium) or wider.</p>
+                    <p class="mt-20 text-dark">Left aligned text on viewports sized LG (large) or wider.</p>
+                    <p class="mt-20 text-dark">Left aligned text on viewports sized XL (extra-large) or wider.</p>
+
+                </div>
+            </div>
+            <div class="card mt-20">
+                <div class="card-header">
+                    <h4>Font weight and italics</h4>
+                    <p class="text-5 mt-4">Use tags <code>fw-bold, fw-normal, fw-italic</code> for get desire text.</p>
+                </div>
+                <div class="card-body mt-20">
+                    <p class="fw-bold text-dark">Bold text.</p>
+                    <p class="fw-normal mt-20 text-dark">Normal weight text.</p>
+                    <p class="fw-italic mt-20 text-dark">Italic text.</p>
+                </div>
+            </div>
+            <div class="card mt-20">
+                <div class="card-header">
+                    <h4>Text colors</h4>
+                    <p class="text-5 mt-4">Use tags below class for get desire text.</p>
+                </div>
+                <ul class="card-body mt-20">
+                    <li>
+                        <p class="text-muted text-dark">This is an example of muted text.</p>
+                        <p class="text-dark">Add class <code>text-muted</code> </p>
+                    </li>
+                    <li class="mt-20">
+                        <p class="text-primary">This is an example of muted text.</p>
+                        <p class="text-dark">Add class <code>text-primary</code> </p>
+                    </li>
+                    <li class="mt-20">
+                        <p class="text-success">This is an example of muted text.</p>
+                        <p class="text-dark">Add class <code>text-success</code> </p>
+                    </li>
+                    <li class="mt-20">
+                        <p class="text-info">This is an example of muted text.</p>
+                        <p class="text-dark">Add class <code>text-info</code> </p>
+                    </li>
+                    <li class="mt-20">
+                        <p class="text-warning">This is an example of muted text.</p>
+                        <p class="text-dark">Add class <code>text-warning</code> </p>
+                    </li>
+                    <li class="mt-20">
+                        <p class="text-danger">This is an example of muted text.</p>
+                        <p class="text-dark">Add class <code>text-danger</code> </p>
+                    </li>
+                </ul>
+            </div>
+            <div class="card mt-20">
+                <div class="card-header">
+                    <h4>Address</h4>
+                    <p class="text-5 mt-4 text-dark">Use <code>address</code> for get desire address.</p>
+                </div>
+                <div class="card-body mt-20">
+                    <address class="fw-normal text-dark">
+                        4140 Parker Rd. <br>
+                        Allentown, New Mexico 31134
+                    </address>
+                </div>
+            </div>
+            <div class="card mt-20">
+                <div class="card-header">
+                    <h4 class="text-dark">Blockquotes</h4>
+                    <p class="text-5 mt-4 text-dark">Use <code>blockquote</code> for get desire address.</p>
+                </div>
+                <div class="card-body mt-20">
+                    <blockquote class="fw-normal text-dark">Mauris consectetur, lacus sit amet malesuada convallis, quam
+                        erat laoreet turpis, eget dapibus magna erat et turpis.</blockquote>
+                    <p class="fw-normal mt-20 text-1 fw-italic text-sm-start text-dark">Someone famous in Source Title
+                    </p>
+                </div>
+            </div>
+            <div class="card mt-20">
+                <div class="card-header">
+                    <h4>Ul Listing</h4>
+                    <p class="text-5 mt-4">Use tags <code>ul > li</code> for get desire ol list.</p>
+                </div>
+                <ul class="list-style mt-20">
+                    <li class="fw-norma text-dark">Mauris consectetur, lacus sit amet</li>
+                    <li class="mt-10 fw-normal text-dark">Malesuada convallis, quam erat laoreet </li>
+                    <li class="mt-10 fw-normal text-dark">Turpis, eget dapibus magna erat et turpis.</li>
+                </ul>
+            </div>
+            <div class="card mt-20">
+                <div class="card-header">
+                    <h4>Ol Listing</h4>
+                    <p class="text-5 mt-4 text-dark">Use tags <code>ol > li</code> for get desire ol list.</p>
+                </div>
+                <ol class="list-style mt-20">
+                    <li class="fw-normal text-dark">Mauris consectetur, lacus sit amet</li>
+                    <li class="mt-10 fw-normal text-dark">Malesuada convallis, quam erat laoreet </li>
+                    <li class="mt-10 fw-normal text-dark">Turpis, eget dapibus magna erat et turpis.</li>
+                </ol>
+            </div>
+            <div class="card mt-20">
+                <div class="card-header">
+                    <h4>Description Text</h4>
+                    <p class="text-5 mt-4 text-dark">Use tags <code>dl > dt</code> for get desire ol list.</p>
+                </div>
+                <dl class="mt-20">
+                    <dt class="text-dark">Standard Description List</dt>
+                    <dd class="mt-8 fw-normal text-dark">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis
+                        et sodales purus.</dd>
+                    <dt class="mt-20 text-dark">Description List Title</dt>
+                    <dd class="mt-8 fw-normal text-1 text-dark">Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+                        Duis et sodales purus.</dd>
+                </dl>
+
+            </div>
+            <div class="card mt-20">
+                <div class="card-header">
+                    <h4>Fancy Listing</h4>
+                    <p class="text-5 mt-4 text-dark">Use class <code>list-icons</code>for get desire ol list</p>
+                </div>
+                <ul class="mt-20 list-icons">
+                    <li class="item fw-normal text-dark">
+                        <span class="icon text-dark icon-left-arr"></span>
+                        Lorem ipsum dolor sit amet
+                    </li>
+                    <li class="mt-10 item fw-normal text-dark">
+                        <span class="icon text-dark icon-left-arr"></span>
+                        Consectetur adipiscing elit
+                    </li>
+                    <li class="mt-10 item fw-normal text-dark">
+                        <span class="icon text-dark icon-left-arr"></span>
+                        Duis et sodales purus.
+                    </li>
+                </ul>
+            </div>
+            <div class="card mt-20">
+                <div class="card-header">
+                    <h4>Fancy Listing with href</h4>
+                    <p class="text-5 mt-4 text-dark">Use class <code>list-icons</code>for get desire ol list</p>
+                </div>
+                <ul class="mt-20 list-icons">
+                    <li>
+                        <a href="javascript:void(0);" class="item fw-normal text-dark">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"
+                                fill="none">
+                                <path
+                                    d="M14.354 4.85403L6.35403 12.854C6.30759 12.9005 6.25245 12.9374 6.19175 12.9626C6.13105 12.9877 6.06599 13.0007 6.00028 13.0007C5.93457 13.0007 5.86951 12.9877 5.80881 12.9626C5.74811 12.9374 5.69296 12.9005 5.64653 12.854L2.14653 9.35403C2.05271 9.26021 2 9.13296 2 9.00028C2 8.8676 2.05271 8.74035 2.14653 8.64653C2.24035 8.55271 2.3676 8.5 2.50028 8.5C2.63296 8.5 2.76021 8.55271 2.85403 8.64653L6.00028 11.7934L13.6465 4.14653C13.7403 4.05271 13.8676 4 14.0003 4C14.133 4 14.2602 4.05271 14.354 4.14653C14.4478 4.24035 14.5006 4.3676 14.5006 4.50028C14.5006 4.63296 14.4478 4.76021 14.354 4.85403Z"
+                                    fill="#1E7F11" />
+                            </svg>
+                            Lorem ipsum dolor sit amet
+                    </li>
+                    <li class="mt-10">
+                        <a href="javascript:void(0);" class="item fw-normal text-dark">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"
+                                fill="none">
+                                <path
+                                    d="M14.354 4.85403L6.35403 12.854C6.30759 12.9005 6.25245 12.9374 6.19175 12.9626C6.13105 12.9877 6.06599 13.0007 6.00028 13.0007C5.93457 13.0007 5.86951 12.9877 5.80881 12.9626C5.74811 12.9374 5.69296 12.9005 5.64653 12.854L2.14653 9.35403C2.05271 9.26021 2 9.13296 2 9.00028C2 8.8676 2.05271 8.74035 2.14653 8.64653C2.24035 8.55271 2.3676 8.5 2.50028 8.5C2.63296 8.5 2.76021 8.55271 2.85403 8.64653L6.00028 11.7934L13.6465 4.14653C13.7403 4.05271 13.8676 4 14.0003 4C14.133 4 14.2602 4.05271 14.354 4.14653C14.4478 4.24035 14.5006 4.3676 14.5006 4.50028C14.5006 4.63296 14.4478 4.76021 14.354 4.85403Z"
+                                    fill="#1E7F11" />
+                            </svg>
+                            Consectetur adipiscing elit
+                        </a>
+                    </li>
+                    <li class="mt-10">
+                        <a href="javascript:void(0);" class="item fw-normal text-dark">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"
+                                fill="none">
+                                <path
+                                    d="M14.354 4.85403L6.35403 12.854C6.30759 12.9005 6.25245 12.9374 6.19175 12.9626C6.13105 12.9877 6.06599 13.0007 6.00028 13.0007C5.93457 13.0007 5.86951 12.9877 5.80881 12.9626C5.74811 12.9374 5.69296 12.9005 5.64653 12.854L2.14653 9.35403C2.05271 9.26021 2 9.13296 2 9.00028C2 8.8676 2.05271 8.74035 2.14653 8.64653C2.24035 8.55271 2.3676 8.5 2.50028 8.5C2.63296 8.5 2.76021 8.55271 2.85403 8.64653L6.00028 11.7934L13.6465 4.14653C13.7403 4.05271 13.8676 4 14.0003 4C14.133 4 14.2602 4.05271 14.354 4.14653C14.4478 4.24035 14.5006 4.3676 14.5006 4.50028C14.5006 4.63296 14.4478 4.76021 14.354 4.85403Z"
+                                    fill="#1E7F11" />
+                            </svg>
+                            Duis et sodales purus.
+                        </a>
+                    </li>
+
+                </ul>
+            </div>
+        </div>
+    </div>
+
+
+
+    <script type="text/javascript" src="js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="js/jquery.min.js"></script>
+    <script type="text/javascript" src="js/main.js"></script>
+
+
+
+</body>
+
+
+<!-- Mirrored from findee-ruddy.vercel.app/findee/ui-typography.html by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 05 Oct 2026 07:35:54 GMT -->
+</html>

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!-- Mirrored from findee-ruddy.vercel.app/findee/sign-in.html by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 05 Oct 2026 07:35:44 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, viewport-fit=cover">
+    <!-- font -->
+    <link rel="stylesheet" href="fonts/fonts.css">
+    <!-- Icons -->
+    <link rel="stylesheet" href="fonts/font-icons.css">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet"type="text/css" href="css/nouislider.min.css"/>
+    <link rel="stylesheet" href="css/swiper-bundle.min.css">
+    <link rel="stylesheet"type="text/css" href="css/styles.css"/>
+
+    <!-- Favicon and Touch Icons  -->
+    <link rel="shortcut icon" href="images/logo/168.png" />
+    <link rel="apple-touch-icon-precomposed" href="images/logo/168.png" />
+    <title>Sign In</title>
+    <script>
+        if (localStorage.toggled === "dark-theme") {
+            document.documentElement.classList.add('dark-theme');
+        }
+    </script>
+
+</head>
+
+<body>
+    <!-- preloade -->
+    <div class="preload preload-container">
+        <div class="logo-img">
+            <img src="images/logo/logo-light.png" alt="">
+        </div>
+        
+    </div>
+    <!-- /preload -->
+    <div class="header-avt fixed-top">
+        <div class="left">
+            <a href="javascript:void(0);" class="icon back-btn d-flex">
+                <svg width="8" height="14" viewBox="0 0 8 14" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                    <path d="M6.88986 12.2951L1.60986 7.00008L6.88986 1.70508" stroke="#121927" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+            </a>
+        </div>
+        <div class="logo-account">
+            <img class="logo-white logo-image" src="images/logo/logo-light.png" alt="">
+        </div>
+        <div></div>
+    </div>
+    <div class="app-content style-4 signIn-area">
+        <div class="tf-container">
+            
+            <h2 class="text-center">Login</h2>
+            <form action="https://findee-ruddy.vercel.app/findee/index.html">
+                <div class="mt-32">
+                    <div class="label text-caption-1">Email or Phone</div>
+                    <fieldset class="input-icon mt-12">
+                        <input type="text" value="hi.findee@gmail.com" placeholder="Type your email" class="form-control">
+                    </fieldset>
+                </div>
+                <div class="mt-20">
+                    <div class="label text-caption-1">Password</div>
+                    <fieldset class="mt-16 input-icon">
+                        <div class="box-view-hide">
+                            <input type="text" value="123456" placeholder="Type your password" class="form-control password-field">
+                            <div class="show-pass active">
+                                <span class="icon-pass icon-view">
+                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                        <path d="M0.833984 10.0007C0.833984 10.0007 4.16732 3.33398 10.0007 3.33398C15.834 3.33398 19.1673 10.0007 19.1673 10.0007C19.1673 10.0007 15.834 16.6673 10.0007 16.6673C4.16732 16.6673 0.833984 10.0007 0.833984 10.0007Z" stroke="#64666C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M10 12.5C11.3807 12.5 12.5 11.3807 12.5 10C12.5 8.61929 11.3807 7.5 10 7.5C8.61929 7.5 7.5 8.61929 7.5 10C7.5 11.3807 8.61929 12.5 10 12.5Z" stroke="#64666C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </span>
+                                <span class="icon-pass icon-hide">
+                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                        <path d="M12.1073 7.8916L7.89063 12.1083C7.34896 11.5666 7.01562 10.8249 7.01562 9.99993C7.01562 8.34993 8.34896 7.0166 9.99896 7.0166C10.824 7.0166 11.5656 7.34994 12.1073 7.8916Z" stroke="#64666C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M14.8518 4.8084C13.3935 3.7084 11.7268 3.1084 10.0018 3.1084C7.06016 3.1084 4.31849 4.84173 2.41016 7.84173C1.66016 9.01673 1.66016 10.9917 2.41016 12.1667C3.06849 13.2001 3.83516 14.0917 4.66849 14.8084" stroke="#64666C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M7.01562 16.2751C7.96563 16.6751 8.97396 16.8917 9.99896 16.8917C12.9406 16.8917 15.6823 15.1584 17.5906 12.1584C18.3406 10.9834 18.3406 9.0084 17.5906 7.8334C17.3156 7.40006 17.0156 6.99173 16.7073 6.6084" stroke="#64666C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M12.9242 10.5835C12.7076 11.7585 11.7492 12.7168 10.5742 12.9335" stroke="#64666C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M7.89297 12.1084L1.66797 18.3334" stroke="#64666C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M18.3344 1.6665L12.1094 7.8915" stroke="#64666C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </span>
+                            </div>
+                        </div>
+                    </fieldset>
+                </div>
+                <div class="mt-20 d-flex justify-content-between">
+                    <div class="box-check-remember">
+                        <input type="checkbox" class="tf-checkbox" id="checkRemember">
+                        <label for="checkRemember" class="body-2 text-dark-4">Remember Me</label>
+                    </div>
+                    <a href="forgot-pass.html" class="button-1 text-primary">Forgot Password?</a>
+                </div>
+                <button class="mt-40 tf-btn round-full Login">Login</button>
+            </form>
+            <p class="mt-35 text-center body-2 text-dark-4">Not registered yet?  <a href="sign-up.html" class="text-OnSurface">Sign Up</a></p>
+            <div class="auth-line body-2 text-dark-4">or</div>
+            <div class="d-flex flex-column gap-12">
+                <a href="index.html" class="btn-social-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                        <g clip-path="url(#clip0_3912_27396)">
+                        <path d="M23.7643 12.2763C23.7643 11.4605 23.6982 10.6404 23.5571 9.83789H12.2383V14.4589H18.72C18.451 15.9492 17.5868 17.2676 16.3213 18.1054V21.1037H20.1883C22.4591 19.0137 23.7643 15.9272 23.7643 12.2763Z" fill="#1777D1"/>
+                        <path d="M12.2391 24.0008C15.4756 24.0008 18.205 22.9382 20.1936 21.1039L16.3266 18.1055C15.2507 18.8375 13.8618 19.252 12.2435 19.252C9.11291 19.252 6.45849 17.1399 5.50607 14.3003H1.51562V17.3912C3.55274 21.4434 7.70192 24.0008 12.2391 24.0008Z" fill="#34A853"/>
+                        <path d="M5.50082 14.3002C4.99816 12.8099 4.99816 11.196 5.50082 9.70569V6.61475H1.51478C-0.187219 10.0055 -0.187219 14.0004 1.51478 17.3912L5.50082 14.3002Z" fill="#FBBC04"/>
+                        <path d="M12.2391 4.74966C13.9499 4.7232 15.6034 5.36697 16.8425 6.54867L20.2685 3.12262C18.0991 1.0855 15.2198 -0.034466 12.2391 0.000808666C7.70192 0.000808666 3.55274 2.55822 1.51562 6.61481L5.50166 9.70575C6.44967 6.86173 9.1085 4.74966 12.2391 4.74966Z" fill="#EA4335"/>
+                        </g>
+                        <defs>
+                        <clipPath id="clip0_3912_27396">
+                        <rect width="24" height="24" fill="white"/>
+                        </clipPath>
+                        </defs>
+                    </svg>
+                    <div class="text-button text-OnSurface">Continue with Google</div>
+                </a>
+                <a href="index.html" class="btn-social-icon">
+                    <svg width="25" height="24" viewBox="0 0 25 24" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                        <path d="M16.2621 13.519L16.7483 10.456H13.709V8.469C13.6877 8.24029 13.7199 8.00988 13.8032 7.79482C13.8865 7.57977 14.0188 7.38559 14.1902 7.22666C14.3617 7.06772 14.5679 6.94811 14.7937 6.87668C15.0195 6.80525 15.259 6.78383 15.4945 6.814H16.8766V4.207C16.0646 4.08019 15.2441 4.01101 14.4217 4C11.9183 4 10.2838 5.467 10.2838 8.122V10.457H7.5V13.519H10.2838V20.919H13.709V13.519H16.2621Z" fill="#4279D9"/>
+                    </svg>
+                    <div class="text-button text-OnSurface">Continue with Facebook</div>
+                </a>
+                <a href="index.html" class="btn-social-icon">
+                    <svg width="18" height="21" viewBox="0 0 18 21" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                        <path d="M14.4802 11.7109C13.9301 8.94213 16.5581 7.31828 16.5581 7.31828C16.5581 7.31828 15.5342 5.83691 13.8134 5.45582C12.0934 5.07389 11.2326 5.55107 10.3734 5.90897C9.51341 6.26774 9.08429 6.26774 9.08429 6.26774C7.84324 6.26774 6.93602 4.95373 4.57151 5.55195C2.94252 5.96304 1.22768 7.84353 0.917844 10.0879C0.60801 12.3332 1.27662 15.198 2.56573 17.4184C3.85484 19.6405 5.16802 20.4756 6.10007 20.4996C7.03215 20.5227 7.96253 19.8319 9.08429 19.6636C10.2069 19.4971 10.8978 20.0705 11.999 20.3803C13.0958 20.6893 13.4803 20.4026 14.7437 19.3281C16.0105 18.2535 17.1571 15.1715 17.1571 15.1715C17.1571 15.1715 15.0304 14.4814 14.4802 11.7109Z" fill="#121212"/>
+                        <path d="M12.0444 3.66442C13.2631 2.42254 12.8503 0.5 12.8503 0.5C12.8503 0.5 11.1389 0.800404 9.99227 1.99338C8.84648 3.18724 9.03615 5.07286 9.03615 5.07286C9.03615 5.07286 10.8256 4.90551 12.0444 3.66442Z" fill="#121212"/>
+                    </svg>
+                    <div class="text-button text-OnSurface">Continue with Apple</div>
+                </a>
+                <a href="index.html" class="btn-social-icon">
+                    <svg width="16" height="17" viewBox="0 0 16 17" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                        <path d="M3.58151 16.5H0.264292V5.81762H3.58151V16.5ZM1.92111 4.36044C0.860376 4.36044 0 3.48185 0 2.42111C7.59231e-09 1.9116 0.202403 1.42296 0.562681 1.06268C0.92296 0.702403 1.4116 0.5 1.92111 0.5C2.43063 0.5 2.91927 0.702403 3.27955 1.06268C3.63983 1.42296 3.84223 1.9116 3.84223 2.42111C3.84223 3.48185 2.98149 4.36044 1.92111 4.36044ZM15.9968 16.5H12.6867V11.2999C12.6867 10.0606 12.6617 8.47125 10.962 8.47125C9.23735 8.47125 8.97306 9.81771 8.97306 11.2106V16.5H5.65941V5.81762H8.84091V7.27479H8.88734C9.33021 6.43549 10.412 5.54976 12.026 5.54976C15.3832 5.54976 16.0004 7.76052 16.0004 10.632V16.5H15.9968Z" fill="#0066C8"/>
+                    </svg>
+                    <div class="text-button text-OnSurface">Continue with Linkedin</div>
+                </a>
+            </div>
+            
+        </div>
+
+    </div>
+
+   
+    
+    <script type="text/javascript" src="js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="js/jquery.min.js"></script>
+    <script type="text/javascript" src="js/lazysize.min.js"></script>
+    <script type="text/javascript" src="js/jquery.nice-select.min.js"></script>
+    <script type="text/javascript" src="js/main.js"></script>
+
+</body>
+
+<!-- Mirrored from findee-ruddy.vercel.app/findee/sign-in.html by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 05 Oct 2026 07:35:44 GMT -->
+</html>

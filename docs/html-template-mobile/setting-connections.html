@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+
+
+<!-- Mirrored from findee-ruddy.vercel.app/findee/setting-connections.html by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 05 Oct 2026 07:35:50 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, viewport-fit=cover">
+    <!-- font -->
+    <link rel="stylesheet" href="fonts/fonts.css">
+    <!-- Icons -->
+    <link rel="stylesheet" href="fonts/font-icons.css">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="css/nouislider.min.css" />
+    <link rel="stylesheet" href="css/swiper-bundle.min.css">
+    <link rel="stylesheet" type="text/css" href="css/styles.css" />
+
+    <!-- Favicon and Touch Icons  -->
+    <link rel="shortcut icon" href="images/logo/168.png" />
+    <link rel="apple-touch-icon-precomposed" href="images/logo/168.png" />
+    <title>Connections</title>
+    <!-- Apply dark theme early to avoid white flash -->
+    <script>
+        if (localStorage.toggled === "dark-theme") {
+            document.documentElement.classList.add('dark-theme');
+        }
+    </script>
+
+</head>
+
+<body>
+    <!-- preloade -->
+    <div class="preload preload-container">
+        <div class="logo-img">
+            <img src="images/logo/logo-light.png" alt="">
+        </div>
+        
+    </div>
+    <!-- /preload -->
+    <div class="header-avt fixed-top">
+        <a href="javascript:void(0);" class="icon back-btn">
+            <svg width="24" height="25" viewBox="0 0 24 25" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                <path d="M15.398 19.9524C15.4532 20.0039 15.4976 20.066 15.5283 20.135C15.5591 20.204 15.5756 20.2784 15.5769 20.354C15.5783 20.4295 15.5644 20.5045 15.5361 20.5746C15.5078 20.6446 15.4657 20.7082 15.4123 20.7616C15.3588 20.8151 15.2952 20.8572 15.2252 20.8855C15.1551 20.9137 15.0801 20.9276 15.0046 20.9263C14.9291 20.925 14.8546 20.9084 14.7856 20.8777C14.7166 20.847 14.6545 20.8026 14.603 20.7474L7.10298 13.2474C6.99764 13.1419 6.93848 12.9989 6.93848 12.8499C6.93848 12.7008 6.99764 12.5578 7.10298 12.4524L14.603 4.95236C14.7096 4.853 14.8506 4.79891 14.9964 4.80148C15.1421 4.80405 15.2811 4.86308 15.3842 4.96614C15.4873 5.0692 15.5463 5.20824 15.5489 5.35397C15.5514 5.49969 15.4973 5.64073 15.398 5.74736L8.29642 12.8499L15.398 19.9524Z" fill="#121212"/>
+            </svg>
+        </a>
+        <h4>Connections</h4>
+        <a href="index.html" class="d-flex">
+            <i class="icon-home-line fs-19"></i>
+        </a>
+    </div>
+    <div class="app-content style-2">
+        <div class="tf-container">
+            <div class="search-box mb-8">
+                <div class="icon-left">
+                    <i class="icon icon-search"></i>
+                </div>
+                <input type="text" class="search-field" placeholder="Job title, Keyword or company...">
+            </div>
+            <div class="d-grid gap-8">
+                <div class="d-flex gap-12 align-items-center py-12 line">
+                    <div class="avatar avt-status avt-40">
+                        <img src="images/avt/avt-1.png" alt="">
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between flex-grow-1">
+                        <div class="">
+                            <div class="text-caption-2 text-Primary">UI/UX Designer</div>
+                            <a href="message.html" class="link text-button-small text-OnSurface mb-4">Gustavo Philips</a>
+                            <div class="text-caption-3">Connected 4 day ago</div>
+                        </div>
+                        <div class="d-flex align-items-center gap-8">
+                            <a href="message.html" class="tf-btn style-1 text-button-small round-full type-small">Message</a>
+                            <a class="right-icon more-option d-flex" data-bs-target="#more-option" data-bs-toggle="offcanvas" aria-controls="offcanvasRight">
+                                <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                    <path d="M12.1875 10.813C12.1875 11.2456 12.0592 11.6686 11.8188 12.0283C11.5785 12.388 11.2368 12.6684 10.8371 12.834C10.4374 12.9995 9.99757 13.0429 9.57324 12.9585C9.14891 12.8741 8.75913 12.6657 8.45321 12.3598C8.14728 12.0539 7.93894 11.6641 7.85453 11.2397C7.77013 10.8154 7.81345 10.3756 7.97901 9.97587C8.14458 9.57616 8.42496 9.23452 8.78469 8.99415C9.14442 8.75378 9.56735 8.62549 10 8.62549C10.5802 8.62549 11.1366 8.85596 11.5468 9.26619C11.957 9.67643 12.1875 10.2328 12.1875 10.813ZM10 6.75049C10.4326 6.75049 10.8556 6.6222 11.2153 6.38183C11.575 6.14146 11.8554 5.79982 12.021 5.40011C12.1866 5.0004 12.2299 4.56056 12.1455 4.13623C12.0611 3.7119 11.8527 3.32212 11.5468 3.01619C11.2409 2.71027 10.8511 2.50193 10.4268 2.41752C10.0024 2.33312 9.56259 2.37644 9.16288 2.542C8.76317 2.70757 8.42153 2.98795 8.18116 3.34768C7.9408 3.70741 7.8125 4.13034 7.8125 4.56299C7.8125 5.14315 8.04297 5.69955 8.45321 6.10979C8.86344 6.52002 9.41984 6.75049 10 6.75049ZM10 14.8755C9.56735 14.8755 9.14442 15.0038 8.78469 15.2442C8.42496 15.4845 8.14458 15.8262 7.97901 16.2259C7.81345 16.6256 7.77013 17.0654 7.85453 17.4898C7.93894 17.9141 8.14728 18.3039 8.45321 18.6098C8.75913 18.9157 9.14891 19.1241 9.57324 19.2085C9.99757 19.2929 10.4374 19.2495 10.8371 19.084C11.2368 18.9184 11.5785 18.638 11.8188 18.2783C12.0592 17.9186 12.1875 17.4956 12.1875 17.063C12.1875 16.4828 11.957 15.9264 11.5468 15.5162C11.1366 15.106 10.5802 14.8755 10 14.8755Z" fill="#121212"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex gap-12 align-items-center py-12 line">
+                    <div class="avatar avt-status avt-40">
+                        <img src="images/avt/avt-2.png" alt="">
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between flex-grow-1">
+                        <div class="">
+                            <div class="text-caption-2 text-Primary">UI/UX Designer</div>
+                            <a href="message.html" class="link text-button-small text-OnSurface mb-4">Giana Donin</a>
+                            <div class="text-caption-3">Connected 4 day ago</div>
+                        </div>
+                        <div class="d-flex align-items-center gap-8">
+                            <a href="message.html" class="tf-btn style-1 text-button-small round-full type-small">Message</a>
+                            <a class="right-icon more-option d-flex" data-bs-target="#more-option" data-bs-toggle="offcanvas" aria-controls="offcanvasRight">
+                                <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                    <path d="M12.1875 10.813C12.1875 11.2456 12.0592 11.6686 11.8188 12.0283C11.5785 12.388 11.2368 12.6684 10.8371 12.834C10.4374 12.9995 9.99757 13.0429 9.57324 12.9585C9.14891 12.8741 8.75913 12.6657 8.45321 12.3598C8.14728 12.0539 7.93894 11.6641 7.85453 11.2397C7.77013 10.8154 7.81345 10.3756 7.97901 9.97587C8.14458 9.57616 8.42496 9.23452 8.78469 8.99415C9.14442 8.75378 9.56735 8.62549 10 8.62549C10.5802 8.62549 11.1366 8.85596 11.5468 9.26619C11.957 9.67643 12.1875 10.2328 12.1875 10.813ZM10 6.75049C10.4326 6.75049 10.8556 6.6222 11.2153 6.38183C11.575 6.14146 11.8554 5.79982 12.021 5.40011C12.1866 5.0004 12.2299 4.56056 12.1455 4.13623C12.0611 3.7119 11.8527 3.32212 11.5468 3.01619C11.2409 2.71027 10.8511 2.50193 10.4268 2.41752C10.0024 2.33312 9.56259 2.37644 9.16288 2.542C8.76317 2.70757 8.42153 2.98795 8.18116 3.34768C7.9408 3.70741 7.8125 4.13034 7.8125 4.56299C7.8125 5.14315 8.04297 5.69955 8.45321 6.10979C8.86344 6.52002 9.41984 6.75049 10 6.75049ZM10 14.8755C9.56735 14.8755 9.14442 15.0038 8.78469 15.2442C8.42496 15.4845 8.14458 15.8262 7.97901 16.2259C7.81345 16.6256 7.77013 17.0654 7.85453 17.4898C7.93894 17.9141 8.14728 18.3039 8.45321 18.6098C8.75913 18.9157 9.14891 19.1241 9.57324 19.2085C9.99757 19.2929 10.4374 19.2495 10.8371 19.084C11.2368 18.9184 11.5785 18.638 11.8188 18.2783C12.0592 17.9186 12.1875 17.4956 12.1875 17.063C12.1875 16.4828 11.957 15.9264 11.5468 15.5162C11.1366 15.106 10.5802 14.8755 10 14.8755Z" fill="#121212"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex gap-12 align-items-center py-12 line">
+                    <div class="avatar avt-status avt-40">
+                        <img src="images/avt/avt-3.png" alt="">
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between flex-grow-1">
+                        <div class="">
+                            <div class="text-caption-2 text-Primary">UI/UX Designer</div>
+                            <a href="message.html" class="link text-button-small text-OnSurface mb-4">Roger Donin</a>
+                            <div class="text-caption-3">Connected 4 day ago</div>
+                        </div>
+                        <div class="d-flex align-items-center gap-8">
+                            <a href="message.html" class="tf-btn style-1 text-button-small round-full type-small">Message</a>
+                            <a class="right-icon more-option d-flex" data-bs-target="#more-option" data-bs-toggle="offcanvas" aria-controls="offcanvasRight">
+                                <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                    <path d="M12.1875 10.813C12.1875 11.2456 12.0592 11.6686 11.8188 12.0283C11.5785 12.388 11.2368 12.6684 10.8371 12.834C10.4374 12.9995 9.99757 13.0429 9.57324 12.9585C9.14891 12.8741 8.75913 12.6657 8.45321 12.3598C8.14728 12.0539 7.93894 11.6641 7.85453 11.2397C7.77013 10.8154 7.81345 10.3756 7.97901 9.97587C8.14458 9.57616 8.42496 9.23452 8.78469 8.99415C9.14442 8.75378 9.56735 8.62549 10 8.62549C10.5802 8.62549 11.1366 8.85596 11.5468 9.26619C11.957 9.67643 12.1875 10.2328 12.1875 10.813ZM10 6.75049C10.4326 6.75049 10.8556 6.6222 11.2153 6.38183C11.575 6.14146 11.8554 5.79982 12.021 5.40011C12.1866 5.0004 12.2299 4.56056 12.1455 4.13623C12.0611 3.7119 11.8527 3.32212 11.5468 3.01619C11.2409 2.71027 10.8511 2.50193 10.4268 2.41752C10.0024 2.33312 9.56259 2.37644 9.16288 2.542C8.76317 2.70757 8.42153 2.98795 8.18116 3.34768C7.9408 3.70741 7.8125 4.13034 7.8125 4.56299C7.8125 5.14315 8.04297 5.69955 8.45321 6.10979C8.86344 6.52002 9.41984 6.75049 10 6.75049ZM10 14.8755C9.56735 14.8755 9.14442 15.0038 8.78469 15.2442C8.42496 15.4845 8.14458 15.8262 7.97901 16.2259C7.81345 16.6256 7.77013 17.0654 7.85453 17.4898C7.93894 17.9141 8.14728 18.3039 8.45321 18.6098C8.75913 18.9157 9.14891 19.1241 9.57324 19.2085C9.99757 19.2929 10.4374 19.2495 10.8371 19.084C11.2368 18.9184 11.5785 18.638 11.8188 18.2783C12.0592 17.9186 12.1875 17.4956 12.1875 17.063C12.1875 16.4828 11.957 15.9264 11.5468 15.5162C11.1366 15.106 10.5802 14.8755 10 14.8755Z" fill="#121212"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex gap-12 align-items-center py-12 line">
+                    <div class="avatar avt-status avt-40">
+                        <img src="images/avt/avt-1.png" alt="">
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between flex-grow-1">
+                        <div class="">
+                            <div class="text-caption-2 text-Primary">UI/UX Designer</div>
+                            <a href="message.html" class="link text-button-small text-OnSurface mb-4">Gustavo Philips</a>
+                            <div class="text-caption-3">Connected 4 day ago</div>
+                        </div>
+                        <div class="d-flex align-items-center gap-8">
+                            <a href="message.html" class="tf-btn style-1 text-button-small round-full type-small">Message</a>
+                            <a class="right-icon more-option d-flex" data-bs-target="#more-option" data-bs-toggle="offcanvas" aria-controls="offcanvasRight">
+                                <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                    <path d="M12.1875 10.813C12.1875 11.2456 12.0592 11.6686 11.8188 12.0283C11.5785 12.388 11.2368 12.6684 10.8371 12.834C10.4374 12.9995 9.99757 13.0429 9.57324 12.9585C9.14891 12.8741 8.75913 12.6657 8.45321 12.3598C8.14728 12.0539 7.93894 11.6641 7.85453 11.2397C7.77013 10.8154 7.81345 10.3756 7.97901 9.97587C8.14458 9.57616 8.42496 9.23452 8.78469 8.99415C9.14442 8.75378 9.56735 8.62549 10 8.62549C10.5802 8.62549 11.1366 8.85596 11.5468 9.26619C11.957 9.67643 12.1875 10.2328 12.1875 10.813ZM10 6.75049C10.4326 6.75049 10.8556 6.6222 11.2153 6.38183C11.575 6.14146 11.8554 5.79982 12.021 5.40011C12.1866 5.0004 12.2299 4.56056 12.1455 4.13623C12.0611 3.7119 11.8527 3.32212 11.5468 3.01619C11.2409 2.71027 10.8511 2.50193 10.4268 2.41752C10.0024 2.33312 9.56259 2.37644 9.16288 2.542C8.76317 2.70757 8.42153 2.98795 8.18116 3.34768C7.9408 3.70741 7.8125 4.13034 7.8125 4.56299C7.8125 5.14315 8.04297 5.69955 8.45321 6.10979C8.86344 6.52002 9.41984 6.75049 10 6.75049ZM10 14.8755C9.56735 14.8755 9.14442 15.0038 8.78469 15.2442C8.42496 15.4845 8.14458 15.8262 7.97901 16.2259C7.81345 16.6256 7.77013 17.0654 7.85453 17.4898C7.93894 17.9141 8.14728 18.3039 8.45321 18.6098C8.75913 18.9157 9.14891 19.1241 9.57324 19.2085C9.99757 19.2929 10.4374 19.2495 10.8371 19.084C11.2368 18.9184 11.5785 18.638 11.8188 18.2783C12.0592 17.9186 12.1875 17.4956 12.1875 17.063C12.1875 16.4828 11.957 15.9264 11.5468 15.5162C11.1366 15.106 10.5802 14.8755 10 14.8755Z" fill="#121212"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex gap-12 align-items-center py-12 line">
+                    <div class="avatar avt-status avt-40">
+                        <img src="images/avt/avt-2.png" alt="">
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between flex-grow-1">
+                        <div class="">
+                            <div class="text-caption-2 text-Primary">UI/UX Designer</div>
+                            <a href="message.html" class="link text-button-small text-OnSurface mb-4">Giana Donin</a>
+                            <div class="text-caption-3">Connected 4 day ago</div>
+                        </div>
+                        <div class="d-flex align-items-center gap-8">
+                            <a href="message.html" class="tf-btn style-1 text-button-small round-full type-small">Message</a>
+                            <a class="right-icon more-option d-flex" data-bs-target="#more-option" data-bs-toggle="offcanvas" aria-controls="offcanvasRight">
+                                <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                    <path d="M12.1875 10.813C12.1875 11.2456 12.0592 11.6686 11.8188 12.0283C11.5785 12.388 11.2368 12.6684 10.8371 12.834C10.4374 12.9995 9.99757 13.0429 9.57324 12.9585C9.14891 12.8741 8.75913 12.6657 8.45321 12.3598C8.14728 12.0539 7.93894 11.6641 7.85453 11.2397C7.77013 10.8154 7.81345 10.3756 7.97901 9.97587C8.14458 9.57616 8.42496 9.23452 8.78469 8.99415C9.14442 8.75378 9.56735 8.62549 10 8.62549C10.5802 8.62549 11.1366 8.85596 11.5468 9.26619C11.957 9.67643 12.1875 10.2328 12.1875 10.813ZM10 6.75049C10.4326 6.75049 10.8556 6.6222 11.2153 6.38183C11.575 6.14146 11.8554 5.79982 12.021 5.40011C12.1866 5.0004 12.2299 4.56056 12.1455 4.13623C12.0611 3.7119 11.8527 3.32212 11.5468 3.01619C11.2409 2.71027 10.8511 2.50193 10.4268 2.41752C10.0024 2.33312 9.56259 2.37644 9.16288 2.542C8.76317 2.70757 8.42153 2.98795 8.18116 3.34768C7.9408 3.70741 7.8125 4.13034 7.8125 4.56299C7.8125 5.14315 8.04297 5.69955 8.45321 6.10979C8.86344 6.52002 9.41984 6.75049 10 6.75049ZM10 14.8755C9.56735 14.8755 9.14442 15.0038 8.78469 15.2442C8.42496 15.4845 8.14458 15.8262 7.97901 16.2259C7.81345 16.6256 7.77013 17.0654 7.85453 17.4898C7.93894 17.9141 8.14728 18.3039 8.45321 18.6098C8.75913 18.9157 9.14891 19.1241 9.57324 19.2085C9.99757 19.2929 10.4374 19.2495 10.8371 19.084C11.2368 18.9184 11.5785 18.638 11.8188 18.2783C12.0592 17.9186 12.1875 17.4956 12.1875 17.063C12.1875 16.4828 11.957 15.9264 11.5468 15.5162C11.1366 15.106 10.5802 14.8755 10 14.8755Z" fill="#121212"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex gap-12 align-items-center py-12 line">
+                    <div class="avatar avt-status avt-40">
+                        <img src="images/avt/avt-3.png" alt="">
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between flex-grow-1">
+                        <div class="">
+                            <div class="text-caption-2 text-Primary">UI/UX Designer</div>
+                            <a href="message.html" class="link text-button-small text-OnSurface mb-4">Roger Donin</a>
+                            <div class="text-caption-3">Connected 4 day ago</div>
+                        </div>
+                        <div class="d-flex align-items-center gap-8">
+                            <a href="message.html" class="tf-btn style-1 text-button-small round-full type-small">Message</a>
+                            <a class="right-icon more-option d-flex" data-bs-target="#more-option" data-bs-toggle="offcanvas" aria-controls="offcanvasRight">
+                                <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                    <path d="M12.1875 10.813C12.1875 11.2456 12.0592 11.6686 11.8188 12.0283C11.5785 12.388 11.2368 12.6684 10.8371 12.834C10.4374 12.9995 9.99757 13.0429 9.57324 12.9585C9.14891 12.8741 8.75913 12.6657 8.45321 12.3598C8.14728 12.0539 7.93894 11.6641 7.85453 11.2397C7.77013 10.8154 7.81345 10.3756 7.97901 9.97587C8.14458 9.57616 8.42496 9.23452 8.78469 8.99415C9.14442 8.75378 9.56735 8.62549 10 8.62549C10.5802 8.62549 11.1366 8.85596 11.5468 9.26619C11.957 9.67643 12.1875 10.2328 12.1875 10.813ZM10 6.75049C10.4326 6.75049 10.8556 6.6222 11.2153 6.38183C11.575 6.14146 11.8554 5.79982 12.021 5.40011C12.1866 5.0004 12.2299 4.56056 12.1455 4.13623C12.0611 3.7119 11.8527 3.32212 11.5468 3.01619C11.2409 2.71027 10.8511 2.50193 10.4268 2.41752C10.0024 2.33312 9.56259 2.37644 9.16288 2.542C8.76317 2.70757 8.42153 2.98795 8.18116 3.34768C7.9408 3.70741 7.8125 4.13034 7.8125 4.56299C7.8125 5.14315 8.04297 5.69955 8.45321 6.10979C8.86344 6.52002 9.41984 6.75049 10 6.75049ZM10 14.8755C9.56735 14.8755 9.14442 15.0038 8.78469 15.2442C8.42496 15.4845 8.14458 15.8262 7.97901 16.2259C7.81345 16.6256 7.77013 17.0654 7.85453 17.4898C7.93894 17.9141 8.14728 18.3039 8.45321 18.6098C8.75913 18.9157 9.14891 19.1241 9.57324 19.2085C9.99757 19.2929 10.4374 19.2495 10.8371 19.084C11.2368 18.9184 11.5785 18.638 11.8188 18.2783C12.0592 17.9186 12.1875 17.4956 12.1875 17.063C12.1875 16.4828 11.957 15.9264 11.5468 15.5162C11.1366 15.106 10.5802 14.8755 10 14.8755Z" fill="#121212"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex gap-12 align-items-center py-12 line">
+                    <div class="avatar avt-status avt-40">
+                        <img src="images/avt/avt-1.png" alt="">
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between flex-grow-1">
+                        <div class="">
+                            <div class="text-caption-2 text-Primary">UI/UX Designer</div>
+                            <a href="message.html" class="link text-button-small text-OnSurface mb-4">Gustavo Philips</a>
+                            <div class="text-caption-3">Connected 4 day ago</div>
+                        </div>
+                        <div class="d-flex align-items-center gap-8">
+                            <a href="message.html" class="tf-btn style-1 text-button-small round-full type-small">Message</a>
+                            <a class="right-icon more-option d-flex" data-bs-target="#more-option" data-bs-toggle="offcanvas" aria-controls="offcanvasRight">
+                                <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                    <path d="M12.1875 10.813C12.1875 11.2456 12.0592 11.6686 11.8188 12.0283C11.5785 12.388 11.2368 12.6684 10.8371 12.834C10.4374 12.9995 9.99757 13.0429 9.57324 12.9585C9.14891 12.8741 8.75913 12.6657 8.45321 12.3598C8.14728 12.0539 7.93894 11.6641 7.85453 11.2397C7.77013 10.8154 7.81345 10.3756 7.97901 9.97587C8.14458 9.57616 8.42496 9.23452 8.78469 8.99415C9.14442 8.75378 9.56735 8.62549 10 8.62549C10.5802 8.62549 11.1366 8.85596 11.5468 9.26619C11.957 9.67643 12.1875 10.2328 12.1875 10.813ZM10 6.75049C10.4326 6.75049 10.8556 6.6222 11.2153 6.38183C11.575 6.14146 11.8554 5.79982 12.021 5.40011C12.1866 5.0004 12.2299 4.56056 12.1455 4.13623C12.0611 3.7119 11.8527 3.32212 11.5468 3.01619C11.2409 2.71027 10.8511 2.50193 10.4268 2.41752C10.0024 2.33312 9.56259 2.37644 9.16288 2.542C8.76317 2.70757 8.42153 2.98795 8.18116 3.34768C7.9408 3.70741 7.8125 4.13034 7.8125 4.56299C7.8125 5.14315 8.04297 5.69955 8.45321 6.10979C8.86344 6.52002 9.41984 6.75049 10 6.75049ZM10 14.8755C9.56735 14.8755 9.14442 15.0038 8.78469 15.2442C8.42496 15.4845 8.14458 15.8262 7.97901 16.2259C7.81345 16.6256 7.77013 17.0654 7.85453 17.4898C7.93894 17.9141 8.14728 18.3039 8.45321 18.6098C8.75913 18.9157 9.14891 19.1241 9.57324 19.2085C9.99757 19.2929 10.4374 19.2495 10.8371 19.084C11.2368 18.9184 11.5785 18.638 11.8188 18.2783C12.0592 17.9186 12.1875 17.4956 12.1875 17.063C12.1875 16.4828 11.957 15.9264 11.5468 15.5162C11.1366 15.106 10.5802 14.8755 10 14.8755Z" fill="#121212"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex gap-12 align-items-center py-12 line">
+                    <div class="avatar avt-status avt-40">
+                        <img src="images/avt/avt-2.png" alt="">
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between flex-grow-1">
+                        <div class="">
+                            <div class="text-caption-2 text-Primary">UI/UX Designer</div>
+                            <a href="message.html" class="link text-button-small text-OnSurface mb-4">Giana Donin</a>
+                            <div class="text-caption-3">Connected 4 day ago</div>
+                        </div>
+                        <div class="d-flex align-items-center gap-8">
+                            <a href="message.html" class="tf-btn style-1 text-button-small round-full type-small">Message</a>
+                            <a class="right-icon more-option d-flex" data-bs-target="#more-option" data-bs-toggle="offcanvas" aria-controls="offcanvasRight">
+                                <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                    <path d="M12.1875 10.813C12.1875 11.2456 12.0592 11.6686 11.8188 12.0283C11.5785 12.388 11.2368 12.6684 10.8371 12.834C10.4374 12.9995 9.99757 13.0429 9.57324 12.9585C9.14891 12.8741 8.75913 12.6657 8.45321 12.3598C8.14728 12.0539 7.93894 11.6641 7.85453 11.2397C7.77013 10.8154 7.81345 10.3756 7.97901 9.97587C8.14458 9.57616 8.42496 9.23452 8.78469 8.99415C9.14442 8.75378 9.56735 8.62549 10 8.62549C10.5802 8.62549 11.1366 8.85596 11.5468 9.26619C11.957 9.67643 12.1875 10.2328 12.1875 10.813ZM10 6.75049C10.4326 6.75049 10.8556 6.6222 11.2153 6.38183C11.575 6.14146 11.8554 5.79982 12.021 5.40011C12.1866 5.0004 12.2299 4.56056 12.1455 4.13623C12.0611 3.7119 11.8527 3.32212 11.5468 3.01619C11.2409 2.71027 10.8511 2.50193 10.4268 2.41752C10.0024 2.33312 9.56259 2.37644 9.16288 2.542C8.76317 2.70757 8.42153 2.98795 8.18116 3.34768C7.9408 3.70741 7.8125 4.13034 7.8125 4.56299C7.8125 5.14315 8.04297 5.69955 8.45321 6.10979C8.86344 6.52002 9.41984 6.75049 10 6.75049ZM10 14.8755C9.56735 14.8755 9.14442 15.0038 8.78469 15.2442C8.42496 15.4845 8.14458 15.8262 7.97901 16.2259C7.81345 16.6256 7.77013 17.0654 7.85453 17.4898C7.93894 17.9141 8.14728 18.3039 8.45321 18.6098C8.75913 18.9157 9.14891 19.1241 9.57324 19.2085C9.99757 19.2929 10.4374 19.2495 10.8371 19.084C11.2368 18.9184 11.5785 18.638 11.8188 18.2783C12.0592 17.9186 12.1875 17.4956 12.1875 17.063C12.1875 16.4828 11.957 15.9264 11.5468 15.5162C11.1366 15.106 10.5802 14.8755 10 14.8755Z" fill="#121212"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex gap-12 align-items-center py-12 line">
+                    <div class="avatar avt-status avt-40">
+                        <img src="images/avt/avt-3.png" alt="">
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between flex-grow-1">
+                        <div class="">
+                            <div class="text-caption-2 text-Primary">UI/UX Designer</div>
+                            <a href="message.html" class="link text-button-small text-OnSurface mb-4">Roger Donin</a>
+                            <div class="text-caption-3">Connected 4 day ago</div>
+                        </div>
+                        <div class="d-flex align-items-center gap-8">
+                            <a href="message.html" class="tf-btn style-1 text-button-small round-full type-small">Message</a>
+                            <a class="right-icon more-option d-flex" data-bs-target="#more-option" data-bs-toggle="offcanvas" aria-controls="offcanvasRight">
+                                <svg width="20" height="21" viewBox="0 0 20 21" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                                    <path d="M12.1875 10.813C12.1875 11.2456 12.0592 11.6686 11.8188 12.0283C11.5785 12.388 11.2368 12.6684 10.8371 12.834C10.4374 12.9995 9.99757 13.0429 9.57324 12.9585C9.14891 12.8741 8.75913 12.6657 8.45321 12.3598C8.14728 12.0539 7.93894 11.6641 7.85453 11.2397C7.77013 10.8154 7.81345 10.3756 7.97901 9.97587C8.14458 9.57616 8.42496 9.23452 8.78469 8.99415C9.14442 8.75378 9.56735 8.62549 10 8.62549C10.5802 8.62549 11.1366 8.85596 11.5468 9.26619C11.957 9.67643 12.1875 10.2328 12.1875 10.813ZM10 6.75049C10.4326 6.75049 10.8556 6.6222 11.2153 6.38183C11.575 6.14146 11.8554 5.79982 12.021 5.40011C12.1866 5.0004 12.2299 4.56056 12.1455 4.13623C12.0611 3.7119 11.8527 3.32212 11.5468 3.01619C11.2409 2.71027 10.8511 2.50193 10.4268 2.41752C10.0024 2.33312 9.56259 2.37644 9.16288 2.542C8.76317 2.70757 8.42153 2.98795 8.18116 3.34768C7.9408 3.70741 7.8125 4.13034 7.8125 4.56299C7.8125 5.14315 8.04297 5.69955 8.45321 6.10979C8.86344 6.52002 9.41984 6.75049 10 6.75049ZM10 14.8755C9.56735 14.8755 9.14442 15.0038 8.78469 15.2442C8.42496 15.4845 8.14458 15.8262 7.97901 16.2259C7.81345 16.6256 7.77013 17.0654 7.85453 17.4898C7.93894 17.9141 8.14728 18.3039 8.45321 18.6098C8.75913 18.9157 9.14891 19.1241 9.57324 19.2085C9.99757 19.2929 10.4374 19.2495 10.8371 19.084C11.2368 18.9184 11.5785 18.638 11.8188 18.2783C12.0592 17.9186 12.1875 17.4956 12.1875 17.063C12.1875 16.4828 11.957 15.9264 11.5468 15.5162C11.1366 15.106 10.5802 14.8755 10 14.8755Z" fill="#121212"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="offcanvas offcanvas-bottom more-option" id="more-option">
+        <div class="overflow-auto">
+            <div class="more-option-wrap">
+                <a href="javascript:void(0);" data-bs-dismiss="offcanvas" class="item">
+                    <svg class="icon" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="../../www.w3.org/2000/svg.html">
+                        <path d="M19.8435 10.6245C19.8435 10.7489 19.7941 10.8681 19.7062 10.956C19.6183 11.0439 19.4991 11.0933 19.3748 11.0933H15.6248C15.5004 11.0933 15.3812 11.0439 15.2933 10.956C15.2054 10.8681 15.156 10.7489 15.156 10.6245C15.156 10.5002 15.2054 10.381 15.2933 10.2931C15.3812 10.2052 15.5004 10.1558 15.6248 10.1558H19.3748C19.4991 10.1558 19.6183 10.2052 19.7062 10.2931C19.7941 10.381 19.8435 10.5002 19.8435 10.6245ZM15.3583 15.323C15.4001 15.3698 15.4321 15.4245 15.4524 15.4838C15.4727 15.5432 15.4808 15.6061 15.4764 15.6686C15.4719 15.7312 15.4549 15.7923 15.4264 15.8482C15.3979 15.9041 15.3585 15.9537 15.3105 15.994C15.2625 16.0344 15.2068 16.0648 15.1469 16.0832C15.0869 16.1017 15.0239 16.108 14.9615 16.1016C14.899 16.0953 14.8385 16.0765 14.7835 16.0464C14.7285 16.0162 14.6801 15.9753 14.6412 15.9261C13.0388 14.0191 10.8349 12.9683 8.43725 12.9683C6.0396 12.9683 3.83647 14.0191 2.23335 15.9261C2.15214 16.017 2.03872 16.0727 1.91714 16.0814C1.79556 16.09 1.67538 16.051 1.58209 15.9726C1.48881 15.8941 1.42975 15.7824 1.41744 15.6611C1.40513 15.5399 1.44054 15.4186 1.51616 15.323C2.74507 13.8597 4.29663 12.8495 6.01538 12.3636C4.9998 11.8233 4.19408 10.9589 3.72638 9.90786C3.25869 8.85686 3.15588 7.67964 3.43433 6.56348C3.71277 5.44731 4.35646 4.45632 5.26301 3.74814C6.16955 3.03996 7.28689 2.65527 8.43725 2.65527C9.58762 2.65527 10.705 3.03996 11.6115 3.74814C12.518 4.45632 13.1617 5.44731 13.4402 6.56348C13.7186 7.67964 13.6158 8.85686 13.1481 9.90786C12.6804 10.9589 11.8747 11.8233 10.8591 12.3636C12.5779 12.8495 14.1294 13.8597 15.3583 15.323ZM8.43725 12.0308C9.27164 12.0308 10.0873 11.7834 10.7811 11.3198C11.4748 10.8562 12.0156 10.1974 12.3349 9.42649C12.6542 8.65561 12.7377 7.80736 12.5749 6.989C12.4122 6.17065 12.0104 5.41894 11.4204 4.82893C10.8304 4.23893 10.0786 3.83713 9.26029 3.67435C8.44193 3.51157 7.59368 3.59512 6.82281 3.91442C6.05193 4.23373 5.39305 4.77446 4.92949 5.46823C4.46593 6.162 4.2185 6.97765 4.2185 7.81204C4.21974 8.93054 4.66462 10.0029 5.45552 10.7938C6.24642 11.5847 7.31875 12.0296 8.43725 12.0308Z" fill="#121212"/>
+                    </svg>
+                    <div class="text-caption-1 text-OnSurface">Remove connection</div>
+                </a>
+            </div>
+        </div>
+    </div>
+
+
+    <script type="text/javascript" src="js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="js/jquery.min.js"></script>
+    <script type="text/javascript" src="js/lazysize.min.js"></script>
+    <script type="text/javascript" src="js/countto.js"></script>
+    <script type="text/javascript" src="js/swiper-bundle.min.js"></script>
+    <script type="text/javascript" src="js/carousel.js"></script>
+    <script type="text/javascript" src="js/jquery.nice-select.min.js"></script>
+    <script type="text/javascript" src="js/main.js"></script>
+
+
+
+</body>
+
+
+<!-- Mirrored from findee-ruddy.vercel.app/findee/setting-connections.html by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 05 Oct 2026 07:35:50 GMT -->
+</html>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!-- Mirrored from findee-ruddy.vercel.app/findee/companies-filter.html by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 05 Oct 2026 07:35:46 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, viewport-fit=cover">
+    <!-- font -->
+    <link rel="stylesheet" href="fonts/fonts.css">
+    <!-- Icons -->
+    <link rel="stylesheet" href="fonts/font-icons.css">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet"type="text/css" href="css/nouislider.min.css"/>
+    <link rel="stylesheet" href="css/swiper-bundle.min.css">
+    <link rel="stylesheet"type="text/css" href="css/styles.css"/>
+
+    <!-- Favicon and Touch Icons  -->
+    <link rel="shortcut icon" href="images/logo/168.png" />
+    <link rel="apple-touch-icon-precomposed" href="images/logo/168.png" />
+    <title>Companies Filters</title>
+    <script>
+        if (localStorage.toggled === "dark-theme") {
+            document.documentElement.classList.add('dark-theme');
+        }
+    </script>
+
+</head>
+
+<body>
+    <!-- preloade -->
+    <div class="preload preload-container">
+        <div class="logo-img">
+            <img src="images/logo/logo-light.png" alt="">
+        </div>
+        
+    </div>
+    <!-- /preload -->
+    <div class="header-avt fixed-top">
+        <div class="left">
+            <a href="javascript:void(0);" class="icon back-btn text-caption-1">
+                Cancel
+            </a>
+        </div>
+        <h4>Companies Filters</h4>
+        <a href="saved.html#Saved-Jobs" class="text-caption-1 text-Primary">Save</a>
+    </div>
+    <div class="app-content style-4 ">
+        <div class="tf-container">
+            <form action="https://findee-ruddy.vercel.app/findee/search-result.html#Companies">
+                <div class="d-grid gap-16 mb-36">
+                    <div class="">
+                        <div class="text-button text-OnSurface fw-6 mb-12">Categories</div>
+                        <div class="nice-select tf-select" tabindex="0">
+                            <span class="current text-body text-OnSurface">All categories</span>
+                            <ul class="list">
+                                <li data-value="All categories" class="option selected">All categories</li>
+                                <li data-value="Categories 1" class="option">Categories 1</li>
+                                <li data-value="Categories 2" class="option">Categories 2</li>
+                                <li data-value="Other" class="option">Other</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="">
+                        <div class="text-button text-OnSurface fw-6 mb-20">
+                            Radius: <span class="field-dir text-Primary">25</span><span class="text-Primary"> Miles</span>
+                        </div>
+                        <div id="basic-slider-one"></div>
+                    </div>
+                    <div class="">
+                        <div class="text-button text-OnSurface fw-6 mb-12">Company Size</div>
+                        <div class="nice-select tf-select" tabindex="0">
+                            <span class="current text-body text-OnSurface">Company Size</span>
+                            <ul class="list">
+                                <li data-value="Company Size" class="option">Company Size</li>
+                                <li data-value="1-5 employees" class="option selected">1-5 employees</li>
+                                <li data-value="6-10 employees" class="option">6-10 employees</li>
+                                <li data-value="11-20 employees" class="option">11-20 employees</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="tf-btn round-full Login">Find Job</button>
+            </form>
+        </div>
+
+    </div>
+
+   
+    
+    <script type="text/javascript" src="js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="js/jquery.min.js"></script>
+    <script type="text/javascript" src="js/lazysize.min.js"></script>
+    <script type="text/javascript" src="js/jquery.nice-select.min.js"></script>
+    <script type="text/javascript" src="js/nouislider.min.js"></script>
+    <script type="text/javascript" src="js/rangle-slider.js"></script>
+    <script type="text/javascript" src="js/main.js"></script>
+
+</body>
+
+<!-- Mirrored from findee-ruddy.vercel.app/findee/companies-filter.html by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 05 Oct 2026 07:35:46 GMT -->
+</html>
