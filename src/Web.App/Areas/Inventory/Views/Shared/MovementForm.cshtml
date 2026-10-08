@@ -2,11 +2,11 @@
 @{
     (string title, string subtitle, string menu, string action, string saveText) = Model.Kind switch
     {
-        StockMovementKind.Return => ("New Stock Return", "Leftover feed/OVK from a coop back to a central warehouse of the same branch",
+        StockMovementKind.Return => ("New Stock Return", "Leftover feed/OVK from a farm back to a central warehouse of the same branch",
             MenuCodes.InventoryStockReturns, "Create", "Post Return"),
-        StockMovementKind.FeedMutation => ("Feed Mutation", "Feed between coops: posted as a return to the central warehouse plus a transfer to the other coop",
+        StockMovementKind.FeedMutation => ("Feed Mutation", "Feed between farms: posted as a return to the central warehouse plus a transfer to the other farm",
             MenuCodes.InventoryFeedMutations, "Index", "Post Mutation"),
-        _ => ("New Stock Transfer", "From a central warehouse to another warehouse of the same branch; to a coop it is charged to the running cycle",
+        _ => ("New Stock Transfer", "From a central warehouse to another warehouse of the same branch; to a farm it is charged to the running cycle",
             MenuCodes.InventoryStockTransfers, "Create", "Post Transfer")
     };
     ViewData["Title"] = title;
@@ -28,7 +28,7 @@
                 <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
                 <div class="row">
                     <div class="col-md-4 mb-3">
-                        <label asp-for="FromWarehouseId" class="form-label">From @(fromType == "Coop" ? "coop warehouse" : "central warehouse")</label> <span class="text-danger">*</span>
+                        <label asp-for="FromWarehouseId" class="form-label">From @(fromType == "Coop" ? "farm warehouse" : "central warehouse")</label> <span class="text-danger">*</span>
                         <select asp-for="FromWarehouseId" id="FromWarehouseId" class="form-select movement-from">
                             <option value="">—</option>
                             @foreach (WarehouseOption warehouse in Model.Warehouses.Where(w => w.Type == fromType))

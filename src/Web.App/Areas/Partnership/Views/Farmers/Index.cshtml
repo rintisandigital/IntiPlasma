@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Farmers";
     ViewData["Menu"] = MenuCodes.PartnershipFarmers;
+    bool canExport = await Rights.CanAsync(MenuCodes.PartnershipFarmers, MenuRights.Export);
 }
 <partial name="Partials/_ListHeader" model='new ListHeaderModel("Farmers", "Inti and plasma farmers per branch", MenuCodes.PartnershipFarmers, "Add Farmer")' />
 
@@ -29,7 +30,7 @@
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead class="thead-light">
-                    <tr><th>Code</th><th>Name</th><th>Type</th><th>Branch</th><th>Phone</th><th class="text-end">Coops</th><th>Status</th><th></th></tr>
+                    <tr><th>Code</th><th>Name</th><th>Type</th><th>Branch</th><th>Phone</th><th class="text-end">Farms</th><th>Status</th><th></th></tr>
                 </thead>
                 <tbody>
                     @foreach (Application.Farmers.FarmerResponse farmer in Model.Rows.Items)
@@ -44,7 +45,13 @@
                                 <a asp-controller="Coops" asp-action="Index" asp-route-farmerId="@farmer.Id" asp-route-branch="all">@Fmt.Number(farmer.CoopCount)</a>
                             </td>
                             <td><partial name="Partials/_StatusBadge" model='farmer.IsActive ? "Active" : "Inactive"' /></td>
-                            <td class="text-end"><a asp-action="Edit" asp-route-id="@farmer.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                            <td class="text-end text-nowrap">
+                                @if (canExport)
+                                {
+                                    <a asp-action="Print" asp-route-id="@farmer.Id" target="_blank" class="btn btn-sm btn-light" title="PDF"><i class="ti ti-file-type-pdf"></i></a>
+                                }
+                                <a asp-action="Edit" asp-route-id="@farmer.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a>
+                            </td>
                         </tr>
                     }
                     @if (Model.Rows.Items.Count == 0)

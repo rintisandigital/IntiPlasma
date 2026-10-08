@@ -30,7 +30,7 @@ public static class CostingDocumentPdf
             [
                 ("Plasma", $"{settlement.FarmerName} ({settlement.FarmerCode})"),
                 ("Settlement", settlement.Number),
-                ("Coop", $"{settlement.CoopCode} — {settlement.CoopName}"),
+                ("Farm", $"{settlement.CoopCode} — {settlement.CoopName}"),
                 ("Date", fmt.Date(settlement.SettlementDate)),
                 ("Cycle", settlement.CycleNumber),
                 ("Contract", $"{settlement.ContractCode} ({SettlementLines.Scheme(settlement.Scheme)})"),

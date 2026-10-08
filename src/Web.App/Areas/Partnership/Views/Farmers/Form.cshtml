@@ -23,9 +23,14 @@
                 <h5 class="card-title mb-0">Farmer</h5>
                 @if (!Model.IsNew)
                 {
-                    <a asp-controller="Coops" asp-action="Index" asp-route-farmerId="@Model.Id" asp-route-branch="all" class="btn btn-sm btn-light">
-                        <i class="ti ti-building-warehouse me-1"></i>@Fmt.Number(Model.CoopCount) coop(s)
-                    </a>
+                    <div class="d-flex gap-2">
+                        <a asp-action="Print" asp-route-id="@Model.Id" asp-menu="@MenuCodes.PartnershipFarmers" asp-right="Export" target="_blank" class="btn btn-sm btn-outline-danger">
+                            <i class="ti ti-file-type-pdf me-1"></i>Export PDF
+                        </a>
+                        <a asp-controller="Coops" asp-action="Index" asp-route-farmerId="@Model.Id" asp-route-branch="all" class="btn btn-sm btn-light">
+                            <i class="ti ti-building-warehouse me-1"></i>@Fmt.Number(Model.CoopCount) farm(s)
+                        </a>
+                    </div>
                 }
             </div>
             <div class="card-body">

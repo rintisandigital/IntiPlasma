@@ -60,7 +60,7 @@
                 <div class="row">
                     <div class="col-md-4 mb-2"><div class="text-muted fs-13">Settlement date</div><div class="fw-semibold">@Fmt.Date(settlement.SettlementDate)</div></div>
                     <div class="col-md-4 mb-2"><div class="text-muted fs-13">Contract</div><div class="fw-semibold">@settlement.ContractCode · @SettlementLines.Scheme(settlement.Scheme)</div></div>
-                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Coop</div><div class="fw-semibold">@settlement.CoopCode — @settlement.CoopName</div></div>
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Farm</div><div class="fw-semibold">@settlement.CoopCode — @settlement.CoopName</div></div>
                     <div class="col-md-4 mb-2">
                         <div class="text-muted fs-13">Cycle</div>
                         <div class="fw-semibold"><a asp-area="Production" asp-controller="Cycles" asp-action="Details" asp-route-id="@settlement.CycleId">@settlement.CycleNumber</a> <partial name="Partials/_StatusBadge" model="settlement.CycleStatus" /></div>

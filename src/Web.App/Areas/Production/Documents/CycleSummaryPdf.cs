@@ -54,7 +54,7 @@ public static class CycleSummaryPdf
                 Field("Cycle", cycle.Number);
                 Field("Status", cycle.Status);
                 Field("Farmer", $"{cycle.FarmerName} ({cycle.FarmerType})");
-                Field("Coop", $"{cycle.CoopCode} — {cycle.CoopName}");
+                Field("Farm", $"{cycle.CoopCode} — {cycle.CoopName}");
                 Field("Branch", cycle.BranchCode);
                 Field("Contract", cycle.ContractCode ?? "—");
                 Field("Chick-in", cycle.ChickInDate is { } chickIn ? fmt.Date(chickIn) : $"planned {fmt.Date(cycle.PlannedChickInDate)}");

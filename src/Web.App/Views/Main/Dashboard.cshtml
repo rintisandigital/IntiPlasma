@@ -31,7 +31,7 @@
                 Url.Action("Index", "Receivables", new { area = "Sales" })!),
             ("Payables", Fmt.Money(s.Payables), $"{Fmt.Money(s.PayablesOverdue)} overdue", "ti-file-invoice", MenuCodes.FinancePayables,
                 Url.Action("Index", "Payables", new { area = "Finance" })!),
-            ("Stock value", Fmt.Money(s.StockValue), "warehouses and coops, moving average", "ti-packages", MenuCodes.InventoryStock,
+            ("Stock value", Fmt.Money(s.StockValue), "warehouses and farms, moving average", "ti-packages", MenuCodes.InventoryStock,
                 Url.Action("Index", "Stock", new { area = "Inventory" })!)
         ];
     }

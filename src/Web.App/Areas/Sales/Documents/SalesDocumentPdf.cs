@@ -15,7 +15,7 @@ namespace Web.App.Areas.Sales.Documents;
 /// </summary>
 public static class SalesDocumentPdf
 {
-    private static readonly string[] DeliveryHeaders = ["#", "Item", "Harvest", "Cycle / coop", "Birds", "Weight (kg)", "Avg (kg)"];
+    private static readonly string[] DeliveryHeaders = ["#", "Item", "Harvest", "Cycle / farm", "Birds", "Weight (kg)", "Avg (kg)"];
     private static readonly string[] InvoiceHeaders = ["#", "Delivery", "Item", "Birds", "Weight (kg)", "Price/kg", "Amount", "VAT"];
 
     public static void DeliveryNote(IContainer container, DeliveryOrderResponse delivery, DisplayFormatter fmt)

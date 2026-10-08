@@ -44,6 +44,12 @@ internal sealed class UpdateCoopCommandHandler(
             return result;
         }
 
+        // Clients that do not send the profile (older mobile builds) leave it unchanged.
+        if (command.Profile is not null)
+        {
+            coop.SetProfile(command.Profile);
+        }
+
         Result documents = await attachments.ApplyDocumentsAsync(
             coop,
             AttachmentOwner.Of(AttachmentOwnerTypes.Coop, coop.Id),

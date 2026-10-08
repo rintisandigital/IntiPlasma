@@ -54,7 +54,7 @@ public sealed class CyclesController(
         new("Branch", c => c.BranchCode, Width: 0.7f),
         new("Farmer", c => $"{c.FarmerCode} — {c.FarmerName}", Width: 2.2f),
         new("Type", c => c.FarmerType, Width: 0.7f),
-        new("Coop", c => $"{c.CoopCode} — {c.CoopName}", Width: 2),
+        new("Farm", c => $"{c.CoopCode} — {c.CoopName}", Width: 2),
         new("Contract", c => c.ContractCode, Width: 1),
         new("Chick-in", c => c.ChickInDate ?? c.PlannedChickInDate, ExportFormat.Date, 1),
         new("Initial population", c => c.InitialPopulation ?? c.PlannedPopulation, ExportFormat.WholeNumber, 1),
@@ -171,7 +171,7 @@ public sealed class CyclesController(
 
             if (result.IsSuccess)
             {
-                NotifySuccess($"Cycle {result.Value.Number} has been planned. Transfer DOC to the coop warehouse, then record the chick-in.");
+                NotifySuccess($"Cycle {result.Value.Number} has been planned. Transfer DOC to the farm warehouse, then record the chick-in.");
                 return RedirectToAction(nameof(Details), new { id = result.Value.Id });
             }
 

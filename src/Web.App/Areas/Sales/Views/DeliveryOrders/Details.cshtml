@@ -65,7 +65,7 @@
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table mb-0">
-                <thead class="thead-light"><tr><th>#</th><th>Item</th><th>Harvest</th><th>Cycle / coop</th><th class="text-end">Birds</th><th class="text-end">kg</th><th class="text-end">Avg</th><th class="text-end">Price/kg</th><th class="text-end">Amount</th><th>VAT</th></tr></thead>
+                <thead class="thead-light"><tr><th>#</th><th>Item</th><th>Harvest</th><th>Cycle / farm</th><th class="text-end">Birds</th><th class="text-end">kg</th><th class="text-end">Avg</th><th class="text-end">Price/kg</th><th class="text-end">Amount</th><th>VAT</th></tr></thead>
                 <tbody>
                     @foreach (Application.Sales.DeliveryOrderLineResponse line in delivery.Lines ?? [])
                     {

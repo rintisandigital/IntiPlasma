@@ -43,9 +43,16 @@ public sealed class Coop : AggregateRoot, IHasDocuments
     public bool IsActive { get; private set; }
 
     /// <summary>
+    /// Survey data (building, equipment, production plan, …) shown on the printed farm data sheet.
+    /// </summary>
+    public CoopProfile Profile { get; private set; } = new();
+
+    /// <summary>
     /// Lampiran: ids of the attached photos and documents.
     /// </summary>
     public Guid[] Documents { get; private set; } = [];
+
+    public void SetProfile(CoopProfile? profile) => Profile = (profile ?? new CoopProfile()).Normalize();
 
     public Result SetDocuments(IEnumerable<Guid>? documents) =>
         DocumentList.Apply(documents, value => Documents = value);

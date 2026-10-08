@@ -34,8 +34,8 @@ public sealed class WarehousesController(
         new("Code", w => w.Code, Width: 1.2f),
         new("Name", w => w.Name, Width: 3),
         new("Branch", w => w.BranchCode, Width: 1),
-        new("Type", w => w.Type, Width: 1),
-        new("Coop", w => w.CoopCode, Width: 1),
+        new("Type", w => EnumOptions.Label(w.Type), Width: 1),
+        new("Farm", w => w.CoopCode, Width: 1),
         new("Address", w => w.Address, Width: 3),
         new("Active", w => w.IsActive, ExportFormat.Boolean, 0.8f)
     ];

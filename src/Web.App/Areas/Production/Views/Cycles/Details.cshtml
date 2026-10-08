@@ -6,7 +6,7 @@
     ViewData["Title"] = $"Cycle {cycle.Number}";
     ViewData["Menu"] = MenuCodes.ProductionCycles;
     Domain.Partnership.Cycles.CyclePerformance? figures = Model.Performance?.Closing ?? Model.Performance?.Current;
-    string[] steps = ["Planned", "DOC in coop", "Chick-in", "Harvesting", "Closed"];
+    string[] steps = ["Planned", "DOC in farm", "Chick-in", "Harvesting", "Closed"];
     string Active(string tab) => Model.Tab == tab ? "active" : "";
     string Show(string tab) => Model.Tab == tab ? "show active" : "";
     IReadOnlyList<Application.Production.HarvestResponse> harvests = Model.Performance?.Harvests ?? [];
@@ -46,7 +46,7 @@
         @if (Model.IsRecordable && Model.CanEdit)
         {
             <form asp-action="Close" asp-route-id="@cycle.Id" method="post"
-                  data-confirm="Close cycle @cycle.Number? All birds must be harvested and sold, and the coop warehouse empty.">
+                  data-confirm="Close cycle @cycle.Number? All birds must be harvested and sold, and the farm warehouse empty.">
                 <button type="submit" class="btn btn-outline-secondary"><i class="ti ti-lock me-1"></i>Close Cycle</button>
             </form>
         }
@@ -92,11 +92,11 @@ else
             </div>
             @if (Model.Step == 1)
             {
-                <div class="text-muted fs-13 mt-2">Next: transfer DOC from a central warehouse to the coop warehouse, then record the chick-in.</div>
+                <div class="text-muted fs-13 mt-2">Next: transfer DOC from a central warehouse to the farm warehouse, then record the chick-in.</div>
             }
             else if (Model.Step == 2)
             {
-                <div class="text-muted fs-13 mt-2">@Fmt.Number(Model.DocInCoop, 0) DOC in the coop warehouse — record the chick-in.</div>
+                <div class="text-muted fs-13 mt-2">@Fmt.Number(Model.DocInCoop, 0) DOC in the farm warehouse — record the chick-in.</div>
             }
         </div>
     </div>
@@ -128,7 +128,7 @@ else
 }
 
 <ul class="nav nav-tabs mb-3" role="tablist">
-    @foreach ((string key, string title) in new[] { ("overview", "Overview"), ("recordings", $"Recordings ({Model.Recordings.Count})"), ("harvests", $"Harvests ({harvests.Count})"), ("stock", "Coop Stock"), ("performance", "Performance"), ("cost", "Cost"), ("attachments", $"Attachments ({Model.Attachments.Count})") })
+    @foreach ((string key, string title) in new[] { ("overview", "Overview"), ("recordings", $"Recordings ({Model.Recordings.Count})"), ("harvests", $"Harvests ({harvests.Count})"), ("stock", "Farm Stock"), ("performance", "Performance"), ("cost", "Cost"), ("attachments", $"Attachments ({Model.Attachments.Count})") })
     {
         <li class="nav-item" role="presentation">
             <button class="nav-link @Active(key)" data-bs-toggle="tab" data-bs-target="#tab-@key" type="button" role="tab">@title</button>
@@ -234,7 +234,7 @@ else
                     }
                     @if (Model.CoopStock.Count == 0)
                     {
-                        <tr><td colspan="5" class="text-center text-muted py-3">The coop warehouse is empty.</td></tr>
+                        <tr><td colspan="5" class="text-center text-muted py-3">The farm warehouse is empty.</td></tr>
                     }
                 </tbody>
             </table>

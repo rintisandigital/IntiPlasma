@@ -39,7 +39,7 @@ public sealed class CycleCostsController(
     [
         new("Cycle", c => c.CycleNumber, Width: 1.5f),
         new("Branch", c => c.BranchCode, Width: 0.7f),
-        new("Coop", c => c.CoopCode, Width: 0.9f),
+        new("Farm", c => c.CoopCode, Width: 0.9f),
         new("Farmer", c => c.FarmerName, Width: 1.5f),
         new("Scheme", c => c.Scheme is null ? "Inti" : SettlementLines.Scheme(c.Scheme), Width: 1),
         new("Status", c => c.Status, Width: 0.8f),

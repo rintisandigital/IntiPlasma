@@ -12,4 +12,5 @@ public sealed record UpdateCoopCommand(
     decimal? Latitude,
     decimal? Longitude,
     bool IsActive,
-    IReadOnlyList<Guid>? Documents = null) : ICommand;
+    IReadOnlyList<Guid>? Documents = null,
+    CoopProfile? Profile = null) : ICommand;

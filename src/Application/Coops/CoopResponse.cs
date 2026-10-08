@@ -1,3 +1,5 @@
+using Domain.MasterData.Coops;
+
 namespace Application.Coops;
 
 public sealed record CoopResponse
@@ -55,4 +57,9 @@ public sealed record CoopResponse
     /// The planned or running production cycle, if any.
     /// </summary>
     public Guid? OpenCycleId { get; init; }
+
+    /// <summary>
+    /// Survey data (building, equipment, production plan, …); only filled by the get-by-id query.
+    /// </summary>
+    public CoopProfile Profile { get; init; } = new();
 }

@@ -1,3 +1,4 @@
+using Application.Coops;
 using Domain.MasterData.Branches;
 using Domain.MasterData.Coops;
 using Domain.MasterData.Customers;
@@ -179,6 +180,10 @@ internal sealed class CoopConfiguration : IEntityTypeConfiguration<Coop>
         builder.Property(c => c.Address).HasMaxLength(500);
         builder.Property(c => c.Latitude).HasPrecision(9, 6);
         builder.Property(c => c.Longitude).HasPrecision(9, 6);
+        builder.Property(c => c.Profile)
+            .HasColumnType("jsonb")
+            .HasDefaultValueSql("'{}'::jsonb")
+            .HasConversion(profile => CoopProfileJson.Serialize(profile), json => CoopProfileJson.Deserialize(json));
         builder.HasIndex(c => c.Code).IsUnique();
         builder.HasIndex(c => c.BranchId);
 

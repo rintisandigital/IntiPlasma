@@ -246,7 +246,7 @@ public sealed class ReportsController(PageSupport support, DisplayFormatter form
         BranchFilter branchFilter = await support.BranchFilterAsync(branch);
         ProfitabilityGrouping grouping = groupBy ?? ProfitabilityGrouping.Cycle;
 
-        ReportPageViewModel page = await PageAsync("Profitability", "Contribution margin per cycle, coop, farmer or branch", MenuCodes.ReportsProfitability,
+        ReportPageViewModel page = await PageAsync("Profitability", "Contribution margin per cycle, farm, farmer or branch", MenuCodes.ReportsProfitability,
             nameof(ProfitabilityExport),
             async ct => Map(await query.Handle(new GetProfitabilityQuery(start, end, grouping, branchFilter.BranchId, farmerId), ct),
                 FinancialReportDocuments.Profitability, ProfitabilityFilters(branchFilter, start, end, grouping)),
@@ -464,7 +464,7 @@ public sealed class ReportsController(PageSupport support, DisplayFormatter form
         [branchFilter.Description, $"As of {formatter.Date(asOf)}"];
 
     private List<string> ProfitabilityFilters(BranchFilter branchFilter, DateOnly from, DateOnly to, ProfitabilityGrouping grouping) =>
-        [.. PeriodFilters(branchFilter, from, to), $"Grouped by: {grouping}"];
+        [.. PeriodFilters(branchFilter, from, to), $"Grouped by: {EnumOptions.Label(grouping.ToString())}"];
 
     private static List<string> TaxFilters(BranchFilter branchFilter, int year, int month, bool withholding) =>
         [branchFilter.Description, $"Tax period (masa): {CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(month)} {year}",

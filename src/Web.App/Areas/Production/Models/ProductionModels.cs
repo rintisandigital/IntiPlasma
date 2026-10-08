@@ -14,7 +14,7 @@ namespace Web.App.Areas.Production.Models;
 public sealed class PlanCycleFormViewModel
 {
     [Required]
-    [Display(Name = "Coop")]
+    [Display(Name = "Farm")]
     public Guid? CoopId { get; set; }
 
     public string? CoopLabel { get; set; }

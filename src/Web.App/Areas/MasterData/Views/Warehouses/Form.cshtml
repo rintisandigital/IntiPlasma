@@ -3,7 +3,7 @@
     ViewData["Title"] = Model.IsNew ? "Add Warehouse" : $"Warehouse {Model.Code}";
     ViewData["Menu"] = MenuCodes.MasterWarehouses;
 }
-<partial name="Partials/_PageHeader" model='new PageHeaderModel(Model.IsNew ? "Add Warehouse" : $"Warehouse {Model.Code}", Model.CoopCode is null ? "Central warehouse (gudang induk)" : $"Coop warehouse of {Model.CoopCode}")' />
+<partial name="Partials/_PageHeader" model='new PageHeaderModel(Model.IsNew ? "Add Warehouse" : $"Warehouse {Model.Code}", Model.CoopCode is null ? "Central warehouse (gudang induk)" : $"Farm warehouse of {Model.CoopCode}")' />
 
 <div class="row">
     <div class="col-xl-7 col-lg-9">

@@ -135,6 +135,32 @@ public sealed partial class ExportService(
         return File(header, ExportFileFormat.Pdf, pdf);
     }
 
+    /// <summary>
+    /// A printed document whose sections each start on a new portrait A4 page with their own letterhead title
+    /// (e.g. farmer data + photo gallery); page numbers run across the whole document.
+    /// </summary>
+    public FileContentResult Document(ExportHeader header, IReadOnlyList<(string Title, Action<IContainer> Content)> pages)
+    {
+        ArgumentNullException.ThrowIfNull(header);
+        ArgumentNullException.ThrowIfNull(pages);
+
+        byte[] pdf = QuestPDF.Fluent.Document.Create(document =>
+        {
+            foreach ((string title, Action<IContainer> content) in pages)
+            {
+                document.Page(page =>
+                {
+                    PdfLayout.Page(page, header with { Title = title }, landscape: false);
+                    page.Content().Element(content);
+                });
+            }
+        }).GeneratePdf();
+
+        Log(header, ExportFileFormat.Pdf, 1, isDocument: true);
+
+        return File(header, ExportFileFormat.Pdf, pdf);
+    }
+
     private static FileContentResult File(ExportHeader header, ExportFileFormat format, byte[] content)
     {
         string branch = string.IsNullOrEmpty(header.BranchCode) ? "ALL" : header.BranchCode;

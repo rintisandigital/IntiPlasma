@@ -1,9 +1,11 @@
 @model CoopFormViewModel
+@using Domain.MasterData.Coops
 @{
-    ViewData["Title"] = Model.IsNew ? "Add Coop" : $"Coop {Model.Code}";
+    ViewData["Title"] = Model.IsNew ? "Add Farm" : $"Farm {Model.Code}";
     ViewData["Menu"] = MenuCodes.PartnershipCoops;
+    CoopProfile profile = Model.Profile;
 }
-<partial name="Partials/_PageHeader" model='new PageHeaderModel(Model.IsNew ? "Add Coop" : $"Coop {Model.Code}", "The coop warehouse GK-{code} is created automatically")' />
+<partial name="Partials/_PageHeader" model='new PageHeaderModel(Model.IsNew ? "Add Farm" : $"Farm {Model.Code}", "The farm warehouse GK-{code} is created automatically")' />
 
 <form asp-action="@(Model.IsNew ? "Create" : "Edit")" method="post">
     @if (Model.IsNew)
@@ -18,6 +20,15 @@
     }
     <fieldset disabled="@(!Model.CanSave)">
         <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h5 class="card-title mb-0">Farm</h5>
+                @if (!Model.IsNew)
+                {
+                    <a asp-action="Print" asp-route-id="@Model.Id" asp-menu="@MenuCodes.PartnershipCoops" asp-right="Export" target="_blank" class="btn btn-sm btn-outline-danger">
+                        <i class="ti ti-file-type-pdf me-1"></i>Export PDF
+                    </a>
+                }
+            </div>
             <div class="card-body">
                 <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
                 <div class="row">
@@ -37,7 +48,7 @@
                         else
                         {
                             <input class="form-control" value="@Model.FarmerLabel" disabled>
-                            <div class="form-text">Branch @Model.BranchCode@(Model.OpenCycleId is null ? "" : " · a cycle is running in this coop")</div>
+                            <div class="form-text">Branch @Model.BranchCode@(Model.OpenCycleId is null ? "" : " · a cycle is running in this farm")</div>
                         }
                     </div>
                     <div class="col-md-2 mb-3">
@@ -70,9 +81,29 @@
                         <input asp-for="Longitude" type="number" step="0.000001" min="-180" max="180" class="form-control">
                         <span asp-validation-for="Longitude" class="text-danger fs-13"></span>
                     </div>
-                    <div class="col-12 mb-3">
+                    <div class="col-md-3 mb-3">
+                        <label for="Profile_Phone" class="form-label">Phone</label>
+                        <input asp-for="Profile.Phone" class="form-control" maxlength="30">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="Profile_Country" class="form-label">Country</label>
+                        <input asp-for="Profile.Country" class="form-control" maxlength="60" placeholder="INDONESIA">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="Profile_Province" class="form-label">Province</label>
+                        <input asp-for="Profile.Province" class="form-control" maxlength="60">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="Profile_City" class="form-label">City / regency</label>
+                        <input asp-for="Profile.City" class="form-control" maxlength="100">
+                    </div>
+                    <div class="col-md-8 mb-3">
                         <label asp-for="Address" class="form-label"></label>
                         <input asp-for="Address" class="form-control">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="Profile_LastPartner" class="form-label">Last partner</label>
+                        <input asp-for="Profile.LastPartner" class="form-control" maxlength="150">
                     </div>
                     @if (!Model.IsNew)
                     {
@@ -86,6 +117,234 @@
                 </div>
             </div>
         </div>
+
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Building</h5></div>
+            <div class="card-body pb-0">
+                <div class="row">
+                    <div class="col-md-2 mb-3">
+                        <label for="Profile_LengthM" class="form-label">Length (m)</label>
+                        <input asp-for="Profile.LengthM" type="number" step="any" min="0" class="form-control text-end">
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label for="Profile_WidthM" class="form-label">Width (m)</label>
+                        <input asp-for="Profile.WidthM" type="number" step="any" min="0" class="form-control text-end">
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label for="Profile_HeightM" class="form-label">Height (m)</label>
+                        <input asp-for="Profile.HeightM" type="number" step="any" min="0" class="form-control text-end">
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label for="Profile_Floors" class="form-label">Floors</label>
+                        <input asp-for="Profile.Floors" type="number" step="1" min="1" class="form-control text-end">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="Profile_Construction" class="form-label">Construction</label>
+                        <input asp-for="Profile.Construction" class="form-control" maxlength="60" placeholder="Wood, steel, bamboo…">
+                    </div>
+                </div>
+                @if (profile.AreaM2() is { } area)
+                {
+                    <p class="text-muted fs-13">Area @Fmt.Number(area) m²@(profile.VolumeM3() is { } volume ? $" · volume {Fmt.Number(volume)} m³" : "")</p>
+                }
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h5 class="card-title mb-0">Equipment — fans</h5>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-collection-add="Profile.Fans"><i class="ti ti-plus me-1"></i>Add fan</button>
+            </div>
+            <div class="card-body p-0">
+                <table class="table mb-0" data-collection="Profile.Fans">
+                    <thead class="thead-light"><tr><th>Brand</th><th>Capacity</th><th>Quantity</th><th></th></tr></thead>
+                    <tbody>
+                        <tr class="collection-empty"><td colspan="4" class="text-center text-muted py-3">No fan yet.</td></tr>
+                        @for (int i = 0; i < profile.Fans.Length; i++)
+                        {
+                            <tr class="collection-row">
+                                <td><input name="Profile.Fans[@i].Brand" value="@profile.Fans[i].Brand" maxlength="60" class="form-control"></td>
+                                <td><input type="number" name="Profile.Fans[@i].Capacity" value="@profile.Fans[i].Capacity" step="any" min="0" class="form-control text-end"></td>
+                                <td><input type="number" name="Profile.Fans[@i].Quantity" value="@profile.Fans[i].Quantity" step="1" min="0" class="form-control text-end"></td>
+                                <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h5 class="card-title mb-0">Equipment — running test (wind speed, m/s)</h5>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-collection-add="Profile.FanTests"><i class="ti ti-plus me-1"></i>Add test</button>
+            </div>
+            <div class="card-body p-0">
+                <table class="table mb-0" data-collection="Profile.FanTests">
+                    <thead class="thead-light"><tr><th>Front</th><th>Middle</th><th>Back</th><th class="text-end">Average</th><th></th></tr></thead>
+                    <tbody>
+                        <tr class="collection-empty"><td colspan="5" class="text-center text-muted py-3">No running test yet.</td></tr>
+                        @for (int i = 0; i < profile.FanTests.Length; i++)
+                        {
+                            CoopFanTest test = profile.FanTests[i];
+                            <tr class="collection-row">
+                                <td><input type="number" name="Profile.FanTests[@i].FrontMs" value="@test.FrontMs" step="any" min="0" class="form-control text-end"></td>
+                                <td><input type="number" name="Profile.FanTests[@i].MiddleMs" value="@test.MiddleMs" step="any" min="0" class="form-control text-end"></td>
+                                <td><input type="number" name="Profile.FanTests[@i].BackMs" value="@test.BackMs" step="any" min="0" class="form-control text-end"></td>
+                                <td class="text-end align-middle">@(test.AverageMs() is { } avg ? Fmt.Number(avg) : "—")</td>
+                                <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Equipment — drinkers, feeders, curtain &amp; genset</h5></div>
+            <div class="card-body pb-0">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label for="Profile_NippleUnits" class="form-label">Nipple (unit)</label>
+                        <input asp-for="Profile.NippleUnits" type="number" step="1" min="0" class="form-control text-end">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="Profile_TmaoUnits" class="form-label">TMAO (unit)</label>
+                        <input asp-for="Profile.TmaoUnits" type="number" step="1" min="0" class="form-control text-end">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="Profile_Curtain" class="form-label">Curtain</label>
+                        <input asp-for="Profile.Curtain" class="form-control" maxlength="60" placeholder="Terpaulin…">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="Profile_ChickFeederUnits" class="form-label">Chick feeder (unit)</label>
+                        <input asp-for="Profile.ChickFeederUnits" type="number" step="1" min="0" class="form-control text-end">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="Profile_TraUnits" class="form-label">TRA (unit)</label>
+                        <input asp-for="Profile.TraUnits" type="number" step="1" min="0" class="form-control text-end">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="Profile_SuperFeederUnits" class="form-label">Super feeder (unit)</label>
+                        <input asp-for="Profile.SuperFeederUnits" type="number" step="1" min="0" class="form-control text-end">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="Profile_AugerUnits" class="form-label">Auger (unit)</label>
+                        <input asp-for="Profile.AugerUnits" type="number" step="1" min="0" class="form-control text-end">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="Profile_GensetBrand" class="form-label">Genset brand</label>
+                        <input asp-for="Profile.GensetBrand" class="form-control" maxlength="60">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="Profile_GensetKva" class="form-label">Genset capacity (kVA)</label>
+                        <input asp-for="Profile.GensetKva" type="number" step="any" min="0" class="form-control text-end">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="Profile_GensetFactoryMade" class="form-label">Genset factory-made</label>
+                        <select name="Profile.GensetFactoryMade" id="Profile_GensetFactoryMade" class="form-select">
+                            <option value="">—</option>
+                            <option value="true" selected="@(profile.GensetFactoryMade == true)">Yes</option>
+                            <option value="false" selected="@(profile.GensetFactoryMade == false)">No (assembled)</option>
+                        </select>
+                    </div>
+                </div>
+                <p class="text-muted fs-13">The PDF shows the ratio per unit (capacity ÷ units).</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h5 class="card-title mb-0">Production plan</h5>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-collection-add="Profile.Thinnings"><i class="ti ti-plus me-1"></i>Add thinning</button>
+            </div>
+            <div class="card-body pb-0">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="Profile_TonnageCapacityKg" class="form-label">Tonnage capacity (kg)</label>
+                        <input asp-for="Profile.TonnageCapacityKg" type="number" step="any" min="0" class="form-control text-end">
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label for="Profile_InitialDensityBirdsPerM2" class="form-label">Initial birds/m²</label>
+                        <input asp-for="Profile.InitialDensityBirdsPerM2" type="number" step="any" min="0" class="form-control text-end">
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label for="Profile_InitialDensityKgPerM2" class="form-label">Initial kg/m²</label>
+                        <input asp-for="Profile.InitialDensityKgPerM2" type="number" step="any" min="0" class="form-control text-end">
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label for="Profile_FinalDensityBirdsPerM2" class="form-label">Final birds/m²</label>
+                        <input asp-for="Profile.FinalDensityBirdsPerM2" type="number" step="any" min="0" class="form-control text-end">
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label for="Profile_FinalDensityKgPerM2" class="form-label">Final kg/m²</label>
+                        <input asp-for="Profile.FinalDensityKgPerM2" type="number" step="any" min="0" class="form-control text-end">
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <table class="table mb-0" data-collection="Profile.Thinnings">
+                    <thead class="thead-light"><tr><th>Thinning weight (kg)</th><th>Birds</th><th></th></tr></thead>
+                    <tbody>
+                        <tr class="collection-empty"><td colspan="3" class="text-center text-muted py-3">No thinning planned.</td></tr>
+                        @for (int i = 0; i < profile.Thinnings.Length; i++)
+                        {
+                            <tr class="collection-row">
+                                <td><input type="number" name="Profile.Thinnings[@i].WeightKg" value="@profile.Thinnings[i].WeightKg" step="any" min="0" class="form-control text-end"></td>
+                                <td><input type="number" name="Profile.Thinnings[@i].Birds" value="@profile.Thinnings[i].Birds" step="1" min="0" class="form-control text-end"></td>
+                                <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Storage capacity &amp; other information</h5></div>
+            <div class="card-body pb-0">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label for="Profile_FeedStorageKg" class="form-label">Feed (kg)</label>
+                        <input asp-for="Profile.FeedStorageKg" type="number" step="any" min="0" class="form-control text-end">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="Profile_HuskStorageSacks" class="form-label">Husk (sacks)</label>
+                        <input asp-for="Profile.HuskStorageSacks" type="number" step="1" min="0" class="form-control text-end">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="Profile_Heaters" class="form-label">Heaters (unit)</label>
+                        <input asp-for="Profile.Heaters" type="number" step="1" min="0" class="form-control text-end">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="Profile_LocationAccess" class="form-label">Location access</label>
+                        <select asp-for="Profile.LocationAccess" class="form-select" asp-items="EnumOptions.For(profile.LocationAccess)">
+                            <option value="">—</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="Profile_CollectorNotes" class="form-label">Collector (pengepul)</label>
+                        <textarea asp-for="Profile.CollectorNotes" class="form-control" rows="2" maxlength="500"></textarea>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="Profile_FarmerNotes" class="form-label">Farmer</label>
+                        <textarea asp-for="Profile.FarmerNotes" class="form-control" rows="2" maxlength="500"></textarea>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="Profile_OtherPartnerNotes" class="form-label">Other partner</label>
+                        <textarea asp-for="Profile.OtherPartnerNotes" class="form-control" rows="2" maxlength="500"></textarea>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="Profile_OtherNotes" class="form-label">Other</label>
+                        <textarea asp-for="Profile.OtherNotes" class="form-control" rows="2" maxlength="500"></textarea>
+                    </div>
+                    <div class="col-12 mb-3">
+                        <label for="Profile_Remarks" class="form-label">Remarks</label>
+                        <textarea asp-for="Profile.Remarks" class="form-control" rows="2" maxlength="1000"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
     </fieldset>
 
     <div class="card">
@@ -95,6 +354,33 @@
 
     <partial name="Partials/_FormButtons" model='new FormButtonsModel(Model.CanSave, Url.Action("Index")!)' />
 </form>
+
+<template data-collection-template="Profile.Fans">
+    <tr class="collection-row">
+        <td><input name="Profile.Fans[__i__].Brand" maxlength="60" class="form-control"></td>
+        <td><input type="number" name="Profile.Fans[__i__].Capacity" step="any" min="0" class="form-control text-end"></td>
+        <td><input type="number" name="Profile.Fans[__i__].Quantity" step="1" min="0" class="form-control text-end"></td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+    </tr>
+</template>
+
+<template data-collection-template="Profile.FanTests">
+    <tr class="collection-row">
+        <td><input type="number" name="Profile.FanTests[__i__].FrontMs" step="any" min="0" class="form-control text-end"></td>
+        <td><input type="number" name="Profile.FanTests[__i__].MiddleMs" step="any" min="0" class="form-control text-end"></td>
+        <td><input type="number" name="Profile.FanTests[__i__].BackMs" step="any" min="0" class="form-control text-end"></td>
+        <td class="text-end align-middle text-muted">—</td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+    </tr>
+</template>
+
+<template data-collection-template="Profile.Thinnings">
+    <tr class="collection-row">
+        <td><input type="number" name="Profile.Thinnings[__i__].WeightKg" step="any" min="0" class="form-control text-end"></td>
+        <td><input type="number" name="Profile.Thinnings[__i__].Birds" step="1" min="0" class="form-control text-end"></td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+    </tr>
+</template>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />

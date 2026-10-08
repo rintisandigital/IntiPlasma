@@ -33,7 +33,7 @@
 
 @if (!cost.IsFinal)
 {
-    <div class="alert alert-info">Running cost: sapronak consumed so far. Sapronak still lying in the coop is not part of the cost; the cost per kg uses the estimated live weight (harvested kg + birds left × latest body weight). The cost is frozen when the cycle is closed.</div>
+    <div class="alert alert-info">Running cost: sapronak consumed so far. Sapronak still lying in the farm is not part of the cost; the cost per kg uses the estimated live weight (harvested kg + birds left × latest body weight). The cost is frozen when the cycle is closed.</div>
 }
 
 <div class="row">
@@ -52,7 +52,7 @@
                                         @if (Model.CoopWarehouseId is { } warehouseId)
                                         {
                                             <a asp-area="Inventory" asp-controller="Stock" asp-action="Card" asp-route-warehouseId="@warehouseId" asp-route-itemId="@input.ItemId"
-                                               asp-route-from="@cycle.ChickInDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" title="Coop stock card">@input.ItemCode</a>
+                                               asp-route-from="@cycle.ChickInDate?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" title="Farm stock card">@input.ItemCode</a>
                                         }
                                         else
                                         {

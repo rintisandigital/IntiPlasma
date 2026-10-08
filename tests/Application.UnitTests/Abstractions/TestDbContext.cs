@@ -186,6 +186,10 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
             b.OwnsOne(i => i.Amount);
         });
 
+        modelBuilder.Entity<Coop>().Property(c => c.Profile).HasConversion(
+            profile => Application.Coops.CoopProfileJson.Serialize(profile),
+            json => Application.Coops.CoopProfileJson.Deserialize(json));
+
         modelBuilder.Entity<ProductionCycle>().Property(c => c.ContractSnapshot).HasConversion(
             snapshot => JsonSerializer.Serialize(snapshot, JsonSerializerOptions.Web),
             json => JsonSerializer.Deserialize<ContractSnapshot>(json, JsonSerializerOptions.Web));

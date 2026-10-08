@@ -3,7 +3,7 @@
     ViewData["Title"] = "Warehouses";
     ViewData["Menu"] = MenuCodes.MasterWarehouses;
 }
-<partial name="Partials/_ListHeader" model='new ListHeaderModel("Warehouses", "Central warehouses per branch; coop warehouses are created with their coop", MenuCodes.MasterWarehouses, "Add Warehouse")' />
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Warehouses", "Central warehouses per branch; farm warehouses are created with their farm", MenuCodes.MasterWarehouses, "Add Warehouse")' />
 
 <div class="card">
     <div class="card-header">
@@ -29,7 +29,7 @@
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead class="thead-light">
-                    <tr><th>Code</th><th>Name</th><th>Branch</th><th>Type</th><th>Coop</th><th>Status</th><th></th></tr>
+                    <tr><th>Code</th><th>Name</th><th>Branch</th><th>Type</th><th>Farm</th><th>Status</th><th></th></tr>
                 </thead>
                 <tbody>
                     @foreach (Application.Warehouses.WarehouseResponse warehouse in Model.Rows.Items)
@@ -38,7 +38,7 @@
                             <td class="fw-semibold">@warehouse.Code</td>
                             <td>@warehouse.Name</td>
                             <td>@warehouse.BranchCode</td>
-                            <td>@warehouse.Type</td>
+                            <td>@EnumOptions.Label(warehouse.Type)</td>
                             <td>@(warehouse.CoopCode ?? "—")</td>
                             <td><partial name="Partials/_StatusBadge" model='warehouse.IsActive ? "Active" : "Inactive"' /></td>
                             <td class="text-end"><a asp-action="Edit" asp-route-id="@warehouse.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>

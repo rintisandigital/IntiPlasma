@@ -70,7 +70,7 @@ public sealed class StockReturnsController(
             result.Value,
             await support.AttachmentsAsync(result.Value.Documents, cancellationToken),
             "Stock Return",
-            "From coop warehouse",
+            "From farm warehouse",
             await support.CanAsync(MenuCode, MenuRights.Export)));
     }
 
@@ -104,7 +104,7 @@ public sealed class StockReturnsController(
 
             if (result.IsSuccess)
             {
-                NotifySuccess($"Stock return {result.Value.Number} has been posted and taken out of the coop's running cycle.");
+                NotifySuccess($"Stock return {result.Value.Number} has been posted and taken out of the farm's running cycle.");
                 return RedirectToAction(nameof(Details), new { id = result.Value.Id });
             }
 
@@ -132,13 +132,13 @@ public sealed class StockReturnsController(
         [
             ("Return number", stockReturn.Number),
             ("Date", formatter.Date(stockReturn.Date)),
-            ("From coop warehouse", stockReturn.Reference),
+            ("From farm warehouse", stockReturn.Reference),
             ("To warehouse", stockReturn.WarehouseCode),
             ("Cycle", stockReturn.CycleNumber ?? "—"),
             ("Reason", stockReturn.Party ?? "—")
         ];
 
         return support.Exports.Document(header, container =>
-            InventoryDocumentPdf.Compose(container, stockReturn, fields, ["Returned by (coop)", "Delivered by", "Received by"], formatter));
+            InventoryDocumentPdf.Compose(container, stockReturn, fields, ["Returned by (farm)", "Delivered by", "Received by"], formatter));
     }
 }

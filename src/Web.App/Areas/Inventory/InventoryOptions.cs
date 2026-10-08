@@ -57,7 +57,7 @@ public sealed class InventoryOptions(
 
     private static string Label(WarehouseResponse w) =>
         w.Type == nameof(WarehouseType.Coop)
-            ? $"{w.Code} — {w.Name} (coop {w.CoopCode}, {w.BranchCode})"
+            ? $"{w.Code} — {w.Name} (farm {w.CoopCode}, {w.BranchCode})"
             : $"{w.Code} — {w.Name} ({w.BranchCode})";
 
     private async Task<IReadOnlyList<WarehouseResponse>> AllAsync(CancellationToken cancellationToken)

@@ -102,7 +102,7 @@ public static class MenuCatalog
 
         Group("partnership", "Partnership", "ti ti-users-group", 30);
         Page("partnership", "partnership.farmers", "Farmers", "/Partnership/Farmers", CreateEditExport, true);
-        Page("partnership", "partnership.coops", "Coops", "/Partnership/Coops", CreateEditExport, true);
+        Page("partnership", "partnership.coops", "Farms", "/Partnership/Coops", CreateEditExport, true);
         Page("partnership", "partnership.contracts", "Contracts", "/Partnership/Contracts", CreateEditExport, true);
 
         Group("procurement", "Procurement", "ti ti-shopping-cart", 40);

@@ -26,7 +26,16 @@ internal sealed class GetCoopByIdQueryHandler(IDbConnectionFactory dbConnectionF
         }
 
         Result access = await branchAccess.EnsureAccessAsync(coop.BranchId, cancellationToken);
+        if (access.IsFailure)
+        {
+            return Result.Failure<CoopResponse>(access.Error);
+        }
 
-        return access.IsSuccess ? coop : Result.Failure<CoopResponse>(access.Error);
+        string? profile = await connection.ExecuteScalarAsync<string?>(new CommandDefinition(
+            "SELECT c.profile::text FROM master.coops c WHERE c.id = @CoopId",
+            new { query.CoopId },
+            cancellationToken: cancellationToken));
+
+        return coop with { Profile = CoopProfileJson.Deserialize(profile) };
     }
 }

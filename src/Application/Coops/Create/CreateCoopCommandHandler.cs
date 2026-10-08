@@ -47,6 +47,8 @@ internal sealed class CreateCoopCommandHandler(
             return Result.Failure<Guid>(coop.Error);
         }
 
+        coop.Value.SetProfile(command.Profile);
+
         if (await context.Coops.AnyAsync(c => c.Code == coop.Value.Code, cancellationToken))
         {
             return Result.Failure<Guid>(CoopErrors.CodeNotUnique(coop.Value.Code));

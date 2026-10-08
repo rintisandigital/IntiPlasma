@@ -3,7 +3,7 @@
     ViewData["Title"] = "Plan Cycle";
     ViewData["Menu"] = MenuCodes.ProductionCycles;
 }
-<partial name="Partials/_PageHeader" model='new PageHeaderModel("Plan Cycle", "Step 1 of the cycle: choose the coop and, for a plasma coop, its partnership contract (the terms are frozen in the cycle)")' />
+<partial name="Partials/_PageHeader" model='new PageHeaderModel("Plan Cycle", "Step 1 of the cycle: choose the farm and, for a plasma farm, its partnership contract (the terms are frozen in the cycle)")' />
 
 <div class="row">
     <div class="col-xl-8">
@@ -18,7 +18,7 @@
                             <input type="hidden" asp-for="CoopLabel" id="coop-label" />
                             <select asp-for="CoopId" id="CoopId" class="form-select" data-lookup="@Url.Action("PlannableCoops", "Lookup", new { area = "" })"
                                     data-copy-label="#coop-label">
-                                <option value="">Search a coop without a running cycle…</option>
+                                <option value="">Search a farm without a running cycle…</option>
                                 @if (Model.CoopId is not null)
                                 {
                                     <option value="@Model.CoopId" selected>@Model.CoopLabel</option>
@@ -32,13 +32,13 @@
                             <select asp-for="ContractId" class="form-select" data-lookup="@Url.Action("CoopContracts", "Lookup", new { area = "" })"
                                     data-lookup-depends="coopId:#CoopId"
                                     data-copy-label="#contract-label">
-                                <option value="">— None (inti coop) —</option>
+                                <option value="">— None (inti farm) —</option>
                                 @if (Model.ContractId is not null)
                                 {
                                     <option value="@Model.ContractId" selected>@Model.ContractLabel</option>
                                 }
                             </select>
-                            <div class="form-text">Required for a plasma coop (active contracts of the coop's branch); leave empty for an inti coop.</div>
+                            <div class="form-text">Required for a plasma farm (active contracts of the farm's branch); leave empty for an inti farm.</div>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label asp-for="PlannedChickInDate" class="form-label"></label> <span class="text-danger">*</span>

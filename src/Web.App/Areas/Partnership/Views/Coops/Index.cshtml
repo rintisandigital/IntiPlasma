@@ -1,10 +1,11 @@
 @model ListViewModel<Application.Coops.CoopResponse>
 @{
-    ViewData["Title"] = "Coops";
+    ViewData["Title"] = "Farms";
     ViewData["Menu"] = MenuCodes.PartnershipCoops;
     string? farmerId = Model.Filters.GetValueOrDefault("farmerId");
+    bool canExport = await Rights.CanAsync(MenuCodes.PartnershipCoops, MenuRights.Export);
 }
-<partial name="Partials/_ListHeader" model='new ListHeaderModel("Coops", "Farmer coops; each coop has its own coop warehouse", MenuCodes.PartnershipCoops, "Add Coop")' />
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Farms", "Farmer farms; each farm has its own farm warehouse", MenuCodes.PartnershipCoops, "Add Farm")' />
 
 <div class="card">
     <div class="card-header">
@@ -14,7 +15,7 @@
                 <input type="hidden" name="farmerId" value="@farmerId">
             }
             <div class="col-md-5">
-                <input type="search" name="search" value="@Model.Search" class="form-control" placeholder="Search coop or farmer">
+                <input type="search" name="search" value="@Model.Search" class="form-control" placeholder="Search farm or farmer">
             </div>
             <div class="col-md-3">
                 <select name="branch" class="form-select" asp-items="Model.BranchOptions" aria-label="Branch"></select>
@@ -47,12 +48,18 @@
                             <td>@EnumOptions.Label(coop.HouseType)</td>
                             <td>@(coop.OpenCycleId is null ? "—" : "Running")</td>
                             <td><partial name="Partials/_StatusBadge" model='coop.IsActive ? "Active" : "Inactive"' /></td>
-                            <td class="text-end"><a asp-action="Edit" asp-route-id="@coop.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                            <td class="text-end text-nowrap">
+                                @if (canExport)
+                                {
+                                    <a asp-action="Print" asp-route-id="@coop.Id" target="_blank" class="btn btn-sm btn-light" title="PDF"><i class="ti ti-file-type-pdf"></i></a>
+                                }
+                                <a asp-action="Edit" asp-route-id="@coop.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a>
+                            </td>
                         </tr>
                     }
                     @if (Model.Rows.Items.Count == 0)
                     {
-                        <tr><td colspan="9" class="text-center text-muted py-4">No coops found.</td></tr>
+                        <tr><td colspan="9" class="text-center text-muted py-4">No farms found.</td></tr>
                     }
                 </tbody>
             </table>

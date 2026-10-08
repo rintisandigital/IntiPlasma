@@ -12,4 +12,5 @@ public sealed record CreateCoopCommand(
     string? Address,
     decimal? Latitude,
     decimal? Longitude,
-    IReadOnlyList<Guid>? Documents = null) : ICommand<Guid>;
+    IReadOnlyList<Guid>? Documents = null,
+    CoopProfile? Profile = null) : ICommand<Guid>;

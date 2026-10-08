@@ -23,7 +23,8 @@ internal sealed class CoopEndpoints : IEndpoint
         decimal? Latitude,
         decimal? Longitude,
         bool IsActive,
-        IReadOnlyList<Guid>? Documents = null);
+        IReadOnlyList<Guid>? Documents = null,
+        CoopProfile? Profile = null);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
@@ -83,7 +84,8 @@ internal sealed class CoopEndpoints : IEndpoint
                 request.Latitude,
                 request.Longitude,
                 request.IsActive,
-                request.Documents);
+                request.Documents,
+                request.Profile);
 
             Result result = await handler.Handle(command, cancellationToken);
 

@@ -231,7 +231,7 @@ public static class EnumOptions
         where TEnum : struct, Enum =>
         [.. Enum.GetValues<TEnum>().Select(v => new SelectListItem(Label(v.ToString()), v.ToString(), selected?.Equals(v) == true))];
 
-    /// <summary>"Pph4Ayat2" → "Pph4 Ayat2", "OpenHouse" → "Open House".</summary>
+    /// <summary>"Pph4Ayat2" → "Pph4 Ayat2", "OpenHouse" → "Open House"; "Coop" is shown as "Farm".</summary>
     public static string Label(string value) =>
-        System.Text.RegularExpressions.Regex.Replace(value, "(?<=[a-z0-9])(?=[A-Z])", " ");
+        value == "Coop" ? "Farm" : System.Text.RegularExpressions.Regex.Replace(value, "(?<=[a-z0-9])(?=[A-Z])", " ");
 }

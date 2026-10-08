@@ -100,7 +100,7 @@ public sealed class StockTransfersController(
             {
                 NotifySuccess(result.Value.CycleId is null
                     ? $"Stock transfer {result.Value.Number} has been posted."
-                    : $"Stock transfer {result.Value.Number} has been posted and charged to the coop's running cycle.");
+                    : $"Stock transfer {result.Value.Number} has been posted and charged to the farm's running cycle.");
                 return RedirectToAction(nameof(Details), new { id = result.Value.Id });
             }
 

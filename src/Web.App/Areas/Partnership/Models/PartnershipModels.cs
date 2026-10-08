@@ -84,6 +84,11 @@ public sealed class CoopFormViewModel : MasterFormViewModel
     [Range(-180, 180)]
     public decimal? Longitude { get; set; }
 
+    /// <summary>
+    /// Survey data (data kandang); validated by the use case.
+    /// </summary>
+    public CoopProfile Profile { get; set; } = new();
+
     [BindNever]
     public string? FarmerLabel { get; set; }
 

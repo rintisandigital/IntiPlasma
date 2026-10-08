@@ -17,7 +17,7 @@
                     <label class="form-label" for="cycle-select">Closed plasma cycle <span class="text-danger">*</span></label>
                     <select id="cycle-select" name="cycleId" class="form-select" data-lookup="@Url.Action("SettleableCycles", "Lookup", new { area = "" })"
                             data-autosubmit="value">
-                        <option value="">Search cycle, coop or farmer…</option>
+                        <option value="">Search cycle, farm or farmer…</option>
                         @if (cycle is not null)
                         {
                             <option value="@cycle.Id" selected>@LookupController.CycleLabel(cycle)</option>
@@ -43,7 +43,7 @@
                 <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
                 <div class="row">
                     <div class="col-md-3 mb-3"><div class="text-muted fs-13">Cycle</div><div class="fw-semibold">@cycle.Number <partial name="Partials/_StatusBadge" model="cycle.Status" /></div></div>
-                    <div class="col-md-3 mb-3"><div class="text-muted fs-13">Coop</div><div class="fw-semibold">@cycle.CoopCode — @cycle.CoopName</div></div>
+                    <div class="col-md-3 mb-3"><div class="text-muted fs-13">Farm</div><div class="fw-semibold">@cycle.CoopCode — @cycle.CoopName</div></div>
                     <div class="col-md-3 mb-3"><div class="text-muted fs-13">Plasma farmer</div><div class="fw-semibold">@cycle.FarmerCode — @cycle.FarmerName</div></div>
                     <div class="col-md-3 mb-3"><div class="text-muted fs-13">Contract / closed</div><div class="fw-semibold">@(cycle.ContractCode ?? "—") · @(cycle.ClosedDate is { } closed ? Fmt.Date(closed) : "not closed")</div></div>
                 </div>

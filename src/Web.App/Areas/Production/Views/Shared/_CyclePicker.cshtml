@@ -7,7 +7,7 @@
                 <label class="form-label" for="cycle-picker">Cycle</label>
                 <select id="cycle-picker" name="cycleId" class="form-select" data-lookup="@Url.Action("RecordableCycles", "Lookup", new { area = "" })"
                         data-autosubmit="value">
-                    <option value="">Search an active cycle (number, coop)…</option>
+                    <option value="">Search an active cycle (number, farm)…</option>
                     @if (Model.Cycle is not null)
                     {
                         <option value="@Model.Cycle.Id" selected>@Model.CycleLabel</option>

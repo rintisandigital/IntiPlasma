@@ -13,5 +13,6 @@ internal sealed class UpdateCoopCommandValidator : AbstractValidator<UpdateCoopC
         RuleFor(c => c.HouseType).IsInEnum();
         RuleFor(c => c.Address).MaximumLength(500);
         RuleFor(c => c.Documents).ValidDocuments();
+        RuleFor(c => c.Profile!).SetValidator(new CoopProfileValidator()).When(c => c.Profile is not null);
     }
 }

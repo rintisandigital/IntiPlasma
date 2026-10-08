@@ -9,7 +9,7 @@
 @if (Model.DocStock.Count == 0)
 {
     <div class="alert alert-warning">
-        There is no DOC in the coop warehouse yet. Transfer DOC from a central warehouse to the coop warehouse first.
+        There is no DOC in the farm warehouse yet. Transfer DOC from a central warehouse to the farm warehouse first.
         <a asp-area="Inventory" asp-controller="StockTransfers" asp-action="Create" class="alert-link">New stock transfer</a>
     </div>
 }
@@ -28,7 +28,7 @@ else
                     </div>
                 </div>
                 <table class="table mb-0">
-                    <thead class="thead-light"><tr><th>DOC item</th><th class="text-end">In coop warehouse</th><th style="width: 22%">Birds placed</th></tr></thead>
+                    <thead class="thead-light"><tr><th>DOC item</th><th class="text-end">In farm warehouse</th><th style="width: 22%">Birds placed</th></tr></thead>
                     <tbody>
                         @for (int i = 0; i < Model.DocStock.Count; i++)
                         {
@@ -46,7 +46,7 @@ else
                         }
                     </tbody>
                 </table>
-                <p class="text-muted fs-13 mt-2 mb-0">The initial population is the number of birds placed; the DOC leaves the coop warehouse into the cycle.</p>
+                <p class="text-muted fs-13 mt-2 mb-0">The initial population is the number of birds placed; the DOC leaves the farm warehouse into the cycle.</p>
             </div>
         </div>
         <div class="card">

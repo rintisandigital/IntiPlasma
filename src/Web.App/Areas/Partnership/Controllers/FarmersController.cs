@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Paging;
+using Application.Documents;
 using Application.Farmers;
 using Application.Farmers.Create;
 using Application.Farmers.Get;
@@ -11,11 +12,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using SharedKernel;
 using Web.App.Areas.MasterData.Models;
+using Web.App.Areas.Partnership.Documents;
 using Web.App.Areas.Partnership.Models;
 using Web.App.Controllers;
 using Web.App.Infrastructure;
 using Web.App.Infrastructure.Authorization;
 using Web.App.Infrastructure.Export;
+using Web.App.Infrastructure.Formatting;
 using Web.App.Models.Shared;
 
 namespace Web.App.Areas.Partnership.Controllers;
@@ -42,7 +45,7 @@ public sealed class FarmersController(
         new("Phone", f => f.Phone, Width: 1.3f),
         new("Bank", f => f.BankAccount.BankName, Width: 1.2f),
         new("Account", f => f.BankAccount.AccountNumber, Width: 1.5f),
-        new("Coops", f => f.CoopCount, ExportFormat.WholeNumber, 0.7f),
+        new("Farms", f => f.CoopCount, ExportFormat.WholeNumber, 0.7f),
         new("Active", f => f.IsActive, ExportFormat.Boolean, 0.6f)
     ];
 
@@ -171,6 +174,37 @@ public sealed class FarmersController(
         }
 
         return View("Form", await WithOptionsAsync(model, cancellationToken));
+    }
+
+    /// <summary>
+    /// Farmer data sheet as PDF: page 1 the farmer, tax and bank data, page 2 the photo attachments.
+    /// </summary>
+    [HttpGet]
+    [MenuAccess(MenuCode, MenuRights.Export)]
+    public async Task<IActionResult> Print(
+        Guid id,
+        [FromServices] IQueryHandler<GetFarmerByIdQuery, FarmerResponse> query,
+        [FromServices] IAttachmentService attachments,
+        [FromServices] DisplayFormatter formatter,
+        CancellationToken cancellationToken)
+    {
+        Result<FarmerResponse> result = await query.Handle(new GetFarmerByIdQuery(id), cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return result.Error.Type == ErrorType.Forbidden ? Forbid() : NotFound();
+        }
+
+        FarmerResponse farmer = result.Value;
+        IReadOnlyList<DataSheetPdf.Photo> photos = await DataSheetPdf.PhotosAsync(attachments, farmer.Documents, cancellationToken);
+        ExportHeader header = await support.Exports.HeaderAsync(
+            FarmerPdf.DataTitle, $"farmer-{farmer.Code}", [$"Kode {farmer.Code}", farmer.Name]);
+
+        return support.Exports.Document(header,
+        [
+            (FarmerPdf.DataTitle, container => FarmerPdf.ComposeData(container, farmer, formatter)),
+            (DataSheetPdf.GalleryTitle, container => FarmerPdf.ComposeGallery(container, farmer, photos))
+        ]);
     }
 
     private async Task<FarmerFormViewModel> WithOptionsAsync(FarmerFormViewModel model, CancellationToken cancellationToken)

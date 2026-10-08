@@ -5,6 +5,7 @@ using Application.Coops.Create;
 using Application.Coops.Get;
 using Application.Coops.GetById;
 using Application.Coops.Update;
+using Application.Documents;
 using Application.Farmers;
 using Application.Farmers.GetById;
 using Domain.Access;
@@ -12,6 +13,7 @@ using Domain.MasterData.Coops;
 using Microsoft.AspNetCore.Mvc;
 using SharedKernel;
 using Web.App.Areas.MasterData.Models;
+using Web.App.Areas.Partnership.Documents;
 using Web.App.Areas.Partnership.Models;
 using Web.App.Controllers;
 using Web.App.Infrastructure;
@@ -70,7 +72,7 @@ public sealed class CoopsController(
     {
         BranchFilter branchFilter = await support.BranchFilterAsync(branch);
 
-        return await support.ExportAsync(format, "Coops", "coops", [branchFilter.Description], Columns,
+        return await support.ExportAsync(format, "Farms", "farms", [branchFilter.Description], Columns,
             (paging, ct) => coopsQuery.Handle(new GetCoopsQuery(paging, branchFilter.BranchId, farmerId), ct), search, cancellationToken);
     }
 
@@ -92,12 +94,12 @@ public sealed class CoopsController(
             Result<Guid> result = await handler.Handle(
                 new CreateCoopCommand(
                     model.FarmerId!.Value, model.Code, model.Name, model.Capacity!.Value, model.HouseType!.Value,
-                    model.Address, model.Latitude, model.Longitude, model.Documents),
+                    model.Address, model.Latitude, model.Longitude, model.Documents, model.Profile),
                 cancellationToken);
 
             if (result.IsSuccess)
             {
-                NotifySuccess($"Coop {model.Code} has been created; its coop warehouse is being set up.");
+                NotifySuccess($"Farm {model.Code} has been created; its farm warehouse is being set up.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -138,6 +140,7 @@ public sealed class CoopsController(
             Longitude = coop.Longitude,
             IsActive = coop.IsActive,
             OpenCycleId = coop.OpenCycleId,
+            Profile = coop.Profile,
             Documents = [.. coop.Documents],
             Attachments = await support.AttachmentsAsync(coop.Documents, cancellationToken),
             CanSave = await support.CanAsync(MenuCode, MenuRights.Edit)
@@ -156,12 +159,12 @@ public sealed class CoopsController(
             Result result = await handler.Handle(
                 new UpdateCoopCommand(
                     id, model.Name, model.Capacity!.Value, model.HouseType!.Value, model.Address, model.Latitude,
-                    model.Longitude, model.IsActive == true, model.Documents),
+                    model.Longitude, model.IsActive == true, model.Documents, model.Profile),
                 cancellationToken);
 
             if (result.IsSuccess)
             {
-                NotifySuccess($"Coop {model.Code} has been saved.");
+                NotifySuccess($"Farm {model.Code} has been saved.");
                 return RedirectToAction(nameof(Index));
             }
 
@@ -170,6 +173,36 @@ public sealed class CoopsController(
 
         model.Attachments = await support.AttachmentsAsync(model.Documents, cancellationToken);
         return View("Form", model);
+    }
+
+    /// <summary>
+    /// Farm data sheet as PDF: the survey data (detail, building, equipment, production plan, …), then the photos.
+    /// </summary>
+    [HttpGet]
+    [MenuAccess(MenuCode, MenuRights.Export)]
+    public async Task<IActionResult> Print(
+        Guid id,
+        [FromServices] IQueryHandler<GetCoopByIdQuery, CoopResponse> query,
+        [FromServices] IAttachmentService attachments,
+        CancellationToken cancellationToken)
+    {
+        Result<CoopResponse> result = await query.Handle(new GetCoopByIdQuery(id), cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return result.Error.Type == ErrorType.Forbidden ? Forbid() : NotFound();
+        }
+
+        CoopResponse coop = result.Value;
+        IReadOnlyList<DataSheetPdf.Photo> photos = await DataSheetPdf.PhotosAsync(attachments, coop.Documents, cancellationToken);
+        ExportHeader header = await support.Exports.HeaderAsync(
+            CoopPdf.DataTitle, $"farm-{coop.Code}", [$"Kode {coop.Code}", coop.Name]);
+
+        return support.Exports.Document(header,
+        [
+            (CoopPdf.DataTitle, container => CoopPdf.ComposeData(container, coop)),
+            (DataSheetPdf.GalleryTitle, container => CoopPdf.ComposeGallery(container, coop, photos))
+        ]);
     }
 
     /// <summary>

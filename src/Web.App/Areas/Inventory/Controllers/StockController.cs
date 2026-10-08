@@ -35,7 +35,7 @@ public sealed class StockController(
     private static readonly ExportColumn<StockBalanceResponse>[] BalanceColumns =
     [
         new("Warehouse", s => s.WarehouseCode, Width: 1.3f),
-        new("Type", s => s.WarehouseType, Width: 0.8f),
+        new("Type", s => EnumOptions.Label(s.WarehouseType), Width: 0.8f),
         new("Item", s => s.ItemCode, Width: 1.2f),
         new("Name", s => s.ItemName, Width: 3),
         new("Category", s => EnumOptions.Label(s.ItemCategory), Width: 1),

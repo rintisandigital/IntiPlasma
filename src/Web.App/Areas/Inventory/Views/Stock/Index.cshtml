@@ -46,7 +46,7 @@
                     @foreach (Application.Inventory.StockBalanceResponse balance in Model.Rows.Items)
                     {
                         <tr>
-                            <td>@balance.WarehouseCode <span class="text-muted fs-12">@balance.WarehouseType</span></td>
+                            <td>@balance.WarehouseCode <span class="text-muted fs-12">@EnumOptions.Label(balance.WarehouseType)</span></td>
                             <td>@balance.ItemCode — @balance.ItemName</td>
                             <td>@EnumOptions.Label(balance.ItemCategory)</td>
                             <td class="text-end text-nowrap">@Fmt.Number(balance.Quantity, 3) @balance.BaseUomCode</td>
