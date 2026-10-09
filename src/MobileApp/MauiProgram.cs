@@ -92,6 +92,9 @@ public static class MauiProgram
             sp.GetRequiredService<IClock>(),
             sp.GetRequiredService<Core.Abstractions.IConnectivity>(),
             CurrentUserId(sp)));
+
+        // Dashboard & charts (M4).
+        services.AddSingleton<DashboardService>();
     }
 
     private static Func<Guid?> CurrentUserId(IServiceProvider services)

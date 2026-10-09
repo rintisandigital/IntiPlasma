@@ -28,7 +28,10 @@
                         <span class="chip"><i class="icon icon-calendar"></i>Chick-in @IdFormat.Date(chickIn)</span>
                     }
                 </div>
-                <a class="link-btn d-inline-block mt-8" href="/siklus/@CycleId/stok-ayam">Stok ayam harian ›</a>
+                <div class="d-flex flex-wrap gap-16 mt-8">
+                    <a class="link-btn" href="/siklus/@CycleId/stok-ayam">Stok ayam harian ›</a>
+                    <a class="link-btn" href="/grafik?cycleId=@CycleId&from=@Uri.EscapeDataString($"/siklus/{CycleId}/recording")">Grafik produksi ›</a>
+                </div>
             </div>
         }
 

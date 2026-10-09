@@ -55,7 +55,7 @@ public static class AppFeatures
         "kontrak", "Kontrak", "icon-bookTxt", "/kontrak", "M1", u => u.Has(AppPermissions.ContractsRead));
 
     public static readonly AppFeature Performance = new(
-        "grafik", "Grafik Produksi", "icon-chart", "/fitur/grafik", "M4", u => u.Has(AppPermissions.ProductionRead));
+        "grafik", "Grafik Produksi", "icon-chart", "/grafik", "M4", u => u.Has(AppPermissions.ProductionRead));
 
     public static readonly AppFeature FeedRequests = new(
         "request-pakan", "Request Pakan", "icon-download", "/fitur/request-pakan", "M9",

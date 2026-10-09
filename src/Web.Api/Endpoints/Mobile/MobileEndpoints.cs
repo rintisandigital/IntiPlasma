@@ -25,5 +25,17 @@ internal sealed class MobileEndpoints : IEndpoint
             return result.Match(Results.Ok, CustomResults.Problem);
         })
         .HasPermission(Permissions.ProductionRead);
+
+        group.MapGet("dashboard", async (
+            DateOnly? date,
+            Guid? branchId,
+            IQueryHandler<GetMobileDashboardQuery, MobileDashboardResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<MobileDashboardResponse> result = await handler.Handle(new GetMobileDashboardQuery(date, branchId), cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.ProductionRead);
     }
 }

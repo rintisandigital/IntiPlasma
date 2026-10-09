@@ -6,6 +6,7 @@ using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
 using Application.Abstractions.Numbering;
 using Application.Abstractions.Storage;
+using Application.Mobile;
 using Application.Users;
 using Dapper;
 using Infrastructure.Auditing;
@@ -191,6 +192,10 @@ public static class DependencyInjection
         // Refresh token lifetime for the Web.Api login (mobile sessions, PLAN-MOBILE M-17).
         services.AddOptions<RefreshTokenOptions>().Bind(configuration.GetSection(RefreshTokenOptions.SectionName));
         services.AddTransient(sp => sp.GetRequiredService<IOptions<RefreshTokenOptions>>().Value);
+
+        // Thresholds of the mobile dashboard (PLAN-MOBILE M-58).
+        services.AddOptions<MobileDashboardOptions>().Bind(configuration.GetSection(MobileDashboardOptions.SectionName));
+        services.AddTransient(sp => sp.GetRequiredService<IOptions<MobileDashboardOptions>>().Value);
 
         return services;
     }

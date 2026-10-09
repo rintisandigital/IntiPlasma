@@ -19,6 +19,11 @@ internal sealed class NetworkErrorHandler : DelegatingHandler
         {
             throw new HttpRequestException(exception.Message, exception);
         }
+        catch (System.Net.WebException exception)
+        {
+            // A connection refused right after the network drops (ConnectException) arrives wrapped in a WebException.
+            throw new HttpRequestException(exception.Message, exception);
+        }
 #else
         return await base.SendAsync(request, cancellationToken);
 #endif

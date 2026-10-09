@@ -474,7 +474,7 @@ Backend (domain + unit test → command/query + validator → EF config + migrat
 - **Web.App**: Master Data → **Weight Ranges**; **Production → Live Bird Stock** (rekap + ekspor).
 - **Klien**: input per rentang (offline), list per siklus, "Salin dari kemarin"; rekap Manager.
 
-### Fase M4 — Grafik & Dashboard
+### Fase M4 — Grafik & Dashboard ✅ (selesai 2026-10-09, task §19, realisasi §20)
 - **Backend**: `GetMobileDashboardQuery` (ambang dari `Mobile:Dashboard`), `GET mobile/dashboard`.
 - **Klien**: Dashboard PPL & Manager, Grafik produksi (Chart.js), perbandingan siklus.
 
@@ -539,7 +539,7 @@ Backend (domain + unit test → command/query + validator → EF config + migrat
 - CSS template besar (`styles.css`) + Bootstrap: ukur ukuran & waktu render pertama; buang aturan yang tidak dipakai bila perlu (M10).
 
 ## 11. Status Keputusan
-- **Semua keputusan M-1 s.d. M-39 disepakati** 2026-10-08. Fase **M0 selesai** 2026-10-08 (§12); **M1 selesai** 2026-10-09 (§13 task, §14 realisasi); **M2 selesai** 2026-10-09 (§15 task, §16 realisasi; M-40 s.d. M-45 disepakati); **M3 selesai** 2026-10-09 (§17 task, §18 realisasi; M-46 s.d. M-54 disepakati); berikutnya **M4**.
+- **Semua keputusan M-1 s.d. M-39 disepakati** 2026-10-08. Fase **M0 selesai** 2026-10-08 (§12); **M1 selesai** 2026-10-09 (§13 task, §14 realisasi); **M2 selesai** 2026-10-09 (§15 task, §16 realisasi; M-40 s.d. M-45 disepakati); **M3 selesai** 2026-10-09 (§17 task, §18 realisasi; M-46 s.d. M-54 disepakati); **M4 selesai** 2026-10-09 (§19 task, §20 realisasi; M-55 s.d. M-68 disepakati); berikutnya **M5**.
 - 2026-10-09: M-38 direvisi — kontrak memakai lingkup cabang, bukan lingkup PPL.
 
 ---
@@ -973,3 +973,121 @@ Disusun 2026-10-09 dari pemetaan kode. Prasyarat: hasil M2 sudah di-commit. Migr
 - Halaman Live Bird Stock Web.App diuji lewat integration test (render + ekspor), tidak dibuka manual; datanya dari query rekap yang sama dengan mobile.
 - `/stok-ayam` untuk PPL ada di menu "Lainnya" (tab bawah PPL sudah penuh), jadi tab Lainnya yang tersorot.
 - Validasi "data basi" (> 1 hari) dan "Belum lapor" diuji di integration test; di emulator hanya "Belum lapor" yang terlihat.
+
+---
+
+## 19. Daftar Task M4 — Grafik & Dashboard (urutan)
+
+Disusun 2026-10-09 dari pemetaan kode. Prasyarat: hasil M3 sudah di-commit (`8a4e562`). **Tidak ada migration** di M4 dan skema SQLite lokal tidak berubah.
+
+### 19.1 Temuan yang memengaruhi desain
+- **Rumus performa sudah terpusat** di `CyclePerformance.Calculate` (`Domain/Partnership/Cycles/CyclePerformance.cs`): deplesi %, FCR = pakan ÷ (populasi × BW + kg panen), ADG, IP. Namun akumulasi harian (`BuildDays`: BW dibawa dari penimbangan terakhir, panen dihitung per tanggal) masih **private** di `GetCyclePerformanceQueryHandler` (`Application/Production/ProductionQueries.cs`). Dashboard butuh angka kumulatif per siklus, jadi akumulasi ini perlu dipindah ke helper bersama agar tidak ada dua rumus.
+- **`GET cycles/{id}/performance` sudah lengkap untuk grafik**: `days[]` per hari (umur, mati, culling, pakan kg, BW, kumulatif: populasi, deplesi %, FCR, ADG, IP) + `harvests[]`; lingkup PPL & cabang sudah ditegakkan. Tidak ada varian multi-siklus; perbandingan ≤ 3 siklus cukup dengan 3 request (masing-masing di-cache).
+- **Belum ada rata-rata FCR/IP lintas siklus** di mana pun. Dashboard Admin Office (`Application/Monitoring/GetDashboardSummaryQuery.cs`) hanya untuk Web.App, tanpa lingkup PPL, dan isinya keuangan → tidak dipakai ulang, hanya pola SQL-nya (siklus aktif, populasi).
+- **Tanggal server = UTC** (`IDateTimeProvider.UtcNow`; `serverDate` field-context juga UTC). Antara 00:00–07:00 WIB tanggal UTC masih "kemarin" → status "recording hari ini" di dashboard salah bila dihitung dari tanggal server.
+- **Data dashboard sudah tersedia di SQL**: populasi & total deplesi di siklus, stok pakan per gudang kandang (`inventory.stock_balances` + item kategori Feed, seperti field-context), pakan per recording (`daily_recording_usages.base_quantity`), tanggal recording/stok ayam terakhir (`MAX(date)`). Pola temp table + `FieldScopeSql` + `IBranchAccess` dari `GetFieldContext`/`GetLiveBirdStockSummary` dipakai ulang.
+- **Rekap stok ayam sudah ada** (`GET production/live-bird-stocks/summary`, M3) dan sudah di-cache di klien → tidak perlu diduplikasi di endpoint dashboard.
+- **Options**: pola `RefreshTokenOptions` (POCO + `SectionName`, di-bind di `Infrastructure/DependencyInjection.cs`, handler menerima POCO). `appsettings.json` Web.Api belum punya section `Mobile`.
+- **Chart.js 4.5.0 (UMD) sudah ada lokal** di Web.App (`wwwroot/assets/plugins/chartjs/chart.min.js`, ±208 KB) + contoh di tab Performance siklus (`Areas/Production/Views/Cycles/Details.cshtml`). MobileApp **belum punya JS interop sama sekali** (`index.html` hanya memuat `blazor.webview.js`).
+- **Beranda** (`Components/Pages/Home.razor`) baru berisi sapaan, cabang, kartu antrean, dan grid menu. **Logo gepeng** (§14.5): aturan template `.header-avt > *:first-child { width: 100% }` meregangkan `<img class="header-logo-text">` yang tingginya tetap 36 px.
+- Menu `AppFeatures.Performance` (`/fitur/grafik`, `production:read`, di "Lainnya") masih placeholder.
+- Bagian dashboard yang bergantung fase lain: **BW vs standar** (M5), **approval & pengajuan saya** (M6), **request pakan** (M9) → belum bisa diisi di M4.
+
+### 19.2 Keputusan tambahan (disepakati 2026-10-09)
+| # | Topik | Usulan |
+|---|---|---|
+| M-55 | Bentuk `GET mobile/dashboard` | **Satu respons untuk semua peran**, mengikuti lingkup user (PPL = kandangnya, Manager = cabangnya): `date`, `kpi` (siklus aktif, populasi, ekor awal, deplesi % gabungan, FCR gabungan, IP tertimbang, recording hari ini x/y, stok ayam hari ini x/y) dan `cycles[]` per siklus `Active`/`Harvesting` (kandang, peternak, PPL, umur, populasi, deplesi %, FCR, BW terakhir, IP, tanggal recording & stok ayam terakhir, stok pakan kg, rata-rata pakai, estimasi sisa hari, **flag** risiko). Klien yang memilih tampilan per peran. Permission `production:read`. Field untuk M5/M6/M9 ditambahkan di fasenya **tanpa** mengganti endpoint. |
+| M-56 | Tanggal acuan | Parameter opsional **`date`** dikirim klien (tanggal lokal `Asia/Jakarta`); default server = UTC+7. Validasi: ≤ tanggal server + 1. |
+| M-57 | Cabang | Parameter opsional `branchId` (harus dalam akses); tanpa parameter = semua cabang dalam akses user (Manager = satu cabang, M-10). Mobile mengirim tanpa `branchId`. |
+| M-58 | Ambang `Mobile:Dashboard` | `FeedAverageDays` = **3** (rata-rata pakan dari recording 3 hari terakhir yang ada pemakaian pakan; tanpa data → estimasi "–"), `FeedWarningDays` = **3** (sisa < 3 hari → peringatan), `RecordingLateDays` = **1** (recording terakhir lebih dari 1 hari sebelum tanggal acuan → terlambat), `DepletionWarningPercent` = **5** (deplesi kumulatif ≥ 5% → berisiko; sementara sampai standar breed M5). |
+| M-59 | Siklus berisiko | Flag: `RecordingLate`, `FeedLow`, `HighDepletion`, `NoStockReport` (stok ayam belum dilaporkan hari ini, hanya untuk siklus umur ≥ 21 hari). Manager melihat daftar siklus ber-flag (urut jumlah flag); PPL melihat flag di kartu kandangnya. M5 menambah `BelowStandard`. |
+| M-60 | Rumus gabungan | Deplesi % = Σ(mati + culling) ÷ Σ ekor awal; FCR = Σ pakan ÷ Σ(bobot hidup + kg panen) (siklus tanpa BW dikecualikan); IP = rata-rata IP siklus tertimbang populasi berjalan. Semua memakai helper akumulasi yang sama dengan `performance`. |
+| M-61 | Dashboard PPL | Kartu **tugas hari ini** (recording & stok ayam per kandang: Belum diisi / Belum terkirim / Gagal / Terisi — status antrean lokal digabung), kartu **kandang saya** (umur, populasi, deplesi, FCR, BW, IP, flag), **stok pakan** (kg + SAK bila ada konversi, estimasi sisa hari, merah bila < 3 hari), antrean sinkron. Ketuk kandang → grafik siklus. |
+| M-62 | Dashboard Manager | **KPI cabang**, recording & stok ayam hari ini x/y, **siklus berisiko**, **stok ayam per rentang** (ekor & ton, dari endpoint rekap M3) + tautan ke tab Stok Ayam. Kartu "Approval menunggu" baru muncul di M6. |
+| M-63 | Offline dashboard | Respons dashboard di-cache (`ApiCache`, "Data per …"); status lokal (antrean, recording belum terkirim) selalu dihitung ulang di klien. Tombol "Segarkan". |
+| M-64 | Grafik produksi | Layar `/grafik?cycleId=` (pilih siklus dalam lingkup, default siklus aktif pertama): pilih metrik lewat chip — **BW (g)**, **Deplesi %**, **FCR**, **Pakan harian & kumulatif**, **Mati harian**, **IP**; sumbu X = umur (hari); ringkasan angka terakhir + tabel harian ringkas. Recording **belum terkirim** ditampilkan sebagai titik/garis **putus-putus** (dihitung di klien, M-65). Data di-cache untuk offline. |
+| M-65 | Rumus di klien | `CyclePerformance.Calculate` + akumulasi harian **diporting** ke `MobileApp.Core` (Core tidak boleh mereferensikan Domain); unit test memakai angka yang sama dengan test Domain agar hasilnya identik. |
+| M-66 | Perbandingan siklus | **PPL & Manager** (dalam lingkup masing-masing) bisa membandingkan **≤ 3 siklus** (aktif atau sudah tutup) untuk satu metrik, ditumpuk per umur dengan warna berbeda + legenda. Tanpa endpoint baru (3 × `performance`). |
+| M-67 | Chart.js di mobile | Salin **Chart.js 4.5.0** dari Web.App ke `src/MobileApp/wwwroot/lib/chartjs/` + `js/chart-interop.js` (render/update/destroy per canvas; angka sudah diformat id-ID dari .NET); komponen `ChartCanvas` (`IAsyncDisposable`). Tanpa plugin tambahan; animasi dimatikan agar ringan. |
+| M-68 | Grafik mingguan | Toggle **Harian / Mingguan** di layar Grafik (juga saat membandingkan siklus). Minggu ke-n = umur `7n-6` s.d. `7n` (minggu 1 = umur 1–7). Metrik **aliran** dijumlah per minggu: pakan (kg & g/ekor), mati + culling (ekor & % dari populasi awal minggu). Metrik **kumulatif/posisi** diambil di hari terakhir minggu: BW (+ pertambahan BW minggu itu), deplesi %, FCR, IP, populasi. Minggu berjalan yang belum genap 7 hari ditandai "berjalan (n hari)"; hari yang tidak ada recording tidak diisi. Dihitung di klien dari `days[]` (tanpa endpoint baru); tabel ringkas per minggu di bawah grafik. |
+
+### 19.3 Task
+1. **Application — helper performa**: pindahkan akumulasi harian (`BuildDays`) ke `Application/Production/CyclePerformanceBuilder` (internal static) yang dipakai `GetCyclePerformanceQueryHandler` & dashboard. Perilaku `performance` tidak berubah (test lama tetap lulus).
+2. **Backend — `GET mobile/dashboard`**:
+   - `MobileDashboardOptions` (`Mobile:Dashboard`, M-58) di-bind di Infrastructure; `appsettings.json` Web.Api + `docs/DEPLOY.md`.
+   - `Application/Mobile/GetMobileDashboard.cs` (`GetMobileDashboardQuery(DateOnly? Date, Guid? BranchId)`): temp table siklus aktif dalam lingkup cabang + `FieldScopeSql`; recording per hari (mati, culling, pakan, BW) untuk akumulasi, panen, stok pakan gudang kandang, rata-rata pakai `FeedAverageDays`, tanggal stok ayam terakhir; hitung per siklus dengan helper (task 1), flag (M-59), KPI gabungan (M-60).
+   - Endpoint `dashboard` di `MobileEndpoints` (`production:read`).
+3. **Test backend**:
+   - Unit: helper akumulasi (hasil sama dengan sebelum refactor), KPI gabungan, flag (terlambat, pakan rendah, deplesi tinggi, belum lapor stok), estimasi sisa hari (tanpa data → null).
+   - Integration Web.Api (`FieldScenarioTest`): PPL A hanya siklusnya, Manager keduanya; recording hari ini mengubah x/y dan menghapus flag terlambat; stok pakan & estimasi; `date` > server + 1 → 400; `branchId` di luar akses ditolak sesuai pola yang ada.
+4. **MobileApp.Core**:
+   - DTO `MobileDashboard` (+ `DashboardCycle`, `DashboardKpi`), `CyclePerformance`/`DailyPerformance`; `ProductionApi.GetDashboardAsync(date)` & `GetPerformanceAsync(cycleId)` lewat `ApiCache`.
+   - `PerformanceCalculator` (porting M-65) + penggabungan recording antrean ke seri grafik (titik "lokal").
+   - `DashboardService`: gabungkan respons server dengan status antrean (tugas hari ini, M-61).
+   - `ChartMetric`/`ChartSeries` (metrik → seri, label Indonesia, warna perbandingan) + `WeeklyAggregator` (M-68: agregasi aliran vs posisi, minggu berjalan).
+   - Unit test: path API & cache, kalkulator = angka test Domain, penggabungan lokal, status tugas hari ini.
+5. **MobileApp — Chart.js**: salin `chart.min.js`, buat `js/chart-interop.js`, tambah script di `index.html`, komponen `Components/Shared/ChartCanvas.razor`.
+6. **MobileApp — UI**:
+   - **Beranda** (`Home.razor`): perbaiki logo header; tampilan PPL (M-61) & Manager (M-62) menggantikan grid menu (menu tetap ada di "Lainnya"); "Data per …" bila dari cache; tombol segarkan.
+   - **Grafik** (`/grafik`, menggantikan placeholder `AppFeatures.Performance`): pilih siklus, chip metrik, toggle **Harian / Mingguan** (M-68), grafik + ringkasan + tabel harian/mingguan, titik lokal putus-putus; **Bandingkan** (tambah ≤ 2 siklus lain).
+   - Tautan ke grafik dari kartu kandang di Beranda, tab Siklus detail Kandang, dan halaman recording siklus.
+7. **Verifikasi** (emulator API 34, `intiplasma_verify` + data demo, `ppl.bdg` / `ppl2.bdg` / `manager.bdg`):
+   - PPL: tugas hari ini "Belum diisi" → input recording → "Terisi"; stok pakan & estimasi sisa hari cocok dengan hitungan manual dari DB.
+   - Manager: KPI & x/y cocok dengan query DB; siklus berisiko tampil (kondisi terlambat/deplesi tinggi dibuat di DB verifikasi); stok ayam per rentang sama dengan tab Stok Ayam.
+   - Grafik: angka hari terakhir = tab Performance di Web.App; mode pesawat → recording baru tampil putus-putus; bandingkan 3 siklus; tampilan mingguan cocok dengan hitungan manual (minggu penuh mode pesawat → recording baru tampil putus-putus; bandingkan 3 siklus. minggu berjalan).
+   - Mode pesawat → Beranda dari cache dengan "Data per …"; logo header tidak gepeng.
+8. **Dokumentasi**: realisasi §20, status §8/§11, RANGKUMAN.
+
+### 19.4 Di luar lingkup M4
+- Garis standar breed, deviasi & flag `BelowStandard` → M5. Kartu approval menunggu & pengajuan saya → M6. Kartu request pakan → M9.
+- Dashboard Manager/PPL di Web.App (Web.App tetap memakai dashboard Admin Office) → tidak direncanakan.
+- Notifikasi push untuk flag risiko → backlog.
+- Ekspor/bagikan grafik sebagai gambar → backlog.
+
+---
+
+## 20. Realisasi Fase M4 — Grafik & Dashboard (2026-10-09)
+
+### 20.1 Backend
+- **`CyclePerformanceBuilder`** (`Application/Production`): akumulasi harian dari `GetCyclePerformanceQueryHandler` dipindah ke helper bersama (`BuildDays`, `Current`); `cycles/{id}/performance` tidak berubah.
+- **`GET mobile/dashboard?date&branchId`** (`Application/Mobile/GetMobileDashboard.cs`, `production:read`), M-55 s.d. M-60:
+  - siklus `Active`/`Harvesting` yang sudah chick-in, lingkup cabang + PPL;
+  - per siklus: performa kumulatif (helper yang sama), umur, populasi, tanggal recording & stok ayam terakhir, terisi hari ini/kemarin, stok pakan gudang kandang per item (+ satuan terbesar mis. SAK), rata-rata pakan dari `FeedAverageDays` recording terakhir yang ada pemakaian pakan, estimasi sisa hari, flag;
+  - KPI gabungan: deplesi Σ(mati+culling)/Σ awal, FCR Σ pakan/Σ bobot hidup+panen (siklus tanpa BW dikecualikan), IP tertimbang populasi, recording & stok ayam hari ini x/y.
+  - Tanggal default = tanggal Asia/Jakarta (UTC+7); `date` > tanggal server + 1 → `400 MobileDashboard.FutureDate`; `branchId` di luar akses → `403`.
+  - Logika flag & KPI di `MobileDashboardCalculator` (tanpa database, diuji unit).
+- **`MobileDashboardOptions`** (`Mobile:Dashboard`: `FeedAverageDays` 3, `FeedWarningDays` 3, `RecordingLateDays` 1, `DepletionWarningPercent` 5, `StockReportFromAgeDays` 21) di `appsettings.json` Web.Api & `docs/DEPLOY.md`.
+- **Tidak ada migration.**
+
+### 20.2 MobileApp.Core
+- DTO `MobileDashboard`, `DashboardCycle`, `DashboardKpi`, `PerformanceFigures`, `CyclePerformanceReport`; `ProductionApi.GetDashboardAsync` (tanpa `date` → satu kunci cache lintas hari), `ReadDashboardAsync`, `GetPerformanceAsync`; `PartnershipApi.GetCyclesAsync` (pemilih siklus).
+- **`PerformanceCalculator`** (M-65): porting `CyclePerformance.Calculate` + akumulasi harian; `WithLocal` menyisipkan recording antrean (tanggal yang belum ada di server) sebagai titik `IsLocal`.
+- **`WeeklyPerformance`** (M-68): minggu ke-n = umur 7n−6…7n (umur 0 masuk minggu 1); pakan & mati+culling dijumlah (pakan g/ekor dan deplesi % terhadap populasi awal minggu), BW (+ pertambahan), deplesi, FCR, IP, populasi dari hari terakhir minggu; minggu terakhir yang belum sampai umur 7n = "berjalan".
+- **`PerformanceCharts`**: spesifikasi Chart.js per metrik (BW, Deplesi, FCR, Pakan, Mati, IP), harian/mingguan, satu siklus (pakan: batang harian + garis kumulatif sumbu kanan; mati & culling bertumpuk; mingguan BW + pertambahan) atau ≤ 3 siklus (satu garis per siklus; pakan kumulatif g/ekor, deplesi minggu %), `LocalFrom` untuk garis putus-putus.
+- **`DashboardService`**: respons server (atau salinan tersimpan) + antrean → status tugas hari ini (`Done`/`Queued`/`Failed`/`Missing`/`NotExpected`), flag `RecordingLate`/`NoStockReport` disembunyikan bila antrean sudah menjawabnya, `AtRisk` urut jumlah flag.
+- `Labels.TaskState/TaskTone/RiskFlag`, `IdFormat.Optional`, `IdFormat.Feed` ("925 kg (18,5 SAK)").
+
+### 20.3 MobileApp
+- **Chart.js 4.5.0** (dari Web.App) di `wwwroot/lib/chartjs/`, `wwwroot/js/chart-interop.js` (render/destroy, locale id-ID, animasi mati, segmen lokal putus-putus + titik kosong), komponen `ChartCanvas`.
+- **Beranda** (`Home.razor`):
+  - PPL — kartu recording & stok ayam hari ini x/y, kartu per kandang (status tugas → tautan ke form/antrean, populasi, deplesi, FCR, BW, IP, stok pakan + estimasi, flag, "Lihat grafik").
+  - Manager — KPI cabang (8 kartu), siklus berisiko, stok ayam siap jual per rentang (endpoint rekap M3) + "Rincian".
+  - "Perbarui" di header; offline → salinan tersimpan dengan "Offline — data per …"; perubahan antrean memperbarui status tanpa request.
+  - Saat online, Beranda PPL juga mengunduh field-context, daftar siklus, dan performa siklus berjalan agar form & grafik bisa dibuka offline setelah login (§3.6).
+  - Logo header tidak lagi gepeng (§14.5).
+- **Grafik Produksi** (`/grafik?cycleId&from`, menggantikan placeholder; tautan dari Beranda dan halaman recording siklus): pilih siklus (siklus terpilih yang lebih lama dari halaman pertama tetap ditambahkan), chip metrik, Harian/Mingguan, ringkasan, tabel harian/mingguan (baris lokal miring), **Bandingkan** ≤ 3 siklus.
+- **`NetworkErrorHandler`** juga membungkus `System.Net.WebException` (koneksi ditolak tepat setelah jaringan putus) — sebelumnya form recording menampilkan "Terjadi kesalahan pada aplikasi".
+
+### 20.4 Pengujian & verifikasi
+- **Test: 602 lulus** — 162 domain, 92 application (+9 `MobileDashboardCalculatorTests`: helper akumulasi, flag, estimasi pakan, KPI), 14 arsitektur, 122 MobileApp.UnitTests (+13: kalkulator = angka test Domain, titik lokal, mingguan, spesifikasi grafik, tugas hari ini, path & cache dashboard/performance, format pakan), 41 integration Web.Api (+2 `MobileDashboardTests`: lingkup PPL/Manager, recording hari ini menghapus flag terlambat, stok & estimasi pakan, tanggal masa depan 400, cabang tanpa akses 403), 171 integration Web.App.
+- **API** pada `intiplasma_verify` + data demo (`ppl.bdg` = Inti Lembang, `ppl2.bdg` = Ahmad 2, `manager.bdg` keduanya): KPI Manager cocok dengan hitungan manual (deplesi 3,564%, IP 239,79); stok pakan 2.343 & 18.160,5 kg = `inventory.stock_balances`; rata-rata pakan 798,433 & 736,033 kg = rata-rata 3 recording terakhir di DB → estimasi 2,9 (FeedLow) & 24,7 hari; performa dashboard identik dengan `cycles/{id}/performance`.
+- **Emulator API 34**:
+  - `manager.bdg`: KPI, recording/stok ayam 0/2, 2 siklus berisiko (Pakan menipis, Stok ayam belum lapor), stok ayam per rentang; grafik BW harian, Pakan mingguan (M1–M5), bandingkan 3 siklus (aktif, selesai, aktif).
+  - `ppl2.bdg`: mode pesawat → Beranda dari cache + catatan offline; recording mati 10 / BW 1.990 disimpan → status "Belum terkirim" + badge 1; online → terkirim (DB 1 baris) dan Beranda "Terisi", deplesi 4,52%.
+  - `ppl.bdg`: mode pesawat → recording mati 20 / BW 800 → grafik menampilkan segmen putus-putus umur 21 + ringkasan lokal (deplesi 3,23%, FCR 1,468, IP 251); setelah online, angka server sama persis (3,225 / 1,468 / 251,21).
+
+### 20.5 Catatan
+- Perbaikan saat verifikasi: tombol "Perbarui" terdorong keluar layar oleh aturan header template (override `.header-right`); form recording error saat offline (`WebException`, lihat §20.3); field-context & performa belum tersimpan untuk user yang baru login (kini diunduh Beranda PPL).
+- Ringkasan grafik menampilkan umur pada recording terakhir (mis. 34 hari), sedangkan kartu Beranda menampilkan umur hari ini (35 hari).
+- "Recording hari ini x/y" hanya menghitung yang sudah di server; entri antrean tampil sebagai "Belum terkirim" pada kartu kandang.
+- Standar breed, flag `BelowStandard`, kartu approval & request pakan menyusul di M5/M6/M9 tanpa mengganti endpoint.

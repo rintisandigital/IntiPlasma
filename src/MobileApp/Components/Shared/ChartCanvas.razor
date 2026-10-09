@@ -1,0 +1,39 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@* A Chart.js canvas (PLAN-MOBILE M-67); redrawn whenever a new spec is passed. *@
+<div class="chart-box" style="height: @(Height)px">
+    <canvas @ref="_canvas"></canvas>
+</div>
+
+@code {
+    private ElementReference _canvas;
+    private ChartSpec? _drawn;
+
+    [Parameter, EditorRequired]
+    public ChartSpec? Spec { get; set; }
+
+    [Parameter]
+    public int Height { get; set; } = 260;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Spec is not null && !ReferenceEquals(Spec, _drawn))
+        {
+            _drawn = Spec;
+            await JS.InvokeVoidAsync("intiplasmaCharts.render", _canvas, Spec);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("intiplasmaCharts.destroy", _canvas);
+        }
+        catch (JSDisconnectedException)
+        {
+            // The WebView is gone (app closing); nothing to clean up.
+        }
+    }
+}

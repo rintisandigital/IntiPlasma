@@ -64,6 +64,14 @@ public sealed class PartnershipApi(ApiCache cache, ApiClient api)
             Path("cycles", ("coopId", Text(coopId)), ("page", "1"), ("pageSize", Text(PageSize))),
             cancellationToken);
 
+    /// <summary>
+    /// Cycles in the user's scope (all coops), for picking cycles to chart and compare (M-64, M-66).
+    /// </summary>
+    public Task<CachedResult<PagedList<Cycle>>> GetCyclesAsync(string? search, int page, CancellationToken cancellationToken = default) =>
+        cache.GetAsync<PagedList<Cycle>>(
+            Path("cycles", ("search", search), ("page", Text(page)), ("pageSize", Text(PageSize))),
+            cancellationToken);
+
     public Task<CachedResult<Cycle>> GetCycleAsync(Guid id, CancellationToken cancellationToken = default) =>
         cache.GetAsync<Cycle>($"cycles/{id}", cancellationToken);
 

@@ -1,3 +1,4 @@
+using MobileApp.Core.Contracts;
 using MobileApp.Core.Formatting;
 
 namespace MobileApp.UnitTests.Formatting;
@@ -37,4 +38,17 @@ public sealed class IdFormatTests
     [InlineData(20, "Selamat malam")]
     public void Greeting_Should_FollowTheTimeOfDay(int hour, string expected) =>
         IdFormat.Greeting(new DateTime(2026, 10, 8, hour, 0, 0, DateTimeKind.Local)).ShouldBe(expected);
+
+    [Fact]
+    public void Feed_Should_AddPacks_OnlyWhenEveryItemHasTheSameUnit()
+    {
+        DashboardFeedStock starter = new(Guid.NewGuid(), "PK1", "Starter", 900m, "KG", "SAK", 50m);
+        DashboardFeedStock finisher = new(Guid.NewGuid(), "PK2", "Finisher", 25m, "KG", "SAK", 50m);
+
+        IdFormat.Feed(925m, [starter, finisher]).ShouldBe("925 kg (18,5 SAK)");
+        IdFormat.Feed(925m, [starter, finisher with { PackUomCode = null, PackFactor = null }]).ShouldBe("925 kg");
+        IdFormat.Feed(0m, []).ShouldBe("0 kg");
+        IdFormat.Optional(null).ShouldBe("–");
+        IdFormat.Optional(1.5413m, 3).ShouldBe("1,541");
+    }
 }

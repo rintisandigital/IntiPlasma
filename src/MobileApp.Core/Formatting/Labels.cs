@@ -64,6 +64,38 @@ public static class Labels
         _ => Tone.Warning
     };
 
+    /// <summary>
+    /// Today's recording or stok ayam on the dashboard (M-61).
+    /// </summary>
+    public static string TaskState(Production.TaskState state) => state switch
+    {
+        Production.TaskState.Done => "Terisi",
+        Production.TaskState.Queued => "Belum terkirim",
+        Production.TaskState.Failed => "Gagal",
+        Production.TaskState.Missing => "Belum diisi",
+        _ => "Belum perlu"
+    };
+
+    public static Tone TaskTone(Production.TaskState state) => state switch
+    {
+        Production.TaskState.Done => Tone.Success,
+        Production.TaskState.Queued => Tone.Warning,
+        Production.TaskState.Failed or Production.TaskState.Missing => Tone.Danger,
+        _ => Tone.Neutral
+    };
+
+    /// <summary>
+    /// Risk flag of a running cycle (M-59).
+    /// </summary>
+    public static string RiskFlag(string flag) => flag switch
+    {
+        Contracts.DashboardFlags.RecordingLate => "Recording terlambat",
+        Contracts.DashboardFlags.FeedLow => "Pakan menipis",
+        Contracts.DashboardFlags.HighDepletion => "Deplesi tinggi",
+        Contracts.DashboardFlags.NoStockReport => "Stok ayam belum lapor",
+        _ => flag
+    };
+
     public static string ContractStatus(string value) => value switch
     {
         "Draft" => "Draf",

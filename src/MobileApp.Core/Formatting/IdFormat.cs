@@ -28,6 +28,27 @@ public static class IdFormat
 
     public static string Number(int value) => Number((decimal)value);
 
+    /// <summary>
+    /// A figure that may be unknown (no body weight yet): "–" then.
+    /// </summary>
+    public static string Optional(decimal? value, int decimals = 0) => value is { } v ? Number(v, decimals) : "–";
+
+    /// <summary>
+    /// Feed stock in kg, plus packs when every item has the same largest unit, e.g. <c>900 kg (18 SAK)</c>.
+    /// </summary>
+    public static string Feed(decimal kilograms, IReadOnlyCollection<Contracts.DashboardFeedStock> items)
+    {
+        string kg = $"{Number(kilograms)} kg";
+        List<string?> packs = [.. items.Select(i => i.PackUomCode).Distinct()];
+
+        if (items.Count == 0 || packs.Count != 1 || packs[0] is not { } pack || items.Any(i => i.PackFactor is not > 0))
+        {
+            return kg;
+        }
+
+        return $"{kg} ({Number(items.Sum(i => i.Quantity / i.PackFactor!.Value), 1)} {pack})";
+    }
+
     public static string Money(decimal value) => value < 0 ? $"-Rp {Number(-value)}" : $"Rp {Number(value)}";
 
     /// <summary>

@@ -1,12 +1,28 @@
 @page "/"
+@implements IDisposable
 @inject SessionService Session
 @inject SyncEngine Sync
+@inject DashboardService Dashboard
+@inject RecordingService Recordings
+@inject PartnershipApi Partnership
+@inject ProductionApi Production
+@inject IClock Clock
+@inject MobileApp.Core.Abstractions.IConnectivity Connectivity
 
-@* Dashboard (PLAN-MOBILE §6.2). M0 shows the user and the menu; the role-specific content comes in M4. *@
+@* Dashboard (PLAN-MOBILE §6.2, M-61 s.d. M-63): the PPL see their running coops with today's tasks, performance and
+   feed; the Manager sees the branch figures, the cycles at risk and the stok ayam ready for sale. *@
 @if (Session.User is { } user)
 {
     <div class="header-avt fixed-top">
         <img class="header-logo-text" src="images/rdi-logo-text.png" alt="Rintisan Digital Indopiranti" />
+        <div class="right header-right">
+            @if (ShowsDashboard)
+            {
+                <button type="button" class="header-icon-btn header-text-btn" disabled="@_loading" @onclick="() => LoadAsync(refresh: true)">
+                    @(_loading ? "Memuat…" : "Perbarui")
+                </button>
+            }
+        </div>
     </div>
 
     <div class="app-content style-2">
@@ -14,7 +30,7 @@
             <div class="hero-card">
                 <div class="text-caption-1 muted">@IdFormat.Greeting(DateTime.Now),</div>
                 <div class="text-title fw-6 mt-4">@user.FullName</div>
-                <div class="text-caption-2 muted mt-4">@IdFormat.LongDate(DateOnly.FromDateTime(DateTime.Now))</div>
+                <div class="text-caption-2 muted mt-4">@IdFormat.LongDate(Clock.Today)</div>
                 <div class="d-flex flex-wrap gap-8 mt-12">
                     @if (user.MainBranch is { } branch)
                     {
@@ -40,28 +56,137 @@
                 </a>
             }
 
-            <h5 class="mt-24 mb-12">Menu</h5>
-            <div class="feature-grid">
-                @foreach (AppFeature feature in MenuTiles(user))
-                {
-                    <a class="feature-tile" href="@feature.Route">
-                        <i class="icon @feature.Icon"></i>
-                        <span>@feature.Title</span>
-                    </a>
-                }
-            </div>
+            @if (!ShowsDashboard)
+            {
+                <h5 class="mt-24 mb-12">Menu</h5>
+                <div class="feature-grid">
+                    @foreach (AppFeature feature in MenuTiles(user))
+                    {
+                        <a class="feature-tile" href="@feature.Route">
+                            <i class="icon @feature.Icon"></i>
+                            <span>@feature.Title</span>
+                        </a>
+                    }
+                </div>
+            }
+            else if (_error is not null && _view is null)
+            {
+                <ErrorState Error="_error" OnRetry="() => LoadAsync(refresh: true)" />
+            }
+            else if (_view is null)
+            {
+                <Spinner />
+            }
+            else
+            {
+                <div class="mt-16"><CacheNote CachedAtUtc="_cachedAtUtc" /></div>
 
-            <p class="text-caption-2 text-dark-4 mt-20">
-                Fitur aplikasi dirilis bertahap. Menu yang belum tersedia menampilkan jadwal fasenya.
-            </p>
+                @if (IsFieldView)
+                {
+                    @FieldDashboard(_view)
+                }
+                else
+                {
+                    @ManagerDashboard(_view)
+                }
+            }
         </div>
     </div>
 }
 
 @code {
+    private DashboardView? _view;
+    private DateTime? _cachedAtUtc;
+    private ApiError? _error;
+    private LiveBirdStockSummary? _stock;
+    private bool _loading;
     private int _queued;
 
-    protected override async Task OnInitializedAsync() => _queued = await Sync.CountAsync();
+    /// <summary>
+    /// Users who record (PPL) get the field view; readers of production data (Manager) the branch view.
+    /// </summary>
+    private bool IsFieldView => Session.Has(AppPermissions.ProductionRecord) || Session.Has(AppPermissions.ProductionStockReport);
+
+    private bool ShowsDashboard => Session.Has(AppPermissions.ProductionRead);
+
+    protected override async Task OnInitializedAsync()
+    {
+        Sync.Changed += OnQueueChanged;
+        _queued = await Sync.CountAsync();
+
+        if (ShowsDashboard)
+        {
+            await LoadAsync(Connectivity.IsOnline);
+        }
+    }
+
+    public void Dispose() => Sync.Changed -= OnQueueChanged;
+
+    private async Task LoadAsync(bool refresh)
+    {
+        _loading = true;
+        _error = null;
+
+        CachedResult<DashboardView> result = await Dashboard.LoadAsync(refresh);
+        if (!result.IsSuccess && refresh)
+        {
+            // Offline or server down: the stored copy, marked with its age.
+            result = await Dashboard.LoadAsync(refresh: false);
+            if (result.IsSuccess)
+            {
+                _cachedAtUtc = result.Value.Dashboard.GeneratedAtUtc;
+            }
+        }
+        else if (result.IsSuccess)
+        {
+            _cachedAtUtc = result.CachedAtUtc ?? (refresh ? null : result.Value.Dashboard.GeneratedAtUtc);
+        }
+
+        if (result.IsSuccess)
+        {
+            _view = result.Value;
+        }
+        else
+        {
+            _error = result.Error;
+        }
+
+        // The PPL's offline forms and charts need the field context (§3.6), the cycle list and the performance of the
+        // running cycles: fetch them whenever the dashboard is refreshed online (a PPL has only a few cycles).
+        if (IsFieldView && refresh && _error is null && _cachedAtUtc is null && _view is not null)
+        {
+            await Recordings.GetContextAsync(refresh: true);
+            await Partnership.GetCyclesAsync(null, 1);
+            foreach (DashboardTask task in _view.Tasks)
+            {
+                await Production.GetPerformanceAsync(task.Cycle.CycleId);
+            }
+        }
+
+        if (!IsFieldView && _view is not null)
+        {
+            CachedResult<LiveBirdStockSummary> stock = await Production.GetStockSummaryAsync(Clock.Today, null);
+            _stock = stock.IsSuccess ? stock.Value : null;
+        }
+
+        _loading = false;
+    }
+
+    private void OnQueueChanged(object? sender, EventArgs e) =>
+        _ = InvokeAsync(async () =>
+        {
+            _queued = await Sync.CountAsync();
+            if (_view is not null)
+            {
+                CachedResult<DashboardView> result = await Dashboard.LoadAsync(refresh: false);
+                if (result.IsSuccess)
+                {
+                    _view = result.Value;
+                }
+            }
+
+            StateHasChanged();
+        });
 
     private static IEnumerable<AppFeature> MenuTiles(CurrentUser user) =>
         AppFeatures.All.Where(f =>
@@ -69,4 +194,193 @@
             && f != AppFeatures.Home
             && f != AppFeatures.More
             && f.IsAvailable(user));
+
+    private static string RecordingLink(DashboardTask task) => task.Recording switch
+    {
+        TaskState.Missing => $"/input/recording?cycleId={task.Cycle.CycleId}",
+        TaskState.Queued or TaskState.Failed => "/antrean",
+        _ => $"/siklus/{task.Cycle.CycleId}/recording"
+    };
+
+    private static string StockLink(DashboardTask task) => task.Stock switch
+    {
+        TaskState.Queued or TaskState.Failed => "/antrean",
+        _ => $"/stok-ayam/input?cycleId={task.Cycle.CycleId}"
+    };
+
+    private RenderFragment FieldDashboard(DashboardView view) => __builder =>
+    {
+        int recorded = view.Tasks.Count(t => t.Recording == TaskState.Done);
+        int stockExpected = view.Tasks.Count(t => t.Stock != TaskState.NotExpected);
+        int stockDone = view.Tasks.Count(t => t.Stock == TaskState.Done);
+
+        <div class="kpi-grid mb-16">
+            <div class="kpi-tile @(recorded < view.Tasks.Count ? "warn" : null)">
+                <span class="label">Recording hari ini</span>
+                <span class="value">@recorded / @view.Tasks.Count</span>
+            </div>
+            <div class="kpi-tile @(stockDone < stockExpected ? "warn" : null)">
+                <span class="label">Stok ayam hari ini</span>
+                <span class="value">@stockDone / @stockExpected</span>
+            </div>
+        </div>
+
+        <h5 class="mb-12">Kandang saya</h5>
+        @if (view.Tasks.Count == 0)
+        {
+            <div class="empty-state">
+                <i class="icon icon-buildings"></i>
+                <p class="body-2 text-dark-4 mt-8">Tidak ada siklus berjalan di kandang tanggung jawab Anda.</p>
+            </div>
+        }
+        @foreach (DashboardTask task in view.Tasks)
+        {
+            DashboardCycle cycle = task.Cycle;
+            PerformanceFigures p = cycle.Performance;
+            bool feedLow = task.Flags.Contains(DashboardFlags.FeedLow);
+
+            <div class="list-card @(task.Flags.Count > 0 ? "risk" : null)">
+                <div class="d-flex justify-content-between align-items-start gap-8">
+                    <div>
+                        <div class="text-caption-2 text-Primary">@cycle.Number</div>
+                        <div class="text-button-small text-OnSurface">@cycle.CoopName</div>
+                    </div>
+                    <span class="text-caption-2 text-dark-4">Umur @task.AgeDays hari</span>
+                </div>
+
+                <div class="task-row mt-8">
+                    @if (Session.Has(AppPermissions.ProductionRecord))
+                    {
+                        <a href="@RecordingLink(task)">Recording <StatusBadge Text="@Labels.TaskState(task.Recording)" Tone="@Labels.TaskTone(task.Recording)" /></a>
+                    }
+                    @if (Session.Has(AppPermissions.ProductionStockReport))
+                    {
+                        <a href="@StockLink(task)">Stok ayam <StatusBadge Text="@Labels.TaskState(task.Stock)" Tone="@Labels.TaskTone(task.Stock)" /></a>
+                    }
+                </div>
+
+                <div class="kpi-mini mt-8">
+                    <div><span>Populasi</span><b>@IdFormat.Number(cycle.Population)</b></div>
+                    <div><span>Deplesi</span><b>@IdFormat.Number(p.DepletionPercent, 2)%</b></div>
+                    <div><span>FCR</span><b>@IdFormat.Optional(p.Fcr, 3)</b></div>
+                    <div><span>BW (g)</span><b>@IdFormat.Optional(p.AverageWeightKg * 1000m)</b></div>
+                    <div><span>IP</span><b>@IdFormat.Optional(p.Ip)</b></div>
+                </div>
+
+                <div class="meta">
+                    <span class="@(feedLow ? "text-danger fw-6" : null)">
+                        Stok pakan @IdFormat.Feed(cycle.FeedStockKg, cycle.FeedStock)
+                        @if (cycle.FeedDaysLeft is { } days)
+                        {
+                            <text> · ±@IdFormat.Number(days, 1) hari</text>
+                        }
+                    </span>
+                </div>
+
+                @if (task.Flags.Count > 0)
+                {
+                    <div class="d-flex flex-wrap gap-8 mt-8">
+                        @foreach (string flag in task.Flags)
+                        {
+                            <StatusBadge Text="@Labels.RiskFlag(flag)" Tone="Labels.Tone.Danger" />
+                        }
+                    </div>
+                }
+
+                <a class="link-btn d-inline-block mt-8" href="/grafik?cycleId=@cycle.CycleId&from=%2F"><i class="icon icon-chart me-1"></i>Lihat grafik</a>
+            </div>
+        }
+    };
+
+    private RenderFragment ManagerDashboard(DashboardView view) => __builder =>
+    {
+        DashboardKpi kpi = view.Dashboard.Kpi;
+        int recorded = view.Tasks.Count(t => t.Recording == TaskState.Done);
+        int stockExpected = view.Tasks.Count(t => t.Stock != TaskState.NotExpected);
+        int stockDone = view.Tasks.Count(t => t.Stock == TaskState.Done);
+
+        <div class="kpi-grid mb-16">
+            <div class="kpi-tile"><span class="label">Siklus aktif</span><span class="value">@IdFormat.Number(kpi.ActiveCycles)</span></div>
+            <div class="kpi-tile"><span class="label">Populasi</span><span class="value">@IdFormat.Number(kpi.Population)</span></div>
+            <div class="kpi-tile"><span class="label">Deplesi</span><span class="value">@IdFormat.Number(kpi.DepletionPercent, 2)%</span></div>
+            <div class="kpi-tile"><span class="label">FCR</span><span class="value">@IdFormat.Optional(kpi.Fcr, 3)</span></div>
+            <div class="kpi-tile"><span class="label">IP</span><span class="value">@IdFormat.Optional(kpi.Ip)</span></div>
+            <div class="kpi-tile"><span class="label">Stok pakan</span><span class="value">@IdFormat.Tons(kpi.FeedStockKg)</span></div>
+            <div class="kpi-tile @(recorded < view.Tasks.Count ? "warn" : null)">
+                <span class="label">Recording hari ini</span><span class="value">@recorded / @view.Tasks.Count</span>
+            </div>
+            <div class="kpi-tile @(stockDone < stockExpected ? "warn" : null)">
+                <span class="label">Stok ayam hari ini</span><span class="value">@stockDone / @stockExpected</span>
+            </div>
+        </div>
+
+        <h5 class="mb-12">Siklus berisiko (@view.AtRisk.Count)</h5>
+        @if (view.AtRisk.Count == 0)
+        {
+            <p class="body-2 text-dark-4 mb-16">Tidak ada siklus berisiko hari ini.</p>
+        }
+        @foreach (DashboardTask task in view.AtRisk)
+        {
+            DashboardCycle cycle = task.Cycle;
+            <a class="list-card risk" href="/grafik?cycleId=@cycle.CycleId&from=%2F">
+                <div class="d-flex justify-content-between align-items-start gap-8">
+                    <div>
+                        <div class="text-caption-2 text-Primary">@cycle.CoopCode · @cycle.BranchCode</div>
+                        <div class="text-button-small text-OnSurface">@cycle.CoopName</div>
+                    </div>
+                    <span class="text-caption-2 text-dark-4">Umur @task.AgeDays hari</span>
+                </div>
+                <div class="d-flex flex-wrap gap-8 mt-8">
+                    @foreach (string flag in task.Flags)
+                    {
+                        <StatusBadge Text="@Labels.RiskFlag(flag)" Tone="Labels.Tone.Danger" />
+                    }
+                </div>
+                <div class="meta">
+                    <span>Deplesi @IdFormat.Number(cycle.Performance.DepletionPercent, 2)%</span>
+                    <span>FCR @IdFormat.Optional(cycle.Performance.Fcr, 3)</span>
+                    <span>Recording terakhir @(cycle.LastRecordingDate is { } last ? IdFormat.Date(last) : "—")</span>
+                    @if (cycle.FeedDaysLeft is { } days)
+                    {
+                        <span>Pakan ±@IdFormat.Number(days, 1) hari</span>
+                    }
+                    @if (cycle.FieldOfficerName is { } ppl)
+                    {
+                        <span>PPL @ppl</span>
+                    }
+                </div>
+            </a>
+        }
+
+        <div class="d-flex justify-content-between align-items-center mt-24 mb-12">
+            <h5 class="m-0">Stok ayam siap jual</h5>
+            <a class="link-btn" href="/stok-ayam">Rincian</a>
+        </div>
+        @if (_stock is null)
+        {
+            <p class="body-2 text-dark-4">Rekap stok ayam belum tersedia.</p>
+        }
+        else
+        {
+            <div class="stock-total mb-12">
+                <div>
+                    <div class="text-caption-2 text-dark-4">Total</div>
+                    <div class="text-button-small text-OnSurface">@IdFormat.Number(_stock.TotalBirds) ekor · @IdFormat.Tons(_stock.TotalWeightKg)</div>
+                </div>
+                <div class="text-end">
+                    <div class="text-caption-2 text-dark-4">Kandang lapor</div>
+                    <div class="text-button-small text-OnSurface">@_stock.ReportedCoops / @_stock.Coops.Count</div>
+                </div>
+            </div>
+            <div class="info-list">
+                @foreach (LiveBirdStockRangeTotal range in _stock.Ranges.Where(r => r.Birds > 0))
+                {
+                    <div class="row-item">
+                        <span>@range.Name</span>
+                        <span class="text-end">@IdFormat.Number(range.Birds) ekor · @IdFormat.Tons(range.WeightKg)</span>
+                    </div>
+                }
+            </div>
+        }
+    };
 }

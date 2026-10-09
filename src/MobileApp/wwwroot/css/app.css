@@ -47,8 +47,12 @@ h1:focus, h2:focus, h4:focus {
   50% { opacity: .45; }
 }
 
-.header-logo-text {
+/* The template stretches the first header child to full width; keep the logo's proportions (M4). */
+.header-avt > .header-logo-text {
+  width: auto;
+  max-width: 60%;
   height: 36px;
+  object-fit: contain;
 }
 
 
@@ -558,4 +562,169 @@ h1:focus, h2:focus, h4:focus {
   padding: 12px 16px;
   border-radius: 12px;
   background-color: var(--Primary-soft);
+}
+
+/* Dashboard & charts (M4) */
+/* Beside the logo the template's full-width last child would push the action off screen. */
+.header-avt > .header-right {
+  width: auto;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+
+.header-avt .header-text-btn,
+.header-avt .header-text-btn:hover,
+.header-avt .header-text-btn:focus {
+  width: auto;
+  white-space: nowrap;
+  color: var(--Primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.header-avt .header-text-btn:disabled {
+  color: var(--Secondary);
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.kpi-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background-color: var(--Primary-soft);
+}
+
+.kpi-tile .label {
+  font-size: 12px;
+  color: var(--Secondary);
+}
+
+.kpi-tile .value {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--On-Surface);
+}
+
+.kpi-tile.warn {
+  background-color: #FFF4E0;
+}
+
+.kpi-mini {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px 10px;
+}
+
+.kpi-mini > div {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  color: var(--Secondary);
+}
+
+.kpi-mini b {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--On-Surface);
+}
+
+.list-card.risk {
+  border-left: 4px solid var(--Red);
+}
+
+.task-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  font-size: 12px;
+}
+
+.task-row a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--On-Surface);
+}
+
+.chart-box {
+  position: relative;
+  width: 100%;
+}
+
+/* Segmented choice (metric, daily/weekly): the template styles every button as a full-width primary block. */
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.segmented button,
+.segmented button:hover,
+.segmented button:focus {
+  width: auto;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background-color: var(--White);
+  color: var(--On-Surface);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.segmented button.active {
+  border-color: var(--Primary);
+  background-color: var(--Primary);
+  color: var(--White);
+}
+
+.segmented.two button {
+  flex: 1;
+}
+
+.compare-chip {
+  border: 1px solid var(--chip-color);
+  background-color: var(--White);
+  color: var(--On-Surface);
+}
+
+.compare-chip::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  background-color: var(--chip-color);
+}
+
+.compare-chip .chip-remove,
+.compare-chip .chip-remove:hover {
+  width: auto;
+  height: auto;
+  padding: 0 0 0 4px;
+  background: transparent;
+  color: var(--Secondary);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.perf-table {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.perf-table th {
+  color: var(--Secondary);
+  font-weight: 500;
+}
+
+.perf-table tr.local td {
+  font-style: italic;
+  color: #A3620A;
 }

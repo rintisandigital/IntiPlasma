@@ -1,0 +1,333 @@
+@page "/grafik"
+@implements IDisposable
+@inject ProductionApi Production
+@inject PartnershipApi Partnership
+@inject RecordingService Recordings
+@inject SyncEngine Sync
+@inject NavigationManager Navigation
+
+@* Grafik produksi (PLAN-MOBILE M-64 s.d. M-68): one metric of a cycle per day of age or per week, recordings not sent
+   yet drawn dashed, and up to two more cycles to compare. *@
+<AppPage Title="Grafik Produksi" BackTo="@BackTo">
+    @if (_cyclesError is not null && _cycles.Count == 0)
+    {
+        <ErrorState Error="_cyclesError" OnRetry="LoadCyclesAsync" />
+    }
+    else if (_cyclesLoaded && _cycles.Count == 0)
+    {
+        <div class="empty-state">
+            <i class="icon icon-chart"></i>
+            <p class="body-2 text-dark-4 mt-8">Belum ada siklus yang sudah chick-in.</p>
+        </div>
+    }
+    else
+    {
+        <select class="form-select filter-select mb-12" aria-label="Siklus" value="@_mainId" @onchange="OnCycleChanged">
+            @foreach (Cycle cycle in _cycles)
+            {
+                <option value="@cycle.Id">@CycleLabel(cycle)</option>
+            }
+        </select>
+
+        <div class="segmented mb-8">
+            @foreach (ChartMetric metric in Enum.GetValues<ChartMetric>())
+            {
+                <button type="button" class="@(metric == _metric ? "active" : null)" @onclick="() => SetMetric(metric)">@PerformanceCharts.Title(metric)</button>
+            }
+        </div>
+        <div class="segmented two mb-12">
+            <button type="button" class="@(!_weekly ? "active" : null)" @onclick="() => SetWeekly(false)">Harian</button>
+            <button type="button" class="@(_weekly ? "active" : null)" @onclick="() => SetWeekly(true)">Mingguan</button>
+        </div>
+
+        @if (_error is not null)
+        {
+            <ErrorState Error="_error" OnRetry="LoadSeriesAsync" />
+        }
+        else if (_series.Count == 0)
+        {
+            <Spinner />
+        }
+        else
+        {
+            CycleSeries main = _series[0];
+            <CacheNote CachedAtUtc="_cachedAtUtc" />
+
+            @if (main.Days.Count == 0)
+            {
+                <div class="empty-state">
+                    <i class="icon icon-chart"></i>
+                    <p class="body-2 text-dark-4 mt-8">Belum ada recording untuk siklus ini.</p>
+                </div>
+            }
+            else
+            {
+                <ChartCanvas Spec="_chart" />
+
+                @if (_series.Any(s => s.Days.Any(d => d.IsLocal)))
+                {
+                    <p class="text-caption-2 text-dark-4 mt-4">Garis putus-putus = recording yang belum terkirim.</p>
+                }
+
+                @Summary(main)
+            }
+
+            <div class="d-flex justify-content-between align-items-center mt-20 mb-8">
+                <h5 class="m-0">Bandingkan siklus</h5>
+                <span class="text-caption-2 text-dark-4">maks. @PerformanceCharts.MaxCompared</span>
+            </div>
+            <div class="d-flex flex-wrap gap-8 mb-8">
+                @for (int i = 0; i < _series.Count; i++)
+                {
+                    CycleSeries series = _series[i];
+                    <span class="chip compare-chip" style="--chip-color: @PerformanceCharts.CompareColors[i]">
+                        @series.Label
+                        @if (i > 0)
+                        {
+                            <button type="button" class="chip-remove" aria-label="Hapus" @onclick="() => RemoveCompareAsync(series.CycleId)">×</button>
+                        }
+                    </span>
+                }
+            </div>
+            @if (_series.Count < PerformanceCharts.MaxCompared && CompareOptions.Any())
+            {
+                <select class="form-select filter-select" aria-label="Tambah siklus" value="" @onchange="OnAddCompareAsync">
+                    <option value="">+ Tambah siklus pembanding</option>
+                    @foreach (Cycle cycle in CompareOptions)
+                    {
+                        <option value="@cycle.Id">@CycleLabel(cycle)</option>
+                    }
+                </select>
+            }
+
+            @if (_series.Count == 1 && main.Days.Count > 0)
+            {
+                <h5 class="mt-24 mb-8">@(_weekly ? "Per minggu" : "Per hari")</h5>
+                @(_weekly ? WeekTable(main) : DayTable(main))
+            }
+        }
+    }
+</AppPage>
+
+@code {
+    private List<Cycle> _cycles = [];
+    private bool _cyclesLoaded;
+    private ApiError? _cyclesError;
+    private Guid? _mainId;
+    private List<Guid> _compared = [];
+    private List<CycleSeries> _series = [];
+    private ApiError? _error;
+    private DateTime? _cachedAtUtc;
+    private ChartMetric _metric = ChartMetric.BodyWeight;
+    private bool _weekly;
+    private ChartSpec? _chart;
+
+    [SupplyParameterFromQuery]
+    public Guid? CycleId { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? From { get; set; }
+
+    private string BackTo => string.IsNullOrEmpty(From) ? "/lainnya" : From;
+
+    private IEnumerable<Cycle> CompareOptions => _cycles.Where(c => c.Id != _mainId && !_compared.Contains(c.Id));
+
+    protected override void OnInitialized() => Sync.Changed += OnQueueChanged;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!_cyclesLoaded)
+        {
+            await LoadCyclesAsync();
+        }
+
+        _mainId = CycleId ?? (_cycles.FirstOrDefault(c => c.Status is "Active" or "Harvesting") ?? _cycles.FirstOrDefault())?.Id;
+
+        // A cycle opened from a link may be older than the first page of the picker.
+        if (_mainId is { } id && !_cycles.Exists(c => c.Id == id)
+            && await Partnership.GetCycleAsync(id) is { IsSuccess: true } opened)
+        {
+            _cycles.Insert(0, opened.Value);
+        }
+
+        _compared = [];
+        await LoadSeriesAsync();
+    }
+
+    public void Dispose() => Sync.Changed -= OnQueueChanged;
+
+    private async Task LoadCyclesAsync()
+    {
+        CachedResult<PagedList<Cycle>> result = await Partnership.GetCyclesAsync(null, 1);
+        _cyclesError = result.Error;
+        if (result.IsSuccess)
+        {
+            _cycles = [.. result.Value.Items.Where(c => c.ChickInDate is not null && c.Status != "Cancelled")];
+        }
+
+        _cyclesLoaded = true;
+    }
+
+    private async Task LoadSeriesAsync()
+    {
+        _error = null;
+        if (_mainId is not { } main)
+        {
+            _series = [];
+            return;
+        }
+
+        FieldContext? context = (await Production.ReadFieldContextAsync())?.Value;
+        IReadOnlyList<LocalRecording> local = await Recordings.GetLocalListAsync();
+        var series = new List<CycleSeries>();
+        DateTime? cachedAt = null;
+
+        foreach (Guid cycleId in (IEnumerable<Guid>)[main, .. _compared])
+        {
+            CachedResult<CyclePerformanceReport> result = await Production.GetPerformanceAsync(cycleId);
+            if (!result.IsSuccess)
+            {
+                _error = result.Error;
+                _series = [];
+                return;
+            }
+
+            cachedAt ??= result.CachedAtUtc;
+            CyclePerformanceReport report = result.Value;
+            series.Add(new CycleSeries(
+                cycleId,
+                SeriesLabel(report),
+                report.Current.InitialPopulation,
+                PerformanceCalculator.WithLocal(report, local.Select(l => l.Draft), context)));
+        }
+
+        _series = series;
+        _cachedAtUtc = cachedAt;
+        Redraw();
+    }
+
+    private void Redraw() => _chart = _series.Count > 0 ? PerformanceCharts.Build(_metric, _weekly, _series) : null;
+
+    private void SetMetric(ChartMetric metric)
+    {
+        _metric = metric;
+        Redraw();
+    }
+
+    private void SetWeekly(bool weekly)
+    {
+        _weekly = weekly;
+        Redraw();
+    }
+
+    private void OnCycleChanged(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out Guid id))
+        {
+            Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("cycleId", id), replace: true);
+        }
+    }
+
+    private async Task OnAddCompareAsync(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out Guid id) && _compared.Count < PerformanceCharts.MaxCompared - 1)
+        {
+            _compared.Add(id);
+            await LoadSeriesAsync();
+        }
+    }
+
+    private async Task RemoveCompareAsync(Guid cycleId)
+    {
+        _compared.Remove(cycleId);
+        await LoadSeriesAsync();
+    }
+
+    private void OnQueueChanged(object? sender, EventArgs e) =>
+        _ = InvokeAsync(async () =>
+        {
+            await LoadSeriesAsync();
+            StateHasChanged();
+        });
+
+    private string SeriesLabel(CyclePerformanceReport report) =>
+        _cycles.FirstOrDefault(c => c.Id == report.CycleId) is { } cycle ? cycle.CoopName : report.Number;
+
+    private static string CycleLabel(Cycle cycle) =>
+        $"{cycle.CoopName} · {cycle.Number}{(cycle.Status is "Active" or "Harvesting" ? string.Empty : $" ({Labels.CycleStatus(cycle.Status)})")}";
+
+    private static RenderFragment Summary(CycleSeries series) => __builder =>
+    {
+        PerformancePoint last = series.Days[^1];
+        PerformanceFigures p = last.Cumulative;
+        <div class="kpi-mini mt-12">
+            <div><span>Umur</span><b>@last.AgeDays hari</b></div>
+            <div><span>Populasi</span><b>@IdFormat.Number(p.Population)</b></div>
+            <div><span>Deplesi</span><b>@IdFormat.Number(p.DepletionPercent, 2)%</b></div>
+            <div><span>FCR</span><b>@IdFormat.Optional(p.Fcr, 3)</b></div>
+            <div><span>BW (g)</span><b>@IdFormat.Optional(p.AverageWeightKg * 1000m)</b></div>
+            <div><span>IP</span><b>@IdFormat.Optional(p.Ip)</b></div>
+        </div>
+    };
+
+    private static RenderFragment DayTable(CycleSeries series) => __builder =>
+    {
+        <div class="table-responsive">
+            <table class="table table-sm perf-table">
+                <thead>
+                    <tr><th>Umur</th><th>Tanggal</th><th>Mati</th><th>Cull</th><th>Pakan kg</th><th>BW g</th><th>Deplesi %</th><th>FCR</th><th>IP</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (PerformancePoint day in series.Days.Reverse())
+                    {
+                        <tr class="@(day.IsLocal ? "local" : null)">
+                            <td>@day.AgeDays</td>
+                            <td>@IdFormat.Date(day.Date)</td>
+                            <td>@day.Mortality</td>
+                            <td>@day.Culling</td>
+                            <td>@IdFormat.Number(day.FeedKg, 1)</td>
+                            <td>@IdFormat.Optional(day.AverageBodyWeightGram)</td>
+                            <td>@IdFormat.Number(day.Cumulative.DepletionPercent, 2)</td>
+                            <td>@IdFormat.Optional(day.Cumulative.Fcr, 3)</td>
+                            <td>@IdFormat.Optional(day.Cumulative.Ip)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    };
+
+    private static RenderFragment WeekTable(CycleSeries series) => __builder =>
+    {
+        <div class="table-responsive">
+            <table class="table table-sm perf-table">
+                <thead>
+                    <tr><th>Minggu</th><th>Umur</th><th>Pakan kg</th><th>g/ekor</th><th>Mati+cull</th><th>BW g</th><th>+BW g</th><th>Deplesi %</th><th>FCR</th><th>IP</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (WeekPerformance week in series.Weeks.Reverse())
+                    {
+                        <tr class="@(week.HasLocal ? "local" : null)">
+                            <td>
+                                @week.Week
+                                @if (!week.IsComplete)
+                                {
+                                    <br /><span class="text-caption-2 text-dark-4">berjalan (@week.Days hari)</span>
+                                }
+                            </td>
+                            <td>@week.FromAge–@week.ToAge</td>
+                            <td>@IdFormat.Number(week.FeedKg, 1)</td>
+                            <td>@IdFormat.Number(week.FeedGramPerBird)</td>
+                            <td>@week.Depleted (@IdFormat.Number(week.DepletedPercent, 2)%)</td>
+                            <td>@IdFormat.Optional(week.BodyWeightGram)</td>
+                            <td>@IdFormat.Optional(week.BodyWeightGainGram)</td>
+                            <td>@IdFormat.Number(week.Cumulative.DepletionPercent, 2)</td>
+                            <td>@IdFormat.Optional(week.Cumulative.Fcr, 3)</td>
+                            <td>@IdFormat.Optional(week.Cumulative.Ip)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    };
+}

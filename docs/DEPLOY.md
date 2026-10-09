@@ -26,6 +26,7 @@ Salin `.env.example` → `.env` di samping `docker-compose.yml` lalu isi. `.env`
 | `WEB_API_PORT`, `WEB_APP_PORT`, `POSTGRES_PORT` | Port di host |
 | `ASPNETCORE_ENVIRONMENT` | `Production` |
 | `Jwt__Secret`, `Jwt__Issuer`, `Jwt__Audience`, `Jwt__ExpirationInMinutes`, `Jwt__RefreshTokenExpirationInDays` | Token mobile (Web.Api). Secret acak ≥ 32 karakter; access token 60 menit, refresh token 30 hari (diperpanjang setiap refresh) |
+| `Mobile__Dashboard__FeedAverageDays`, `…__FeedWarningDays`, `…__RecordingLateDays`, `…__DepletionWarningPercent`, `…__StockReportFromAgeDays` | Ambang dashboard mobile (Web.Api, opsional): rata-rata pakan dari 3 recording terakhir, pakan menipis < 3 hari, recording terlambat > 1 hari, deplesi tinggi ≥ 5%, stok ayam wajib lapor mulai umur 21 hari |
 | `App__CompanyName`, `App__TimeZone` | Kop dokumen & zona waktu tampilan |
 | `Security__Lockout__MaxFailedAttempts`, `Security__Lockout__LockoutMinutes` | Lockout login (default 5 kali / 15 menit), berlaku Web.App & Web.Api |
 | `Security__LoginPermitPerMinute` | Batas percobaan login Web.App per IP per menit (default 10) |

@@ -256,10 +256,10 @@ internal sealed class GetCyclePerformanceQueryHandler(
             WHERE c.id = @CycleId;
 
             SELECT r.date AS Date, r.age_days AS AgeDays, r.mortality AS Mortality, r.culling AS Culling,
-                   r.average_body_weight_gram AS AverageBodyWeightGram,
                    COALESCE((SELECT SUM(u.base_quantity) FROM production.daily_recording_usages u
                              JOIN master.items i ON i.id = u.item_id
-                             WHERE u.daily_recording_id = r.id AND i.category = 'Feed'), 0) AS FeedKg
+                             WHERE u.daily_recording_id = r.id AND i.category = 'Feed'), 0) AS FeedKg,
+                   r.average_body_weight_gram AS AverageBodyWeightGram
             FROM production.daily_recordings r
             WHERE r.cycle_id = @CycleId
             ORDER BY r.date;
@@ -286,14 +286,15 @@ internal sealed class GetCyclePerformanceQueryHandler(
             return Result.Failure<CyclePerformanceResponse>(access.Error);
         }
 
-        List<DayRow> recordings = [.. await multi.ReadAsync<DayRow>()];
+        List<RecordedDay> recordings = [.. await multi.ReadAsync<RecordedDay>()];
         List<HarvestResponse> harvests = [.. await multi.ReadAsync<HarvestResponse>()];
 
-        List<DailyPerformance> days = BuildDays(cycle.InitialPopulation ?? 0, recordings, harvests);
+        List<DailyPerformance> days = CyclePerformanceBuilder.BuildDays(
+            cycle.InitialPopulation ?? 0,
+            recordings,
+            [.. harvests.Select(h => new HarvestedBatch(h.Date, h.Birds, h.WeightKg))]);
 
-        CyclePerformance current = days.Count > 0
-            ? days[^1].Cumulative
-            : CyclePerformance.Calculate(cycle.InitialPopulation ?? 0, 0, 0, 0, 0, 0, null, null);
+        CyclePerformance current = CyclePerformanceBuilder.Current(cycle.InitialPopulation ?? 0, days);
 
         CyclePerformance? closing = cycle.ClosingPerformance is null
             ? null
@@ -301,43 +302,6 @@ internal sealed class GetCyclePerformanceQueryHandler(
 
         return new CyclePerformanceResponse(
             cycle.Id, cycle.Number, cycle.Status, cycle.ChickInDate, cycle.ClosedDate, current, closing, days, harvests);
-    }
-
-    /// <summary>
-    /// Accumulates the recordings day by day; the body weight carries forward from the last weighing.
-    /// </summary>
-    private static List<DailyPerformance> BuildDays(int initialPopulation, List<DayRow> recordings, List<HarvestResponse> harvests)
-    {
-        var days = new List<DailyPerformance>();
-        int mortality = 0;
-        int culling = 0;
-        decimal feedKg = 0;
-        decimal? lastBodyWeightGram = null;
-
-        foreach (DayRow day in recordings)
-        {
-            mortality += day.Mortality;
-            culling += day.Culling;
-            feedKg += day.FeedKg;
-            lastBodyWeightGram = day.AverageBodyWeightGram ?? lastBodyWeightGram;
-
-            var harvestedToDate = harvests.Where(h => h.Date <= day.Date).ToList();
-
-            var cumulative = CyclePerformance.Calculate(
-                initialPopulation,
-                mortality,
-                culling,
-                harvestedToDate.Sum(h => h.Birds),
-                harvestedToDate.Sum(h => h.WeightKg),
-                feedKg,
-                lastBodyWeightGram / 1000m,
-                day.AgeDays);
-
-            days.Add(new DailyPerformance(
-                day.Date, day.AgeDays, day.Mortality, day.Culling, day.FeedKg, day.AverageBodyWeightGram, cumulative));
-        }
-
-        return days;
     }
 
     internal sealed class CycleRow
@@ -350,16 +314,6 @@ internal sealed class GetCyclePerformanceQueryHandler(
         public int? InitialPopulation { get; set; }
         public DateOnly? ClosedDate { get; set; }
         public string? ClosingPerformance { get; set; }
-    }
-
-    internal sealed class DayRow
-    {
-        public DateOnly Date { get; set; }
-        public int AgeDays { get; set; }
-        public int Mortality { get; set; }
-        public int Culling { get; set; }
-        public decimal? AverageBodyWeightGram { get; set; }
-        public decimal FeedKg { get; set; }
     }
 }
 

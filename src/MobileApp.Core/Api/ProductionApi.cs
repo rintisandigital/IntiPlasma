@@ -58,6 +58,27 @@ public sealed class ProductionApi(ApiCache cache, ApiClient api)
     public Task<ApiResult> DeleteStockAsync(Guid entryId, CancellationToken cancellationToken = default) =>
         api.DeleteAsync($"production/live-bird-stocks/{entryId}", cancellationToken);
 
+    /// <summary>
+    /// The dashboard (M-55). Without a date the server takes today in Asia/Jakarta, the same day as
+    /// <see cref="Abstractions.IClock.Today"/>, and the cached copy stays under one key across days.
+    /// </summary>
+    public Task<CachedResult<MobileDashboard>> GetDashboardAsync(CancellationToken cancellationToken = default) =>
+        cache.GetAsync<MobileDashboard>(DashboardPath, cancellationToken);
+
+    /// <summary>
+    /// The stored dashboard, without asking the server.
+    /// </summary>
+    public Task<CachedResult<MobileDashboard>?> ReadDashboardAsync(CancellationToken cancellationToken = default) =>
+        cache.ReadAsync<MobileDashboard>(DashboardPath, cancellationToken);
+
+    /// <summary>
+    /// Daily cumulative performance of a cycle for the charts (M-64).
+    /// </summary>
+    public Task<CachedResult<CyclePerformanceReport>> GetPerformanceAsync(Guid cycleId, CancellationToken cancellationToken = default) =>
+        cache.GetAsync<CyclePerformanceReport>($"cycles/{cycleId}/performance", cancellationToken);
+
+    internal const string DashboardPath = "mobile/dashboard";
+
     internal static string StockPath(Guid cycleId) => PartnershipApi.Path("production/live-bird-stocks", ("cycleId", cycleId.ToString()));
 
     internal static string RecordingsPath(Guid cycleId) => PartnershipApi.Path("production/daily-recordings", ("cycleId", cycleId.ToString()));

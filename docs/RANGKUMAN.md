@@ -250,6 +250,10 @@
 - API: `GET weight-ranges`, `POST production/live-bird-stocks` (upsert per rentang, idempotent), `DELETE …/{id}` (hari ini/kemarin), `GET …?cycleId|branchId&date|from&to`, `GET …/summary?date&branchId` (entri tanggal lapor terakhir ≤ tanggal pilih, data > 1 hari = basi). Field-context + rentang aktif & laporan terakhir per siklus.
 - Web.App: **Master Data → Weight Ranges**, **Production → Live Bird Stock** (rekap rentang & kandang, ekspor Excel/PDF). Demo data: 5 rentang + stok 3 hari terakhir.
 - Mobile: PPL input stok per kandang & tanggal (offline, validasi rata-rata & populasi, salin dari laporan terakhir, hapus online), riwayat per siklus, item stok di Antrean; Manager tab **Stok Ayam** = rekap cabang + drill-down kandang.
+
+### Fase M4 — Grafik & Dashboard ✅ (2026-10-09; detail: PLAN-MOBILE §19–§20)
+- API: `GET mobile/dashboard?date&branchId` (lingkup PPL/cabang; per siklus berjalan: performa kumulatif, status recording & stok ayam hari ini, stok pakan + rata-rata 3 recording terakhir + estimasi sisa hari, flag `RecordingLate`/`FeedLow`/`HighDepletion`/`NoStockReport`; KPI gabungan). Ambang di `Mobile:Dashboard`. Akumulasi harian `performance` dipindah ke `CyclePerformanceBuilder` (dipakai bersama). Tidak ada migration.
+- Mobile: **Beranda** PPL (tugas hari ini + antrean lokal, kandang saya, stok pakan) & Manager (KPI cabang, siklus berisiko, stok ayam per rentang), offline dari cache; **Grafik Produksi** (Chart.js 4.5 lokal): BW, deplesi, FCR, pakan, mati, IP — harian/mingguan (minggu = umur 7n−6…7n), recording belum terkirim putus-putus (rumus diporting ke Core), bandingkan ≤ 3 siklus. Logo header Beranda tidak lagi gepeng.
 ## 5. Alur Akuntansi yang Sudah Berjalan
 
 | Transaksi | Jurnal otomatis |
@@ -317,17 +321,20 @@ Semua event di katalog kini sudah dipakai.
 - **MobileApp**: `Directory.Build.props` men-set `TargetFramework` → proyek MAUI multi-target wajib `<TargetFramework></TargetFramework>`, jika tidak restore tidak memuat runtime Android (`NETSDK1047`).
 - **MobileApp**: WebView Android melaporkan `env(safe-area-inset-*)` = 0 → pakai `SafeAreaEdges="All"` di `ContentPage`; CSS template Findee menata semua `<button>` (biru, lebar penuh) dan `.input-icon .icon` di kiri — tombol ikon perlu kelas sendiri.
 - **MobileApp**: crash saat start `No view found for id … jumpToStart` = ID resource basi dari build inkremental → hapus `src/MobileApp/obj` & `bin`, build ulang.
-- **MobileApp**: di Android `AndroidMessageHandler` melempar `Java.IO.IOException` (bukan `HttpRequestException`) saat offline → dibungkus `NetworkErrorHandler`.
+- **MobileApp**: di Android `AndroidMessageHandler` melempar `Java.IO.IOException` (bukan `HttpRequestException`) saat offline — atau `System.Net.WebException` untuk koneksi ditolak tepat setelah jaringan putus — → keduanya dibungkus `NetworkErrorHandler`.
 - **MobileApp**: build Android (javac) bisa kehabisan memori saat emulator + API + Podman berjalan bersamaan → `-p:JavaMaximumHeapSize=512m`, matikan Podman bila tidak dipakai.
 - **MobileApp**: sinkron antrean berurutan **tanggal, lalu Recording sebelum LiveBirdStock** (`SyncEngine.SendingOrder`) karena validasi stok ayam memakai populasi yang diubah recording.
 - **MobileApp**: build Debug memakai *Fast Deployment* (assembly di folder data app) → `adb shell pm clear` membuat app crash saat start (`No assemblies found … Fast Deployment`). Untuk mengosongkan data: `adb uninstall` lalu `-t:Install` ulang.
+- **MobileApp**: CSS template memberi anak pertama & terakhir `.header-avt` `width: 100%` → logo melar dan tombol di kanan terdorong keluar layar; override per elemen (`.header-avt > .header-logo-text`, `.header-avt > .header-right`).
+- **MobileApp**: Chart.js dipanggil lewat `wwwroot/js/chart-interop.js` (`intiplasmaCharts.render/destroy`); spesifikasi grafik dibentuk & diuji di Core (`PerformanceCharts`), JS hanya menggambar.
+- **Dashboard**: tanggal server = UTC; "hari ini" dashboard memakai tanggal Asia/Jakarta (UTC+7) atau parameter `date` dari klien.
 - **MobileApp**: `MediaPicker.PickPhotoAsync` usang di MAUI 10 → `PickPhotosAsync` + `SelectionLimit = 1`; resize/kompresi/rotasi cukup lewat `MediaPickerOptions` (`MaximumWidth/Height`, `CompressionQuality`, `RotateImage`).
 
 ## 7. Cara Kerja & Verifikasi
 
 - Setiap fase: domain + unit test invariant → command/query + validator → EF config + migration → endpoint + permission → **verifikasi end-to-end** ke PostgreSQL lokal pada database sementara `intiplasma_verify` (dibuat & dihapus otomatis; database `intiplasma` milik user tidak disentuh).
 - User yang melakukan **commit & migrate** setelah tiap fase.
-- Status test saat ini: **578 test lulus** (162 domain, 83 application, 14 arsitektur, 109 MobileApp.UnitTests, 39 integration Web.Api, 171 integration Web.App).
+- Status test saat ini: **602 test lulus** (162 domain, 92 application, 14 arsitektur, 122 MobileApp.UnitTests, 41 integration Web.Api, 171 integration Web.App).
 - Verifikasi mobile (M0): emulator Android **API 34** (`intiplasma_api34`; image API 26 terlalu tua untuk WebView) + Web.Api `:5000` pada `intiplasma_verify`, diarahkan dengan `adb` (tap/teks/screencap). Integration test butuh mesin Podman berjalan (`podman machine start`).
 - Integration test (Testcontainers) **sudah bisa dijalankan** di mesin dev (container runtime tersedia) — `dotnet test IntiPlasma.slnx`.
 - Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario, Fase 7: 32 skenario, Fase 8: 35 skenario, Fase 9: 79 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
