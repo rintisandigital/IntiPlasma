@@ -10,7 +10,8 @@ namespace Application.Users.Refresh;
 internal sealed class RefreshTokenCommandHandler(
     IApplicationDbContext context,
     ITokenProvider tokenProvider,
-    IDateTimeProvider dateTimeProvider) : ICommandHandler<RefreshTokenCommand, AccessTokensResponse>
+    IDateTimeProvider dateTimeProvider,
+    RefreshTokenOptions refreshTokenOptions) : ICommandHandler<RefreshTokenCommand, AccessTokensResponse>
 {
     public async Task<Result<AccessTokensResponse>> Handle(RefreshTokenCommand command, CancellationToken cancellationToken)
     {
@@ -31,12 +32,10 @@ internal sealed class RefreshTokenCommandHandler(
         string accessToken = tokenProvider.Create(refreshToken.User);
         string newRefreshToken = tokenProvider.GenerateRefreshToken();
 
-        refreshToken.Rotate(newRefreshToken, dateTimeProvider.UtcNow.AddDays(RefreshTokenExpirationInDays));
+        refreshToken.Rotate(newRefreshToken, dateTimeProvider.UtcNow.AddDays(refreshTokenOptions.RefreshTokenExpirationInDays));
 
         await context.SaveChangesAsync(cancellationToken);
 
         return new AccessTokensResponse(accessToken, newRefreshToken);
     }
-
-    private const int RefreshTokenExpirationInDays = 7;
 }

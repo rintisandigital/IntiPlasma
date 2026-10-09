@@ -24,6 +24,17 @@ public sealed record CurrentUserResponse
     /// Active branches the user may access, ordered by code.
     /// </summary>
     public IReadOnlyList<CurrentUserBranch> Branches { get; init; } = [];
+
+    /// <summary>
+    /// API roles of the user, ordered by name.
+    /// </summary>
+    public IReadOnlyList<string> Roles { get; init; } = [];
+
+    /// <summary>
+    /// API permissions granted through the roles ({module}:{action}), ordered. The mobile app shows its menus from
+    /// this list because the access token carries no permission claims (PLAN-MOBILE M-10).
+    /// </summary>
+    public IReadOnlyList<string> Permissions { get; init; } = [];
 }
 
 public sealed record CurrentUserBranch

@@ -51,6 +51,33 @@ internal sealed class GetCurrentUserQueryHandler(
                 new { scope.AllBranches, scope.BranchIds },
                 cancellationToken: cancellationToken));
 
-        return user with { AllBranches = scope.AllBranches, Branches = [.. branches] };
+        const string roleSql =
+            """
+            SELECT r.name
+            FROM identity.user_roles ur
+            JOIN identity.roles r ON r.id = ur.role_id
+            WHERE ur.user_id = @UserId
+            ORDER BY r.name;
+
+            SELECT DISTINCT rp.permission
+            FROM identity.user_roles ur
+            JOIN identity.role_permissions rp ON rp.role_id = ur.role_id
+            WHERE ur.user_id = @UserId
+            ORDER BY rp.permission;
+            """;
+
+        await using SqlMapper.GridReader grid = await connection.QueryMultipleAsync(
+            new CommandDefinition(roleSql, new { UserId = userId }, cancellationToken: cancellationToken));
+
+        IEnumerable<string> roles = await grid.ReadAsync<string>();
+        IEnumerable<string> permissions = await grid.ReadAsync<string>();
+
+        return user with
+        {
+            AllBranches = scope.AllBranches,
+            Branches = [.. branches],
+            Roles = [.. roles],
+            Permissions = [.. permissions]
+        };
     }
 }

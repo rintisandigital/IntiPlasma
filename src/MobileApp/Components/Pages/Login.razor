@@ -1,0 +1,101 @@
+@page "/login"
+@layout BlankLayout
+@inject SessionService Session
+@inject IAppSettings Settings
+@inject NavigationManager Navigation
+
+@* Template sign-in.html, without sign-up/social login (accounts are created by the administrator). *@
+<div class="app-content style-4 signIn-area" style="padding-top: calc(40px + env(safe-area-inset-top));">
+    <div class="tf-container">
+        <img class="login-logo" src="images/rdi-logo-text.png" alt="Rintisan Digital Indopiranti" />
+        <h2 class="text-center">Masuk</h2>
+        <p class="text-center body-2 text-dark-4 mt-8">Aplikasi PPL &amp; Manager IntiPlasma</p>
+
+        @if (Session.SessionExpired)
+        {
+            <div class="alert alert-warning mt-20 mb-0" role="alert">Sesi Anda sudah berakhir. Silakan masuk kembali.</div>
+        }
+
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger mt-20 mb-0" role="alert">@_error</div>
+        }
+
+        <EditForm Model="_model" OnValidSubmit="SubmitAsync" FormName="login">
+            <DataAnnotationsValidator />
+            <div class="mt-32">
+                <label class="label text-caption-1" for="email">Email</label>
+                <fieldset class="input-icon mt-12">
+                    <InputText id="email" type="email" class="form-control" placeholder="nama@perusahaan.co.id"
+                               autocomplete="username" @bind-Value="_model.Email" />
+                </fieldset>
+                <ValidationMessage For="() => _model.Email" />
+            </div>
+            <div class="mt-20">
+                <label class="label text-caption-1" for="password">Password</label>
+                <fieldset class="mt-12 input-icon position-relative">
+                    <InputText id="password" type="@(_showPassword ? "text" : "password")" class="form-control pe-5"
+                               placeholder="Password" autocomplete="current-password" @bind-Value="_model.Password" />
+                    <button type="button" class="password-toggle" aria-label="@(_showPassword ? "Sembunyikan password" : "Tampilkan password")"
+                            @onclick="() => _showPassword = !_showPassword">
+                        <i class="@(_showPassword ? "icon-eyeSlash" : "icon-password") fs-20"></i>
+                    </button>
+                </fieldset>
+                <ValidationMessage For="() => _model.Password" />
+            </div>
+            <button type="submit" class="mt-40 tf-btn round-full w-100" disabled="@_busy">
+                @(_busy ? "Memproses…" : "Masuk")
+            </button>
+        </EditForm>
+
+        <p class="mt-35 text-center body-2 text-dark-4">Lupa password? Hubungi administrator untuk reset.</p>
+        <p class="text-center text-caption-2 text-dark-4">Versi @AppInfo.Current.VersionString</p>
+    </div>
+</div>
+
+@code {
+    private readonly LoginModel _model = new();
+    private bool _busy;
+    private bool _showPassword;
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        if (Session.IsSignedIn)
+        {
+            Navigation.NavigateTo("/", replace: true);
+            return;
+        }
+
+        _model.Email = Session.User?.Email ?? Settings.LastEmail ?? string.Empty;
+    }
+
+    private async Task SubmitAsync()
+    {
+        _busy = true;
+        _error = null;
+
+        ApiResult result = await Session.LoginAsync(_model.Email, _model.Password);
+
+        _busy = false;
+
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo("/", replace: true);
+            return;
+        }
+
+        _error = result.Error!.Message;
+        _model.Password = string.Empty;
+    }
+
+    private sealed class LoginModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Email wajib diisi.")]
+        [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "Format email tidak valid.")]
+        public string Email { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Password wajib diisi.")]
+        public string Password { get; set; } = string.Empty;
+    }
+}

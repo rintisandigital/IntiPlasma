@@ -1,0 +1,49 @@
+@implements IDisposable
+@inject NavigationManager Navigation
+
+@* Template "menubar-footer": first four available features + Lainnya (AppFeatures.BottomBar). *@
+<div class="menubar-footer footer-fixed">
+    <ul class="inner-bar">
+        @foreach (AppFeature feature in AppFeatures.BottomBar(User))
+        {
+            <li class="@(IsActive(feature) ? "active" : null)">
+                <a href="@feature.Route">
+                    <div class="icon">
+                        <i class="@feature.Icon"></i>
+                    </div>
+                    <div class="text-caption-3 text">@feature.Title</div>
+                </a>
+            </li>
+        }
+    </ul>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public CurrentUser User { get; set; } = default!;
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+
+    private bool IsActive(AppFeature feature)
+    {
+        string path = new Uri(Navigation.Uri).AbsolutePath;
+
+        if (feature.Route == "/")
+        {
+            return path == "/";
+        }
+
+        if (feature == AppFeatures.More)
+        {
+            // Pages opened from "Lainnya" keep it highlighted.
+            return path == feature.Route
+                || AppFeatures.MoreMenu(User).Any(f => path.StartsWith(f.Route, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return path.StartsWith(feature.Route, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => _ = InvokeAsync(StateHasChanged);
+}

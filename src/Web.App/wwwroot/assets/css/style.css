@@ -37627,7 +37627,7 @@ a.link-hover:hover {
   display: flex;
 }
 .login-wrapper.bg-img {
-  background-image: url(../img/authentication/login-img.jpg);
+  background-image: url(../img/login-bg.jpg);
   background-repeat: no-repeat;
   background-size: cover;
   background-position: center;

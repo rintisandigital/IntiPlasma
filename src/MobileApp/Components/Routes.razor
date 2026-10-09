@@ -1,6 +1,45 @@
-﻿<Router AppAssembly="typeof(MauiProgram).Assembly" NotFoundPage="typeof(Pages.NotFound)">
-    <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
-        <FocusOnNavigate RouteData="routeData" Selector="h1" />
-    </Found>
-</Router>
+@implements IDisposable
+@inject SessionService Session
+@inject NavigationManager Navigation
+
+@if (Session.State == SessionState.Starting)
+{
+    <div class="app-loading">
+        <img src="images/rdi-small.png" alt="" />
+    </div>
+}
+else
+{
+    <Router AppAssembly="typeof(MauiProgram).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+        <Found Context="routeData">
+            <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        </Found>
+    </Router>
+}
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        Session.Changed += OnSessionChanged;
+        await Session.InitializeAsync();
+    }
+
+    public void Dispose() => Session.Changed -= OnSessionChanged;
+
+    /// <summary>
+    /// Signed out (logout or session ended on the server): back to the login page from wherever the user is.
+    /// </summary>
+    private void OnSessionChanged(object? sender, EventArgs e) =>
+        _ = InvokeAsync(() =>
+        {
+            if (Session.State == SessionState.SignedOut && !IsOnLoginPage())
+            {
+                Navigation.NavigateTo("/login", replace: true);
+            }
+
+            StateHasChanged();
+        });
+
+    private bool IsOnLoginPage() =>
+        Navigation.ToBaseRelativePath(Navigation.Uri).StartsWith("login", StringComparison.OrdinalIgnoreCase);
+}

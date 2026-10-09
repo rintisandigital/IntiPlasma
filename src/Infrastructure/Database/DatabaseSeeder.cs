@@ -39,6 +39,8 @@ public static class DatabaseSeeder
 
         await SeedAccessProfilesAsync(dbContext, cancellationToken);
 
+        await SeedMobileRolesAsync(dbContext, cancellationToken);
+
         string? email = configuration["Seed:Admin:Email"];
         string? password = configuration["Seed:Admin:Password"];
 
@@ -81,6 +83,62 @@ public static class DatabaseSeeder
         if (!await dbContext.BranchAccessProfiles.AnyAsync(p => p.Id == BranchAccessProfile.AllBranchesId, cancellationToken))
         {
             dbContext.BranchAccessProfiles.Add(BranchAccessProfile.CreateAllBranches());
+        }
+    }
+
+    /// <summary>
+    /// Default API roles for the mobile app (PLAN-MOBILE §4.2), created only when no role with that name exists:
+    /// administrators may change them afterwards without the seeder overwriting their changes.
+    /// </summary>
+    private static async Task SeedMobileRolesAsync(ApplicationDbContext dbContext, CancellationToken cancellationToken)
+    {
+        (string Name, string Description, string[] Permissions)[] defaults =
+        [
+            (
+                MobileRoles.FieldOfficer,
+                "Petugas lapangan (mobile): farmers, coops, contracts and daily inputs of the assigned coops",
+                [
+                    Permissions.PartnershipAssignedOnly,
+                    Permissions.FarmersRead,
+                    Permissions.FarmersManage,
+                    Permissions.ContractsRead,
+                    Permissions.ContractsManage,
+                    Permissions.CyclesRead,
+                    Permissions.ProductionRead,
+                    Permissions.ProductionRecord,
+                    Permissions.ProductionRevise,
+                    Permissions.ProductionStockReport,
+                    Permissions.InventoryRead,
+                    Permissions.InventoryRequestFeed,
+                    Permissions.InventoryRequestFeedMutation,
+                    Permissions.MasterDataRead,
+                    Permissions.WarehousesRead,
+                    Permissions.AttachmentsUpload,
+                    Permissions.AttachmentsRead
+                ]
+            ),
+            (
+                MobileRoles.Manager,
+                "Manager (mobile): reads the data of their branches and decides approvals",
+                [
+                    Permissions.FarmersRead,
+                    Permissions.ContractsRead,
+                    Permissions.CyclesRead,
+                    Permissions.ProductionRead,
+                    Permissions.InventoryRead,
+                    Permissions.MasterDataRead,
+                    Permissions.WarehousesRead,
+                    Permissions.AttachmentsRead,
+                    Permissions.ApprovalsDecide
+                ]
+            )
+        ];
+
+        List<string> existing = await dbContext.Roles.Select(r => r.Name).ToListAsync(cancellationToken);
+
+        foreach ((string name, string description, string[] permissions) in defaults.Where(d => !existing.Contains(d.Name)))
+        {
+            dbContext.Roles.Add(Role.Create(name, description, permissions).Value);
         }
     }
 

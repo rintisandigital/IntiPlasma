@@ -188,6 +188,10 @@ public static class DependencyInjection
         services.AddOptions<LockoutOptions>().Bind(configuration.GetSection(LockoutOptions.SectionName));
         services.AddTransient(sp => sp.GetRequiredService<IOptions<LockoutOptions>>().Value);
 
+        // Refresh token lifetime for the Web.Api login (mobile sessions, PLAN-MOBILE M-17).
+        services.AddOptions<RefreshTokenOptions>().Bind(configuration.GetSection(RefreshTokenOptions.SectionName));
+        services.AddTransient(sp => sp.GetRequiredService<IOptions<RefreshTokenOptions>>().Value);
+
         return services;
     }
 

@@ -1,0 +1,254 @@
+/*
+  IntiPlasma overrides on top of the template styles (docs/html-template-mobile, PLAN-MOBILE §3.9):
+  primary color #0984E3 (same as the WebApp), light mode only, and the few components the template does not have.
+*/
+:root {
+  --Primary: #0984E3;
+  --blue: #0984E3;
+  --Primary-dark: #0769B5;
+  --Primary-soft: #E6F2FC;
+  color-scheme: light only;
+}
+
+html, body {
+  background-color: var(--White);
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1:focus, h2:focus, h4:focus {
+  outline: none;
+}
+
+/* Safe area under the Android status bar / notch. */
+.header-avt.fixed-top {
+  padding-top: calc(15px + env(safe-area-inset-top));
+  background-color: var(--White);
+}
+
+.menubar-footer.footer-fixed {
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
+
+/* Start-up splash while Blazor boots and the session is restored. */
+.app-loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-loading img {
+  width: 96px;
+  animation: app-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes app-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .45; }
+}
+
+.header-logo-text {
+  height: 36px;
+}
+
+
+.header-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.header-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--On-Surface);
+  padding: 0;
+}
+
+/* Login */
+.login-logo {
+  display: block;
+  width: 180px;
+  margin: 8px auto 24px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--Secondary);
+  padding: 4px;
+}
+
+.tf-btn[disabled] {
+  opacity: .6;
+  pointer-events: none;
+}
+
+/* Offline / session banners */
+.app-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 1031;
+  padding: 6px 16px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--White);
+}
+
+/* Just above the bottom bar, so it never hides a page header or the first card. */
+.app-banner.offline {
+  bottom: 82px;
+  background-color: #64666C;
+}
+
+/* Dashboard */
+.hero-card {
+  border-radius: 16px;
+  padding: 20px;
+  color: var(--White);
+  background: linear-gradient(135deg, var(--Primary) 0%, var(--Primary-dark) 100%);
+}
+
+.hero-card .muted {
+  opacity: .85;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background-color: var(--Primary-soft);
+  color: var(--Primary-dark);
+}
+
+.hero-card .chip {
+  background-color: rgba(255, 255, 255, .2);
+  color: var(--White);
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.feature-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 6px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  color: var(--On-Surface);
+  text-align: center;
+  font-size: 12px;
+}
+
+.feature-tile .icon {
+  font-size: 24px;
+  color: var(--Primary);
+}
+
+.coming-soon {
+  text-align: center;
+  padding: 48px 16px;
+}
+
+.coming-soon .icon {
+  font-size: 48px;
+  color: var(--Primary);
+}
+
+.info-list .row-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.info-list .row-item:last-child {
+  border-bottom: 0;
+}
+
+.info-list .row-item .label {
+  color: var(--Secondary);
+}
+
+.setting-item.danger,
+.setting-item.danger .text {
+  color: var(--Red) !important;
+}
+
+.validation-message,
+.field-error {
+  color: var(--Red);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+#blazor-error-ui {
+  color-scheme: light only;
+  background: lightyellow;
+  bottom: 0;
+  box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+  box-sizing: border-box;
+  display: none;
+  left: 0;
+  padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+  position: fixed;
+  width: 100%;
+  z-index: 2000;
+}
+
+#blazor-error-ui .dismiss {
+  cursor: pointer;
+  position: absolute;
+  right: 0.75rem;
+  top: 0.5rem;
+}
+
+/* Touch screens keep :hover after a tap; the template's hover inverts the primary button, so keep it solid. */
+.tf-btn:not(.style-1):hover,
+.tf-btn:not(.style-1):focus {
+  background-color: var(--Primary);
+  border-color: var(--Primary);
+  color: var(--White);
+}
+
+/* The template styles every <button> as a full-width blue block; icon buttons opt out. */
+.password-toggle,
+.password-toggle:hover,
+.password-toggle:focus,
+.header-icon-btn,
+.header-icon-btn:hover,
+.header-icon-btn:focus {
+  width: auto;
+  padding: 4px;
+  border-radius: 8px;
+  background-color: transparent;
+  color: var(--Secondary);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.header-icon-btn,
+.header-icon-btn:hover,
+.header-icon-btn:focus {
+  color: var(--On-Surface);
+}

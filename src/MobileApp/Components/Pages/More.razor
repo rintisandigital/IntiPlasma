@@ -1,0 +1,53 @@
+@page "/lainnya"
+@inject SessionService Session
+
+@* Template setting-profile.html: every available feature that is not in the bottom bar, then logout. *@
+<AppPage Title="Lainnya">
+    @if (Session.User is { } user)
+    {
+        <a href="/profil" class="d-flex align-items-center gap-12 mb-16">
+            <div class="chip" style="width: 44px; height: 44px; justify-content: center; font-size: 18px;">
+                <i class="icon icon-user-fill"></i>
+            </div>
+            <div>
+                <div class="text-button-small text-OnSurface">@user.FullName</div>
+                <div class="text-caption-2 text-dark-4">@user.Email</div>
+            </div>
+        </a>
+
+        <div class="profile-setting">
+            @foreach (AppFeature feature in AppFeatures.MoreMenu(user))
+            {
+                <a href="@feature.Route" class="setting-item">
+                    <i class="icon @feature.Icon"></i>
+                    <div class="text text-button-small text-OnSurface">@feature.Title</div>
+                </a>
+            }
+            <a href="" class="setting-item danger" @onclick="() => _confirmLogout = true" @onclick:preventDefault>
+                <i class="icon icon-xCircle"></i>
+                <div class="text text-button-small">Keluar</div>
+            </a>
+        </div>
+    }
+</AppPage>
+
+<ConfirmSheet Visible="_confirmLogout"
+              Title="Keluar dari aplikasi?"
+              Message="Sesi di perangkat ini diakhiri dan data tersimpan di perangkat dihapus."
+              ConfirmText="Keluar"
+              OnClose="CloseLogoutAsync" />
+
+@code {
+    private bool _confirmLogout;
+
+    private async Task CloseLogoutAsync(bool confirmed)
+    {
+        _confirmLogout = false;
+
+        if (confirmed)
+        {
+            // Routes navigates to the login page when the session changes.
+            await Session.LogoutAsync();
+        }
+    }
+}

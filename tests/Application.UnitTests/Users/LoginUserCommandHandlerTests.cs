@@ -128,7 +128,8 @@ public sealed class LoginUserCommandHandlerTests : BaseHandlerTest
             context,
             CreateCredentialVerifier(context, verifies, DateTime.UtcNow, maxFailedAttempts: 3, lockoutMinutes: 15),
             tokenProvider,
-            dateTimeProvider);
+            dateTimeProvider,
+            new RefreshTokenOptions());
     }
 
     private static async Task SeedUserAsync(TestDbContext context, bool active = true)

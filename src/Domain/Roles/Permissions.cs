@@ -243,6 +243,34 @@ public static class Permissions
     /// </summary>
     public const string AttachmentsDelete = "attachments:delete";
 
+    /// <summary>
+    /// Restricts farmers, coops and the data below them (contracts, cycles, recordings, live bird stock, feed
+    /// requests) to those assigned to the user (PPL). Not a right but a limit; ignored for the Administrator role
+    /// (PLAN-MOBILE M-36).
+    /// </summary>
+    public const string PartnershipAssignedOnly = "partnership:assigned-only";
+
+    /// <summary>
+    /// Report the daily live bird stock per weight range (stok ayam harian, information for sales).
+    /// </summary>
+    public const string ProductionStockReport = "production:stock-report";
+
+    /// <summary>
+    /// Request a feed delivery from the central warehouse to a coop (request pengiriman pakan).
+    /// </summary>
+    public const string InventoryRequestFeed = "inventory:request-feed";
+
+    /// <summary>
+    /// Request a feed mutation between coops; it runs only after the approval flow approves it.
+    /// </summary>
+    public const string InventoryRequestFeedMutation = "inventory:request-feed-mutation";
+
+    /// <summary>
+    /// Open the approval inbox and decide requests. Which requests a user may decide still comes from the approvers
+    /// of the current level in the approval flow.
+    /// </summary>
+    public const string ApprovalsDecide = "approvals:decide";
+
     public static readonly IReadOnlyList<string> All =
     [
         UsersRead,
@@ -305,7 +333,12 @@ public static class Permissions
         SystemOutbox,
         AttachmentsUpload,
         AttachmentsRead,
-        AttachmentsDelete
+        AttachmentsDelete,
+        PartnershipAssignedOnly,
+        ProductionStockReport,
+        InventoryRequestFeed,
+        InventoryRequestFeedMutation,
+        ApprovalsDecide
     ];
 
     public static bool Exists(string permission) => All.Contains(permission);

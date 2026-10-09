@@ -10,7 +10,8 @@ internal sealed class LoginUserCommandHandler(
     IApplicationDbContext context,
     CredentialVerifier credentials,
     ITokenProvider tokenProvider,
-    IDateTimeProvider dateTimeProvider) : ICommandHandler<LoginUserCommand, AccessTokensResponse>
+    IDateTimeProvider dateTimeProvider,
+    RefreshTokenOptions refreshTokenOptions) : ICommandHandler<LoginUserCommand, AccessTokensResponse>
 {
     public async Task<Result<AccessTokensResponse>> Handle(LoginUserCommand command, CancellationToken cancellationToken)
     {
@@ -36,7 +37,7 @@ internal sealed class LoginUserCommandHandler(
         var refreshTokenEntity = RefreshToken.Create(
             refreshToken,
             user.Id,
-            dateTimeProvider.UtcNow.AddDays(RefreshTokenExpirationInDays));
+            dateTimeProvider.UtcNow.AddDays(refreshTokenOptions.RefreshTokenExpirationInDays));
 
         context.RefreshTokens.Add(refreshTokenEntity);
 
@@ -45,6 +46,4 @@ internal sealed class LoginUserCommandHandler(
 
         return new AccessTokensResponse(accessToken, refreshToken);
     }
-
-    private const int RefreshTokenExpirationInDays = 7;
 }

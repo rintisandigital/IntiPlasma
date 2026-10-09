@@ -1,0 +1,88 @@
+@page "/profil"
+@inject SessionService Session
+
+<AppPage Title="Profil" BackTo="/lainnya">
+    @if (Session.User is { } user)
+    {
+        <div class="info-list">
+            <div class="row-item"><span class="label">Nama</span><span>@user.FullName</span></div>
+            <div class="row-item"><span class="label">Email</span><span>@user.Email</span></div>
+            <div class="row-item"><span class="label">Peran</span><span>@(user.Roles.Count == 0 ? "-" : string.Join(", ", user.Roles))</span></div>
+            <div class="row-item">
+                <span class="label">Cabang</span>
+                <span class="text-end">@(user.AllBranches ? "Semua cabang" : string.Join(", ", user.Branches.Select(b => b.Name)))</span>
+            </div>
+        </div>
+
+        <h5 class="mt-32 mb-8">Ganti Password</h5>
+
+        @if (_message is not null)
+        {
+            <div class="alert @(_success ? "alert-success" : "alert-danger") mt-12 mb-0" role="alert">@_message</div>
+        }
+
+        <EditForm Model="_model" OnValidSubmit="ChangePasswordAsync" FormName="change-password">
+            <DataAnnotationsValidator />
+            <div class="mt-16">
+                <label class="label text-caption-1" for="current">Password saat ini</label>
+                <InputText id="current" type="password" class="form-control mt-8" autocomplete="current-password"
+                           @bind-Value="_model.CurrentPassword" />
+                <ValidationMessage For="() => _model.CurrentPassword" />
+            </div>
+            <div class="mt-16">
+                <label class="label text-caption-1" for="new">Password baru</label>
+                <InputText id="new" type="password" class="form-control mt-8" autocomplete="new-password"
+                           @bind-Value="_model.NewPassword" />
+                <ValidationMessage For="() => _model.NewPassword" />
+            </div>
+            <div class="mt-16">
+                <label class="label text-caption-1" for="confirm">Ulangi password baru</label>
+                <InputText id="confirm" type="password" class="form-control mt-8" autocomplete="new-password"
+                           @bind-Value="_model.ConfirmPassword" />
+                <ValidationMessage For="() => _model.ConfirmPassword" />
+            </div>
+            <button type="submit" class="mt-24 tf-btn round-full w-100" disabled="@_busy">
+                @(_busy ? "Menyimpan…" : "Simpan Password")
+            </button>
+        </EditForm>
+    }
+</AppPage>
+
+@code {
+    private PasswordModel _model = new();
+    private bool _busy;
+    private bool _success;
+    private string? _message;
+
+    private async Task ChangePasswordAsync()
+    {
+        _busy = true;
+        _message = null;
+
+        ApiResult result = await Session.ChangePasswordAsync(_model.CurrentPassword, _model.NewPassword);
+
+        _busy = false;
+        _success = result.IsSuccess;
+        _message = result.IsSuccess
+            ? "Password berhasil diganti. Sesi di perangkat lain telah diakhiri."
+            : result.Error!.Message;
+
+        if (result.IsSuccess)
+        {
+            _model = new PasswordModel();
+        }
+    }
+
+    private sealed class PasswordModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Password saat ini wajib diisi.")]
+        public string CurrentPassword { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Password baru wajib diisi.")]
+        [System.ComponentModel.DataAnnotations.MinLength(8, ErrorMessage = "Password baru minimal 8 karakter.")]
+        public string NewPassword { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Compare(nameof(NewPassword), ErrorMessage = "Ulangan password tidak sama.")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}

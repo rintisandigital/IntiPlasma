@@ -1,0 +1,42 @@
+@inject NavigationManager Navigation
+
+@* Page frame from the template: fixed header (back button, title, optional action) + content area. *@
+<div class="header-avt fixed-top">
+    <div class="left" style="min-width: 32px;">
+        @if (BackTo is not null)
+        {
+            <button type="button" class="header-icon-btn" aria-label="Kembali" @onclick="GoBack">
+                <i class="icon icon-arrLeft"></i>
+            </button>
+        }
+    </div>
+    <h4 class="header-title">@Title</h4>
+    <div class="right d-flex justify-content-end" style="min-width: 32px;">
+        @HeaderAction
+    </div>
+</div>
+
+<div class="app-content style-2">
+    <div class="tf-container pt-16 pb-16">
+        @ChildContent
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Route of the back button; no back button when null (top-level pages).
+    /// </summary>
+    [Parameter]
+    public string? BackTo { get; set; }
+
+    [Parameter]
+    public RenderFragment? HeaderAction { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private void GoBack() => Navigation.NavigateTo(BackTo!);
+}

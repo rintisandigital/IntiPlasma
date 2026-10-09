@@ -1,17 +1,45 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject SessionService Session
+@inject NavigationManager Navigation
+@inject MobileApp.Core.Abstractions.IConnectivity Connectivity
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@* Layout of every page after sign-in: page content (header included) + bottom bar from permissions (§6.1). *@
+@if (Session is { IsSignedIn: true, User: { } user })
+{
+    @if (!_online)
+    {
+        <div class="app-banner offline">Offline — data yang tampil dari penyimpanan perangkat</div>
+    }
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
+    @Body
 
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-</div>
+    <BottomBar User="user" />
+}
+
+@code {
+    private bool _online = true;
+
+    protected override void OnInitialized()
+    {
+        _online = Connectivity.IsOnline;
+        Connectivity.Changed += OnConnectivityChanged;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!Session.IsSignedIn)
+        {
+            Navigation.NavigateTo("/login", replace: true);
+        }
+    }
+
+    public void Dispose() => Connectivity.Changed -= OnConnectivityChanged;
+
+    private void OnConnectivityChanged(object? sender, EventArgs e) =>
+        _ = InvokeAsync(() =>
+        {
+            _online = Connectivity.IsOnline;
+            StateHasChanged();
+        });
+}

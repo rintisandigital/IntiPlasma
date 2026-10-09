@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Non-UI logic of the mobile app (PLAN-MOBILE §3.1): API client, session, local SQLite store, formatting.
+    Plain net10.0 without MAUI so it can be unit tested on any machine. It talks to Web.Api over HTTP only and
+    never references Domain/Application/Infrastructure (checked by MobileApp.UnitTests).
+  -->
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="MobileApp.UnitTests" />
+  </ItemGroup>
+
+</Project>

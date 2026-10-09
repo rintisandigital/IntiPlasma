@@ -51,7 +51,7 @@
 | M-35 | Adaptasi template & logo | Primary color **`#0984E3`** (template `#2748DB`); **light mode saja**; font **Inter di-host lokal**; **tanpa jQuery/plugin JS** template (interaksi dibuat di Blazor, CSS template dipakai); logo **`src/MobileApp/wwwroot/images/rdi-*.png`** menggantikan logo Findee (§3.9). |
 | M-36 | Mekanisme lingkup PPL | Permission baru **`partnership:assigned-only`** di role PPL: user yang memilikinya (kecuali role sistem Administrator) hanya bisa membaca & mengubah data yang ditugaskan kepadanya. User tanpa permission ini tetap memakai lingkup cabang seperti sekarang (Manager, admin, user WebApp lama tidak terpengaruh). |
 | M-37 | Aturan "tanggung jawab PPL" | **Kandang**: `Coop.FieldOfficerUserId = saya`. **Peternak**: `Farmer.FieldOfficerUserId = saya` **atau** punya minimal satu kandang yang ditugaskan ke saya. Peternak/kandang yang **dibuat PPL** otomatis ditugaskan ke pembuatnya. PPL hanya boleh menambah kandang untuk peternak dalam lingkupnya. |
-| M-38 | Data turunan dalam lingkup PPL | Lingkup PPL juga berlaku untuk **kontrak** (peternak dalam lingkup), **siklus, recording, grafik, stok ayam harian, request pakan, mutasi pakan** (kandang dalam lingkup). Kandang **tujuan** mutasi pakan boleh di luar lingkup (dipilih dari satu cabang), karena keputusan ada di approval. |
+| M-38 | Data turunan dalam lingkup PPL | Lingkup PPL juga berlaku untuk **siklus, recording, grafik, stok ayam harian, request pakan, mutasi pakan** (kandang dalam lingkup). Kandang **tujuan** mutasi pakan boleh di luar lingkup (dipilih dari satu cabang), karena keputusan ada di approval. **Kontrak** tetap memakai **lingkup cabang** (direvisi 2026-10-09: `PartnershipContract` tidak punya `FarmerId`, kontrak adalah skema & harga tingkat cabang, dan kontrak buatan PPL di M7 harus tetap terlihat). |
 | M-39 | Siapa mengubah penugasan | **WebApp** (form Farmer & Coop, hak Edit) + layar **Field Officer Assignment** (pindahkan banyak kandang/peternak sekaligus dari PPL A ke B, mis. saat mutasi pegawai). Tidak di mobile. |
 
 ---
@@ -335,7 +335,7 @@ Akses cabang tetap lewat profil Akses Cabang (W1). User mobile dibuat admin di W
 
 **Application** — `IFieldScope` (berdampingan dengan `IBranchAccess`, implementasi di Infrastructure, di-cache seperti permission):
 - `IsRestricted` = user punya `partnership:assigned-only` dan bukan Administrator.
-- Query (Dapper) menambah klausa bila restricted: kandang `c.field_officer_user_id = @UserId`; peternak `f.field_officer_user_id = @UserId OR EXISTS (kandang peternak itu yang ditugaskan ke @UserId)`; kontrak lewat peternak; siklus, recording, performance, stok ayam, request pakan, mutasi pakan lewat kandang. Lingkup cabang tetap berlaku di atasnya.
+- Query (Dapper) menambah klausa bila restricted: kandang `c.field_officer_user_id = @UserId`; peternak `f.field_officer_user_id = @UserId OR EXISTS (kandang peternak itu yang ditugaskan ke @UserId)`; kontrak **tidak** dibatasi (lingkup cabang, M-38); siklus, recording, performance, stok ayam, request pakan, mutasi pakan lewat kandang. Lingkup cabang tetap berlaku di atasnya.
 - Detail & command memanggil `EnsureInScopeAsync` (di luar lingkup → **404**, agar keberadaan data tidak bocor). Create oleh user restricted: `FieldOfficerUserId` diisi dirinya; kandang hanya untuk peternak dalam lingkup.
 - `GET mobile/field-context` & `mobile/dashboard` otomatis mengikuti lingkup.
 - Inbox approval **tidak** memakai lingkup PPL (approver ditentukan alur, M-29).
@@ -454,7 +454,7 @@ Backend (domain + unit test → command/query + validator → EF config + migrat
 
 ## 8. Tahapan Implementasi
 
-### Fase M0 — Fondasi
+### Fase M0 — Fondasi ✅ (selesai 2026-10-08, realisasi §12)
 - **Project**: perbaiki `MobileApp.csproj` (versi paket terpusat, `TargetFramework` vs `TargetFrameworks`, nama & `ApplicationId`, ikon/splash dari logo `rdi-small` dengan latar `#0984E3`, buang halaman contoh); `src/MobileApp.Core` + `tests/MobileApp.UnitTests` masuk `IntiPlasma.slnx`.
 - **UI dasar**: salin aset template terpilih (§3.9), Inter self-host, `app.css` (primary `#0984E3`), `MainLayout` (header + `menubar-footer` per permission), komponen Modal/Sheet/Badge/Spinner.
 - **Backend**: `GET users/me`, `POST users/logout`, `POST users/me/change-password`, `Jwt:RefreshTokenExpirationInDays`, permission baru (§4.2) + seeder role **PPL** & **Manager**.
@@ -539,4 +539,105 @@ Backend (domain + unit test → command/query + validator → EF config + migrat
 - CSS template besar (`styles.css`) + Bootstrap: ukur ukuran & waktu render pertama; buang aturan yang tidak dipakai bila perlu (M10).
 
 ## 11. Status Keputusan
-- **Semua keputusan M-1 s.d. M-39 disepakati** 2026-10-08. Fase **M0** siap dimulai (§9).
+- **Semua keputusan M-1 s.d. M-39 disepakati** 2026-10-08. Fase **M0 selesai** 2026-10-08 (§12); berikutnya **M1** (daftar task §13).
+- 2026-10-09: M-38 direvisi — kontrak memakai lingkup cabang, bukan lingkup PPL.
+
+---
+
+## 12. Realisasi Fase M0 — Fondasi (2026-10-08)
+
+### 12.1 Backend (Domain / Application / Infrastructure / Web.Api)
+- **Permission baru** (`Domain/Roles/Permissions.cs`): `partnership:assigned-only`, `production:stock-report`, `inventory:request-feed`, `inventory:request-feed-mutation`, `approvals:decide`. Role Administrator otomatis ikut (sinkron seeder).
+- **Role default** `PPL` (17 permission) & `Manager` (9 permission) dibuat seeder bila belum ada (`DatabaseSeeder.SeedMobileRolesAsync`, nama di `Domain/Roles/MobileRoles.cs`); tidak ditimpa bila admin mengubahnya.
+- **`GET users/me`**: `GetCurrentUserQuery` kini juga mengembalikan `roles[]` & `permissions[]` (Web.App ikut mendapat field baru, tanpa perubahan perilaku).
+- **`POST users/logout`** (`LogoutUserCommand`, mencabut satu refresh token milik user; token tak dikenal/milik user lain diabaikan) dan **`POST users/me/change-password`** (`ChangeOwnPasswordCommand` yang sudah ada; rate limit auth). Endpoint di `Web.Api/Endpoints/Users/CurrentUserEndpoints.cs`, cukup login.
+- **Masa refresh token** dari konfigurasi `Jwt:RefreshTokenExpirationInDays` (default **30**, `RefreshTokenOptions`), menggantikan konstanta 7 hari di handler login & refresh. `appsettings*.json`, `.env.example`, `docs/DEPLOY.md` diperbarui.
+- **Tidak ada migration** di M0.
+
+### 12.2 MobileApp & MobileApp.Core
+- `src/MobileApp.Core` (net10.0, tanpa MAUI): `ApiClient` (ProblemDetails → `ApiError` berbahasa Indonesia, error jaringan tidak melempar exception), `AuthHandler` (bearer + refresh sekali saat 401, body di-buffer agar bisa dikirim ulang), `TokenRefresher` (satu refresh pada satu waktu karena token berotasi; ditolak server → `SessionExpired`), `TokenStore` (SecureStorage), `SessionService` (login → `users/me` → cache profil di SQLite; buka aplikasi offline dengan sesi tersimpan; ganti user di perangkat menghapus data user sebelumnya; ganti password → login ulang otomatis), `LocalDb` (SQLite + migrasi `PRAGMA user_version`, v1: `session`, `cache_entries`), `ErrorMessages`, `IdFormat` (format id-ID tanpa bergantung locale perangkat), `AppFeatures` (menu dari permission).
+- `src/MobileApp`: proyek dirapikan (versi paket terpusat, hanya Android + Windows untuk debug, `ApplicationId` `com.intiplasma.mobile`, nama "IntiPlasma"), ikon & splash dari `rdi-small.png` (latar putih), status bar `#0984E3`, `allowBackup=false`, cleartext hanya ke `10.0.2.2`/`localhost`.
+- UI dari template Findee: `bootstrap.min.css` + `styles.css` + icomoon + Inter self-host, override di `wwwroot/css/app.css` (primary `#0984E3`, light mode, tombol ikon). Halaman: Login, Beranda (sapaan, cabang, peran, menu), Lainnya, Profil (ganti password), Pengaturan (versi, alamat server khusus debug, muat ulang profil, hapus cache), placeholder "Segera hadir" per fase, bottom bar per permission, banner offline, dialog konfirmasi keluar.
+- Default alamat server: debug `http://10.0.2.2:5000/` (emulator) / `http://localhost:5000/` (Windows); **release masih placeholder** di `Services/MauiPlatformServices.cs` (`ServerDefaults`) — diisi di M10.
+
+### 12.3 Pengujian & verifikasi
+- Test: **467 lulus** — 146 domain, 71 application (+3 logout), 14 arsitektur, **46 MobileApp.UnitTests** (baru: API client, AuthHandler termasuk refresh paralel, SessionService, LocalDb, menu per peran, format, sinkronisasi katalog permission & kode error dengan Domain, Core tidak mereferensikan proyek server), 25 integration Web.Api (+6: `users/me`, logout, ganti password, role seeder), 165 integration Web.App.
+- Verifikasi end-to-end di **emulator Android 14 (API 34)** terhadap Web.Api pada `intiplasma_verify` + data demo (dibuat & dihapus), `Jwt:ExpirationInMinutes=1`: login salah → "Email atau password salah."; login PPL → bottom bar Beranda · Kandang · Input · Antrean · Lainnya; Manager → Beranda · Kandang · Approval · Stok Ayam · Lainnya; user tanpa permission ditolak; ganti password (401 → refresh → retry 204, lalu login ulang otomatis, refresh token lama tercabut); muat ulang profil setelah access token kedaluwarsa (401 → refresh 200 → 200); restart aplikasi tetap masuk; **mode pesawat** → aplikasi tetap terbuka dengan banner offline; keluar → token dicabut di server (0 refresh token) dan email terisi di halaman login.
+
+### 12.4 Catatan & penyesuaian
+- **WebView minimum**: Blazor .NET 10 gagal di WebView bawaan emulator API 26 (`blazor.webview.js: Unexpected token .`). Perangkat Android 7+ butuh **Android System WebView/Chrome yang diperbarui** (Play Store); emulator verifikasi memakai API 34 (WebView 113). Perlu dicantumkan di panduan pengguna (M10).
+- `Directory.Build.props` men-set `TargetFramework=net10.0` untuk semua proyek; `MobileApp.csproj` mengosongkannya agar restore multi-target menyertakan runtime Android (`NETSDK1047`).
+- `SQLitePCLRaw.bundle_e_sqlite3` dipin ke **2.1.13** (advisory NU1903 pada 2.1.11, dependensi transitif Microsoft.Data.Sqlite 10.0.9).
+- Target Windows: `NoWarn CA5392` khusus target itu (file dari paket Windows App SDK).
+- Halaman MAUI memakai `SafeAreaEdges="All"`: WebView Android melaporkan `env(safe-area-inset-*)` = 0 sehingga header/bottom bar tertutup status bar & navigation bar.
+- CSS template menata **semua `<button>`** sebagai blok biru selebar penuh dan `.input-icon .icon` di kiri; tombol ikon diberi kelas sendiri (`.password-toggle`, `.header-icon-btn`). Hover template membalik warna tombol primer (menempel di layar sentuh) → dinetralkan.
+- Tombol profil di header Beranda dihapus (ikon tidak tampil di WebView; Profil tetap dari Lainnya).
+
+---
+
+## 13. Daftar Task M1 — Data Kemitraan (lihat) & Penugasan PPL (urutan)
+
+Disusun 2026-10-09 dari pemetaan kode. Prasyarat: hasil M0 sudah di-commit.
+
+### 13.1 Temuan yang memengaruhi desain
+- **Kontrak tanpa `FarmerId`** → kontrak memakai lingkup cabang (M-38 direvisi).
+- **Web.App ikut memanggil `AddInfrastructureCore`** (`src/Web.App/Program.cs`). Karena lingkup PPL tidak berlaku di WebApp (§4.5), Web.App mendaftarkan `IFieldScope` versi *unrestricted*.
+- **Administrator mendapat semua permission**, termasuk `partnership:assigned-only` (`Permissions.All`), jadi `FieldScope` wajib mengecualikan role sistem Administrator (`r.is_system AND r.name = 'Administrator'`).
+- **Belum ada antarmuka permission di Application**: `IUserContext` hanya berisi `UserId`, sedangkan `PermissionProvider` bersifat internal di Infrastructure. `FieldScope` dibuat di Infrastructure dengan memakai `PermissionProvider`.
+- **Handler dibuat manual di unit test**: menambah parameter `IFieldScope` di konstruktor akan merusak test berikut, sehingga perlu helper `Unrestricted()`:
+  - `PlanCycleCommandHandlerTests`
+  - `ProductionHandlersTests`
+  - test Costing, Inventory & Sales yang memakai `CycleLoader`
+- **Route `users/{userId}` tanpa constraint `:guid`**: route literal `users/field-officers` tetap menang (sama seperti `users/me`).
+- Belum ada query user per cabang. Pola SQL yang bisa dipakai ulang ada di `GetUserByIdQueryHandler` (cakupan profil Akses Cabang) dan `GetCurrentUserQueryHandler` (role → permission).
+- `LocalDb.cache_entries` sudah ada (v1), tetapi belum punya metode get/set.
+
+### 13.2 Task
+1. **Domain**: `Farmer.FieldOfficerUserId` & `Coop.FieldOfficerUserId` (`Guid?`) + metode `AssignFieldOfficer(Guid?)` + unit test.
+2. **EF**:
+   - FK ke `identity.users` (Restrict) + index `field_officer_user_id` pada `master.farmers` & `master.coops`.
+   - Migration **`PhaseM1_FieldOfficerScope`** (data lama dibiarkan kosong). **User yang menjalankan migrate.**
+3. **`IFieldScope`** (Application/Abstractions/Authorization):
+   - Anggota: `IsRestricted`, `UserId`, potongan SQL/parameter untuk Dapper, serta `EnsureFarmerInScopeAsync`, `EnsureCoopInScopeAsync` & `EnsureCycleInScopeAsync` (di luar lingkup → **404**).
+   - Implementasi di Infrastructure (HybridCache, key baru di `PermissionCacheKeys` yang ikut di-*invalidate* oleh `AllForUser`).
+   - Web.App memakai versi *unrestricted*.
+4. **Terapkan lingkup** (kontrak tidak):
+   - **Peternak**: list (langsung **atau** lewat kandang) & detail; update.
+   - **Kandang**: list & detail; create (hanya untuk peternak dalam lingkup) & update.
+   - **Siklus**: list & detail; `PlanCycle`; `CycleLoader` (start, cancel, create/revise recording, panen, tutup).
+   - **Recording & performance**: list, detail & grafik, lewat `ProductionReadSupport.EnsureCycleAccessAsync`.
+   - **Lampiran**: `AttachmentService`/`SetDocuments` untuk pemilik Farmer, Coop, Cycle & DailyRecording.
+5. **Penugasan pada create/update** farmer & coop:
+   - Field `fieldOfficerUserId?`: harus user aktif, punya `partnership:assigned-only`, dan punya akses ke cabang dokumen.
+   - User restricted → otomatis diisi dirinya sendiri.
+   - Response list/detail menambah `fieldOfficerUserId` & `fieldOfficerName`; filter `fieldOfficerId` di list farmers, coops & cycles.
+6. **`GET users/field-officers?branchId`**: user aktif dengan `partnership:assigned-only` lewat role, bukan Administrator, dan profil aksesnya mencakup cabang tersebut. Dipakai untuk lookup WebApp & filter Manager.
+7. **Test backend**:
+   - Perbaiki konstruktor test lama.
+   - Unit test: lingkup peternak langsung vs lewat kandang; detail di luar lingkup → 404; create oleh user restricted otomatis ditugaskan ke pembuatnya; kandang untuk peternak di luar lingkup ditolak; Administrator tidak dibatasi.
+   - Integration test Web.Api: PPL A tidak melihat data PPL B (list kosong, detail 404); Manager melihat seluruh cabang; pemindahan penugasan langsung berlaku; `users/field-officers`.
+8. **Web.App**:
+   - Field PPL (lookup per cabang) di form Farmers/Coops, serta kolom & filter PPL di list (+ ekspor).
+   - Menu **Partnership → Field Officer Assignment** (`MenuCatalog`, *released*): pilih PPL asal → centang peternak/kandang → pindahkan ke PPL tujuan. Dijalankan lewat `ReassignFieldOfficerCommand` (bulk, satu transaksi) dan tercatat di audit log (kategori audit baru bila perlu).
+   - Integration test: menu terbuka & pemindahan penugasan.
+9. **MobileApp.Core**:
+   - `PagedList<T>` + DTO farmer, coop, contract, cycle & stock balance.
+   - `FarmersApi`, `CoopsApi`, `ContractsApi`, `CyclesApi` & `InventoryApi` (saldo gudang kandang); `UsersApi.GetFieldOfficers`.
+   - Get/set `cache_entries` di `LocalDb`: cache tampil dulu lalu diperbarui; saat offline tampil "Data per dd/MM HH:mm".
+   - Unit test.
+10. **MobileApp UI**:
+    - Komponen `Shared`: ListPage/InfiniteList, SearchBox (debounce), FilterSheet, StatusBadge, Tabs, EmptyState.
+    - Halaman list & detail **Peternak** (NIK dimasker, telepon/WhatsApp, kandang, lampiran), **Kandang** (profil, lokasi + buka peta, PPL, siklus berjalan & riwayat, stok gudang kandang, lampiran) dan **Kontrak** (skema, periode, harga sapronak, harga jaminan, insentif).
+    - Arahkan rute `AppFeatures` (Peternak, Kandang, Kontrak) dari placeholder ke halaman baru.
+    - Filter **PPL** untuk Manager.
+11. **Verifikasi** (emulator API 34, `intiplasma_verify` + data demo):
+    - `ppl.bdg` & `ppl2.bdg` hanya melihat datanya masing-masing; `manager.bdg` melihat keduanya.
+    - Pindahkan kandang di Field Officer Assignment → muncul di `ppl2.bdg` setelah disegarkan.
+    - Detail di luar lingkup → 404.
+    - Mode pesawat → list & detail dari cache.
+12. **Dokumentasi**: realisasi §14, RANGKUMAN, dan catatan "penugasan massal setelah migrate M1" di `docs/DEPLOY.md`.
+
+### 13.3 Di luar lingkup M1
+- Form add/edit peternak/kandang/kontrak di mobile → M7.
+- `inventory/stock-balances` & modul inventory lain tetap memakai lingkup cabang; lingkup kandang untuk stok/request/mutasi pakan menyusul di M2/M8/M9.
+

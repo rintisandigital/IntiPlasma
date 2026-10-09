@@ -43,6 +43,13 @@
     <!-- Web.App: export (W-3) -->
     <PackageVersion Include="ClosedXML" Version="0.105.1" />
     <PackageVersion Include="QuestPDF" Version="2026.9.1" />
+    <!-- MobileApp (MAUI Blazor Hybrid, PLAN-MOBILE). MAUI version follows the installed workload (MauiVersion). -->
+    <PackageVersion Include="Microsoft.Maui.Controls" Version="10.0.20" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.20" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.9" />
+    <!-- Patched native SQLite (NU1903 GHSA-2m69-gcr7-jv3q in lib.e_sqlite3 2.1.11, a transitive dependency of Microsoft.Data.Sqlite 10.0.9). -->
+    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.13" />
     <!-- Tests -->
     <PackageVersion Include="Shouldly" Version="4.3.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.9" />

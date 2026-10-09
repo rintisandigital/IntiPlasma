@@ -8,6 +8,7 @@
     <Project Path="src/Application/Application.csproj" />
     <Project Path="src/Domain/Domain.csproj" />
     <Project Path="src/Infrastructure/Infrastructure.csproj" />
+    <Project Path="src/MobileApp.Core/MobileApp.Core.csproj" />
     <Project Path="src/MobileApp/MobileApp.csproj" Id="02d212a2-6d85-4916-8db2-ddd6b71c56f9" />
     <Project Path="src/SharedKernel/SharedKernel.csproj" />
     <Project Path="src/Web.Api/Web.Api.csproj" />
@@ -18,6 +19,7 @@
     <Project Path="tests/ArchitectureTests/ArchitectureTests.csproj" />
     <Project Path="tests/Domain.UnitTests/Domain.UnitTests.csproj" />
     <Project Path="tests/IntegrationTests/IntegrationTests.csproj" />
+    <Project Path="tests/MobileApp.UnitTests/MobileApp.UnitTests.csproj" />
     <Project Path="tests/Web.App.IntegrationTests/Web.App.IntegrationTests.csproj" />
   </Folder>
   <Project Path="docker-compose.dcproj">

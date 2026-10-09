@@ -1,0 +1,74 @@
+@page "/pengaturan"
+@inject SessionService Session
+@inject IAppSettings AppSettings
+@inject MobileApp.Core.Local.LocalDb Db
+
+<AppPage Title="Pengaturan" BackTo="/lainnya">
+    @if (_message is not null)
+    {
+        <div class="alert @(_success ? "alert-success" : "alert-danger") mb-16" role="alert">@_message</div>
+    }
+
+    <div class="info-list">
+        <div class="row-item"><span class="label">Versi aplikasi</span><span>@AppInfo.Current.VersionString (@AppInfo.Current.BuildString)</span></div>
+        <div class="row-item"><span class="label">Server</span><span class="text-end text-break">@AppSettings.ServerUrl</span></div>
+    </div>
+
+    @if (AppSettings.CanEditServerUrl)
+    {
+        <div class="mt-20">
+            <label class="label text-caption-1" for="server">Alamat server (khusus build debug)</label>
+            <input id="server" class="form-control mt-8" @bind="_serverUrl" />
+            <button type="button" class="mt-12 tf-btn style-1 round-full w-100" @onclick="SaveServer">Simpan alamat server</button>
+        </div>
+    }
+
+    <div class="profile-setting mt-24">
+        <a href="" class="setting-item" @onclick="RefreshProfileAsync" @onclick:preventDefault>
+            <i class="icon icon-profile"></i>
+            <div class="text text-button-small text-OnSurface">Muat ulang profil &amp; hak akses</div>
+        </a>
+        <a href="" class="setting-item" @onclick="ClearCacheAsync" @onclick:preventDefault>
+            <i class="icon icon-trash"></i>
+            <div class="text text-button-small text-OnSurface">Hapus cache data</div>
+        </a>
+    </div>
+</AppPage>
+
+@code {
+    private string _serverUrl = string.Empty;
+    private bool _success;
+    private string? _message;
+
+    protected override void OnInitialized() => _serverUrl = AppSettings.ServerUrl;
+
+    private void SaveServer()
+    {
+        if (!Uri.TryCreate(_serverUrl.Trim(), UriKind.Absolute, out Uri? uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            Show(false, "Alamat server harus diawali http:// atau https://.");
+            return;
+        }
+
+        AppSettings.ServerUrl = uri.ToString();
+        Show(true, "Alamat server disimpan.");
+    }
+
+    private async Task RefreshProfileAsync()
+    {
+        ApiResult result = await Session.RefreshProfileAsync();
+        Show(result.IsSuccess, result.IsSuccess ? "Profil dan hak akses diperbarui." : result.Error!.Message);
+    }
+
+    private async Task ClearCacheAsync()
+    {
+        await Db.ClearCacheAsync();
+        Show(true, "Cache data dihapus.");
+    }
+
+    private void Show(bool success, string message)
+    {
+        _success = success;
+        _message = message;
+    }
+}

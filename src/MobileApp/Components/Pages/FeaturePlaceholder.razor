@@ -1,0 +1,32 @@
+@page "/fitur/{Key}"
+@inject SessionService Session
+
+@* Menu entries whose screens are built in a later phase (PLAN-MOBILE §8). *@
+<AppPage Title="@(_feature?.Title ?? "Fitur")" BackTo="@(IsInBottomBar ? null : "/lainnya")">
+    <div class="coming-soon">
+        <i class="icon @(_feature?.Icon ?? "icon-info")"></i>
+        <h5 class="mt-16">Segera hadir</h5>
+        <p class="body-2 text-dark-4 mt-8">
+            @if (_feature?.Phase is { } phase)
+            {
+                <text>Menu <b>@_feature.Title</b> sedang dikembangkan dan akan tersedia pada fase @phase.</text>
+            }
+            else
+            {
+                <text>Menu ini belum tersedia.</text>
+            }
+        </p>
+    </div>
+</AppPage>
+
+@code {
+    private AppFeature? _feature;
+
+    [Parameter]
+    public string Key { get; set; } = string.Empty;
+
+    private bool IsInBottomBar =>
+        _feature is not null && Session.User is { } user && AppFeatures.BottomBar(user).Contains(_feature);
+
+    protected override void OnParametersSet() => _feature = AppFeatures.Find(Key);
+}

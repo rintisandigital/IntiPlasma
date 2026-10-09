@@ -1,25 +1,31 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>MobileApp</title>
+    <title>IntiPlasma</title>
     <base href="/" />
-    <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="app.css" />
+    <!-- UI kit: docs/html-template-mobile (PLAN-MOBILE M-16, M-35). All assets are local (offline). -->
+    <link rel="stylesheet" href="fonts/inter/inter.css" />
+    <link rel="stylesheet" href="fonts/font-icons.css" />
+    <link rel="stylesheet" href="css/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="MobileApp.styles.css" />
     <link rel="icon" href="data:,">
 </head>
 
 <body>
 
-    <div class="status-bar-safe-area"></div>
-
-    <div id="app">Loading...</div>
+    <div id="app">
+        <div class="app-loading">
+            <img src="images/rdi-small.png" alt="" />
+        </div>
+    </div>
 
     <div id="blazor-error-ui" data-nosnippet>
-        An unhandled error has occurred.
-        <a href="." class="reload">Reload</a>
+        Terjadi kesalahan pada aplikasi.
+        <a href="." class="reload">Muat ulang</a>
         <span class="dismiss">🗙</span>
     </div>
 

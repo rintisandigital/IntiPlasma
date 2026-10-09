@@ -1,0 +1,41 @@
+@* Confirmation dialog in the template's modal style, driven by Blazor (no Bootstrap JS). *@
+@if (Visible)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" style="background: rgba(18, 18, 18, .45);">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content p-20">
+                <h5 class="mb-8">@Title</h5>
+                <p class="body-2 text-dark-4 mb-20">@Message</p>
+                <div class="d-flex gap-12">
+                    <button type="button" class="tf-btn style-1 round-full w-100" @onclick="() => Close(false)">@CancelText</button>
+                    <button type="button" class="tf-btn round-full w-100" @onclick="() => Close(true)">@ConfirmText</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public bool Visible { get; set; }
+
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Message { get; set; } = string.Empty;
+
+    [Parameter]
+    public string ConfirmText { get; set; } = "Ya";
+
+    [Parameter]
+    public string CancelText { get; set; } = "Batal";
+
+    /// <summary>
+    /// True when confirmed, false when cancelled.
+    /// </summary>
+    [Parameter]
+    public EventCallback<bool> OnClose { get; set; }
+
+    private Task Close(bool confirmed) => OnClose.InvokeAsync(confirmed);
+}

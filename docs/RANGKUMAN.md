@@ -227,6 +227,12 @@
   - user `staff.bdg` hanya melihat data BDG.
 - Hasil audit: semua modul API & WebApp lengkap dan terhubung (lihat celah di §8).
 
+### Fase M0 — Fondasi Mobile App ✅ (2026-10-08; detail: PLAN-MOBILE §12)
+- Rencana mobile PPL & Manager: [PLAN-MOBILE.md](PLAN-MOBILE.md) (M0–M10, keputusan M-1 s.d. M-39 disepakati).
+- API: permission baru (`partnership:assigned-only`, `production:stock-report`, `inventory:request-feed`, `inventory:request-feed-mutation`, `approvals:decide`), role default **PPL** & **Manager** di seeder, `GET users/me` (+ roles & permissions), `POST users/logout`, `POST users/me/change-password`, refresh token **30 hari** (`Jwt:RefreshTokenExpirationInDays`). Tidak ada migration.
+- Proyek baru `src/MobileApp.Core` (API client + refresh token, sesi, SQLite, format id-ID, menu per permission) & `tests/MobileApp.UnitTests`; `src/MobileApp` (MAUI Blazor Hybrid, Android) dengan template Findee, logo `rdi-*`, primary `#0984E3`: Login, Beranda, Lainnya, Profil/ganti password, Pengaturan, offline dengan sesi tersimpan.
+- ⚠️ Butuh Android System WebView yang diperbarui (WebView bawaan API 26 tidak bisa menjalankan Blazor .NET 10).
+
 ## 5. Alur Akuntansi yang Sudah Berjalan
 
 | Transaksi | Jurnal otomatis |
@@ -291,11 +297,16 @@ Semua event di katalog kini sudah dipakai.
 - Integration test Web.App: wrong-password memakai user baru (bukan admin) karena lockout; factory men-set `Security:SecureCookies=false` dan batas rate limit tinggi.
 - Migration bundle (`efbundle`) butuh env `ConnectionStrings__Database` agar host Web.Api bisa dibangun.
 
+- **MobileApp**: `Directory.Build.props` men-set `TargetFramework` → proyek MAUI multi-target wajib `<TargetFramework></TargetFramework>`, jika tidak restore tidak memuat runtime Android (`NETSDK1047`).
+- **MobileApp**: WebView Android melaporkan `env(safe-area-inset-*)` = 0 → pakai `SafeAreaEdges="All"` di `ContentPage`; CSS template Findee menata semua `<button>` (biru, lebar penuh) dan `.input-icon .icon` di kiri — tombol ikon perlu kelas sendiri.
+- **MobileApp**: build Android (javac) bisa kehabisan memori saat emulator + API + Podman berjalan bersamaan → `-p:JavaMaximumHeapSize=512m`, matikan Podman bila tidak dipakai.
+
 ## 7. Cara Kerja & Verifikasi
 
 - Setiap fase: domain + unit test invariant → command/query + validator → EF config + migration → endpoint + permission → **verifikasi end-to-end** ke PostgreSQL lokal pada database sementara `intiplasma_verify` (dibuat & dihapus otomatis; database `intiplasma` milik user tidak disentuh).
 - User yang melakukan **commit & migrate** setelah tiap fase.
-- Status test saat ini: **412 test lulus** (146 domain, 68 application, 14 arsitektur, 19 integration Web.Api, 165 integration Web.App).
+- Status test saat ini: **467 test lulus** (146 domain, 71 application, 14 arsitektur, 46 MobileApp.UnitTests, 25 integration Web.Api, 165 integration Web.App).
+- Verifikasi mobile (M0): emulator Android **API 34** (`intiplasma_api34`; image API 26 terlalu tua untuk WebView) + Web.Api `:5000` pada `intiplasma_verify`, diarahkan dengan `adb` (tap/teks/screencap). Integration test butuh mesin Podman berjalan (`podman machine start`).
 - Integration test (Testcontainers) **sudah bisa dijalankan** di mesin dev (container runtime tersedia) — `dotnet test IntiPlasma.slnx`.
 - Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario, Fase 7: 32 skenario, Fase 8: 35 skenario, Fase 9: 79 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
 - ⚠️ Sejak W0 Web.Api tidak memproses outbox: verifikasi yang hanya menjalankan API perlu `BackgroundJobs__Enabled=true`.

@@ -25,7 +25,7 @@ Salin `.env.example` → `.env` di samping `docker-compose.yml` lalu isi. `.env`
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Database; connection string kedua aplikasi dibentuk dari sini |
 | `WEB_API_PORT`, `WEB_APP_PORT`, `POSTGRES_PORT` | Port di host |
 | `ASPNETCORE_ENVIRONMENT` | `Production` |
-| `Jwt__Secret`, `Jwt__Issuer`, `Jwt__Audience`, `Jwt__ExpirationInMinutes` | Token mobile (Web.Api). Secret acak ≥ 32 karakter |
+| `Jwt__Secret`, `Jwt__Issuer`, `Jwt__Audience`, `Jwt__ExpirationInMinutes`, `Jwt__RefreshTokenExpirationInDays` | Token mobile (Web.Api). Secret acak ≥ 32 karakter; access token 60 menit, refresh token 30 hari (diperpanjang setiap refresh) |
 | `App__CompanyName`, `App__TimeZone` | Kop dokumen & zona waktu tampilan |
 | `Security__Lockout__MaxFailedAttempts`, `Security__Lockout__LockoutMinutes` | Lockout login (default 5 kali / 15 menit), berlaku Web.App & Web.Api |
 | `Security__LoginPermitPerMinute` | Batas percobaan login Web.App per IP per menit (default 10) |

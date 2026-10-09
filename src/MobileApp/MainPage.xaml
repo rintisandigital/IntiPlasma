@@ -3,7 +3,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:MobileApp"
              xmlns:components="clr-namespace:MobileApp.Components"
-             x:Class="MobileApp.MainPage">
+             x:Class="MobileApp.MainPage"
+             SafeAreaEdges="All">
+    <!-- Keep the WebView inside the status and navigation bars: Android WebView reports env(safe-area-inset-*) as 0. -->
 
     <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html">
         <BlazorWebView.RootComponents>
