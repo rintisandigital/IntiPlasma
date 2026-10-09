@@ -17,10 +17,14 @@ public sealed record CoopResponse
                c.latitude AS Latitude, c.longitude AS Longitude, c.is_active AS IsActive,
                (SELECT pc.id FROM partnership.production_cycles pc
                 WHERE pc.coop_id = c.id AND pc.status IN ('Planned', 'Active', 'Harvesting')) AS OpenCycleId,
-               c.documents AS Documents
+               c.documents AS Documents,
+               (SELECT w.id FROM master.warehouses w WHERE w.coop_id = c.id LIMIT 1) AS WarehouseId,
+               c.field_officer_user_id AS FieldOfficerUserId,
+               NULLIF(TRIM(CONCAT(fo.first_name, ' ', fo.last_name)), '') AS FieldOfficerName
         FROM master.coops c
         JOIN master.farmers f ON f.id = c.farmer_id
         JOIN master.branches b ON b.id = c.branch_id
+        LEFT JOIN identity.users fo ON fo.id = c.field_officer_user_id
         """;
 
     public Guid Id { get; init; }
@@ -57,6 +61,18 @@ public sealed record CoopResponse
     /// The planned or running production cycle, if any.
     /// </summary>
     public Guid? OpenCycleId { get; init; }
+
+    /// <summary>
+    /// The farm warehouse (gudang kandang GK-…), once created; stock via <c>inventory/stock-balances?warehouseId=</c>.
+    /// </summary>
+    public Guid? WarehouseId { get; init; }
+
+    /// <summary>
+    /// PPL responsible for the coop (PLAN-MOBILE M-11).
+    /// </summary>
+    public Guid? FieldOfficerUserId { get; init; }
+
+    public string? FieldOfficerName { get; init; }
 
     /// <summary>
     /// Survey data (building, equipment, production plan, …); only filled by the get-by-id query.

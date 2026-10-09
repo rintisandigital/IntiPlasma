@@ -136,14 +136,17 @@ internal static class DailyRecordingSql
         """;
 }
 
-internal sealed class GetDailyRecordingsQueryHandler(IDbConnectionFactory dbConnectionFactory, IBranchAccess branchAccess)
+internal sealed class GetDailyRecordingsQueryHandler(
+    IDbConnectionFactory dbConnectionFactory,
+    IBranchAccess branchAccess,
+    IFieldScope fieldScope)
     : IQueryHandler<GetDailyRecordingsQuery, IReadOnlyList<DailyRecordingResponse>>
 {
     public async Task<Result<IReadOnlyList<DailyRecordingResponse>>> Handle(GetDailyRecordingsQuery query, CancellationToken cancellationToken)
     {
         await using DbConnection connection = await dbConnectionFactory.OpenConnectionAsync(cancellationToken);
 
-        Result access = await ProductionReadSupport.EnsureCycleAccessAsync(connection, branchAccess, query.CycleId, cancellationToken);
+        Result access = await ProductionReadSupport.EnsureCycleAccessAsync(connection, branchAccess, fieldScope, query.CycleId, cancellationToken);
         if (access.IsFailure)
         {
             return Result.Failure<IReadOnlyList<DailyRecordingResponse>>(access.Error);
@@ -164,7 +167,10 @@ internal sealed class GetDailyRecordingsQueryHandler(IDbConnectionFactory dbConn
     }
 }
 
-internal sealed class GetDailyRecordingByIdQueryHandler(IDbConnectionFactory dbConnectionFactory, IBranchAccess branchAccess)
+internal sealed class GetDailyRecordingByIdQueryHandler(
+    IDbConnectionFactory dbConnectionFactory,
+    IBranchAccess branchAccess,
+    IFieldScope fieldScope)
     : IQueryHandler<GetDailyRecordingByIdQuery, DailyRecordingResponse>
 {
     public async Task<Result<DailyRecordingResponse>> Handle(GetDailyRecordingByIdQuery query, CancellationToken cancellationToken)
@@ -196,7 +202,7 @@ internal sealed class GetDailyRecordingByIdQueryHandler(IDbConnectionFactory dbC
             new CommandDefinition(sql, new { Id = query.DailyRecordingId }, cancellationToken: cancellationToken));
 
         DailyRecordingResponse? recording = await multi.ReadSingleOrDefaultAsync<DailyRecordingResponse>();
-        if (recording is null)
+        if (recording is null || !await fieldScope.CanAccessCycleAsync(recording.CycleId, cancellationToken))
         {
             return Result.Failure<DailyRecordingResponse>(DailyRecordingErrors.NotFound(query.DailyRecordingId));
         }
@@ -229,7 +235,10 @@ internal sealed class GetDailyRecordingByIdQueryHandler(IDbConnectionFactory dbC
     }
 }
 
-internal sealed class GetCyclePerformanceQueryHandler(IDbConnectionFactory dbConnectionFactory, IBranchAccess branchAccess)
+internal sealed class GetCyclePerformanceQueryHandler(
+    IDbConnectionFactory dbConnectionFactory,
+    IBranchAccess branchAccess,
+    IFieldScope fieldScope)
     : IQueryHandler<GetCyclePerformanceQuery, CyclePerformanceResponse>
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -266,7 +275,7 @@ internal sealed class GetCyclePerformanceQueryHandler(IDbConnectionFactory dbCon
             new CommandDefinition(sql, new { query.CycleId }, cancellationToken: cancellationToken));
 
         CycleRow? cycle = await multi.ReadSingleOrDefaultAsync<CycleRow>();
-        if (cycle is null)
+        if (cycle is null || !await fieldScope.CanAccessCycleAsync(cycle.Id, cancellationToken))
         {
             return Result.Failure<CyclePerformanceResponse>(CycleErrors.NotFound(query.CycleId));
         }
@@ -359,6 +368,7 @@ internal static class ProductionReadSupport
     public static async Task<Result> EnsureCycleAccessAsync(
         DbConnection connection,
         IBranchAccess branchAccess,
+        IFieldScope fieldScope,
         Guid cycleId,
         CancellationToken cancellationToken)
     {
@@ -367,7 +377,7 @@ internal static class ProductionReadSupport
             new { CycleId = cycleId },
             cancellationToken: cancellationToken));
 
-        if (branchId is null)
+        if (branchId is null || !await fieldScope.CanAccessCycleAsync(cycleId, cancellationToken))
         {
             return Result.Failure(CycleErrors.NotFound(cycleId));
         }

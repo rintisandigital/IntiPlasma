@@ -13,6 +13,10 @@ public static class UserErrors
         "Users.Unauthorized",
         "You are not authorized to perform this action.");
 
+    public static Error NotFieldOfficer(Guid userId) => Error.Problem(
+        "Users.NotFieldOfficer",
+        $"The user with the Id = '{userId}' is not an active field officer (PPL) with access to this branch");
+
     public static readonly Error NotFoundByEmail = Error.NotFound(
         "Users.NotFoundByEmail",
         "The user with the specified email was not found");

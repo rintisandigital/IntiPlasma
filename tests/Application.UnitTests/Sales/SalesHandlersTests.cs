@@ -44,7 +44,7 @@ public sealed class SalesHandlersTests : BaseHandlerTest
         Guid firstDelivery = (await Deliver(context, orderId, s.FirstHarvest)).Value.Id;
         (await Deliver(context, orderId, s.FirstHarvest)).Error.ShouldBe(DeliveryOrderErrors.HarvestAlreadyDelivered(s.FirstHarvest));
 
-        var close = new CloseCycleCommandHandler(context, AllBranches());
+        var close = new CloseCycleCommandHandler(context, AllBranches(), NoFieldScope());
         (await close.Handle(new CloseCycleCommand(s.Cycle.Id), CancellationToken.None)).Error.ShouldBe(CycleErrors.UnsoldHarvest(2));
 
         Guid secondDelivery = (await Deliver(context, orderId, s.SecondHarvest)).Value.Id;

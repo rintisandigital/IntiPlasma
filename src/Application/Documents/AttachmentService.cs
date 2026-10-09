@@ -16,6 +16,7 @@ internal sealed partial class AttachmentService(
     IApplicationDbContext context,
     IFileStorage fileStorage,
     IBranchAccess branchAccess,
+    IFieldScope fieldScope,
     IUserContext userContext,
     IDateTimeProvider dateTimeProvider,
     ILogger<AttachmentService> logger) : IAttachmentService
@@ -112,7 +113,16 @@ internal sealed partial class AttachmentService(
 
         BranchScope scope = await branchAccess.GetScopeAsync(cancellationToken);
 
-        return [.. attachments.Where(a => CanRead(a, scope)).OrderBy(a => a.CreatedAtUtc).Select(ToResponse)];
+        List<Attachment> readable = [];
+        foreach (Attachment attachment in attachments.Where(a => CanRead(a, scope)))
+        {
+            if (await InFieldScopeAsync(attachment, cancellationToken))
+            {
+                readable.Add(attachment);
+            }
+        }
+
+        return [.. readable.OrderBy(a => a.CreatedAtUtc).Select(ToResponse)];
     }
 
     public async Task<Result<AttachmentContent>> OpenAsync(Guid attachmentId, CancellationToken cancellationToken = default)
@@ -316,7 +326,41 @@ internal sealed partial class AttachmentService(
     }
 
     private async Task<bool> CanReadAsync(Attachment attachment, CancellationToken cancellationToken) =>
-        CanRead(attachment, await branchAccess.GetScopeAsync(cancellationToken));
+        CanRead(attachment, await branchAccess.GetScopeAsync(cancellationToken)) &&
+        await InFieldScopeAsync(attachment, cancellationToken);
+
+    /// <summary>
+    /// For a user limited to assigned data (PPL): a linked attachment is readable when at least one of its owners is
+    /// in scope (<see cref="AttachmentOwnerScope"/>).
+    /// </summary>
+    private async Task<bool> InFieldScopeAsync(Attachment attachment, CancellationToken cancellationToken)
+    {
+        if (attachment.Status == AttachmentStatus.Temporary || !(await fieldScope.GetScopeAsync(cancellationToken)).Restricted)
+        {
+            return true;
+        }
+
+        var owners = await context.AttachmentLinks
+            .AsNoTracking()
+            .Where(l => l.AttachmentId == attachment.Id)
+            .Select(l => new { l.OwnerType, l.OwnerId })
+            .ToListAsync(cancellationToken);
+
+        if (owners.Count == 0)
+        {
+            return true;
+        }
+
+        foreach (var owner in owners)
+        {
+            if (await AttachmentOwnerScope.CanAccessAsync(context, fieldScope, owner.OwnerType, owner.OwnerId, cancellationToken))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>
     /// A temporary attachment is private to its uploader (head office users see everything). Once linked it follows

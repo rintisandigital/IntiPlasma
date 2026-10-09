@@ -2,6 +2,7 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Documents;
+using Application.Users.FieldOfficers;
 using Domain.Common;
 using Domain.Documents.Attachments;
 using Domain.MasterData.Farmers;
@@ -13,6 +14,7 @@ namespace Application.Farmers.Update;
 internal sealed class UpdateFarmerCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
+    IFieldScope fieldScope,
     IAttachmentService attachments)
     : ICommandHandler<UpdateFarmerCommand>
 {
@@ -20,7 +22,7 @@ internal sealed class UpdateFarmerCommandHandler(
     {
         Farmer? farmer = await context.Farmers.SingleOrDefaultAsync(f => f.Id == command.FarmerId, cancellationToken);
 
-        if (farmer is null)
+        if (farmer is null || !await fieldScope.CanAccessFarmerAsync(farmer.Id, cancellationToken))
         {
             return Result.Failure(FarmerErrors.NotFound(command.FarmerId));
         }
@@ -29,6 +31,19 @@ internal sealed class UpdateFarmerCommandHandler(
         if (access.IsFailure)
         {
             return access;
+        }
+
+        FieldScope field = await fieldScope.GetScopeAsync(cancellationToken);
+        if (!field.Restricted)
+        {
+            Result fieldOfficer = await FieldOfficerRules.EnsureValidAsync(
+                context, command.FieldOfficerUserId, farmer.BranchId, cancellationToken);
+            if (fieldOfficer.IsFailure)
+            {
+                return fieldOfficer;
+            }
+
+            farmer.AssignFieldOfficer(command.FieldOfficerUserId);
         }
 
         Result<TaxIdentity> taxIdentity = command.TaxIdentity.ToDomain();

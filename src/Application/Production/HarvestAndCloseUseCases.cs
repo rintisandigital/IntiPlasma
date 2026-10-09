@@ -50,6 +50,7 @@ internal sealed class RecordHarvestCommandValidator : AbstractValidator<RecordHa
 internal sealed class RecordHarvestCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
+    IFieldScope fieldScope,
     IDateTimeProvider dateTimeProvider,
     IAttachmentService attachments) : ICommandHandler<RecordHarvestCommand, Guid>
 {
@@ -61,7 +62,7 @@ internal sealed class RecordHarvestCommandHandler(
             return Result.Failure<Guid>(notFuture.Error);
         }
 
-        Result<ProductionCycle> cycle = await ProductionSupport.LoadWithHarvestsAsync(context, branchAccess, command.CycleId, cancellationToken);
+        Result<ProductionCycle> cycle = await ProductionSupport.LoadWithHarvestsAsync(context, branchAccess, fieldScope, command.CycleId, cancellationToken);
         if (cycle.IsFailure)
         {
             return Result.Failure<Guid>(cycle.Error);
@@ -91,12 +92,15 @@ internal sealed class RecordHarvestCommandHandler(
     }
 }
 
-internal sealed class CloseCycleCommandHandler(IApplicationDbContext context, IBranchAccess branchAccess)
+internal sealed class CloseCycleCommandHandler(
+    IApplicationDbContext context,
+    IBranchAccess branchAccess,
+    IFieldScope fieldScope)
     : ICommandHandler<CloseCycleCommand, CyclePerformance>
 {
     public async Task<Result<CyclePerformance>> Handle(CloseCycleCommand command, CancellationToken cancellationToken)
     {
-        Result<ProductionCycle> cycle = await ProductionSupport.LoadWithHarvestsAsync(context, branchAccess, command.CycleId, cancellationToken);
+        Result<ProductionCycle> cycle = await ProductionSupport.LoadWithHarvestsAsync(context, branchAccess, fieldScope, command.CycleId, cancellationToken);
         if (cycle.IsFailure)
         {
             return Result.Failure<CyclePerformance>(cycle.Error);
@@ -161,6 +165,7 @@ internal static class ProductionSupport
     public static async Task<Result<ProductionCycle>> LoadWithHarvestsAsync(
         IApplicationDbContext context,
         IBranchAccess branchAccess,
+        IFieldScope fieldScope,
         Guid cycleId,
         CancellationToken cancellationToken)
     {
@@ -174,6 +179,10 @@ internal static class ProductionSupport
         }
 
         Result access = await branchAccess.EnsureAccessAsync(cycle.BranchId, cancellationToken);
+        if (access.IsSuccess)
+        {
+            access = await fieldScope.EnsureCycleAsync(cycle.Id, cancellationToken);
+        }
 
         return access.IsSuccess ? cycle : Result.Failure<ProductionCycle>(access.Error);
     }

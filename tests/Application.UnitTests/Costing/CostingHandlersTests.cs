@@ -35,13 +35,13 @@ public sealed class CostingHandlersTests : BaseHandlerTest
         Setup s = await SeedAsync(context);
 
         // Chick-in places 1.000 DOC @ Rp 7.500 from the coop warehouse: the cycle's cost so far is Rp 7.500.000.
-        await new StartCycleCommandHandler(context, AllBranches(), CreateAttachments(context))
+        await new StartCycleCommandHandler(context, AllBranches(), NoFieldScope(), CreateAttachments(context))
             .Handle(new StartCycleCommand(s.Cycle.Id, ChickIn, [new ChickInLine(s.Doc.Id, 1_000)]), CancellationToken.None);
 
         // Half of the birds harvested (1.000 kg); the rest still in the coop at a recorded BW of 2.000 g.
-        await new CreateDailyRecordingCommandHandler(context, AllBranches(), Clock(), CreateAttachments(context))
+        await new CreateDailyRecordingCommandHandler(context, AllBranches(), NoFieldScope(), Clock(), CreateAttachments(context))
             .Handle(new CreateDailyRecordingCommand(null, s.Cycle.Id, HarvestDate, 0, 0, 2_000m, null, []), CancellationToken.None);
-        Guid harvest = (await new RecordHarvestCommandHandler(context, AllBranches(), Clock(), CreateAttachments(context))
+        Guid harvest = (await new RecordHarvestCommandHandler(context, AllBranches(), NoFieldScope(), Clock(), CreateAttachments(context))
             .Handle(new RecordHarvestCommand(s.Cycle.Id, HarvestDate, 500, 1_000m, null), CancellationToken.None)).Value;
 
         CycleCostResponse running = (await new GetCycleCostQueryHandler(context, AllBranches())
@@ -59,11 +59,11 @@ public sealed class CostingHandlersTests : BaseHandlerTest
         invoice.CostAmount.ShouldBe(new Money(3_750_000m));
 
         // The rest is harvested lighter than recorded: 500 birds / 900 kg; final cost per kg = 7.500.000 / 1.900.
-        Guid second = (await new RecordHarvestCommandHandler(context, AllBranches(), Clock(), CreateAttachments(context))
+        Guid second = (await new RecordHarvestCommandHandler(context, AllBranches(), NoFieldScope(), Clock(), CreateAttachments(context))
             .Handle(new RecordHarvestCommand(s.Cycle.Id, HarvestDate.AddDays(1), 500, 900m, null), CancellationToken.None)).Value;
         await SellAsync(context, s, second, birds: 500);
 
-        Result<CyclePerformance> closed = await new CloseCycleCommandHandler(context, AllBranches())
+        Result<CyclePerformance> closed = await new CloseCycleCommandHandler(context, AllBranches(), NoFieldScope())
             .Handle(new CloseCycleCommand(s.Cycle.Id), CancellationToken.None);
 
         closed.IsSuccess.ShouldBeTrue();

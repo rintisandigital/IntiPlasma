@@ -1,0 +1,103 @@
+@inject PartnershipApi Partnership
+
+@* Lampiran of a record: names and sizes; a photo opens in a preview (downloaded on tap, not cached). *@
+@if (Ids.Count == 0)
+{
+    <p class="body-2 text-dark-4">Tidak ada lampiran.</p>
+}
+else if (_error is not null)
+{
+    <ErrorState Error="_error" OnRetry="LoadAsync" />
+}
+else if (_attachments is null)
+{
+    <Spinner />
+}
+else
+{
+    @foreach (Attachment attachment in _attachments)
+    {
+        <button type="button" class="attachment-item" @onclick="() => OpenAsync(attachment)" disabled="@(!attachment.IsPhoto)">
+            <i class="icon @(attachment.IsPhoto ? "icon-imageSquare" : "icon-paperclip")"></i>
+            <span class="name">@(attachment.Description ?? attachment.FileName)</span>
+            <span class="size">@Size(attachment.SizeBytes)</span>
+        </button>
+    }
+}
+
+@if (_preview is not null)
+{
+    <div class="photo-preview" role="dialog" aria-modal="true" @onclick="ClosePreview">
+        @if (_previewData is null)
+        {
+            <Spinner />
+        }
+        else
+        {
+            <img src="@_previewData" alt="@_preview.FileName" />
+        }
+        <div class="caption">@_previewMessage</div>
+    </div>
+}
+
+@code {
+    private List<Attachment>? _attachments;
+    private ApiError? _error;
+    private Attachment? _preview;
+    private string? _previewData;
+    private string? _previewMessage;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<Guid> Ids { get; set; } = [];
+
+    protected override Task OnParametersSetAsync() => Ids.Count == 0 ? Task.CompletedTask : LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        _attachments = null;
+
+        CachedResult<List<Attachment>> result = await Partnership.GetAttachmentsAsync(Ids);
+        if (result.IsSuccess)
+        {
+            _attachments = result.Value;
+        }
+        else
+        {
+            _error = result.Error;
+        }
+    }
+
+    private async Task OpenAsync(Attachment attachment)
+    {
+        _preview = attachment;
+        _previewData = null;
+        _previewMessage = "Memuat foto…";
+        StateHasChanged();
+
+        ApiResult<AttachmentContent> content = await Partnership.GetAttachmentContentAsync(attachment.Id);
+        if (_preview != attachment)
+        {
+            return;
+        }
+
+        if (content.IsSuccess)
+        {
+            _previewData = $"data:{content.Value.ContentType};base64,{Convert.ToBase64String(content.Value.Bytes)}";
+            _previewMessage = "Ketuk untuk menutup";
+        }
+        else
+        {
+            _previewMessage = content.Error!.Message;
+        }
+    }
+
+    private void ClosePreview()
+    {
+        _preview = null;
+        _previewData = null;
+    }
+
+    private static string Size(long bytes) =>
+        bytes >= 1024 * 1024 ? $"{IdFormat.Number(bytes / 1024m / 1024m, 1)} MB" : $"{IdFormat.Number(Math.Max(1, bytes / 1024))} KB";
+}

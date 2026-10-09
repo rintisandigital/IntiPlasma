@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Threading.RateLimiting;
+using Application.Abstractions.Authorization;
 using Infrastructure;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -33,6 +34,10 @@ public static class DependencyInjection
     public static IServiceCollection AddWebApp(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddOptions<AppOptions>().Bind(configuration.GetSection(AppOptions.SectionName));
+
+        // The PPL scope applies to the mobile API only; Web.App users work with Akses Menu & Akses Cabang
+        // (PLAN-MOBILE §4.5).
+        services.AddScoped<IFieldScope, UnrestrictedFieldScope>();
 
         services.AddControllersWithViews(options =>
         {

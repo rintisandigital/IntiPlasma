@@ -1,0 +1,61 @@
+@page "/peternak"
+@inject PartnershipApi Partnership
+@inject SessionService Session
+
+@* Peternak (PLAN-MOBILE §6.2): a PPL sees the farmers they are responsible for, a Manager the branch (+ PPL filter). *@
+<AppPage Title="Peternak" BackTo="@(AppFeatures.BottomBar(Session.User!).Contains(AppFeatures.Farmers) ? null : "/lainnya")">
+    <SearchBox Placeholder="Cari kode, nama, atau NIK" OnSearch="SearchAsync" />
+    <FieldOfficerFilter Value="_fieldOfficerId" ValueChanged="FilterAsync" />
+
+    <LoaderList Loader="_loader" EmptyText="Belum ada peternak." EmptyIcon="icon-user-line"
+                OnLoadMore="() => _loader.LoadMoreAsync()" OnRetry="() => _loader.ReloadAsync()">
+        <ItemTemplate Context="farmer">
+            <a class="list-card" href="/peternak/@farmer.Id">
+                <div class="d-flex justify-content-between align-items-start gap-8">
+                    <div>
+                        <div class="text-caption-2 text-Primary">@farmer.Code · @farmer.Type</div>
+                        <div class="text-button-small text-OnSurface">@farmer.Name</div>
+                    </div>
+                    @if (!farmer.IsActive)
+                    {
+                        <StatusBadge Text="Nonaktif" />
+                    }
+                </div>
+                <div class="meta">
+                    <span><i class="icon icon-buildings"></i>@IdFormat.Number(farmer.CoopCount) kandang</span>
+                    @if (farmer.FieldOfficerName is { } ppl)
+                    {
+                        <span><i class="icon icon-user-line"></i>@ppl</span>
+                    }
+                </div>
+            </a>
+        </ItemTemplate>
+    </LoaderList>
+</AppPage>
+
+@code {
+    private PagedLoader<Farmer> _loader = default!;
+    private string? _search;
+    private Guid? _fieldOfficerId;
+
+    protected override Task OnInitializedAsync()
+    {
+        _loader = new PagedLoader<Farmer>((page, ct) => Partnership.GetFarmersAsync(_search, page, _fieldOfficerId, ct));
+
+        return _loader.ReloadAsync();
+    }
+
+    private Task SearchAsync(string? search)
+    {
+        _search = search;
+
+        return _loader.ReloadAsync();
+    }
+
+    private Task FilterAsync(Guid? fieldOfficerId)
+    {
+        _fieldOfficerId = fieldOfficerId;
+
+        return _loader.ReloadAsync();
+    }
+}

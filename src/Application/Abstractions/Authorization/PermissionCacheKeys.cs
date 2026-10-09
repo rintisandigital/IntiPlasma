@@ -12,6 +12,11 @@ public static class PermissionCacheKeys
     public static string BranchesForUser(Guid userId) => $"branches:user:{userId}";
 
     /// <summary>
+    /// Whether the user is limited to the farmers and coops assigned to them (PPL scope).
+    /// </summary>
+    public static string FieldScopeForUser(Guid userId) => $"field-scope:user:{userId}";
+
+    /// <summary>
     /// Web.App menu rights of the user (from the menu access profile).
     /// </summary>
     public static string MenuAccessForUser(Guid userId) => $"menu-access:user:{userId}";
@@ -23,6 +28,7 @@ public static class PermissionCacheKeys
     [
         ForUser(userId),
         BranchesForUser(userId),
+        FieldScopeForUser(userId),
         MenuAccessForUser(userId),
         SessionForUser(userId)
     ];

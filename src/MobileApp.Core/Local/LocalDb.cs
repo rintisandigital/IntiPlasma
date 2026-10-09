@@ -128,6 +128,56 @@ public sealed class LocalDb(string databasePath) : IDisposable
     }
 
     /// <summary>
+    /// A cached API response (read-only cache, PLAN-MOBILE §3.5), or null.
+    /// </summary>
+    public async Task<CacheEntry?> GetCacheAsync(string key, CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        await using SqliteConnection connection = await OpenAsync(cancellationToken);
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT json, fetched_at FROM cache_entries WHERE key = $key;";
+        command.Parameters.AddWithValue("$key", key);
+
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        return new CacheEntry(
+            reader.GetString(0),
+            DateTime.Parse(reader.GetString(1), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind));
+    }
+
+    public async Task SetCacheAsync(string key, string json, DateTime fetchedAtUtc, CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        await using SqliteConnection connection = await OpenAsync(cancellationToken);
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO cache_entries (key, json, fetched_at) VALUES ($key, $json, $fetchedAt)
+            ON CONFLICT (key) DO UPDATE SET json = excluded.json, fetched_at = excluded.fetched_at;
+            """;
+        command.Parameters.AddWithValue("$key", key);
+        command.Parameters.AddWithValue("$json", json);
+        command.Parameters.AddWithValue("$fetchedAt", fetchedAtUtc.ToString("O", CultureInfo.InvariantCulture));
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task RemoveCacheAsync(string key, CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        await using SqliteConnection connection = await OpenAsync(cancellationToken);
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM cache_entries WHERE key = $key;";
+        command.Parameters.AddWithValue("$key", key);
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    /// <summary>
     /// Removes cached API responses only (settings page "Hapus cache").
     /// </summary>
     public async Task ClearCacheAsync(CancellationToken cancellationToken = default)
@@ -176,3 +226,7 @@ public sealed class LocalDb(string databasePath) : IDisposable
     }
 #pragma warning restore CA2100
 }
+
+/// <param name="Json">The response body as stored (camelCase JSON).</param>
+/// <param name="FetchedAtUtc">When the response was received from the server.</param>
+public sealed record CacheEntry(string Json, DateTime FetchedAtUtc);

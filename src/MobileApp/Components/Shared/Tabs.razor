@@ -1,0 +1,21 @@
+@* Tab bar of the template (company-detail.html .menu-tab-job), switched by Blazor instead of Bootstrap JS. *@
+<ul class="menu-tab-job mb-16" role="tablist">
+    @foreach (string tab in Items)
+    {
+        <li class="tab-item flex-grow-1 text-center" role="presentation">
+            <a href="" class="tab-link @(tab == Active ? "active" : null)" role="tab"
+               @onclick="() => ActiveChanged.InvokeAsync(tab)" @onclick:preventDefault>@tab</a>
+        </li>
+    }
+</ul>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<string> Items { get; set; } = [];
+
+    [Parameter]
+    public string? Active { get; set; }
+
+    [Parameter]
+    public EventCallback<string> ActiveChanged { get; set; }
+}

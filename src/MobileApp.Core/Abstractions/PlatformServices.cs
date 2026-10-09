@@ -42,3 +42,11 @@ public interface IAppSettings
     /// </summary>
     bool CanEditServerUrl { get; }
 }
+
+/// <summary>
+/// Opens a link in another app of the device (MAUI <c>Launcher</c>): phone, WhatsApp, maps.
+/// </summary>
+public interface IExternalLauncher
+{
+    Task<bool> OpenAsync(Uri uri);
+}

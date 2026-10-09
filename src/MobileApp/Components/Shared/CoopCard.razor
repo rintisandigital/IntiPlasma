@@ -1,0 +1,30 @@
+@* One coop in a list (Kandang, farmer detail). *@
+<a class="list-card" href="/kandang/@Coop.Id">
+    <div class="d-flex justify-content-between align-items-start gap-8">
+        <div>
+            <div class="text-caption-2 text-Primary">@Coop.Code · @Coop.FarmerName</div>
+            <div class="text-button-small text-OnSurface">@Coop.Name</div>
+        </div>
+        @if (Coop.OpenCycleId is not null)
+        {
+            <StatusBadge Text="Siklus berjalan" Tone="Labels.Tone.Success" />
+        }
+        else if (!Coop.IsActive)
+        {
+            <StatusBadge Text="Nonaktif" />
+        }
+    </div>
+    <div class="meta">
+        <span><i class="icon icon-human"></i>@IdFormat.Number(Coop.Capacity) ekor</span>
+        <span>@Labels.HouseType(Coop.HouseType)</span>
+        @if (Coop.FieldOfficerName is { } ppl)
+        {
+            <span><i class="icon icon-user-line"></i>@ppl</span>
+        }
+    </div>
+</a>
+
+@code {
+    [Parameter, EditorRequired]
+    public Coop Coop { get; set; } = default!;
+}

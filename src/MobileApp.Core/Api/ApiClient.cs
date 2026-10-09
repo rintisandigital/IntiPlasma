@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using MobileApp.Core.Abstractions;
+using MobileApp.Core.Contracts;
 
 namespace MobileApp.Core.Api;
 
@@ -25,6 +26,33 @@ public sealed class ApiClient(HttpClient httpClient, IAppSettings settings)
         using var request = new HttpRequestMessage(HttpMethod.Get, BuildUri(settings.ServerUrl, path));
 
         return await SendAsync<T>(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// A binary response (attachment file) with its content type.
+    /// </summary>
+    public async Task<ApiResult<AttachmentContent>> GetBytesAsync(string path, CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, BuildUri(settings.ServerUrl, path));
+
+        (HttpResponseMessage? response, ApiError? networkError) = await TrySendAsync(request, cancellationToken);
+        if (response is null)
+        {
+            return ApiResult<AttachmentContent>.Failure(networkError!);
+        }
+
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+            {
+                return ApiResult<AttachmentContent>.Failure(await ReadErrorAsync(response, cancellationToken));
+            }
+
+            byte[] bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+            string contentType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+
+            return ApiResult<AttachmentContent>.Success(new AttachmentContent(contentType, bytes));
+        }
     }
 
     public async Task<ApiResult<T>> PostAsync<T>(string path, object? body, CancellationToken cancellationToken = default)

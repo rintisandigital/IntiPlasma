@@ -1,0 +1,19 @@
+@* Small status pill (template ui-badge). *@
+<span class="status-badge @ToneClass">@Text</span>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Text { get; set; } = string.Empty;
+
+    [Parameter]
+    public Labels.Tone Tone { get; set; } = Labels.Tone.Neutral;
+
+    private string ToneClass => Tone switch
+    {
+        Labels.Tone.Info => "info",
+        Labels.Tone.Success => "success",
+        Labels.Tone.Warning => "warning",
+        Labels.Tone.Danger => "danger",
+        _ => "neutral"
+    };
+}

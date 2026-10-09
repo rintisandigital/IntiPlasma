@@ -56,6 +56,7 @@ internal sealed class SetDocumentsCommandValidator : AbstractValidator<SetDocume
 internal sealed class SetDocumentsCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
+    IFieldScope fieldScope,
     IAttachmentService attachments) : ICommandHandler<SetDocumentsCommand>
 {
     public async Task<Result> Handle(SetDocumentsCommand command, CancellationToken cancellationToken)
@@ -64,6 +65,11 @@ internal sealed class SetDocumentsCommandHandler(
         if (target.IsFailure)
         {
             return target;
+        }
+
+        if (!await AttachmentOwnerScope.CanAccessAsync(context, fieldScope, command.OwnerType, command.OwnerId, cancellationToken))
+        {
+            return Result.Failure(OutOfFieldScope(command));
         }
 
         if (target.Value.BranchId is { } branchId)
@@ -235,6 +241,18 @@ internal sealed class SetDocumentsCommandHandler(
             ids => recording.SetRevisionDocuments(revisionNumber, ids),
             () => recording.Revisions.Single(r => r.RevisionNumber == revisionNumber).Documents);
     }
+
+    /// <summary>
+    /// Owners outside the PPL scope are reported as not found (only owners of <see cref="AttachmentOwnerScope"/>).
+    /// </summary>
+    private static Error OutOfFieldScope(SetDocumentsCommand command) => command.OwnerType switch
+    {
+        AttachmentOwnerTypes.Farmer => FarmerErrors.NotFound(command.OwnerId),
+        AttachmentOwnerTypes.Coop => CoopErrors.NotFound(command.OwnerId),
+        AttachmentOwnerTypes.Cycle => CycleErrors.NotFound(command.OwnerId),
+        AttachmentOwnerTypes.Harvest => CycleErrors.HarvestNotFound(command.OwnerId),
+        _ => DailyRecordingErrors.NotFound(command.OwnerId)
+    };
 
     private static Result<DocumentTarget> Of(IHasDocuments? entity, AttachmentOwner owner, Guid? branchId, Error notFound) =>
         entity is null

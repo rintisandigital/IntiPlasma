@@ -13,9 +13,12 @@ internal static class FarmerQueries
                f.bank_account_account_holder_name AS AccountHolderName,
                (SELECT COUNT(*) FROM master.coops c WHERE c.farmer_id = f.id)::int AS CoopCount,
                f.is_active AS IsActive,
-               f.documents AS Documents
+               f.documents AS Documents,
+               f.field_officer_user_id AS FieldOfficerUserId,
+               NULLIF(TRIM(CONCAT(fo.first_name, ' ', fo.last_name)), '') AS FieldOfficerName
         FROM master.farmers f
         JOIN master.branches b ON b.id = f.branch_id
+        LEFT JOIN identity.users fo ON fo.id = f.field_officer_user_id
         """;
 
     internal sealed class Row
@@ -38,6 +41,8 @@ internal static class FarmerQueries
         public int CoopCount { get; set; }
         public bool IsActive { get; set; }
         public Guid[] Documents { get; set; } = [];
+        public Guid? FieldOfficerUserId { get; set; }
+        public string? FieldOfficerName { get; set; }
 
         public FarmerResponse ToResponse() => new()
         {
@@ -54,7 +59,9 @@ internal static class FarmerQueries
             BankAccount = new BankAccountResponse(BankName, AccountNumber, AccountHolderName),
             CoopCount = CoopCount,
             IsActive = IsActive,
-            Documents = Documents
+            Documents = Documents,
+            FieldOfficerUserId = FieldOfficerUserId,
+            FieldOfficerName = FieldOfficerName
         };
     }
 }

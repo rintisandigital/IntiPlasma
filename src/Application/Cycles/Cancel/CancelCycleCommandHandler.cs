@@ -6,12 +6,15 @@ using SharedKernel;
 
 namespace Application.Cycles.Cancel;
 
-internal sealed class CancelCycleCommandHandler(IApplicationDbContext context, IBranchAccess branchAccess)
+internal sealed class CancelCycleCommandHandler(
+    IApplicationDbContext context,
+    IBranchAccess branchAccess,
+    IFieldScope fieldScope)
     : ICommandHandler<CancelCycleCommand>
 {
     public async Task<Result> Handle(CancelCycleCommand command, CancellationToken cancellationToken)
     {
-        Result<ProductionCycle> cycle = await CycleLoader.LoadAsync(context, branchAccess, command.CycleId, cancellationToken);
+        Result<ProductionCycle> cycle = await CycleLoader.LoadAsync(context, branchAccess, fieldScope, command.CycleId, cancellationToken);
         if (cycle.IsFailure)
         {
             return cycle;

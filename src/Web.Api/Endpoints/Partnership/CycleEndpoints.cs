@@ -32,10 +32,11 @@ internal sealed class CycleEndpoints : IEndpoint
             Guid? farmerId,
             Guid? coopId,
             CycleStatus? status,
+            Guid? fieldOfficerId,
             IQueryHandler<GetCyclesQuery, PagedList<CycleResponse>> handler,
             CancellationToken cancellationToken) =>
         {
-            var query = new GetCyclesQuery(new PageRequest(page, pageSize, search), branchId, farmerId, coopId, status);
+            var query = new GetCyclesQuery(new PageRequest(page, pageSize, search), branchId, farmerId, coopId, status, fieldOfficerId);
 
             Result<PagedList<CycleResponse>> result = await handler.Handle(query, cancellationToken);
 

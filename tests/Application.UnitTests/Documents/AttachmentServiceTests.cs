@@ -185,7 +185,7 @@ public sealed class AttachmentServiceTests : BaseHandlerTest
 
         IBranchAccess allBranches = Substitute.For<IBranchAccess>();
         allBranches.GetScopeAsync(Arg.Any<CancellationToken>()).Returns(BranchScope.All);
-        var handler = new SetDocumentsCommandHandler(context, allBranches, service);
+        var handler = new SetDocumentsCommandHandler(context, allBranches, NoFieldScope(), service);
 
         (await handler.Handle(new SetDocumentsCommand(AttachmentOwnerTypes.SalesOrder, order.Id, [contract]), CancellationToken.None))
             .IsSuccess.ShouldBeTrue();

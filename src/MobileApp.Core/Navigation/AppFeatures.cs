@@ -5,7 +5,7 @@ namespace MobileApp.Core.Navigation;
 
 /// <summary>
 /// A menu entry of the app. <see cref="Phase"/> names the PLAN-MOBILE phase that builds the screen; until then the
-/// route shows a "coming soon" page.
+/// route is <c>/fitur/{key}</c>, a "coming soon" page.
 /// </summary>
 public sealed record AppFeature(
     string Key,
@@ -28,7 +28,7 @@ public static class AppFeatures
     public static readonly AppFeature Home = new("beranda", "Beranda", "icon-house-fill", "/", null, _ => true);
 
     public static readonly AppFeature Coops = new(
-        "kandang", "Kandang", "icon-buildings", "/fitur/kandang", "M1", u => u.Has(AppPermissions.FarmersRead));
+        "kandang", "Kandang", "icon-buildings", "/kandang", "M1", u => u.Has(AppPermissions.FarmersRead));
 
     public static readonly AppFeature DailyInput = new(
         "input", "Input", "icon-edit", "/fitur/input", "M2",
@@ -49,10 +49,10 @@ public static class AppFeatures
     public static readonly AppFeature More = new("lainnya", "Lainnya", "icon-listBullets", "/lainnya", null, _ => true);
 
     public static readonly AppFeature Farmers = new(
-        "peternak", "Peternak", "icon-user-line", "/fitur/peternak", "M1", u => u.Has(AppPermissions.FarmersRead));
+        "peternak", "Peternak", "icon-user-line", "/peternak", "M1", u => u.Has(AppPermissions.FarmersRead));
 
     public static readonly AppFeature Contracts = new(
-        "kontrak", "Kontrak", "icon-bookTxt", "/fitur/kontrak", "M1", u => u.Has(AppPermissions.ContractsRead));
+        "kontrak", "Kontrak", "icon-bookTxt", "/kontrak", "M1", u => u.Has(AppPermissions.ContractsRead));
 
     public static readonly AppFeature Performance = new(
         "grafik", "Grafik Produksi", "icon-chart", "/fitur/grafik", "M4", u => u.Has(AppPermissions.ProductionRead));

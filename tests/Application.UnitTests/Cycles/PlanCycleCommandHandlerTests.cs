@@ -26,7 +26,7 @@ public sealed class PlanCycleCommandHandlerTests : BaseHandlerTest
         IDocumentNumberGenerator numbers = Substitute.For<IDocumentNumberGenerator>();
         numbers.NextAsync("SKL", "BDG", ChickInDate, Arg.Any<CancellationToken>()).Returns("SKL/BDG/2026/X/0001");
 
-        var handler = new PlanCycleCommandHandler(context, AllBranches(), numbers);
+        var handler = new PlanCycleCommandHandler(context, AllBranches(), NoFieldScope(), numbers);
 
         // Act
         Result<PlanCycleResponse> result = await handler.Handle(
@@ -49,7 +49,7 @@ public sealed class PlanCycleCommandHandlerTests : BaseHandlerTest
         IDocumentNumberGenerator numbers = Substitute.For<IDocumentNumberGenerator>();
         numbers.NextAsync(default!, default!, default, default).ReturnsForAnyArgs("SKL/BDG/2026/X/0001", "SKL/BDG/2026/X/0002");
 
-        var handler = new PlanCycleCommandHandler(context, AllBranches(), numbers);
+        var handler = new PlanCycleCommandHandler(context, AllBranches(), NoFieldScope(), numbers);
         await handler.Handle(new PlanCycleCommand(coop.Id, null, ChickInDate, 9_000, null), CancellationToken.None);
 
         // Act
@@ -71,7 +71,7 @@ public sealed class PlanCycleCommandHandlerTests : BaseHandlerTest
         otherBranchOnly.GetScopeAsync(Arg.Any<CancellationToken>()).Returns(new BranchScope(false, [Guid.NewGuid()]));
 
         IDocumentNumberGenerator numbers = Substitute.For<IDocumentNumberGenerator>();
-        var handler = new PlanCycleCommandHandler(context, otherBranchOnly, numbers);
+        var handler = new PlanCycleCommandHandler(context, otherBranchOnly, NoFieldScope(), numbers);
 
         // Act
         Result<PlanCycleResponse> result = await handler.Handle(
@@ -89,7 +89,7 @@ public sealed class PlanCycleCommandHandlerTests : BaseHandlerTest
         await using TestDbContext context = CreateDbContext();
         Coop coop = await SeedIntiCoopAsync(context);
         IDocumentNumberGenerator numbers = Substitute.For<IDocumentNumberGenerator>();
-        var handler = new PlanCycleCommandHandler(context, AllBranches(), numbers);
+        var handler = new PlanCycleCommandHandler(context, AllBranches(), NoFieldScope(), numbers);
 
         // Act: population above the coop capacity of 10,000.
         Result<PlanCycleResponse> result = await handler.Handle(

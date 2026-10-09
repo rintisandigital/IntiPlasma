@@ -44,12 +44,21 @@ public sealed class Farmer : AggregateRoot, IHasDocuments
     public bool IsActive { get; private set; }
 
     /// <summary>
+    /// PPL (petugas penyuluh lapangan) responsible for this farmer. Users limited to their assigned data
+    /// (<c>partnership:assigned-only</c>) only see farmers (directly or through one of their coops) assigned to them.
+    /// </summary>
+    public Guid? FieldOfficerUserId { get; private set; }
+
+    /// <summary>
     /// Lampiran: ids of the attached photos and documents.
     /// </summary>
     public Guid[] Documents { get; private set; } = [];
 
     public Result SetDocuments(IEnumerable<Guid>? documents) =>
         DocumentList.Apply(documents, value => Documents = value);
+
+    public void AssignFieldOfficer(Guid? userId) =>
+        FieldOfficerUserId = userId == Guid.Empty ? null : userId;
 
     public static Result<Farmer> Create(
         string code,

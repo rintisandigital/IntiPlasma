@@ -14,6 +14,8 @@ using Application.Customers.Get;
 using Application.Farmers;
 using Application.Finance.Accounts;
 using Application.Farmers.Get;
+using Application.Farmers.GetById;
+using Application.Users.FieldOfficers;
 using Application.Items;
 using Application.Inventory;
 using Application.Items.Get;
@@ -73,6 +75,43 @@ public sealed class LookupController : AppController
         return Json(result.IsFailure
             ? []
             : result.Value.Items.Where(f => f.IsActive).Select(f => new LookupItem(f.Id, $"{f.Code} — {f.Name} ({f.Type}, {f.BranchCode})")));
+    }
+
+    /// <summary>
+    /// Field officers (PPL) a farmer or farm can be assigned to: of the branch, or of the farmer's branch (new farm).
+    /// Nothing until the branch is known.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> FieldOfficers(
+        string? q,
+        Guid? branchId,
+        Guid? farmerId,
+        [FromServices] IQueryHandler<GetFieldOfficersQuery, IReadOnlyList<FieldOfficerResponse>> query,
+        [FromServices] IQueryHandler<GetFarmerByIdQuery, FarmerResponse> farmerQuery,
+        CancellationToken cancellationToken)
+    {
+        if (branchId is null && farmerId is { } id)
+        {
+            Result<FarmerResponse> farmer = await farmerQuery.Handle(new GetFarmerByIdQuery(id), cancellationToken);
+            branchId = farmer.IsSuccess ? farmer.Value.BranchId : null;
+        }
+
+        if (branchId is null)
+        {
+            return Json(Array.Empty<LookupItem>());
+        }
+
+        Result<IReadOnlyList<FieldOfficerResponse>> result =
+            await query.Handle(new GetFieldOfficersQuery(branchId), cancellationToken);
+
+        return Json(result.IsFailure
+            ? []
+            : result.Value
+                .Where(o => string.IsNullOrWhiteSpace(q) ||
+                            o.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                            o.Email.Contains(q, StringComparison.OrdinalIgnoreCase))
+                .Take(MaxResults)
+                .Select(o => new LookupItem(o.Id, $"{o.Name} ({o.Email})")));
     }
 
     /// <summary>

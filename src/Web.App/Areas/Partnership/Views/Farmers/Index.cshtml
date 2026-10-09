@@ -9,15 +9,20 @@
 <div class="card">
     <div class="card-header">
         <form method="get" class="row g-2 align-items-end">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <input type="search" name="search" value="@Model.Search" class="form-control" placeholder="Search code, name or NIK">
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <select name="branch" class="form-select" asp-items="Model.BranchOptions" aria-label="Branch"></select>
             </div>
             <div class="col-md-2">
                 <select name="type" class="form-select" asp-items='Model.FilterOptions["type"]'>
                     <option value="">All types</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="fieldOfficerId" class="form-select" asp-items='Model.FilterOptions["fieldOfficerId"]' aria-label="PPL">
+                    <option value="">All PPL</option>
                 </select>
             </div>
             <div class="col-md-3 d-flex gap-2">
@@ -30,7 +35,7 @@
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead class="thead-light">
-                    <tr><th>Code</th><th>Name</th><th>Type</th><th>Branch</th><th>Phone</th><th class="text-end">Farms</th><th>Status</th><th></th></tr>
+                    <tr><th>Code</th><th>Name</th><th>Type</th><th>Branch</th><th>Phone</th><th class="text-end">Farms</th><th>PPL</th><th>Status</th><th></th></tr>
                 </thead>
                 <tbody>
                     @foreach (Application.Farmers.FarmerResponse farmer in Model.Rows.Items)
@@ -44,6 +49,7 @@
                             <td class="text-end">
                                 <a asp-controller="Coops" asp-action="Index" asp-route-farmerId="@farmer.Id" asp-route-branch="all">@Fmt.Number(farmer.CoopCount)</a>
                             </td>
+                            <td>@(farmer.FieldOfficerName ?? "—")</td>
                             <td><partial name="Partials/_StatusBadge" model='farmer.IsActive ? "Active" : "Inactive"' /></td>
                             <td class="text-end text-nowrap">
                                 @if (canExport)
@@ -56,7 +62,7 @@
                     }
                     @if (Model.Rows.Items.Count == 0)
                     {
-                        <tr><td colspan="8" class="text-center text-muted py-4">No farmers found.</td></tr>
+                        <tr><td colspan="9" class="text-center text-muted py-4">No farmers found.</td></tr>
                     }
                 </tbody>
             </table>

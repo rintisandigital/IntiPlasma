@@ -1,5 +1,7 @@
+using Application.Abstractions.Messaging;
 using Application.Abstractions.Paging;
 using Application.Documents;
+using Application.Users.FieldOfficers;
 using Application.Users.GetCurrent;
 using Domain.Access;
 using Microsoft.AspNetCore.Mvc;
@@ -18,6 +20,7 @@ public sealed class PageSupport(
     IMenuRights menuRights,
     IBranchContext branchContext,
     IAttachmentService attachments,
+    IQueryHandler<GetFieldOfficersQuery, IReadOnlyList<FieldOfficerResponse>> fieldOfficers,
     ExportService exports)
 {
     /// <summary>
@@ -55,6 +58,36 @@ public sealed class PageSupport(
         selected ??= (await branchContext.GetActiveBranchAsync())?.Id;
 
         return [.. ToOptions(user?.Branches ?? [], selected)];
+    }
+
+    /// <summary>
+    /// PPL filter of a list (PLAN-MOBILE M1): the field officers of the branch, or of every branch I may see.
+    /// </summary>
+    public async Task<IReadOnlyList<SelectListItem>> FieldOfficerOptionsAsync(
+        Guid? branchId,
+        Guid? selected,
+        CancellationToken cancellationToken)
+    {
+        Result<IReadOnlyList<FieldOfficerResponse>> result =
+            await fieldOfficers.Handle(new GetFieldOfficersQuery(branchId), cancellationToken);
+
+        return result.IsFailure
+            ? []
+            : [.. result.Value.Select(o => new SelectListItem(o.Name, o.Id.ToString(), o.Id == selected))];
+    }
+
+    /// <summary>
+    /// Label of the chosen PPL when a form is shown again after a failed save.
+    /// </summary>
+    public async Task<string?> FieldOfficerLabelAsync(Guid? branchId, Guid? fieldOfficerUserId, CancellationToken cancellationToken)
+    {
+        if (branchId is null || fieldOfficerUserId is null)
+        {
+            return null;
+        }
+
+        return (await FieldOfficerOptionsAsync(branchId, null, cancellationToken))
+            .FirstOrDefault(o => o.Value == fieldOfficerUserId.ToString())?.Text;
     }
 
     public async Task<IReadOnlyList<AttachmentResponse>> AttachmentsAsync(

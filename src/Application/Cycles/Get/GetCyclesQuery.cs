@@ -5,9 +5,11 @@ using SharedKernel;
 
 namespace Application.Cycles.Get;
 
+/// <param name="FieldOfficerId">Cycles in the coops of this PPL.</param>
 public sealed record GetCyclesQuery(
     PageRequest Paging,
     Guid? BranchId,
     Guid? FarmerId,
     Guid? CoopId,
-    CycleStatus? Status) : IQuery<PagedList<CycleResponse>>;
+    CycleStatus? Status,
+    Guid? FieldOfficerId = null) : IQuery<PagedList<CycleResponse>>;

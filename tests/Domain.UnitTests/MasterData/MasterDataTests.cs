@@ -40,6 +40,26 @@ public sealed class MasterDataTests
     }
 
     [Fact]
+    public void FieldOfficer_Should_BeAssignedAndCleared()
+    {
+        Farmer farmer = TestData.PlasmaFarmer();
+        Coop coop = TestData.Coop(farmer);
+        var ppl = Guid.NewGuid();
+
+        farmer.AssignFieldOfficer(ppl);
+        coop.AssignFieldOfficer(ppl);
+
+        farmer.FieldOfficerUserId.ShouldBe(ppl);
+        coop.FieldOfficerUserId.ShouldBe(ppl);
+
+        farmer.AssignFieldOfficer(Guid.Empty);
+        coop.AssignFieldOfficer(null);
+
+        farmer.FieldOfficerUserId.ShouldBeNull();
+        coop.FieldOfficerUserId.ShouldBeNull();
+    }
+
+    [Fact]
     public void Coop_Should_NotBeCreated_ForInactiveFarmer()
     {
         Farmer farmer = TestData.PlasmaFarmer();

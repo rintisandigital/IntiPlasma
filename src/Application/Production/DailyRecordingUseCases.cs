@@ -188,6 +188,7 @@ internal static class DailyRecordingSupport
 internal sealed class CreateDailyRecordingCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
+    IFieldScope fieldScope,
     IDateTimeProvider dateTimeProvider,
     IAttachmentService attachments) : ICommandHandler<CreateDailyRecordingCommand, Guid>
 {
@@ -208,7 +209,7 @@ internal sealed class CreateDailyRecordingCommandHandler(
             }
         }
 
-        Result<ProductionCycle> cycle = await CycleLoader.LoadAsync(context, branchAccess, command.CycleId, cancellationToken);
+        Result<ProductionCycle> cycle = await CycleLoader.LoadAsync(context, branchAccess, fieldScope, command.CycleId, cancellationToken);
         if (cycle.IsFailure)
         {
             return Result.Failure<Guid>(cycle.Error);
@@ -281,6 +282,7 @@ internal sealed class CreateDailyRecordingCommandHandler(
 internal sealed class ReviseDailyRecordingCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
+    IFieldScope fieldScope,
     IUserContext userContext,
     IDateTimeProvider dateTimeProvider,
     IAttachmentService attachments) : ICommandHandler<ReviseDailyRecordingCommand>
@@ -297,7 +299,7 @@ internal sealed class ReviseDailyRecordingCommandHandler(
             return Result.Failure(DailyRecordingErrors.NotFound(command.DailyRecordingId));
         }
 
-        Result<ProductionCycle> cycle = await CycleLoader.LoadAsync(context, branchAccess, recording.CycleId, cancellationToken);
+        Result<ProductionCycle> cycle = await CycleLoader.LoadAsync(context, branchAccess, fieldScope, recording.CycleId, cancellationToken);
         if (cycle.IsFailure)
         {
             return cycle;

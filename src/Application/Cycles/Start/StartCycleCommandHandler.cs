@@ -15,12 +15,13 @@ namespace Application.Cycles.Start;
 internal sealed class StartCycleCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
+    IFieldScope fieldScope,
     IAttachmentService attachments)
     : ICommandHandler<StartCycleCommand, int>
 {
     public async Task<Result<int>> Handle(StartCycleCommand command, CancellationToken cancellationToken)
     {
-        Result<ProductionCycle> cycle = await CycleLoader.LoadAsync(context, branchAccess, command.CycleId, cancellationToken);
+        Result<ProductionCycle> cycle = await CycleLoader.LoadAsync(context, branchAccess, fieldScope, command.CycleId, cancellationToken);
         if (cycle.IsFailure)
         {
             return Result.Failure<int>(cycle.Error);

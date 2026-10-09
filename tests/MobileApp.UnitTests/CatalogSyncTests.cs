@@ -66,9 +66,41 @@ public sealed class CatalogSyncTests
             .Where(f => typeof(Error).IsAssignableFrom(f.FieldType))
             .Select(f => f.GetValue(null) as Error);
 
-        HashSet<string> codes = [.. fields.OfType<Error>().Select(e => e.Code)];
+        // Factories such as FarmerErrors.NotFound(Guid): the code does not depend on the arguments.
+        IEnumerable<Error?> factories = assemblies
+            .SelectMany(a => a.GetTypes())
+            .Where(t => t.IsAbstract && t.IsSealed && t.Name.EndsWith("Errors", StringComparison.Ordinal))
+            .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Static))
+            .Where(m => typeof(Error).IsAssignableFrom(m.ReturnType) && !m.IsGenericMethod)
+            .Select(Invoke);
+
+        HashSet<string> codes = [.. fields.Concat(factories).OfType<Error>().Select(e => e.Code)];
         codes.Add(new ValidationError([]).Code);
 
         return codes;
+    }
+
+    private static Error? Invoke(MethodInfo method)
+    {
+        object?[] arguments = [.. method.GetParameters().Select(p => SampleValue(p.ParameterType))];
+
+        try
+        {
+            return method.Invoke(null, arguments) as Error;
+        }
+        catch (TargetInvocationException)
+        {
+            return null;
+        }
+    }
+
+    private static object? SampleValue(Type type)
+    {
+        if (type == typeof(string))
+        {
+            return "x";
+        }
+
+        return type.IsValueType ? Activator.CreateInstance(type) : null;
     }
 }

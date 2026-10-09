@@ -37,11 +37,12 @@ public static class MauiProgram
         services.AddSingleton<ISecureStore, MauiSecureStore>();
         services.AddSingleton<Core.Abstractions.IConnectivity, MauiConnectivity>();
         services.AddSingleton<IAppSettings, MauiAppSettings>();
+        services.AddSingleton<IExternalLauncher, MauiExternalLauncher>();
 
         services.AddSingleton(_ => new LocalDb(Path.Combine(FileSystem.AppDataDirectory, "intiplasma.db3")));
         services.AddSingleton<TokenStore>();
         services.AddSingleton(sp => new TokenRefresher(
-            new HttpClient { Timeout = RequestTimeout },
+            new HttpClient(new NetworkErrorHandler { InnerHandler = new HttpClientHandler() }) { Timeout = RequestTimeout },
             sp.GetRequiredService<IAppSettings>(),
             sp.GetRequiredService<TokenStore>()));
 
@@ -49,13 +50,15 @@ public static class MauiProgram
         {
             var authHandler = new AuthHandler(sp.GetRequiredService<TokenStore>(), sp.GetRequiredService<TokenRefresher>())
             {
-                InnerHandler = new HttpClientHandler()
+                InnerHandler = new NetworkErrorHandler { InnerHandler = new HttpClientHandler() }
             };
 
             return new ApiClient(new HttpClient(authHandler) { Timeout = RequestTimeout }, sp.GetRequiredService<IAppSettings>());
         });
 
         services.AddSingleton<UsersApi>();
+        services.AddSingleton<ApiCache>();
+        services.AddSingleton<PartnershipApi>();
         services.AddSingleton<SessionService>();
     }
 }

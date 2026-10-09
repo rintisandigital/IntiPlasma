@@ -252,3 +252,142 @@ h1:focus, h2:focus, h4:focus {
 .header-icon-btn:focus {
   color: var(--On-Surface);
 }
+
+/* Lists & details (M1) */
+.list-card {
+  display: block;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background-color: var(--White);
+  color: var(--On-Surface);
+}
+
+.list-card.highlight {
+  border-color: var(--Primary);
+  background-color: var(--Primary-soft);
+}
+
+.list-card .meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--Secondary);
+}
+
+.list-card .meta .icon {
+  margin-right: 4px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  background-color: #EEF0F3;
+  color: #64666C;
+}
+
+.status-badge.info { background-color: var(--Primary-soft); color: var(--Primary-dark); }
+.status-badge.success { background-color: #E7F7EE; color: #1E874B; }
+.status-badge.warning { background-color: #FFF4E0; color: #A3620A; }
+.status-badge.danger { background-color: #FDECEC; color: #C62828; }
+
+.cache-note {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  background-color: #FFF4E0;
+  color: #A3620A;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 32px 16px;
+}
+
+.empty-state .icon {
+  font-size: 40px;
+  color: var(--Primary);
+}
+
+.filter-select {
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+.detail-head h4 {
+  margin: 0;
+}
+
+.menu-tab-job .tab-link {
+  cursor: pointer;
+}
+
+/* The template styles every <button>; attachment rows are plain list rows. */
+.attachment-item,
+.attachment-item:hover,
+.attachment-item:focus {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--On-Surface);
+  font-size: 14px;
+  text-align: left;
+}
+
+.attachment-item[disabled] {
+  opacity: 1;
+}
+
+.attachment-item .icon {
+  font-size: 20px;
+  color: var(--Primary);
+}
+
+.attachment-item .name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-item .size {
+  font-size: 12px;
+  color: var(--Secondary);
+}
+
+.photo-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(0, 0, 0, .9);
+}
+
+.photo-preview img {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+}
+
+.photo-preview .caption {
+  color: var(--White);
+  font-size: 12px;
+}

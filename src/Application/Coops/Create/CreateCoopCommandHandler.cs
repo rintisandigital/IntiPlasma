@@ -2,6 +2,7 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Documents;
+using Application.Users.FieldOfficers;
 using Domain.Documents.Attachments;
 using Domain.MasterData.Coops;
 using Domain.MasterData.Farmers;
@@ -13,6 +14,7 @@ namespace Application.Coops.Create;
 internal sealed class CreateCoopCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
+    IFieldScope fieldScope,
     IAttachmentService attachments)
     : ICommandHandler<CreateCoopCommand, Guid>
 {
@@ -21,7 +23,7 @@ internal sealed class CreateCoopCommandHandler(
         Farmer? farmer = await context.Farmers.AsNoTracking()
             .SingleOrDefaultAsync(f => f.Id == command.FarmerId, cancellationToken);
 
-        if (farmer is null)
+        if (farmer is null || !await fieldScope.CanAccessFarmerAsync(farmer.Id, cancellationToken))
         {
             return Result.Failure<Guid>(FarmerErrors.NotFound(command.FarmerId));
         }
@@ -30,6 +32,16 @@ internal sealed class CreateCoopCommandHandler(
         if (access.IsFailure)
         {
             return Result.Failure<Guid>(access.Error);
+        }
+
+        FieldScope field = await fieldScope.GetScopeAsync(cancellationToken);
+        Guid? fieldOfficerUserId = field.AssignFieldOfficer(command.FieldOfficerUserId);
+
+        Result fieldOfficer = await FieldOfficerRules.EnsureValidAsync(
+            context, fieldOfficerUserId, farmer.BranchId, cancellationToken);
+        if (fieldOfficer.IsFailure)
+        {
+            return Result.Failure<Guid>(fieldOfficer.Error);
         }
 
         Result<Coop> coop = Coop.Create(
@@ -48,6 +60,7 @@ internal sealed class CreateCoopCommandHandler(
         }
 
         coop.Value.SetProfile(command.Profile);
+        coop.Value.AssignFieldOfficer(fieldOfficerUserId);
 
         if (await context.Coops.AnyAsync(c => c.Code == coop.Value.Code, cancellationToken))
         {

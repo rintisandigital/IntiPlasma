@@ -1,0 +1,147 @@
+@model FieldOfficerAssignmentViewModel
+@using Application.Users.FieldOfficers
+@{
+    ViewData["Title"] = "Field Officer Assignment";
+    ViewData["Menu"] = MenuCodes.PartnershipFieldOfficers;
+    string? fromName = Model.From == FieldOfficerAssignmentViewModel.Unassigned
+        ? "Unassigned"
+        : Model.FieldOfficers.FirstOrDefault(o => o.Value == Model.From)?.Text;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel("Field Officer Assignment", "Move farmers and farms from one PPL to another; the mobile app shows a PPL only their assigned data")' />
+
+<div class="card">
+    <div class="card-header">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label for="branchId" class="form-label">Branch</label>
+                <select id="branchId" name="branchId" class="form-select" asp-items="Model.Branches" data-submit-on-change></select>
+            </div>
+            <div class="col-md-4">
+                <label for="from" class="form-label">From field officer (PPL)</label>
+                <select id="from" name="from" class="form-select">
+                    <option value="">Choose…</option>
+                    <option value="@FieldOfficerAssignmentViewModel.Unassigned" selected="@(Model.From == FieldOfficerAssignmentViewModel.Unassigned)">(Unassigned)</option>
+                    @foreach (SelectListItem officer in Model.FieldOfficers)
+                    {
+                        <option value="@officer.Value" selected="@(officer.Value == Model.From)">@officer.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="ti ti-filter me-1"></i>Show</button>
+            </div>
+        </form>
+        @if (Model.FieldOfficers.Count == 0)
+        {
+            <div class="alert alert-warning mt-3 mb-0">
+                No field officers in this branch. A PPL is an active user with an API role that has
+                <code>partnership:assigned-only</code> (e.g. role <strong>PPL</strong>) and branch access to this branch.
+            </div>
+        }
+    </div>
+</div>
+
+@if (Model.Assignments is not null)
+{
+    <form asp-action="Move" method="post">
+        <input type="hidden" name="branchId" value="@Model.BranchId">
+        <input type="hidden" name="from" value="@Model.From">
+        <fieldset disabled="@(!Model.CanMove)">
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-header d-flex align-items-center justify-content-between">
+                            <h5 class="card-title mb-0">Farmers — @fromName</h5>
+                            <span class="text-muted fs-13">@Fmt.Number(Model.Assignments.Farmers.Count) assigned directly</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="thead-light">
+                                        <tr>
+                                            <th style="width: 2.5rem"><input type="checkbox" class="form-check-input" data-check-all="farmerIds" aria-label="Select all farmers"></th>
+                                            <th>Code</th><th>Name</th><th>Type</th><th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (AssignedFarmer farmer in Model.Assignments.Farmers)
+                                        {
+                                            <tr>
+                                                <td><input type="checkbox" class="form-check-input" name="farmerIds" value="@farmer.Id" aria-label="Select @farmer.Code"></td>
+                                                <td class="fw-semibold">@farmer.Code</td>
+                                                <td>@farmer.Name</td>
+                                                <td>@farmer.Type</td>
+                                                <td><partial name="Partials/_StatusBadge" model='farmer.IsActive ? "Active" : "Inactive"' /></td>
+                                            </tr>
+                                        }
+                                        @if (Model.Assignments.Farmers.Count == 0)
+                                        {
+                                            <tr><td colspan="5" class="text-center text-muted py-4">No farmers.</td></tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-header d-flex align-items-center justify-content-between">
+                            <h5 class="card-title mb-0">Farms — @fromName</h5>
+                            <span class="text-muted fs-13">@Fmt.Number(Model.Assignments.Coops.Count) farm(s)</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="thead-light">
+                                        <tr>
+                                            <th style="width: 2.5rem"><input type="checkbox" class="form-check-input" data-check-all="coopIds" aria-label="Select all farms"></th>
+                                            <th>Code</th><th>Name</th><th>Farmer</th><th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (AssignedCoop coop in Model.Assignments.Coops)
+                                        {
+                                            <tr>
+                                                <td><input type="checkbox" class="form-check-input" name="coopIds" value="@coop.Id" aria-label="Select @coop.Code"></td>
+                                                <td class="fw-semibold">@coop.Code</td>
+                                                <td>@coop.Name</td>
+                                                <td>@coop.FarmerCode — @coop.FarmerName</td>
+                                                <td><partial name="Partials/_StatusBadge" model='coop.IsActive ? "Active" : "Inactive"' /></td>
+                                            </tr>
+                                        }
+                                        @if (Model.Assignments.Coops.Count == 0)
+                                        {
+                                            <tr><td colspan="5" class="text-center text-muted py-4">No farms.</td></tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label for="to" class="form-label">Move selected to</label>
+                        <select id="to" name="to" class="form-select">
+                            <option value="@FieldOfficerAssignmentViewModel.Unassigned">(Unassigned)</option>
+                            @foreach (SelectListItem officer in Model.FieldOfficers.Where(o => o.Value != Model.From))
+                            {
+                                <option value="@officer.Value">@officer.Text</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-8">
+                        <button type="submit" class="btn btn-primary"><i class="ti ti-arrows-exchange me-1"></i>Move</button>
+                        <span class="text-muted fs-13 ms-2">
+                            A farmer also stays visible to the PPL of any of its farms. The change is recorded in the audit log.
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </fieldset>
+    </form>
+}

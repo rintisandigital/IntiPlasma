@@ -1,0 +1,116 @@
+@page "/peternak/{Id:guid}"
+@inject PartnershipApi Partnership
+@inject IExternalLauncher Launcher
+
+@* Detail peternak (PLAN-MOBILE §6.2): identity (NIK masked), contact, bank account, coops and attachments. *@
+<AppPage Title="Peternak" BackTo="/peternak">
+    @if (_error is not null)
+    {
+        <ErrorState Error="_error" OnRetry="LoadAsync" />
+    }
+    else if (_farmer is null)
+    {
+        <Spinner />
+    }
+    else
+    {
+        <CacheNote CachedAtUtc="_cachedAtUtc" />
+
+        <div class="detail-head mb-16">
+            <div class="text-caption-2 text-Primary">@_farmer.Code · @_farmer.Type · @_farmer.BranchCode</div>
+            <h4 class="mt-4">@_farmer.Name</h4>
+            <div class="d-flex flex-wrap gap-8 mt-8">
+                <StatusBadge Text="@Labels.Active(_farmer.IsActive)" Tone="@(_farmer.IsActive ? Labels.Tone.Success : Labels.Tone.Neutral)" />
+                @if (_farmer.FieldOfficerName is { } ppl)
+                {
+                    <span class="chip"><i class="icon icon-user-line"></i>PPL: @ppl</span>
+                }
+            </div>
+        </div>
+
+        @if (ExternalLinks.Phone(_farmer.Phone) is { } tel)
+        {
+            <div class="d-flex gap-12 mb-16">
+                <button type="button" class="tf-btn style-1 round-full" @onclick="() => Launcher.OpenAsync(tel)">
+                    <i class="icon icon-headphones me-1"></i>Telepon
+                </button>
+                @if (ExternalLinks.WhatsApp(_farmer.Phone) is { } wa)
+                {
+                    <button type="button" class="tf-btn style-1 round-full" @onclick="() => Launcher.OpenAsync(wa)">
+                        <i class="icon icon-chat me-1"></i>WhatsApp
+                    </button>
+                }
+            </div>
+        }
+
+        <Tabs Items="TabNames" @bind-Active="_tab" />
+
+        @if (_tab == "Data")
+        {
+            <div class="info-list">
+                <div class="row-item"><span class="label">NIK</span><span>@Labels.MaskNik(_farmer.Nik)</span></div>
+                <div class="row-item"><span class="label">NPWP</span><span>@(_farmer.TaxIdentity.Npwp ?? "—")</span></div>
+                <div class="row-item"><span class="label">PKP</span><span>@(_farmer.TaxIdentity.IsPkp ? "Ya" : "Tidak")</span></div>
+                <div class="row-item"><span class="label">Telepon</span><span>@(_farmer.Phone ?? "—")</span></div>
+                <div class="row-item"><span class="label">Alamat</span><span class="text-end">@(_farmer.Address ?? "—")</span></div>
+            </div>
+
+            <h6 class="mt-20 mb-8">Rekening</h6>
+            <div class="info-list">
+                <div class="row-item"><span class="label">Bank</span><span>@(_farmer.BankAccount.BankName ?? "—")</span></div>
+                <div class="row-item"><span class="label">Nomor</span><span>@(_farmer.BankAccount.AccountNumber ?? "—")</span></div>
+                <div class="row-item"><span class="label">Atas nama</span><span>@(_farmer.BankAccount.AccountHolderName ?? "—")</span></div>
+            </div>
+        }
+        else if (_tab == "Kandang")
+        {
+            <LoaderList Loader="_coops" EmptyText="Belum ada kandang." EmptyIcon="icon-buildings"
+                        OnLoadMore="() => _coops.LoadMoreAsync()" OnRetry="() => _coops.ReloadAsync()">
+                <ItemTemplate Context="coop">
+                    <CoopCard Coop="coop" />
+                </ItemTemplate>
+            </LoaderList>
+        }
+        else
+        {
+            <AttachmentList Ids="_farmer.Documents" />
+        }
+    }
+</AppPage>
+
+@code {
+    private static readonly string[] TabNames = ["Data", "Kandang", "Lampiran"];
+
+    private Farmer? _farmer;
+    private DateTime? _cachedAtUtc;
+    private ApiError? _error;
+    private string _tab = "Data";
+    private PagedLoader<Coop> _coops = default!;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _coops = new PagedLoader<Coop>((page, ct) => Partnership.GetCoopsAsync(null, page, Id, null, ct));
+
+        await LoadAsync();
+        await _coops.ReloadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+
+        CachedResult<Farmer> result = await Partnership.GetFarmerAsync(Id);
+        if (result.IsSuccess)
+        {
+            _farmer = result.Value;
+            _cachedAtUtc = result.CachedAtUtc;
+        }
+        else
+        {
+            _error = result.Error;
+        }
+    }
+}

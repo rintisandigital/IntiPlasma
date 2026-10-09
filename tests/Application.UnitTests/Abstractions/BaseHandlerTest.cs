@@ -24,6 +24,11 @@ public abstract class BaseHandlerTest
     }
 
     /// <summary>
+    /// No PPL scope (a user without <c>partnership:assigned-only</c>).
+    /// </summary>
+    protected static IFieldScope NoFieldScope() => new UnrestrictedFieldScope();
+
+    /// <summary>
     /// The real attachment service over the test database and an in-memory file storage. By default the user
     /// sees every branch.
     /// </summary>
@@ -46,7 +51,7 @@ public abstract class BaseHandlerTest
         clock.UtcNow.Returns(_ => DateTime.UtcNow);
 
         return new AttachmentService(
-            context, storage ?? new InMemoryFileStorage(), branchAccess, user, clock, NullLogger<AttachmentService>.Instance);
+            context, storage ?? new InMemoryFileStorage(), branchAccess, NoFieldScope(), user, clock, NullLogger<AttachmentService>.Instance);
     }
 
     /// <summary>

@@ -8,6 +8,7 @@ using Domain.MasterData.TaxCodes;
 using Domain.MasterData.Uoms;
 using Domain.MasterData.Vendors;
 using Domain.MasterData.Warehouses;
+using Domain.Users;
 using Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -162,10 +163,12 @@ internal sealed class FarmerConfiguration : IEntityTypeConfiguration<Farmer>
         builder.Property(f => f.Phone).HasMaxLength(30);
         builder.HasIndex(f => f.Code).IsUnique();
         builder.HasIndex(f => f.BranchId);
+        builder.HasIndex(f => f.FieldOfficerUserId);
         builder.ComplexTaxIdentity(f => f.TaxIdentity);
         builder.ComplexBankAccount(f => f.BankAccount);
 
         builder.HasOne<Branch>().WithMany().HasForeignKey(f => f.BranchId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(f => f.FieldOfficerUserId).OnDelete(DeleteBehavior.SetNull);
     }
 }
 
@@ -186,8 +189,10 @@ internal sealed class CoopConfiguration : IEntityTypeConfiguration<Coop>
             .HasConversion(profile => CoopProfileJson.Serialize(profile), json => CoopProfileJson.Deserialize(json));
         builder.HasIndex(c => c.Code).IsUnique();
         builder.HasIndex(c => c.BranchId);
+        builder.HasIndex(c => c.FieldOfficerUserId);
 
         builder.HasOne<Farmer>().WithMany().HasForeignKey(c => c.FarmerId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Branch>().WithMany().HasForeignKey(c => c.BranchId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(c => c.FieldOfficerUserId).OnDelete(DeleteBehavior.SetNull);
     }
 }

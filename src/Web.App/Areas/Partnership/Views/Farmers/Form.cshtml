@@ -71,6 +71,18 @@
                         <label asp-for="Address" class="form-label"></label>
                         <input asp-for="Address" class="form-control">
                     </div>
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="FieldOfficerUserId" class="form-label"></label>
+                        <select asp-for="FieldOfficerUserId" class="form-select" data-lookup="@Url.Action("FieldOfficers", "Lookup", new { area = "" })" data-lookup-depends="branchId:#BranchId">
+                            <option value="">— none —</option>
+                            @if (Model.FieldOfficerUserId is not null)
+                            {
+                                <option value="@Model.FieldOfficerUserId" selected>@(Model.FieldOfficerLabel ?? "(current PPL)")</option>
+                            }
+                        </select>
+                        <div class="form-text">The mobile app shows this record to this PPL only (and to managers of the branch).</div>
+                        <span asp-validation-for="FieldOfficerUserId" class="text-danger fs-13"></span>
+                    </div>
                     @if (!Model.IsNew)
                     {
                         <div class="col-12">

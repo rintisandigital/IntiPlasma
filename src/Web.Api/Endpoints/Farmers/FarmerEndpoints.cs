@@ -24,7 +24,8 @@ internal sealed class FarmerEndpoints : IEndpoint
         string? Phone,
         BankAccountRequest BankAccount,
         bool IsActive,
-        IReadOnlyList<Guid>? Documents = null);
+        IReadOnlyList<Guid>? Documents = null,
+        Guid? FieldOfficerUserId = null);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
@@ -36,11 +37,12 @@ internal sealed class FarmerEndpoints : IEndpoint
             int? pageSize,
             Guid? branchId,
             FarmerType? type,
+            Guid? fieldOfficerId,
             IQueryHandler<GetFarmersQuery, PagedList<FarmerResponse>> handler,
             CancellationToken cancellationToken) =>
         {
             Result<PagedList<FarmerResponse>> result = await handler.Handle(
-                new GetFarmersQuery(new PageRequest(page, pageSize, search), branchId, type), cancellationToken);
+                new GetFarmersQuery(new PageRequest(page, pageSize, search), branchId, type, fieldOfficerId), cancellationToken);
 
             return result.Match(Results.Ok, CustomResults.Problem);
         })
@@ -84,7 +86,8 @@ internal sealed class FarmerEndpoints : IEndpoint
                 request.Phone,
                 request.BankAccount,
                 request.IsActive,
-                request.Documents);
+                request.Documents,
+                request.FieldOfficerUserId);
 
             Result result = await handler.Handle(command, cancellationToken);
 

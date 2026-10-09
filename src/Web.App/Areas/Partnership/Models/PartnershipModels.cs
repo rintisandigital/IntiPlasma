@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Application.Contracts;
 using Application.Documents;
+using Application.Users.FieldOfficers;
 using Domain.MasterData.Coops;
 using Domain.MasterData.Farmers;
 using Domain.Partnership.Contracts;
@@ -42,6 +43,15 @@ public sealed class FarmerFormViewModel : MasterFormViewModel
     public string? Phone { get; set; }
 
     public BankAccountInput BankAccount { get; set; } = new();
+
+    /// <summary>
+    /// PPL responsible (PLAN-MOBILE M-11); the mobile app limits a PPL to their assigned data.
+    /// </summary>
+    [Display(Name = "Field officer (PPL)")]
+    public Guid? FieldOfficerUserId { get; set; }
+
+    [BindNever]
+    public string? FieldOfficerLabel { get; set; }
 
     [BindNever]
     public int CoopCount { get; set; }
@@ -88,6 +98,20 @@ public sealed class CoopFormViewModel : MasterFormViewModel
     /// Survey data (data kandang); validated by the use case.
     /// </summary>
     public CoopProfile Profile { get; set; } = new();
+
+    /// <summary>
+    /// PPL responsible (PLAN-MOBILE M-11); the mobile app limits a PPL to their assigned data.
+    /// </summary>
+    [Display(Name = "Field officer (PPL)")]
+    public Guid? FieldOfficerUserId { get; set; }
+
+    [BindNever]
+    public string? FieldOfficerLabel { get; set; }
+
+    /// <summary>
+    /// Branch of an existing farm (PPL lookup).
+    /// </summary>
+    public Guid? BranchId { get; set; }
 
     [BindNever]
     public string? FarmerLabel { get; set; }
@@ -272,3 +296,28 @@ public sealed record ContractDetailsViewModel(
     bool CanEditDraft,
     bool CanChangeStatus,
     bool CanManageAttachments);
+
+// ---- Field officer assignment ------------------------------------------------------------------------------
+
+public sealed class FieldOfficerAssignmentViewModel
+{
+    /// <summary>
+    /// Value of the "from" choice meaning farmers and farms without a PPL.
+    /// </summary>
+    public const string Unassigned = "none";
+
+    public Guid? BranchId { get; set; }
+
+    /// <summary>
+    /// A PPL id or <see cref="Unassigned"/>; nothing chosen yet when null.
+    /// </summary>
+    public string? From { get; set; }
+
+    public IReadOnlyList<SelectListItem> Branches { get; set; } = [];
+
+    public IReadOnlyList<SelectListItem> FieldOfficers { get; set; } = [];
+
+    public FieldOfficerAssignmentsResponse? Assignments { get; set; }
+
+    public bool CanMove { get; set; }
+}

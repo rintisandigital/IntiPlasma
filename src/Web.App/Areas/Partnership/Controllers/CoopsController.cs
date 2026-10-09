@@ -11,6 +11,7 @@ using Application.Farmers.GetById;
 using Domain.Access;
 using Domain.MasterData.Coops;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using SharedKernel;
 using Web.App.Areas.MasterData.Models;
 using Web.App.Areas.Partnership.Documents;
@@ -44,17 +45,25 @@ public sealed class CoopsController(
         new("Capacity", c => c.Capacity, ExportFormat.WholeNumber, 1),
         new("House type", c => c.HouseType, Width: 1.1f),
         new("Running cycle", c => c.OpenCycleId is not null, ExportFormat.Boolean, 0.9f),
+        new("PPL", c => c.FieldOfficerName, Width: 1.5f),
         new("Address", c => c.Address, Width: 2.5f),
         new("Active", c => c.IsActive, ExportFormat.Boolean, 0.6f)
     ];
 
     [HttpGet]
-    public async Task<IActionResult> Index(string? search, string? branch, Guid? farmerId, int? page, CancellationToken cancellationToken)
+    public async Task<IActionResult> Index(
+        string? search,
+        string? branch,
+        Guid? farmerId,
+        Guid? fieldOfficerId,
+        int? page,
+        CancellationToken cancellationToken)
     {
         BranchFilter branchFilter = await support.BranchFilterAsync(branch);
 
         Result<PagedList<CoopResponse>> result = await coopsQuery.Handle(
-            new GetCoopsQuery(new PageRequest(page, PageRequest.DefaultPageSize, search), branchFilter.BranchId, farmerId),
+            new GetCoopsQuery(
+                new PageRequest(page, PageRequest.DefaultPageSize, search), branchFilter.BranchId, farmerId, fieldOfficerId),
             cancellationToken);
 
         return View(new ListViewModel<CoopResponse>
@@ -62,18 +71,34 @@ public sealed class CoopsController(
             Rows = result.Value,
             Search = search,
             BranchOptions = branchFilter.Options,
-            Filters = new Dictionary<string, string?> { ["farmerId"] = farmerId?.ToString() }
+            Filters = new Dictionary<string, string?> { ["farmerId"] = farmerId?.ToString() },
+            FilterOptions = new Dictionary<string, IReadOnlyList<SelectListItem>>
+            {
+                ["fieldOfficerId"] = await support.FieldOfficerOptionsAsync(branchFilter.BranchId, fieldOfficerId, cancellationToken)
+            }
         });
     }
 
     [HttpGet]
     [MenuAccess(MenuCode, MenuRights.Export)]
-    public async Task<IActionResult> Export(string? format, string? search, string? branch, Guid? farmerId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export(
+        string? format,
+        string? search,
+        string? branch,
+        Guid? farmerId,
+        Guid? fieldOfficerId,
+        CancellationToken cancellationToken)
     {
         BranchFilter branchFilter = await support.BranchFilterAsync(branch);
+        List<string> filters = [branchFilter.Description];
+        if (fieldOfficerId is not null)
+        {
+            filters.Add("One PPL");
+        }
 
-        return await support.ExportAsync(format, "Farms", "farms", [branchFilter.Description], Columns,
-            (paging, ct) => coopsQuery.Handle(new GetCoopsQuery(paging, branchFilter.BranchId, farmerId), ct), search, cancellationToken);
+        return await support.ExportAsync(format, "Farms", "farms", filters, Columns,
+            (paging, ct) => coopsQuery.Handle(new GetCoopsQuery(paging, branchFilter.BranchId, farmerId, fieldOfficerId), ct),
+            search, cancellationToken);
     }
 
     [HttpGet]
@@ -94,7 +119,7 @@ public sealed class CoopsController(
             Result<Guid> result = await handler.Handle(
                 new CreateCoopCommand(
                     model.FarmerId!.Value, model.Code, model.Name, model.Capacity!.Value, model.HouseType!.Value,
-                    model.Address, model.Latitude, model.Longitude, model.Documents, model.Profile),
+                    model.Address, model.Latitude, model.Longitude, model.Documents, model.Profile, model.FieldOfficerUserId),
                 cancellationToken);
 
             if (result.IsSuccess)
@@ -131,6 +156,9 @@ public sealed class CoopsController(
             FarmerId = coop.FarmerId,
             FarmerLabel = $"{coop.FarmerCode} — {coop.FarmerName} ({coop.FarmerType})",
             BranchCode = coop.BranchCode,
+            BranchId = coop.BranchId,
+            FieldOfficerUserId = coop.FieldOfficerUserId,
+            FieldOfficerLabel = coop.FieldOfficerName,
             Code = coop.Code,
             Name = coop.Name,
             Capacity = coop.Capacity,
@@ -159,7 +187,7 @@ public sealed class CoopsController(
             Result result = await handler.Handle(
                 new UpdateCoopCommand(
                     id, model.Name, model.Capacity!.Value, model.HouseType!.Value, model.Address, model.Latitude,
-                    model.Longitude, model.IsActive == true, model.Documents, model.Profile),
+                    model.Longitude, model.IsActive == true, model.Documents, model.Profile, model.FieldOfficerUserId),
                 cancellationToken);
 
             if (result.IsSuccess)
@@ -172,6 +200,7 @@ public sealed class CoopsController(
         }
 
         model.Attachments = await support.AttachmentsAsync(model.Documents, cancellationToken);
+        model.FieldOfficerLabel = await support.FieldOfficerLabelAsync(model.BranchId, model.FieldOfficerUserId, cancellationToken);
         return View("Form", model);
     }
 
@@ -215,6 +244,9 @@ public sealed class CoopsController(
             Result<FarmerResponse> farmer = await farmerQuery.Handle(new GetFarmerByIdQuery(farmerId), cancellationToken);
             model.FarmerLabel = farmer.IsSuccess
                 ? $"{farmer.Value.Code} — {farmer.Value.Name} ({farmer.Value.Type}, {farmer.Value.BranchCode})"
+                : null;
+            model.FieldOfficerLabel = farmer.IsSuccess
+                ? await support.FieldOfficerLabelAsync(farmer.Value.BranchId, model.FieldOfficerUserId, cancellationToken)
                 : null;
         }
 

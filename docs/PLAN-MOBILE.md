@@ -460,8 +460,8 @@ Backend (domain + unit test → command/query + validator → EF config + migrat
 - **Backend**: `GET users/me`, `POST users/logout`, `POST users/me/change-password`, `Jwt:RefreshTokenExpirationInDays`, permission baru (§4.2) + seeder role **PPL** & **Manager**.
 - **Klien**: `ApiClient` + `AuthHandler` + `SessionService` + `SecureStorage`, SQLite `LocalDb`, `ErrorMessages`, format id-ID, Login, Profil (ganti password), Pengaturan, banner offline.
 
-### Fase M1 — Data Kemitraan (lihat) & Penugasan PPL
-- **Backend**: `Coop.FieldOfficerUserId` & `Farmer.FieldOfficerUserId` (migration `PhaseM1_FieldOfficerScope`), `IFieldScope` diterapkan di query & command farmer, coop, contract, cycle, recording, performance (§4.5), `GET users/field-officers`.
+### Fase M1 — Data Kemitraan (lihat) & Penugasan PPL ✅ (selesai 2026-10-09, realisasi §14)
+- **Backend**: `Coop.FieldOfficerUserId` & `Farmer.FieldOfficerUserId` (migration `PhaseM1_FieldOfficerScope`), `IFieldScope` diterapkan di query & command farmer, coop, cycle, recording, performance (§4.5), `GET users/field-officers`.
 - **Web.App**: field & filter PPL di Farmers/Coops, menu **Partnership → Field Officer Assignment**.
 - **Klien**: list & detail **Peternak**, **Kandang**, **Kontrak** (+ siklus, stok kandang, lampiran), cache read-only, komponen List/Detail/Filter; filter PPL untuk Manager.
 
@@ -539,7 +539,7 @@ Backend (domain + unit test → command/query + validator → EF config + migrat
 - CSS template besar (`styles.css`) + Bootstrap: ukur ukuran & waktu render pertama; buang aturan yang tidak dipakai bila perlu (M10).
 
 ## 11. Status Keputusan
-- **Semua keputusan M-1 s.d. M-39 disepakati** 2026-10-08. Fase **M0 selesai** 2026-10-08 (§12); berikutnya **M1** (daftar task §13).
+- **Semua keputusan M-1 s.d. M-39 disepakati** 2026-10-08. Fase **M0 selesai** 2026-10-08 (§12); **M1 selesai** 2026-10-09 (§13 task, §14 realisasi); berikutnya **M2**.
 - 2026-10-09: M-38 direvisi — kontrak memakai lingkup cabang, bukan lingkup PPL.
 
 ---
@@ -641,3 +641,79 @@ Disusun 2026-10-09 dari pemetaan kode. Prasyarat: hasil M0 sudah di-commit.
 - Form add/edit peternak/kandang/kontrak di mobile → M7.
 - `inventory/stock-balances` & modul inventory lain tetap memakai lingkup cabang; lingkup kandang untuk stok/request/mutasi pakan menyusul di M2/M8/M9.
 
+---
+
+## 14. Realisasi Fase M1 — Data Kemitraan (lihat) & Penugasan PPL (2026-10-09)
+
+### 14.1 Backend
+- **Domain**: `Farmer.FieldOfficerUserId`, `Coop.FieldOfficerUserId` + `AssignFieldOfficer(Guid?)`; error baru `Users.NotFieldOfficer`.
+- **Migration `PhaseM1_FieldOfficerScope`**: kolom `field_officer_user_id` (nullable, ber-index) di `master.farmers` & `master.coops`, FK ke `identity.users` **ON DELETE SET NULL** (user bisa dihapus permanen, W-22; penugasannya menjadi kosong). Data lama tetap kosong. **Belum di-migrate.**
+- **`IFieldScope`** (`Application/Abstractions/Authorization`): `GetScopeAsync`, `CanAccessFarmer/Coop/CycleAsync`, `FieldScopeSql` (potongan SQL Dapper), `FieldScopeExtensions` (di luar lingkup → `*.NotFound`). Implementasi `FieldScopeProvider` (Infrastructure): restricted = punya `partnership:assigned-only` **dan bukan** role sistem Administrator; flag di-cache (`PermissionCacheKeys.FieldScopeForUser`, ikut di-*invalidate* bersama akses user). **Web.App** memakai `UnrestrictedFieldScope`.
+- **Lingkup diterapkan di**:
+  - peternak: list, detail & update (ditugaskan langsung atau lewat kandang);
+  - kandang: list, detail, create (hanya untuk peternak dalam lingkup) & update;
+  - siklus: list, detail, `PlanCycle`, `CycleLoader` (start, cancel, create/revise recording), panen & tutup siklus;
+  - recording & grafik performance: list & detail;
+  - lampiran: baca/daftar di `AttachmentService` + `PUT …/documents` untuk Farmer, Coop, Cycle, Harvest, DailyRecording & revisinya.
+  - **Kontrak** tetap memakai lingkup cabang (M-38 direvisi).
+- **Penugasan**: `fieldOfficerUserId` di create/update farmer & coop (API: body POST dan `UpdateRequest`). User restricted otomatis menugaskan dirinya dan tidak bisa memindahkan. Validasi `FieldOfficerRules`:
+  - user aktif;
+  - punya `partnership:assigned-only` lewat role;
+  - bukan Administrator;
+  - profil Akses Cabang mencakup cabang data.
+  - ⚠️ Untuk user tidak terbatas, `PUT` mengganti penugasan (null = kosong).
+- **Endpoint**:
+  - `GET users/field-officers?branchId` (`farmers:read`).
+  - Filter `fieldOfficerId` di `GET farmers` (langsung atau lewat kandang), `coops` dan `cycles`.
+  - Response farmer & coop ditambah `fieldOfficerUserId` dan `fieldOfficerName`; response coop ditambah `warehouseId` (gudang kandang).
+- **Penugasan massal**: `GetFieldOfficerAssignmentsQuery` & `ReassignFieldOfficerCommand` (hanya memindahkan data yang masih milik PPL asal; dicatat di audit log kategori Access, aksi `ReassignFieldOfficer`).
+
+### 14.2 Web.App
+- **Farmers & Farms**: field **Field officer (PPL)** (Tom-Select `/Lookup/FieldOfficers`, bergantung cabang/peternak), kolom & filter **PPL** di list, ikut ekspor.
+- **Menu baru Partnership → Field Officer Assignment** (`partnership.field-officers`, hak Edit): pilih cabang & PPL asal (atau *Unassigned*), centang peternak/kandang, lalu pindahkan ke PPL lain atau kosongkan.
+- **`app.js`**: perilaku umum `data-check-all` dan `select[data-submit-on-change]` (CSP tidak mengizinkan handler inline).
+
+### 14.3 MobileApp.Core & MobileApp
+- **Core**:
+  - DTO kemitraan: `PagedList<T>`, `Farmer`, `Coop`, `Contract`, `Cycle`, `StockBalance`, `Attachment`, `FieldOfficer`.
+  - `PartnershipApi`.
+  - **`ApiCache`**: GET yang sukses disimpan di `cache_entries`; saat offline dipakai salinan terakhir + umur datanya; 403/404 menghapus salinan; hasil pencarian tidak di-cache.
+  - `PagedLoader<T>`.
+  - `Labels` (label Indonesia, masker NIK, nomor telepon/WhatsApp) dan `ExternalLinks`.
+  - `ApiClient.GetBytesAsync` dan `CurrentUser.IsLimitedToAssignedData`.
+  - Pesan error `*.NotFound` = "… tidak ditemukan atau bukan tanggung jawab Anda".
+- **Layar**:
+  - **Peternak**: list + detail (data, NIK dimasker, rekening, telepon/WhatsApp, kandang, lampiran).
+  - **Kandang**: list + detail (info & buka peta, siklus, stok gudang kandang, lampiran).
+  - **Kontrak**: list + filter status; detail berisi umum, harga sapronak & jaminan, insentif, lampiran.
+- **Komponen**: `SearchBox`, `LoaderList`, `CacheNote`, `StatusBadge`, `Tabs`, `ErrorState`, `Spinner`, `CoopCard`, `AttachmentList` (pratinjau foto), `FieldOfficerFilter` (Manager), dan `IExternalLauncher` (MAUI `Launcher`).
+- **`NetworkErrorHandler`**: di Android, `AndroidMessageHandler` melempar `Java.IO.IOException` saat offline. Handler ini mengubahnya menjadi `HttpRequestException` agar Core melaporkan offline dan memakai cache; sebelumnya halaman menampilkan error.
+
+### 14.4 Pengujian & verifikasi
+- **Test: 507 lulus**:
+
+  | Proyek test | Jumlah |
+  |---|---|
+  | Domain | 147 (+1) |
+  | Application | 81 (+10 `FieldOfficerScopeTests`) |
+  | Arsitektur | 14 |
+  | MobileApp.UnitTests | 68 (+22: `PartnershipApi`/cache, `PagedLoader`, `Labels`, `ExternalLinks`; `CatalogSyncTests` kini juga membaca error factory) |
+  | Integration Web.Api | 30 (+5 lingkup PPL) |
+  | Integration Web.App | 167 (+2 penugasan & form) |
+
+- **API** pada `intiplasma_verify` + data demo (user `ppl.bdg`, `ppl2.bdg`, `manager.bdg`; 5 kandang BDG dibagi):
+  - PPL A melihat 3 kandang, PPL B 2, Manager 5;
+  - detail kandang, siklus, recording & grafik milik PPL lain → 404;
+  - peternak yang kandangnya dipegang dua PPL terlihat oleh keduanya;
+  - `users/field-officers` hanya mengembalikan 2 PPL.
+- **Emulator API 34**:
+  - PPL melihat kandang/peternak miliknya; tab Kandang di detail peternak hanya berisi kandangnya; siklus & stok gudang kandang tampil;
+  - kandang yang dipindah lewat API langsung muncul tanpa login ulang;
+  - **mode pesawat** → list & detail tampil dari cache dengan catatan "Offline — data per …";
+  - Manager melihat 5 kandang + filter PPL; kontrak & harga tampil.
+
+### 14.5 Catatan
+- Build Android inkremental bisa menghasilkan ID resource basi sehingga aplikasi crash saat start (`No view found for id … jumpToStart`). Solusi: hapus `src/MobileApp/obj` & `bin`, lalu build ulang.
+- `CoopCount` di list peternak menghitung semua kandang peternak (termasuk milik PPL lain); detail hanya menampilkan kandang dalam lingkup.
+- Logo header Beranda tampak gepeng di emulator (sudah ada sejak M0) → dirapikan di M4 (dashboard).
+- Setelah migrate M1 semua data belum ditugaskan: PPL tidak melihat apa pun sampai admin memakai **Field Officer Assignment** (*Unassigned* → PPL).

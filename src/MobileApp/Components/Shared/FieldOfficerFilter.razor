@@ -1,0 +1,38 @@
+@inject PartnershipApi Partnership
+@inject SessionService Session
+
+@* PPL filter of the Manager's lists (PLAN-MOBILE §4.5). Hidden for a PPL: the server already limits their data. *@
+@if (Session.User is { IsLimitedToAssignedData: false } && _officers is { Count: > 0 })
+{
+    <select class="form-select filter-select mb-12" aria-label="PPL" value="@Value" @onchange="OnChangeAsync">
+        <option value="">Semua PPL</option>
+        @foreach (FieldOfficer officer in _officers)
+        {
+            <option value="@officer.Id">@officer.Name</option>
+        }
+    </select>
+}
+
+@code {
+    private List<FieldOfficer>? _officers;
+
+    [Parameter]
+    public Guid? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<Guid?> ValueChanged { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Session.User is not { IsLimitedToAssignedData: false } user)
+        {
+            return;
+        }
+
+        CachedResult<List<FieldOfficer>> result = await Partnership.GetFieldOfficersAsync(user.MainBranch?.Id);
+        _officers = result.IsSuccess ? result.Value : null;
+    }
+
+    private Task OnChangeAsync(ChangeEventArgs e) =>
+        ValueChanged.InvokeAsync(Guid.TryParse(e.Value?.ToString(), out Guid id) ? id : null);
+}

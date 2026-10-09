@@ -1,0 +1,58 @@
+@implements IDisposable
+
+@* Search field of the template (index.html .search-box); reports the text after a short pause in typing. *@
+<div class="search-box mb-12">
+    <div class="icon-left">
+        <i class="icon icon-search"></i>
+    </div>
+    <input type="search" class="search-field" placeholder="@Placeholder" value="@_text" @oninput="OnInput" />
+</div>
+
+@code {
+    private static readonly TimeSpan Delay = TimeSpan.FromMilliseconds(400);
+
+    private string? _text;
+    private CancellationTokenSource? _pending;
+
+    [Parameter]
+    public string Placeholder { get; set; } = "Cari…";
+
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> OnSearch { get; set; }
+
+    protected override void OnInitialized() => _text = Value;
+
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        _text = e.Value?.ToString();
+
+        if (_pending is not null)
+        {
+            await _pending.CancelAsync();
+            _pending.Dispose();
+        }
+
+        _pending = new CancellationTokenSource();
+        CancellationToken token = _pending.Token;
+
+        try
+        {
+            await Task.Delay(Delay, token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        await OnSearch.InvokeAsync(string.IsNullOrWhiteSpace(_text) ? null : _text.Trim());
+    }
+
+    public void Dispose()
+    {
+        _pending?.Cancel();
+        _pending?.Dispose();
+    }
+}

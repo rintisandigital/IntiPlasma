@@ -14,11 +14,16 @@
             {
                 <input type="hidden" name="farmerId" value="@farmerId">
             }
-            <div class="col-md-5">
+            <div class="col-md-4">
                 <input type="search" name="search" value="@Model.Search" class="form-control" placeholder="Search farm or farmer">
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <select name="branch" class="form-select" asp-items="Model.BranchOptions" aria-label="Branch"></select>
+            </div>
+            <div class="col-md-2">
+                <select name="fieldOfficerId" class="form-select" asp-items='Model.FilterOptions["fieldOfficerId"]' aria-label="PPL">
+                    <option value="">All PPL</option>
+                </select>
             </div>
             <div class="col-md-4 d-flex gap-2">
                 <button type="submit" class="btn btn-primary"><i class="ti ti-filter me-1"></i>Filter</button>
@@ -34,7 +39,7 @@
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead class="thead-light">
-                    <tr><th>Code</th><th>Name</th><th>Farmer</th><th>Branch</th><th class="text-end">Capacity</th><th>House type</th><th>Cycle</th><th>Status</th><th></th></tr>
+                    <tr><th>Code</th><th>Name</th><th>Farmer</th><th>Branch</th><th class="text-end">Capacity</th><th>House type</th><th>Cycle</th><th>PPL</th><th>Status</th><th></th></tr>
                 </thead>
                 <tbody>
                     @foreach (Application.Coops.CoopResponse coop in Model.Rows.Items)
@@ -47,6 +52,7 @@
                             <td class="text-end">@Fmt.Number(coop.Capacity)</td>
                             <td>@EnumOptions.Label(coop.HouseType)</td>
                             <td>@(coop.OpenCycleId is null ? "—" : "Running")</td>
+                            <td>@(coop.FieldOfficerName ?? "—")</td>
                             <td><partial name="Partials/_StatusBadge" model='coop.IsActive ? "Active" : "Inactive"' /></td>
                             <td class="text-end text-nowrap">
                                 @if (canExport)
@@ -59,7 +65,7 @@
                     }
                     @if (Model.Rows.Items.Count == 0)
                     {
-                        <tr><td colspan="9" class="text-center text-muted py-4">No farms found.</td></tr>
+                        <tr><td colspan="10" class="text-center text-muted py-4">No farms found.</td></tr>
                     }
                 </tbody>
             </table>

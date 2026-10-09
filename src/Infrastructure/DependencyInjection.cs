@@ -214,6 +214,9 @@ public static class DependencyInjection
 
         services.AddScoped<IBranchAccess, BranchAccess>();
 
+        // PPL scope (PLAN-MOBILE §4.5); Web.App replaces it with UnrestrictedFieldScope.
+        services.AddScoped<IFieldScope, FieldScopeProvider>();
+
         services.AddScoped<IMenuAccessProvider, MenuAccessProvider>();
 
         return services;

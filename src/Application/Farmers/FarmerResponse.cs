@@ -34,4 +34,11 @@ public sealed record FarmerResponse
     public int CoopCount { get; init; }
 
     public bool IsActive { get; init; }
+
+    /// <summary>
+    /// PPL responsible for the farmer (PLAN-MOBILE M-11).
+    /// </summary>
+    public Guid? FieldOfficerUserId { get; init; }
+
+    public string? FieldOfficerName { get; init; }
 }

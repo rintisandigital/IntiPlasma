@@ -182,5 +182,16 @@
             if (e.key === '.' && (val === '' || val === '-' || val.indexOf('.') > -1)) { return false; }
             return true;
         });
+
+        /* <input type="checkbox" data-check-all="name"> toggles every checkbox named "name" of its form. */
+        $(document).on('change', '[data-check-all]', function () {
+            var name = $(this).attr('data-check-all');
+            $(this.form || document).find('input[type="checkbox"][name="' + name + '"]').prop('checked', this.checked);
+        });
+
+        /* <select data-submit-on-change> reloads a filter form as soon as the choice changes. */
+        $(document).on('change', 'select[data-submit-on-change]', function () {
+            if (this.form) { this.form.submit(); }
+        });
     });
 })(jQuery);

@@ -1,0 +1,53 @@
+@typeparam TItem
+
+@* A list page body (PLAN-MOBILE §3.7): cache note, items, "load more", and the loading / empty / error states. *@
+<CacheNote CachedAtUtc="Loader.CachedAtUtc" />
+
+@foreach (TItem item in Loader.Items)
+{
+    @ItemTemplate(item)
+}
+
+@if (Loader.IsLoading)
+{
+    <Spinner />
+}
+else if (Loader.Error is { } error && Loader.Items.Count == 0)
+{
+    <ErrorState Error="error" OnRetry="OnRetry" />
+}
+else if (Loader.IsEmpty)
+{
+    <div class="empty-state">
+        <i class="icon @EmptyIcon"></i>
+        <p class="body-2 text-dark-4 mt-8">@EmptyText</p>
+    </div>
+}
+else if (Loader.HasMore)
+{
+    <button type="button" class="tf-btn style-1 round-full mt-8" @onclick="OnLoadMore">Muat lebih banyak</button>
+}
+else if (Loader.Items.Count > 0)
+{
+    <p class="text-caption-2 text-dark-4 text-center mt-12">@IdFormat.Number(Loader.Items.Count) data</p>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public PagedLoader<TItem> Loader { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public RenderFragment<TItem> ItemTemplate { get; set; } = default!;
+
+    [Parameter]
+    public string EmptyText { get; set; } = "Belum ada data.";
+
+    [Parameter]
+    public string EmptyIcon { get; set; } = "icon-info";
+
+    [Parameter]
+    public EventCallback OnLoadMore { get; set; }
+
+    [Parameter]
+    public EventCallback OnRetry { get; set; }
+}

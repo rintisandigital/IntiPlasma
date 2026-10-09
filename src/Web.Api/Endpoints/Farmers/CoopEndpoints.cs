@@ -24,7 +24,8 @@ internal sealed class CoopEndpoints : IEndpoint
         decimal? Longitude,
         bool IsActive,
         IReadOnlyList<Guid>? Documents = null,
-        CoopProfile? Profile = null);
+        CoopProfile? Profile = null,
+        Guid? FieldOfficerUserId = null);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
@@ -36,11 +37,12 @@ internal sealed class CoopEndpoints : IEndpoint
             int? pageSize,
             Guid? branchId,
             Guid? farmerId,
+            Guid? fieldOfficerId,
             IQueryHandler<GetCoopsQuery, PagedList<CoopResponse>> handler,
             CancellationToken cancellationToken) =>
         {
             Result<PagedList<CoopResponse>> result = await handler.Handle(
-                new GetCoopsQuery(new PageRequest(page, pageSize, search), branchId, farmerId), cancellationToken);
+                new GetCoopsQuery(new PageRequest(page, pageSize, search), branchId, farmerId, fieldOfficerId), cancellationToken);
 
             return result.Match(Results.Ok, CustomResults.Problem);
         })
@@ -85,7 +87,8 @@ internal sealed class CoopEndpoints : IEndpoint
                 request.Longitude,
                 request.IsActive,
                 request.Documents,
-                request.Profile);
+                request.Profile,
+                request.FieldOfficerUserId);
 
             Result result = await handler.Handle(command, cancellationToken);
 

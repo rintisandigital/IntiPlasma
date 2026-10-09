@@ -8,7 +8,10 @@ using SharedKernel;
 
 namespace Application.Coops.GetById;
 
-internal sealed class GetCoopByIdQueryHandler(IDbConnectionFactory dbConnectionFactory, IBranchAccess branchAccess)
+internal sealed class GetCoopByIdQueryHandler(
+    IDbConnectionFactory dbConnectionFactory,
+    IBranchAccess branchAccess,
+    IFieldScope fieldScope)
     : IQueryHandler<GetCoopByIdQuery, CoopResponse>
 {
     public async Task<Result<CoopResponse>> Handle(GetCoopByIdQuery query, CancellationToken cancellationToken)
@@ -20,7 +23,7 @@ internal sealed class GetCoopByIdQueryHandler(IDbConnectionFactory dbConnectionF
             new { query.CoopId },
             cancellationToken: cancellationToken));
 
-        if (coop is null)
+        if (coop is null || !await fieldScope.CanAccessCoopAsync(coop.Id, cancellationToken))
         {
             return Result.Failure<CoopResponse>(CoopErrors.NotFound(query.CoopId));
         }

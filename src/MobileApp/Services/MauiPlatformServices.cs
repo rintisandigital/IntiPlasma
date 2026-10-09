@@ -47,6 +47,25 @@ internal sealed class MauiConnectivity : Core.Abstractions.IConnectivity, IDispo
 }
 
 /// <summary>
+/// <see cref="IExternalLauncher"/> over MAUI <c>Launcher</c> (tel:, WhatsApp and map links).
+/// </summary>
+internal sealed class MauiExternalLauncher : IExternalLauncher
+{
+    public async Task<bool> OpenAsync(Uri uri)
+    {
+        try
+        {
+            return await Launcher.Default.OpenAsync(uri);
+        }
+        catch (InvalidOperationException)
+        {
+            // No app on the device handles this kind of link.
+            return false;
+        }
+    }
+}
+
+/// <summary>
 /// <see cref="IAppSettings"/> over MAUI <c>Preferences</c>.
 /// </summary>
 internal sealed class MauiAppSettings : IAppSettings

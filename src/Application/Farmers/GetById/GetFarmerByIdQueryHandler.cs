@@ -8,7 +8,10 @@ using SharedKernel;
 
 namespace Application.Farmers.GetById;
 
-internal sealed class GetFarmerByIdQueryHandler(IDbConnectionFactory dbConnectionFactory, IBranchAccess branchAccess)
+internal sealed class GetFarmerByIdQueryHandler(
+    IDbConnectionFactory dbConnectionFactory,
+    IBranchAccess branchAccess,
+    IFieldScope fieldScope)
     : IQueryHandler<GetFarmerByIdQuery, FarmerResponse>
 {
     public async Task<Result<FarmerResponse>> Handle(GetFarmerByIdQuery query, CancellationToken cancellationToken)
@@ -20,7 +23,7 @@ internal sealed class GetFarmerByIdQueryHandler(IDbConnectionFactory dbConnectio
             new { query.FarmerId },
             cancellationToken: cancellationToken));
 
-        if (row is null)
+        if (row is null || !await fieldScope.CanAccessFarmerAsync(row.Id, cancellationToken))
         {
             return Result.Failure<FarmerResponse>(FarmerErrors.NotFound(query.FarmerId));
         }

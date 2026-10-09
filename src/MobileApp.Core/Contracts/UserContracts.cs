@@ -37,6 +37,12 @@ public sealed record CurrentUser
         Branches.FirstOrDefault(b => b.Id == DefaultBranchId) ?? (Branches.Count > 0 ? Branches[0] : null);
 
     public bool Has(string permission) => Permissions.Contains(permission, StringComparer.Ordinal);
+
+    /// <summary>
+    /// A PPL: the server limits the data to the farmers and coops assigned to the user (PLAN-MOBILE M-36). Users
+    /// without this see the whole branch and get the PPL filter.
+    /// </summary>
+    public bool IsLimitedToAssignedData => Has(Session.AppPermissions.PartnershipAssignedOnly);
 }
 
 public sealed record CurrentUserBranch(Guid Id, string Code, string Name);

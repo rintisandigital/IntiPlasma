@@ -5,5 +5,6 @@ using SharedKernel;
 
 namespace Application.Farmers.Get;
 
-public sealed record GetFarmersQuery(PageRequest Paging, Guid? BranchId, FarmerType? Type)
+/// <param name="FieldOfficerId">Farmers of this PPL: assigned directly or through one of their coops.</param>
+public sealed record GetFarmersQuery(PageRequest Paging, Guid? BranchId, FarmerType? Type, Guid? FieldOfficerId = null)
     : IQuery<PagedList<FarmerResponse>>;

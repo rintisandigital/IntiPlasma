@@ -60,6 +60,8 @@ Variabel `Bagian__Kunci` menimpa `appsettings.json` (mis. `Outbox__MaxAttempts`,
 4. `docker compose up -d` (Web.Api & Web.App diganti bersamaan; keduanya kompatibel dengan skema yang sama).
 5. Cek `/health/ready`, login, buka satu dokumen.
 
+Catatan M1: migration `PhaseM1_FieldOfficerScope` menambah kolom PPL (`field_officer_user_id`) di peternak & kandang. Setelah upgrade **semua data belum ditugaskan**, sehingga user mobile ber-role PPL tidak melihat peternak/kandang apa pun. Tugaskan lewat Web.App **Partnership → Field Officer Assignment** (pilih *Unassigned* → centang → pindahkan ke PPL). User PPL harus aktif, punya role dengan `partnership:assigned-only`, dan profil Akses Cabang yang mencakup cabangnya.
+
 Catatan W10: migration `PhaseW10_Hardening` menambah kolom lockout user, tabel `infrastructure.audit_logs` dan `infrastructure.data_protection_keys`.
 
 ## 5. Reverse proxy & TLS

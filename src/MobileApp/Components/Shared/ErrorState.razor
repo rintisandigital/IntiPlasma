@@ -1,0 +1,17 @@
+@* A failed load with its Indonesian message and a retry button. *@
+<div class="empty-state">
+    <i class="icon @(Error.IsNetwork ? "icon-globe" : "icon-alert")"></i>
+    <p class="body-2 text-dark-4 mt-8">@Error.Message</p>
+    @if (OnRetry.HasDelegate)
+    {
+        <button type="button" class="tf-btn style-1 round-full mt-12" @onclick="OnRetry">Coba lagi</button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public ApiError Error { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnRetry { get; set; }
+}

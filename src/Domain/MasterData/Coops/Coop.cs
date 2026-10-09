@@ -43,6 +43,12 @@ public sealed class Coop : AggregateRoot, IHasDocuments
     public bool IsActive { get; private set; }
 
     /// <summary>
+    /// PPL (petugas penyuluh lapangan) responsible for this coop. Users limited to their assigned data
+    /// (<c>partnership:assigned-only</c>) only see coops assigned to them.
+    /// </summary>
+    public Guid? FieldOfficerUserId { get; private set; }
+
+    /// <summary>
     /// Survey data (building, equipment, production plan, …) shown on the printed farm data sheet.
     /// </summary>
     public CoopProfile Profile { get; private set; } = new();
@@ -56,6 +62,9 @@ public sealed class Coop : AggregateRoot, IHasDocuments
 
     public Result SetDocuments(IEnumerable<Guid>? documents) =>
         DocumentList.Apply(documents, value => Documents = value);
+
+    public void AssignFieldOfficer(Guid? userId) =>
+        FieldOfficerUserId = userId == Guid.Empty ? null : userId;
 
     public static Result<Coop> Create(
         Farmer farmer,

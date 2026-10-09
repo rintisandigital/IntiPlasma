@@ -3307,6 +3307,10 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("farmer_id");
 
+                    b.Property<Guid?>("FieldOfficerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_officer_user_id");
+
                     b.Property<string>("HouseType")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -3366,6 +3370,9 @@ namespace Infrastructure.Database.Migrations
 
                     b.HasIndex("FarmerId")
                         .HasDatabaseName("ix_coops_farmer_id");
+
+                    b.HasIndex("FieldOfficerUserId")
+                        .HasDatabaseName("ix_coops_field_officer_user_id");
 
                     b.ToTable("coops", "master");
                 });
@@ -3517,6 +3524,10 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnName("documents")
                         .HasDefaultValueSql("'{}'");
 
+                    b.Property<Guid?>("FieldOfficerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("field_officer_user_id");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
@@ -3605,6 +3616,9 @@ namespace Infrastructure.Database.Migrations
                     b.HasIndex("Code")
                         .IsUnique()
                         .HasDatabaseName("ix_farmers_code");
+
+                    b.HasIndex("FieldOfficerUserId")
+                        .HasDatabaseName("ix_farmers_field_officer_user_id");
 
                     b.ToTable("farmers", "master");
                 });
@@ -6733,6 +6747,12 @@ namespace Infrastructure.Database.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_coops_farmers_farmer_id");
+
+                    b.HasOne("Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("FieldOfficerUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_coops_users_field_officer_user_id");
                 });
 
             modelBuilder.Entity("Domain.MasterData.Farmers.Farmer", b =>
@@ -6743,6 +6763,12 @@ namespace Infrastructure.Database.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_farmers_branches_branch_id");
+
+                    b.HasOne("Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("FieldOfficerUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_farmers_users_field_officer_user_id");
                 });
 
             modelBuilder.Entity("Domain.MasterData.Items.Item", b =>

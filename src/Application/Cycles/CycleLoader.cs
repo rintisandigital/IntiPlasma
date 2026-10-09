@@ -11,6 +11,7 @@ internal static class CycleLoader
     public static async Task<Result<ProductionCycle>> LoadAsync(
         IApplicationDbContext context,
         IBranchAccess branchAccess,
+        IFieldScope fieldScope,
         Guid cycleId,
         CancellationToken cancellationToken)
     {
@@ -23,6 +24,10 @@ internal static class CycleLoader
         }
 
         Result access = await branchAccess.EnsureAccessAsync(cycle.BranchId, cancellationToken);
+        if (access.IsSuccess)
+        {
+            access = await fieldScope.EnsureCycleAsync(cycle.Id, cancellationToken);
+        }
 
         return access.IsSuccess ? cycle : Result.Failure<ProductionCycle>(access.Error);
     }

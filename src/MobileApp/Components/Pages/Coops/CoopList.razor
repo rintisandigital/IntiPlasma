@@ -1,0 +1,43 @@
+@page "/kandang"
+@inject PartnershipApi Partnership
+@inject SessionService Session
+
+@* Kandang (PLAN-MOBILE §6.2): a PPL sees the coops assigned to them, a Manager the branch (+ PPL filter). *@
+<AppPage Title="Kandang" BackTo="@(AppFeatures.BottomBar(Session.User!).Contains(AppFeatures.Coops) ? null : "/lainnya")">
+    <SearchBox Placeholder="Cari kode atau nama kandang" OnSearch="SearchAsync" />
+    <FieldOfficerFilter Value="_fieldOfficerId" ValueChanged="FilterAsync" />
+
+    <LoaderList Loader="_loader" EmptyText="Belum ada kandang yang menjadi tanggung jawab Anda." EmptyIcon="icon-buildings"
+                OnLoadMore="() => _loader.LoadMoreAsync()" OnRetry="() => _loader.ReloadAsync()">
+        <ItemTemplate Context="coop">
+            <CoopCard Coop="coop" />
+        </ItemTemplate>
+    </LoaderList>
+</AppPage>
+
+@code {
+    private PagedLoader<Coop> _loader = default!;
+    private string? _search;
+    private Guid? _fieldOfficerId;
+
+    protected override Task OnInitializedAsync()
+    {
+        _loader = new PagedLoader<Coop>((page, ct) => Partnership.GetCoopsAsync(_search, page, null, _fieldOfficerId, ct));
+
+        return _loader.ReloadAsync();
+    }
+
+    private Task SearchAsync(string? search)
+    {
+        _search = search;
+
+        return _loader.ReloadAsync();
+    }
+
+    private Task FilterAsync(Guid? fieldOfficerId)
+    {
+        _fieldOfficerId = fieldOfficerId;
+
+        return _loader.ReloadAsync();
+    }
+}

@@ -19,6 +19,12 @@ public static partial class ErrorMessages
         ["Users.Inactive"] = "Akun Anda tidak aktif. Hubungi administrator.",
         ["Users.InvalidCurrentPassword"] = "Password saat ini salah.",
         ["Users.InvalidRefreshToken"] = "Sesi Anda sudah berakhir. Silakan masuk kembali.",
+        // Also the answer for data outside the PPL scope (M-36), so it does not reveal that the data exists.
+        ["Farmers.NotFound"] = "Peternak tidak ditemukan atau bukan tanggung jawab Anda.",
+        ["Coops.NotFound"] = "Kandang tidak ditemukan atau bukan tanggung jawab Anda.",
+        ["Cycles.NotFound"] = "Siklus tidak ditemukan atau bukan tanggung jawab Anda.",
+        ["Contracts.NotFound"] = "Kontrak tidak ditemukan.",
+        ["Users.NotFieldOfficer"] = "PPL yang dipilih tidak aktif atau tidak memiliki akses ke cabang ini.",
         ["Concurrency.Conflict"] = "Data sudah diubah pengguna lain. Muat ulang lalu coba lagi.",
         ["Database.UniqueViolation"] = "Data yang sama sudah ada.",
         ["Validation.General"] = "Periksa kembali isian Anda.",

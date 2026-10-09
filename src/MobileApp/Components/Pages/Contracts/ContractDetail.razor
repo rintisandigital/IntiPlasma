@@ -1,0 +1,147 @@
+@page "/kontrak/{Id:guid}"
+@inject PartnershipApi Partnership
+
+@* Detail kontrak (PLAN-MOBILE §6.2): scheme, period, sapronak prices, guaranteed live bird prices, incentives. *@
+<AppPage Title="Kontrak" BackTo="/kontrak">
+    @if (_error is not null)
+    {
+        <ErrorState Error="_error" OnRetry="LoadAsync" />
+    }
+    else if (_contract is null)
+    {
+        <Spinner />
+    }
+    else
+    {
+        <CacheNote CachedAtUtc="_cachedAtUtc" />
+
+        <div class="detail-head mb-16">
+            <div class="text-caption-2 text-Primary">@_contract.Code · @_contract.BranchCode</div>
+            <h4 class="mt-4">@_contract.Name</h4>
+            <div class="d-flex flex-wrap gap-8 mt-8">
+                <StatusBadge Text="@Labels.ContractStatus(_contract.Status)" Tone="@Labels.ContractTone(_contract.Status)" />
+                <span class="chip">@Labels.Scheme(_contract.Scheme)</span>
+            </div>
+        </div>
+
+        <Tabs Items="TabNames" @bind-Active="_tab" />
+
+        @if (_tab == "Umum")
+        {
+            <div class="info-list">
+                <div class="row-item"><span class="label">Periode</span><span>@ContractList.Period(_contract)</span></div>
+                <div class="row-item"><span class="label">Skema</span><span>@Labels.Scheme(_contract.Scheme)</span></div>
+                @if (_contract.PlasmaProfitSharePercent is { } share)
+                {
+                    <div class="row-item"><span class="label">Bagian plasma</span><span>@IdFormat.Number(share, 2)%</span></div>
+                }
+                <div class="row-item"><span class="label">PPh</span><span>@(_contract.IncomeTaxCode ?? "—")</span></div>
+                <div class="row-item"><span class="label">Catatan</span><span class="text-end">@(_contract.Notes ?? "—")</span></div>
+            </div>
+        }
+        else if (_tab == "Harga")
+        {
+            <h6 class="mb-8">Harga sapronak</h6>
+            @if (_contract.InputPrices is { Count: > 0 } inputs)
+            {
+                <div class="info-list mb-20">
+                    @foreach (ContractInputPrice price in inputs)
+                    {
+                        <div class="row-item">
+                            <span><span class="text-caption-2 text-dark-4">@price.ItemCode</span><br />@price.ItemName</span>
+                            <span class="text-end">@IdFormat.Money(price.Price)<br /><span class="text-caption-2 text-dark-4">per @price.UomCode</span></span>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="body-2 text-dark-4 mb-20">Tidak ada harga sapronak.</p>
+            }
+
+            <h6 class="mb-8">Harga jaminan ayam (per kg)</h6>
+            @if (_contract.LiveBirdPrices is { Count: > 0 } birds)
+            {
+                <div class="info-list">
+                    @foreach (ContractLiveBirdPrice price in birds)
+                    {
+                        <div class="row-item">
+                            <span>@IdFormat.Number(price.MinWeightKg, 2) – @IdFormat.Number(price.MaxWeightKg, 2) kg</span>
+                            <span>@IdFormat.Money(price.PricePerKg)</span>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="body-2 text-dark-4">Tidak ada harga jaminan.</p>
+            }
+        }
+        else if (_tab == "Insentif")
+        {
+            @if (_contract.Incentives is { Count: > 0 } incentives)
+            {
+                @foreach (ContractIncentive incentive in incentives)
+                {
+                    <div class="list-card">
+                        <div class="d-flex justify-content-between align-items-start gap-8">
+                            <div class="text-button-small text-OnSurface">@incentive.Name</div>
+                            <StatusBadge Text="@Labels.IncentiveKind(incentive.Kind)"
+                                         Tone="@(incentive.Kind == "Bonus" ? Labels.Tone.Success : Labels.Tone.Danger)" />
+                        </div>
+                        <div class="meta">
+                            <span>@Labels.IncentiveMetric(incentive.Metric)@Range(incentive)</span>
+                            <span class="fw-6">@IdFormat.Money(incentive.Amount) @Labels.IncentiveBasis(incentive.Basis)</span>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <p class="body-2 text-dark-4">Tidak ada insentif atau potongan.</p>
+            }
+        }
+        else
+        {
+            <AttachmentList Ids="_contract.Documents" />
+        }
+    }
+</AppPage>
+
+@code {
+    private static readonly string[] TabNames = ["Umum", "Harga", "Insentif", "Lampiran"];
+
+    private Contract? _contract;
+    private DateTime? _cachedAtUtc;
+    private ApiError? _error;
+    private string _tab = "Umum";
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+
+        CachedResult<Contract> result = await Partnership.GetContractAsync(Id);
+        if (result.IsSuccess)
+        {
+            _contract = result.Value;
+            _cachedAtUtc = result.CachedAtUtc;
+        }
+        else
+        {
+            _error = result.Error;
+        }
+    }
+
+    private static string Range(ContractIncentive incentive) => (incentive.RangeFrom, incentive.RangeTo) switch
+    {
+        (null, null) => string.Empty,
+        ({ } from, null) => $" ≥ {IdFormat.Number(from, 2)}",
+        (null, { } to) => $" < {IdFormat.Number(to, 2)}",
+        ({ } from, { } to) => $" {IdFormat.Number(from, 2)} – {IdFormat.Number(to, 2)}"
+    };
+}

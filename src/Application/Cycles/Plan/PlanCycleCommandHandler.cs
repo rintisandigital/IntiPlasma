@@ -14,6 +14,7 @@ namespace Application.Cycles.Plan;
 internal sealed class PlanCycleCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
+    IFieldScope fieldScope,
     IDocumentNumberGenerator documentNumberGenerator)
     : ICommandHandler<PlanCycleCommand, PlanCycleResponse>
 {
@@ -24,7 +25,7 @@ internal sealed class PlanCycleCommandHandler(
         Coop? coop = await context.Coops.AsNoTracking()
             .SingleOrDefaultAsync(c => c.Id == command.CoopId, cancellationToken);
 
-        if (coop is null)
+        if (coop is null || !await fieldScope.CanAccessCoopAsync(coop.Id, cancellationToken))
         {
             return Result.Failure<PlanCycleResponse>(CoopErrors.NotFound(command.CoopId));
         }

@@ -2,6 +2,7 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Documents;
+using Application.Users.FieldOfficers;
 using Domain.Documents.Attachments;
 using Domain.MasterData.Coops;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,7 @@ namespace Application.Coops.Update;
 internal sealed class UpdateCoopCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
+    IFieldScope fieldScope,
     IAttachmentService attachments)
     : ICommandHandler<UpdateCoopCommand>
 {
@@ -19,7 +21,7 @@ internal sealed class UpdateCoopCommandHandler(
     {
         Coop? coop = await context.Coops.SingleOrDefaultAsync(c => c.Id == command.CoopId, cancellationToken);
 
-        if (coop is null)
+        if (coop is null || !await fieldScope.CanAccessCoopAsync(coop.Id, cancellationToken))
         {
             return Result.Failure(CoopErrors.NotFound(command.CoopId));
         }
@@ -28,6 +30,19 @@ internal sealed class UpdateCoopCommandHandler(
         if (access.IsFailure)
         {
             return access;
+        }
+
+        FieldScope field = await fieldScope.GetScopeAsync(cancellationToken);
+        if (!field.Restricted)
+        {
+            Result fieldOfficer = await FieldOfficerRules.EnsureValidAsync(
+                context, command.FieldOfficerUserId, coop.BranchId, cancellationToken);
+            if (fieldOfficer.IsFailure)
+            {
+                return fieldOfficer;
+            }
+
+            coop.AssignFieldOfficer(command.FieldOfficerUserId);
         }
 
         Result result = coop.Update(

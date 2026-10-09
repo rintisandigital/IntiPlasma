@@ -22,6 +22,7 @@ public static class MenuCodes
     public const string MasterCustomers = "master.customers";
     public const string PartnershipFarmers = "partnership.farmers";
     public const string PartnershipCoops = "partnership.coops";
+    public const string PartnershipFieldOfficers = "partnership.field-officers";
     public const string PartnershipContracts = "partnership.contracts";
     public const string FinanceAccounts = "finance.accounts";
     public const string FinanceCostCenters = "finance.cost-centers";
@@ -104,6 +105,7 @@ public static class MenuCatalog
         Page("partnership", "partnership.farmers", "Farmers", "/Partnership/Farmers", CreateEditExport, true);
         Page("partnership", "partnership.coops", "Farms", "/Partnership/Coops", CreateEditExport, true);
         Page("partnership", "partnership.contracts", "Contracts", "/Partnership/Contracts", CreateEditExport, true);
+        Page("partnership", "partnership.field-officers", "Field Officer Assignment", "/Partnership/FieldOfficers", MenuRights.Edit, true);
 
         Group("procurement", "Procurement", "ti ti-shopping-cart", 40);
         Page("procurement", "procurement.purchase-orders", "Purchase Orders", "/Procurement/PurchaseOrders", CreateEditExport, true);

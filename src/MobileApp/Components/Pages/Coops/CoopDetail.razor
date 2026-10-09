@@ -1,0 +1,150 @@
+@page "/kandang/{Id:guid}"
+@inject PartnershipApi Partnership
+@inject IExternalLauncher Launcher
+
+@* Detail kandang (PLAN-MOBILE §6.2): info & location, PPL, running cycle and history, farm stock, attachments. *@
+<AppPage Title="Kandang" BackTo="/kandang">
+    @if (_error is not null)
+    {
+        <ErrorState Error="_error" OnRetry="LoadAsync" />
+    }
+    else if (_coop is null)
+    {
+        <Spinner />
+    }
+    else
+    {
+        <CacheNote CachedAtUtc="_cachedAtUtc" />
+
+        <div class="detail-head mb-16">
+            <div class="text-caption-2 text-Primary">@_coop.Code · @_coop.BranchCode</div>
+            <h4 class="mt-4">@_coop.Name</h4>
+            <a class="body-2 text-dark-4" href="/peternak/@_coop.FarmerId">@_coop.FarmerCode — @_coop.FarmerName (@_coop.FarmerType)</a>
+            <div class="d-flex flex-wrap gap-8 mt-8">
+                <StatusBadge Text="@Labels.Active(_coop.IsActive)" Tone="@(_coop.IsActive ? Labels.Tone.Success : Labels.Tone.Neutral)" />
+                @if (_coop.FieldOfficerName is { } ppl)
+                {
+                    <span class="chip"><i class="icon icon-user-line"></i>PPL: @ppl</span>
+                }
+            </div>
+        </div>
+
+        <Tabs Items="TabNames" @bind-Active="_tab" />
+
+        @if (_tab == "Info")
+        {
+            <div class="info-list">
+                <div class="row-item"><span class="label">Kapasitas</span><span>@IdFormat.Number(_coop.Capacity) ekor</span></div>
+                <div class="row-item"><span class="label">Tipe</span><span>@Labels.HouseType(_coop.HouseType)</span></div>
+                <div class="row-item"><span class="label">Alamat</span><span class="text-end">@(_coop.Address ?? "—")</span></div>
+                <div class="row-item">
+                    <span class="label">Koordinat</span>
+                    <span>@(_coop.HasLocation ? $"{IdFormat.Number(_coop.Latitude!.Value, 6)}, {IdFormat.Number(_coop.Longitude!.Value, 6)}" : "—")</span>
+                </div>
+            </div>
+            @if (_coop.HasLocation)
+            {
+                <button type="button" class="tf-btn style-1 round-full mt-16" @onclick="OpenMapAsync">
+                    <i class="icon icon-mapTrifold me-1"></i>Buka di peta
+                </button>
+            }
+        }
+        else if (_tab == "Siklus")
+        {
+            <LoaderList Loader="_cycles" EmptyText="Belum ada siklus di kandang ini." EmptyIcon="icon-timeline"
+                        OnLoadMore="() => _cycles.LoadMoreAsync()" OnRetry="() => _cycles.ReloadAsync()">
+                <ItemTemplate Context="cycle">
+                    <div class="list-card @(cycle.Id == _coop.OpenCycleId ? "highlight" : null)">
+                        <div class="d-flex justify-content-between align-items-start gap-8">
+                            <div>
+                                <div class="text-caption-2 text-Primary">@(cycle.ContractCode ?? "Tanpa kontrak")</div>
+                                <div class="text-button-small text-OnSurface">@cycle.Number</div>
+                            </div>
+                            <StatusBadge Text="@Labels.CycleStatus(cycle.Status)" Tone="@Labels.CycleTone(cycle.Status)" />
+                        </div>
+                        <div class="meta">
+                            <span><i class="icon icon-calendar"></i>Chick-in @IdFormat.Date(cycle.ChickInDate ?? cycle.PlannedChickInDate)@(cycle.ChickInDate is null ? " (rencana)" : null)</span>
+                            @if (cycle.ChickInDate is not null)
+                            {
+                                <span><i class="icon icon-human"></i>Populasi @IdFormat.Number(cycle.CurrentPopulation) / @IdFormat.Number(cycle.InitialPopulation ?? 0)</span>
+                                <span>Mati @IdFormat.Number(cycle.TotalMortality) · Afkir @IdFormat.Number(cycle.TotalCulling)</span>
+                            }
+                            @if (cycle.HarvestedBirds > 0)
+                            {
+                                <span>Panen @IdFormat.Number(cycle.HarvestedBirds) ekor · @IdFormat.Tons(cycle.HarvestedWeightKg)</span>
+                            }
+                        </div>
+                    </div>
+                </ItemTemplate>
+            </LoaderList>
+        }
+        else if (_tab == "Stok")
+        {
+            @if (_coop.WarehouseId is null)
+            {
+                <p class="body-2 text-dark-4">Gudang kandang belum tersedia.</p>
+            }
+            else
+            {
+                <LoaderList Loader="_stock" EmptyText="Gudang kandang kosong." EmptyIcon="icon-download"
+                            OnLoadMore="() => _stock.LoadMoreAsync()" OnRetry="() => _stock.ReloadAsync()">
+                    <ItemTemplate Context="balance">
+                        <div class="info-list">
+                            <div class="row-item">
+                                <span><span class="text-caption-2 text-dark-4">@balance.ItemCode</span><br />@balance.ItemName</span>
+                                <span class="text-end fw-6">@IdFormat.Number(balance.Quantity, 2) @balance.BaseUomCode</span>
+                            </div>
+                        </div>
+                    </ItemTemplate>
+                </LoaderList>
+            }
+        }
+        else
+        {
+            <AttachmentList Ids="_coop.Documents" />
+        }
+    }
+</AppPage>
+
+@code {
+    private static readonly string[] TabNames = ["Info", "Siklus", "Stok", "Lampiran"];
+
+    private Coop? _coop;
+    private DateTime? _cachedAtUtc;
+    private ApiError? _error;
+    private string _tab = "Info";
+    private PagedLoader<Cycle> _cycles = default!;
+    private PagedLoader<StockBalance> _stock = default!;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _cycles = new PagedLoader<Cycle>((_, ct) => Partnership.GetCoopCyclesAsync(Id, ct));
+        _stock = new PagedLoader<StockBalance>((_, ct) => _coop?.WarehouseId is { } warehouseId
+            ? Partnership.GetStockAsync(warehouseId, ct)
+            : Task.FromResult(CachedResult<PagedList<StockBalance>>.Fresh(new PagedList<StockBalance>())));
+
+        await LoadAsync();
+        await Task.WhenAll(_cycles.ReloadAsync(), _stock.ReloadAsync());
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+
+        CachedResult<Coop> result = await Partnership.GetCoopAsync(Id);
+        if (result.IsSuccess)
+        {
+            _coop = result.Value;
+            _cachedAtUtc = result.CachedAtUtc;
+        }
+        else
+        {
+            _error = result.Error;
+        }
+    }
+
+    private Task OpenMapAsync() => Launcher.OpenAsync(ExternalLinks.Map(_coop!.Latitude!.Value, _coop.Longitude!.Value));
+}

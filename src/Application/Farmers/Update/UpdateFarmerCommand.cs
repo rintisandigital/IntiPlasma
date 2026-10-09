@@ -5,6 +5,8 @@ namespace Application.Farmers.Update;
 
 /// <remarks>
 /// The type and branch cannot change: running cycles, contracts and settlements depend on them.
+/// <see cref="FieldOfficerUserId"/> replaces the assignment (null = none), except for a user limited to assigned
+/// data, who cannot reassign.
 /// </remarks>
 public sealed record UpdateFarmerCommand(
     Guid FarmerId,
@@ -15,4 +17,5 @@ public sealed record UpdateFarmerCommand(
     string? Phone,
     BankAccountRequest BankAccount,
     bool IsActive,
-    IReadOnlyList<Guid>? Documents = null) : ICommand;
+    IReadOnlyList<Guid>? Documents = null,
+    Guid? FieldOfficerUserId = null) : ICommand;

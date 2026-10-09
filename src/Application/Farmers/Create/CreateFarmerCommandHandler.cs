@@ -2,6 +2,7 @@ using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Documents;
+using Application.Users.FieldOfficers;
 using Domain.Common;
 using Domain.Documents.Attachments;
 using Domain.MasterData.Branches;
@@ -14,6 +15,7 @@ namespace Application.Farmers.Create;
 internal sealed class CreateFarmerCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
+    IFieldScope fieldScope,
     IAttachmentService attachments)
     : ICommandHandler<CreateFarmerCommand, Guid>
 {
@@ -28,6 +30,16 @@ internal sealed class CreateFarmerCommandHandler(
         if (!await context.Branches.AnyAsync(b => b.Id == command.BranchId && b.IsActive, cancellationToken))
         {
             return Result.Failure<Guid>(BranchErrors.NotFound(command.BranchId));
+        }
+
+        FieldScope field = await fieldScope.GetScopeAsync(cancellationToken);
+        Guid? fieldOfficerUserId = field.AssignFieldOfficer(command.FieldOfficerUserId);
+
+        Result fieldOfficer = await FieldOfficerRules.EnsureValidAsync(
+            context, fieldOfficerUserId, command.BranchId, cancellationToken);
+        if (fieldOfficer.IsFailure)
+        {
+            return Result.Failure<Guid>(fieldOfficer.Error);
         }
 
         Result<TaxIdentity> taxIdentity = command.TaxIdentity.ToDomain();
@@ -57,6 +69,8 @@ internal sealed class CreateFarmerCommandHandler(
         {
             return Result.Failure<Guid>(farmer.Error);
         }
+
+        farmer.Value.AssignFieldOfficer(fieldOfficerUserId);
 
         if (await context.Farmers.AnyAsync(f => f.Code == farmer.Value.Code, cancellationToken))
         {

@@ -46,16 +46,24 @@ public sealed class FarmersController(
         new("Bank", f => f.BankAccount.BankName, Width: 1.2f),
         new("Account", f => f.BankAccount.AccountNumber, Width: 1.5f),
         new("Farms", f => f.CoopCount, ExportFormat.WholeNumber, 0.7f),
+        new("PPL", f => f.FieldOfficerName, Width: 1.5f),
         new("Active", f => f.IsActive, ExportFormat.Boolean, 0.6f)
     ];
 
     [HttpGet]
-    public async Task<IActionResult> Index(string? search, string? branch, FarmerType? type, int? page, CancellationToken cancellationToken)
+    public async Task<IActionResult> Index(
+        string? search,
+        string? branch,
+        FarmerType? type,
+        Guid? fieldOfficerId,
+        int? page,
+        CancellationToken cancellationToken)
     {
         BranchFilter branchFilter = await support.BranchFilterAsync(branch);
 
         Result<PagedList<FarmerResponse>> result = await farmersQuery.Handle(
-            new GetFarmersQuery(new PageRequest(page, PageRequest.DefaultPageSize, search), branchFilter.BranchId, type),
+            new GetFarmersQuery(
+                new PageRequest(page, PageRequest.DefaultPageSize, search), branchFilter.BranchId, type, fieldOfficerId),
             cancellationToken);
 
         return View(new ListViewModel<FarmerResponse>
@@ -63,13 +71,23 @@ public sealed class FarmersController(
             Rows = result.Value,
             Search = search,
             BranchOptions = branchFilter.Options,
-            FilterOptions = new Dictionary<string, IReadOnlyList<SelectListItem>> { ["type"] = EnumOptions.For(type) }
+            FilterOptions = new Dictionary<string, IReadOnlyList<SelectListItem>>
+            {
+                ["type"] = EnumOptions.For(type),
+                ["fieldOfficerId"] = await support.FieldOfficerOptionsAsync(branchFilter.BranchId, fieldOfficerId, cancellationToken)
+            }
         });
     }
 
     [HttpGet]
     [MenuAccess(MenuCode, MenuRights.Export)]
-    public async Task<IActionResult> Export(string? format, string? search, string? branch, FarmerType? type, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export(
+        string? format,
+        string? search,
+        string? branch,
+        FarmerType? type,
+        Guid? fieldOfficerId,
+        CancellationToken cancellationToken)
     {
         BranchFilter branchFilter = await support.BranchFilterAsync(branch);
         List<string> filters = [branchFilter.Description];
@@ -78,8 +96,14 @@ public sealed class FarmersController(
             filters.Add($"Type: {type}");
         }
 
+        if (fieldOfficerId is not null)
+        {
+            filters.Add("One PPL");
+        }
+
         return await support.ExportAsync(format, "Farmers", "farmers", filters, Columns,
-            (paging, ct) => farmersQuery.Handle(new GetFarmersQuery(paging, branchFilter.BranchId, type), ct), search, cancellationToken);
+            (paging, ct) => farmersQuery.Handle(new GetFarmersQuery(paging, branchFilter.BranchId, type, fieldOfficerId), ct),
+            search, cancellationToken);
     }
 
     [HttpGet]
@@ -99,7 +123,7 @@ public sealed class FarmersController(
             Result<Guid> result = await handler.Handle(
                 new CreateFarmerCommand(
                     model.Code, model.Name, model.Type!.Value, model.BranchId!.Value, model.Nik, model.TaxIdentity.ToRequest(),
-                    model.Address, model.Phone, model.BankAccount.ToRequest(), model.Documents),
+                    model.Address, model.Phone, model.BankAccount.ToRequest(), model.Documents, model.FieldOfficerUserId),
                 cancellationToken);
 
             if (result.IsSuccess)
@@ -143,6 +167,8 @@ public sealed class FarmersController(
             IsActive = farmer.IsActive,
             CoopCount = farmer.CoopCount,
             Documents = [.. farmer.Documents],
+            FieldOfficerUserId = farmer.FieldOfficerUserId,
+            FieldOfficerLabel = farmer.FieldOfficerName,
             CanSave = await support.CanAsync(MenuCode, MenuRights.Edit)
         };
 
@@ -161,7 +187,7 @@ public sealed class FarmersController(
             Result result = await handler.Handle(
                 new UpdateFarmerCommand(
                     id, model.Name, model.Nik, model.TaxIdentity.ToRequest(), model.Address, model.Phone,
-                    model.BankAccount.ToRequest(), model.IsActive == true, model.Documents),
+                    model.BankAccount.ToRequest(), model.IsActive == true, model.Documents, model.FieldOfficerUserId),
                 cancellationToken);
 
             if (result.IsSuccess)
@@ -211,6 +237,7 @@ public sealed class FarmersController(
     {
         model.Branches = await support.BranchOptionsAsync(model.BranchId);
         model.Attachments = await support.AttachmentsAsync(model.Documents, cancellationToken);
+        model.FieldOfficerLabel ??= await support.FieldOfficerLabelAsync(model.BranchId, model.FieldOfficerUserId, cancellationToken);
         return model;
     }
 }

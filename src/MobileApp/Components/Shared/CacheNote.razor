@@ -1,0 +1,13 @@
+@* Shown when the data comes from the device cache because the server cannot be reached (PLAN-MOBILE §3.5). *@
+@if (CachedAtUtc is { } cachedAt)
+{
+    <div class="cache-note mb-12">
+        <i class="icon icon-info"></i>
+        Offline — data per @IdFormat.DateTime(cachedAt.ToLocalTime())
+    </div>
+}
+
+@code {
+    [Parameter]
+    public DateTime? CachedAtUtc { get; set; }
+}

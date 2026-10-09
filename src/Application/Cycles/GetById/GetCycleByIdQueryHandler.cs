@@ -9,7 +9,10 @@ using SharedKernel;
 
 namespace Application.Cycles.GetById;
 
-internal sealed class GetCycleByIdQueryHandler(IDbConnectionFactory dbConnectionFactory, IBranchAccess branchAccess)
+internal sealed class GetCycleByIdQueryHandler(
+    IDbConnectionFactory dbConnectionFactory,
+    IBranchAccess branchAccess,
+    IFieldScope fieldScope)
     : IQueryHandler<GetCycleByIdQuery, CycleResponse>
 {
     public async Task<Result<CycleResponse>> Handle(GetCycleByIdQuery query, CancellationToken cancellationToken)
@@ -29,7 +32,7 @@ internal sealed class GetCycleByIdQueryHandler(IDbConnectionFactory dbConnection
 
         CycleResponse? cycle = await multi.ReadSingleOrDefaultAsync<CycleResponse>();
 
-        if (cycle is null)
+        if (cycle is null || !await fieldScope.CanAccessCycleAsync(cycle.Id, cancellationToken))
         {
             return Result.Failure<CycleResponse>(CycleErrors.NotFound(query.CycleId));
         }
