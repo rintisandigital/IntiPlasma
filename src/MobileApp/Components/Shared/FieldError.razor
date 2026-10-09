@@ -1,0 +1,10 @@
+@* Error of one form field (client checks or server validation). *@
+@if (!string.IsNullOrEmpty(Message))
+{
+    <div class="field-error">@Message</div>
+}
+
+@code {
+    [Parameter]
+    public string? Message { get; set; }
+}

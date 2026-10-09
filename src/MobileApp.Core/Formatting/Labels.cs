@@ -45,6 +45,25 @@ public static class Labels
         _ => Tone.Neutral
     };
 
+    /// <summary>
+    /// Status of a daily recording on the device (PLAN-MOBILE §6.2): Terkirim / Belum terkirim / Gagal.
+    /// </summary>
+    public static string RecordingState(Production.RecordingState state) => state switch
+    {
+        Production.RecordingState.Sent => "Terkirim",
+        Production.RecordingState.Sending => "Mengirim…",
+        Production.RecordingState.Failed => "Gagal",
+        _ => "Belum terkirim"
+    };
+
+    public static Tone RecordingTone(Production.RecordingState state) => state switch
+    {
+        Production.RecordingState.Sent => Tone.Success,
+        Production.RecordingState.Failed => Tone.Danger,
+        Production.RecordingState.Sending => Tone.Info,
+        _ => Tone.Warning
+    };
+
     public static string ContractStatus(string value) => value switch
     {
         "Draft" => "Draf",

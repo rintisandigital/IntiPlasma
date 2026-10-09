@@ -106,3 +106,66 @@ internal static class ServerDefaults
     public static string ServerUrl => "https://api.intiplasma.example/";
 #endif
 }
+
+/// <summary>
+/// <see cref="IPhotoPicker"/> over MAUI <c>MediaPicker</c>: the picker itself turns the photo upright and reduces it
+/// to 1600 px at JPEG quality 80 (PLAN-MOBILE M-44) before it is copied to the pending folder.
+/// </summary>
+internal sealed class MauiPhotoPicker : IPhotoPicker
+{
+    private static readonly MediaPickerOptions Options = new()
+    {
+        Title = "Foto recording",
+        MaximumWidth = 1600,
+        MaximumHeight = 1600,
+        CompressionQuality = 80,
+        RotateImage = true,
+        PreserveMetaData = false
+    };
+
+    public Task<bool> CaptureAsync(string targetPath, CancellationToken cancellationToken = default) =>
+        SaveAsync(() => MediaPicker.Default.CapturePhotoAsync(Options), targetPath, cancellationToken);
+
+    public Task<bool> PickAsync(string targetPath, CancellationToken cancellationToken = default) =>
+        SaveAsync(
+            async () => (await MediaPicker.Default.PickPhotosAsync(new MediaPickerOptions
+            {
+                Title = Options.Title,
+                MaximumWidth = Options.MaximumWidth,
+                MaximumHeight = Options.MaximumHeight,
+                CompressionQuality = Options.CompressionQuality,
+                RotateImage = Options.RotateImage,
+                PreserveMetaData = Options.PreserveMetaData,
+                SelectionLimit = 1
+            }))?.FirstOrDefault(),
+            targetPath,
+            cancellationToken);
+
+    private static async Task<bool> SaveAsync(Func<Task<FileResult?>> pick, string targetPath, CancellationToken cancellationToken)
+    {
+        FileResult? photo;
+        try
+        {
+            photo = await MainThread.InvokeOnMainThreadAsync(pick);
+        }
+        catch (PermissionException)
+        {
+            return false;
+        }
+        catch (FeatureNotSupportedException)
+        {
+            return false;
+        }
+
+        if (photo is null)
+        {
+            return false;
+        }
+
+        await using Stream source = await photo.OpenReadAsync();
+        await using FileStream target = File.Create(targetPath);
+        await source.CopyToAsync(target, cancellationToken);
+
+        return true;
+    }
+}

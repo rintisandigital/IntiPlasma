@@ -1,0 +1,49 @@
+@inject RecordingService Recordings
+
+@* Photos of an entry that is still on the device (PLAN-MOBILE M-44): thumbnails read from the pending folder. *@
+<div class="photo-grid">
+    @foreach (DraftPhoto photo in Photos)
+    {
+        <div class="photo-thumb">
+            @if (_sources.TryGetValue(photo.Id, out string? source))
+            {
+                <img src="@source" alt="Foto" />
+            }
+            else
+            {
+                <i class="icon icon-imageSquare"></i>
+            }
+            @if (photo.Uploaded)
+            {
+                <span class="photo-flag">Terunggah</span>
+            }
+            @if (OnRemove.HasDelegate)
+            {
+                <button type="button" class="photo-remove" aria-label="Hapus foto" @onclick="() => OnRemove.InvokeAsync(photo)">
+                    <i class="icon icon-x"></i>
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private readonly Dictionary<Guid, string> _sources = [];
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<DraftPhoto> Photos { get; set; } = [];
+
+    [Parameter]
+    public EventCallback<DraftPhoto> OnRemove { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        foreach (Guid id in Photos.Select(p => p.Id).Where(id => !_sources.ContainsKey(id)))
+        {
+            if (await Recordings.Files.ReadAsync(id) is { } bytes)
+            {
+                _sources[id] = $"data:image/jpeg;base64,{Convert.ToBase64String(bytes)}";
+            }
+        }
+    }
+}

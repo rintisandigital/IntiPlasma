@@ -15,7 +15,7 @@ internal sealed class StubHttpHandler(Func<HttpRequestMessage, string?, HttpResp
 {
     private readonly Lock _gate = new();
 
-    public List<(HttpMethod Method, string Path, string? Authorization, string? Body)> Requests { get; } = [];
+    public List<(HttpMethod Method, string Path, string? Authorization, string? Body, string? IdempotencyKey)> Requests { get; } = [];
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
@@ -23,7 +23,10 @@ internal sealed class StubHttpHandler(Func<HttpRequestMessage, string?, HttpResp
 
         lock (_gate)
         {
-            Requests.Add((request.Method, request.RequestUri!.AbsolutePath, request.Headers.Authorization?.Parameter, body));
+            string? idempotencyKey = request.Headers.TryGetValues(ApiClient.IdempotencyKeyHeader, out IEnumerable<string>? keys)
+                ? keys.Single()
+                : null;
+            Requests.Add((request.Method, request.RequestUri!.AbsolutePath, request.Headers.Authorization?.Parameter, body, idempotencyKey));
         }
 
         if (delay > TimeSpan.Zero)
@@ -129,4 +132,28 @@ internal sealed class TestSettings : IAppSettings
     public string? LastEmail { get; set; }
 
     public bool CanEditServerUrl => true;
+}
+
+internal sealed class TestClock : IClock
+{
+    public DateTime UtcNow { get; set; } = new(2026, 10, 9, 3, 0, 0, DateTimeKind.Utc);
+
+    public DateOnly Today => DateOnly.FromDateTime(UtcNow.AddHours(7));
+}
+
+internal sealed class TestConnectivity : IConnectivity
+{
+    private bool _isOnline = true;
+
+    public bool IsOnline
+    {
+        get => _isOnline;
+        set
+        {
+            _isOnline = value;
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public event EventHandler? Changed;
 }

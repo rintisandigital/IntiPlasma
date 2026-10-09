@@ -31,7 +31,7 @@ public static class AppFeatures
         "kandang", "Kandang", "icon-buildings", "/kandang", "M1", u => u.Has(AppPermissions.FarmersRead));
 
     public static readonly AppFeature DailyInput = new(
-        "input", "Input", "icon-edit", "/fitur/input", "M2",
+        "input", "Input", "icon-edit", "/input", "M2",
         u => u.Has(AppPermissions.ProductionRecord)
             || u.Has(AppPermissions.ProductionStockReport)
             || u.Has(AppPermissions.InventoryRequestFeed));
@@ -40,7 +40,7 @@ public static class AppFeatures
         "approval", "Approval", "icon-CheckCircle", "/fitur/approval", "M6", u => u.Has(AppPermissions.ApprovalsDecide));
 
     public static readonly AppFeature SyncQueue = new(
-        "antrean", "Antrean", "icon-upload", "/fitur/antrean", "M2",
+        "antrean", "Antrean", "icon-upload", "/antrean", "M2",
         u => u.Has(AppPermissions.ProductionRecord) || u.Has(AppPermissions.ProductionStockReport));
 
     public static readonly AppFeature LiveBirdStock = new(

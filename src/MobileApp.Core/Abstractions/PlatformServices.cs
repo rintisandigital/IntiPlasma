@@ -50,3 +50,26 @@ public interface IExternalLauncher
 {
     Task<bool> OpenAsync(Uri uri);
 }
+
+/// <summary>
+/// Current time. Dates of daily entries are local dates in <c>Asia/Jakarta</c> (PLAN-MOBILE M-6, §10).
+/// </summary>
+public interface IClock
+{
+    DateTime UtcNow { get; }
+
+    DateOnly Today { get; }
+}
+
+/// <summary>
+/// Photo from the camera or the gallery (MAUI <c>MediaPicker</c>), reduced to a JPEG of at most 1600 px on the
+/// longest side (PLAN-MOBILE M-44) and written to <paramref name="targetPath"/>.
+/// </summary>
+public interface IPhotoPicker
+{
+    /// <returns>False when the user cancelled or the photo could not be read.</returns>
+    Task<bool> CaptureAsync(string targetPath, CancellationToken cancellationToken = default);
+
+    /// <returns>False when the user cancelled or the photo could not be read.</returns>
+    Task<bool> PickAsync(string targetPath, CancellationToken cancellationToken = default);
+}

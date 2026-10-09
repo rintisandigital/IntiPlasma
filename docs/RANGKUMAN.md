@@ -240,6 +240,10 @@
 - Web.App: field & filter PPL di Farmers/Farms, menu **Partnership → Field Officer Assignment** (audit log).
 - Mobile: Peternak, Kandang, Kontrak (list + detail), cache read-only offline, filter PPL untuk Manager.
 
+### Fase M2 — Recording Harian (offline) ✅ (2026-10-09; detail: PLAN-MOBILE §15–§16)
+- API: `GET mobile/field-context` (siklus berjalan dalam lingkup + tanggal recording 14 hari, item pakan/OVK + konversi satuan, **kuantitas** stok gudang kandang tanpa nilai/HPP). `inventory/stock-balances` & `stock-card` kini memakai lingkup PPL (hanya gudang kandang miliknya). Tidak ada migration.
+- Mobile: hub **Input**, form **Recording Harian** (offline; validasi lokal tanggal/populasi, stok = peringatan, kalkulator sampel timbang, ≤ 5 foto dikompres `MediaPicker`), list & detail recording per siklus (server + lokal), **Antrean Sinkron** (kirim ulang/ubah/hapus), badge antrean. SQLite lokal v2 (`sync_queue`); `SyncEngine` mengirim saat online kembali, aplikasi aktif lagi, sesudah login, dan tiap 30 detik — lampiran dulu lalu recording dengan `Idempotency-Key` = id recording.
+
 ## 5. Alur Akuntansi yang Sudah Berjalan
 
 | Transaksi | Jurnal otomatis |
@@ -309,12 +313,14 @@ Semua event di katalog kini sudah dipakai.
 - **MobileApp**: crash saat start `No view found for id … jumpToStart` = ID resource basi dari build inkremental → hapus `src/MobileApp/obj` & `bin`, build ulang.
 - **MobileApp**: di Android `AndroidMessageHandler` melempar `Java.IO.IOException` (bukan `HttpRequestException`) saat offline → dibungkus `NetworkErrorHandler`.
 - **MobileApp**: build Android (javac) bisa kehabisan memori saat emulator + API + Podman berjalan bersamaan → `-p:JavaMaximumHeapSize=512m`, matikan Podman bila tidak dipakai.
+- **MobileApp**: build Debug memakai *Fast Deployment* (assembly di folder data app) → `adb shell pm clear` membuat app crash saat start (`No assemblies found … Fast Deployment`). Untuk mengosongkan data: `adb uninstall` lalu `-t:Install` ulang.
+- **MobileApp**: `MediaPicker.PickPhotoAsync` usang di MAUI 10 → `PickPhotosAsync` + `SelectionLimit = 1`; resize/kompresi/rotasi cukup lewat `MediaPickerOptions` (`MaximumWidth/Height`, `CompressionQuality`, `RotateImage`).
 
 ## 7. Cara Kerja & Verifikasi
 
 - Setiap fase: domain + unit test invariant → command/query + validator → EF config + migration → endpoint + permission → **verifikasi end-to-end** ke PostgreSQL lokal pada database sementara `intiplasma_verify` (dibuat & dihapus otomatis; database `intiplasma` milik user tidak disentuh).
 - User yang melakukan **commit & migrate** setelah tiap fase.
-- Status test saat ini: **507 test lulus** (147 domain, 81 application, 14 arsitektur, 68 MobileApp.UnitTests, 30 integration Web.Api, 167 integration Web.App).
+- Status test saat ini: **545 test lulus** (147 domain, 81 application, 14 arsitektur, 103 MobileApp.UnitTests, 33 integration Web.Api, 167 integration Web.App).
 - Verifikasi mobile (M0): emulator Android **API 34** (`intiplasma_api34`; image API 26 terlalu tua untuk WebView) + Web.Api `:5000` pada `intiplasma_verify`, diarahkan dengan `adb` (tap/teks/screencap). Integration test butuh mesin Podman berjalan (`podman machine start`).
 - Integration test (Testcontainers) **sudah bisa dijalankan** di mesin dev (container runtime tersedia) — `dotnet test IntiPlasma.slnx`.
 - Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario, Fase 7: 32 skenario, Fase 8: 35 skenario, Fase 9: 79 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.

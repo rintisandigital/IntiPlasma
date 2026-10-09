@@ -391,3 +391,161 @@ h1:focus, h2:focus, h4:focus {
   color: var(--White);
   font-size: 12px;
 }
+
+/* Daily recording & sync queue (M2) */
+.menubar-footer .inner-bar .icon {
+  position: relative;
+}
+
+.bar-badge {
+  position: absolute;
+  top: -6px;
+  right: -12px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background-color: var(--Red);
+  color: var(--White);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+
+.form-section {
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--Gray-3, #EDEDED);
+}
+
+.meta-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--Dark-4, #6B6B6B);
+}
+
+.usage-row {
+  padding: 12px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  background-color: var(--Primary-soft);
+}
+
+.usage-row .uom-select {
+  max-width: 110px;
+}
+
+.calculator {
+  padding: 12px;
+  border-radius: 12px;
+  background-color: var(--Primary-soft);
+}
+
+/* Buttons that keep their content width (the template makes every button full width). */
+.tf-btn.btn-auto {
+  width: auto;
+  flex-shrink: 0;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.tf-btn.btn-small {
+  width: auto;
+  height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+.link-btn,
+.link-btn:hover,
+.link-btn:focus {
+  width: auto;
+  padding: 0;
+  background: transparent;
+  color: var(--Primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.link-btn:disabled {
+  color: var(--Dark-4, #9E9E9E);
+}
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.photo-thumb {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  overflow: hidden;
+  background-color: var(--Primary-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-thumb .photo-flag {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, .55);
+  color: var(--White);
+  font-size: 10px;
+}
+
+.photo-thumb .photo-remove,
+.photo-thumb .photo-remove:hover {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 13px;
+  background: rgba(0, 0, 0, .55);
+  color: var(--White);
+  font-size: 12px;
+  line-height: 26px;
+}
+
+.result-state {
+  padding: 32px 8px;
+  text-align: center;
+}
+
+.result-state > .icon {
+  font-size: 56px;
+}
+
+.feature-tile.muted {
+  opacity: .6;
+}
+
+/* The offline banner sits above the bottom bar: keep the end of the page reachable. */
+.is-offline .app-content {
+  padding-bottom: 130px;
+}
+
+/* Outline buttons with a danger label keep their colors when pressed. */
+.tf-btn.style-1.text-danger:hover,
+.tf-btn.style-1.text-danger:focus,
+.tf-btn.style-1.text-danger:active {
+  background-color: var(--White);
+  color: var(--Red) !important;
+}

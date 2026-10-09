@@ -1,0 +1,114 @@
+@page "/siklus/{CycleId:guid}/recording"
+@implements IDisposable
+@inject RecordingService Recordings
+@inject PartnershipApi Partnership
+@inject SessionService Session
+@inject SyncEngine Sync
+
+@* Recording per siklus (PLAN-MOBILE §6.2): server entries and the ones still on the device, newest first. *@
+<AppPage Title="Recording Harian" BackTo="@(_cycle is null ? "/kandang" : $"/kandang/{_cycle.CoopId}")">
+    <HeaderAction>
+        @if (CanInput)
+        {
+            <a class="header-icon-btn" href="/input/recording?cycleId=@CycleId" aria-label="Input recording">
+                <i class="icon icon-plus"></i>
+            </a>
+        }
+    </HeaderAction>
+    <ChildContent>
+        @if (_cycle is not null)
+        {
+            <div class="detail-head mb-16">
+                <div class="text-caption-2 text-Primary">@_cycle.Number</div>
+                <h4 class="mt-4">@_cycle.CoopName</h4>
+                <div class="d-flex flex-wrap gap-8 mt-8">
+                    <StatusBadge Text="@Labels.CycleStatus(_cycle.Status)" Tone="@Labels.CycleTone(_cycle.Status)" />
+                    @if (_cycle.ChickInDate is { } chickIn)
+                    {
+                        <span class="chip"><i class="icon icon-calendar"></i>Chick-in @IdFormat.Date(chickIn)</span>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (_list is null)
+        {
+            <Spinner />
+        }
+        else
+        {
+            <CacheNote CachedAtUtc="_list.CachedAtUtc" />
+
+            @if (_list.ServerError is { } error)
+            {
+                <ErrorState Error="error" OnRetry="LoadAsync" />
+            }
+
+            @if (_list.Rows.Count == 0 && _list.ServerError is null)
+            {
+                <div class="empty-state">
+                    <i class="icon icon-edit"></i>
+                    <p class="body-2 text-dark-4 mt-8">Belum ada recording untuk siklus ini.</p>
+                </div>
+            }
+
+            @foreach (RecordingRow row in _list.Rows)
+            {
+                <a class="list-card" href="/recording/@row.Id">
+                    <div class="d-flex justify-content-between align-items-start gap-8">
+                        <div>
+                            <div class="text-button-small text-OnSurface">@IdFormat.Date(row.Date)</div>
+                            <div class="text-caption-2 text-dark-4">@(row.AgeDays is { } age ? $"Umur {age} hari" : "Umur —")</div>
+                        </div>
+                        <StatusBadge Text="@Labels.RecordingState(row.State)" Tone="@Labels.RecordingTone(row.State)" />
+                    </div>
+                    <div class="meta">
+                        <span>Mati @IdFormat.Number(row.Mortality) · Culling @IdFormat.Number(row.Culling)</span>
+                        <span>Pakan @IdFormat.Number(row.FeedKg, 1) kg</span>
+                        <span>BW @(row.AverageBodyWeightGram is { } bw ? $"{IdFormat.Number(bw, 0)} g" : "—")</span>
+                    </div>
+                    @if (row.Error is { } message && row.State == RecordingState.Failed)
+                    {
+                        <div class="field-error">@message</div>
+                    }
+                </a>
+            }
+        }
+    </ChildContent>
+</AppPage>
+
+@code {
+    private Cycle? _cycle;
+    private RecordingList? _list;
+
+    [Parameter]
+    public Guid CycleId { get; set; }
+
+    private bool CanInput =>
+        Session.Has(AppPermissions.ProductionRecord) && _cycle is { Status: "Active" or "Harvesting" };
+
+    protected override void OnInitialized() => Sync.Changed += OnQueueChanged;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        CachedResult<Cycle> cycle = await Partnership.GetCycleAsync(CycleId);
+        _cycle = cycle.IsSuccess ? cycle.Value : null;
+
+        await LoadAsync();
+    }
+
+    public void Dispose() => Sync.Changed -= OnQueueChanged;
+
+    private async Task LoadAsync() => _list = await Recordings.GetCycleRecordingsAsync(CycleId);
+
+    /// <summary>
+    /// An entry was sent, failed or queued: show its new state (stored server list, no extra request).
+    /// </summary>
+    private void OnQueueChanged(object? sender, EventArgs e) =>
+        _ = InvokeAsync(async () =>
+        {
+            DateTime? cachedAtUtc = _list?.CachedAtUtc;
+            _list = await Recordings.GetCycleRecordingsAsync(CycleId, refresh: false) with { CachedAtUtc = cachedAtUtc };
+            StateHasChanged();
+        });
+}

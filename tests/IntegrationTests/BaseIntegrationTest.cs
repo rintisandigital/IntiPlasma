@@ -10,11 +10,17 @@ public abstract class BaseIntegrationTest
 
     protected BaseIntegrationTest(IntegrationTestWebAppFactory factory)
     {
+        Services = factory.Services;
         HttpClient = factory.CreateClient();
         HttpClient.BaseAddress = new Uri(HttpClient.BaseAddress!, "api/v1/");
     }
 
     protected HttpClient HttpClient { get; }
+
+    /// <summary>
+    /// The API's services, for arranging data that would take many requests to build (stock, running cycles).
+    /// </summary>
+    protected IServiceProvider Services { get; }
 
     protected sealed record AccessTokens(string AccessToken, string RefreshToken);
 

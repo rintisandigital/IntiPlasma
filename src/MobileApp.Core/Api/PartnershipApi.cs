@@ -64,6 +64,9 @@ public sealed class PartnershipApi(ApiCache cache, ApiClient api)
             Path("cycles", ("coopId", Text(coopId)), ("page", "1"), ("pageSize", Text(PageSize))),
             cancellationToken);
 
+    public Task<CachedResult<Cycle>> GetCycleAsync(Guid id, CancellationToken cancellationToken = default) =>
+        cache.GetAsync<Cycle>($"cycles/{id}", cancellationToken);
+
     /// <summary>
     /// Items in stock in a warehouse (the farm warehouse of a coop).
     /// </summary>

@@ -465,7 +465,7 @@ Backend (domain + unit test → command/query + validator → EF config + migrat
 - **Web.App**: field & filter PPL di Farmers/Coops, menu **Partnership → Field Officer Assignment**.
 - **Klien**: list & detail **Peternak**, **Kandang**, **Kontrak** (+ siklus, stok kandang, lampiran), cache read-only, komponen List/Detail/Filter; filter PPL untuk Manager.
 
-### Fase M2 — Recording Harian (offline)
+### Fase M2 — Recording Harian (offline) ✅ (selesai 2026-10-09, task §15, realisasi §16)
 - **Backend**: `GET mobile/field-context`.
 - **Klien**: list & detail recording, form input, foto, `sync_queue` + `local_entries` + `SyncEngine`, Antrean Sinkron.
 
@@ -539,7 +539,7 @@ Backend (domain + unit test → command/query + validator → EF config + migrat
 - CSS template besar (`styles.css`) + Bootstrap: ukur ukuran & waktu render pertama; buang aturan yang tidak dipakai bila perlu (M10).
 
 ## 11. Status Keputusan
-- **Semua keputusan M-1 s.d. M-39 disepakati** 2026-10-08. Fase **M0 selesai** 2026-10-08 (§12); **M1 selesai** 2026-10-09 (§13 task, §14 realisasi); berikutnya **M2**.
+- **Semua keputusan M-1 s.d. M-39 disepakati** 2026-10-08. Fase **M0 selesai** 2026-10-08 (§12); **M1 selesai** 2026-10-09 (§13 task, §14 realisasi); **M2 selesai** 2026-10-09 (§15 task, §16 realisasi; M-40 s.d. M-45 disepakati); berikutnya **M3**.
 - 2026-10-09: M-38 direvisi — kontrak memakai lingkup cabang, bukan lingkup PPL.
 
 ---
@@ -717,3 +717,144 @@ Disusun 2026-10-09 dari pemetaan kode. Prasyarat: hasil M0 sudah di-commit.
 - `CoopCount` di list peternak menghitung semua kandang peternak (termasuk milik PPL lain); detail hanya menampilkan kandang dalam lingkup.
 - Logo header Beranda tampak gepeng di emulator (sudah ada sejak M0) → dirapikan di M4 (dashboard).
 - Setelah migrate M1 semua data belum ditugaskan: PPL tidak melihat apa pun sampai admin memakai **Field Officer Assignment** (*Unassigned* → PPL).
+
+---
+
+## 15. Daftar Task M2 — Recording Harian (offline) (urutan)
+
+Disusun 2026-10-09 dari pemetaan kode. Prasyarat: hasil M1 sudah di-commit (`44959f4`). **Tidak ada migration** di M2 (hanya skema SQLite lokal v2).
+
+### 15.1 Temuan yang memengaruhi desain
+- **`POST production/daily-recordings` sudah siap offline**:
+  - `id` dari klien → kirim ulang `id` yang sama mengembalikan id itu (idempotent di DB); `id` sama untuk siklus/tanggal lain → `409 DailyRecordings.IdBelongsToOtherRecording`.
+  - Tanggal yang sudah ada → `409 DailyRecordings.AlreadyRecorded`; maks +1 hari dari tanggal server (`FutureDate`).
+  - Siklus harus `Active`/`Harvesting` (`Cycles.NotRecordable`) dan ≥ chick-in (`Cycles.BeforeChickIn`); mati + culling ≤ populasi (`Cycles.PopulationExceeded`).
+  - Lingkup PPL sudah ditegakkan lewat `CycleLoader` (M1) → kandang yang sudah dipindah = `404 Cycles.NotFound`.
+- **Stok gudang kandang di server memblokir** (`StockBalance.Issue` → `Stock.Insufficient`), sedangkan di klien hanya peringatan (§3.6). Recording offline dengan stok cache basi akan berakhir **Gagal** saat sinkron → pesan Indonesia + bisa diedit.
+- **`POST attachments` idempotent** lewat `id` form (`AttachmentService.SaveAsync` mengembalikan lampiran yang ada). Lampiran wajib terunggah **sebelum** recording yang mereferensikannya.
+- **`GET items` tidak mengembalikan konversi satuan** (hanya detail) → konversi wajib dibundel di `field-context`; tanpa itu klien butuh satu request per item.
+- **`GET inventory/stock-balances` hanya memakai lingkup cabang** dan mengembalikan **nilai & HPP rata-rata** → field-context hanya mengirim kuantitas; endpoint stock-balances perlu lingkup PPL (ditunda dari M1, §13.3).
+- `ApiClient` (Core) **belum** mendukung header `Idempotency-Key` maupun upload multipart; belum ada `IClock` & `IPhotoPicker`; manifest Android belum punya izin `CAMERA`.
+- `LocalDb` baru v1 (`session`, `cache_entries`); `ClearUserDataAsync` menghapus semuanya → perlu aturan untuk antrean (antrean user lain ditahan, §3.3).
+- `ErrorMessages` belum memetakan kode recording/stok/siklus di atas; `CatalogSyncTests` otomatis memastikan kode yang dipetakan ada di Domain.
+- `CoopDetail` sudah punya tab **Siklus** → titik masuk list recording per siklus.
+
+### 15.2 Keputusan tambahan (disepakati 2026-10-09)
+| # | Topik | Usulan |
+|---|---|---|
+| M-40 | Isi `field-context` | Siklus `Active`/`Harvesting` dalam lingkup (kandang, peternak, gudang kandang, chick-in, populasi awal & berjalan, umur, **tanggal recording 14 hari terakhir**), item **Feed/OVK aktif** + konversi satuan, **kuantitas** stok gudang kandang (tanpa nilai/HPP), `serverDate`. Permission `production:read` (M3 menambah rentang bobot tanpa mengganti endpoint). |
+| M-41 | Lingkup `inventory/stock-balances` | User lingkup PPL hanya melihat **gudang kandang dalam lingkupnya** (gudang induk/lain tidak). User lain tetap memakai lingkup cabang. |
+| M-42 | Urutan & kegagalan sinkron | FIFO per siklus berdasarkan tanggal; item **Gagal tidak memblokir** item lain (server tidak mewajibkan tanggal berurutan). Lampiran gagal → recording-nya ikut ditahan. |
+| M-43 | Edit/hapus sebelum terkirim | Item `Pending`/`Gagal` bisa **diedit** (id tetap) atau **dihapus** dari Antrean; item `Sending` terkunci. Setelah `Done`, perubahan hanya lewat revisi (M8). |
+| M-44 | Foto | Maks **5 foto** per recording (batas server 20), dari kamera atau galeri, dikompres (sisi terpanjang 1600 px, JPEG 80%) dengan `Microsoft.Maui.Graphics` (tanpa paket baru). File disimpan di `AppDataDirectory/pending/` dan dihapus setelah terkirim. |
+| M-45 | Recording untuk Manager | Manager: list & detail recording **read-only** dari tab Siklus kandang (M-2). Input hanya untuk `production:record`. |
+
+### 15.3 Task
+1. **Backend — `GET mobile/field-context`**:
+   - `Application/Mobile/GetFieldContextQuery` (Dapper; lingkup cabang + `FieldScopeSql` untuk siklus/kandang); respons sesuai M-40.
+   - Endpoint `Web.Api/Endpoints/Mobile/MobileEndpoints.cs` (`Tags.Mobile`, `HasPermission(production:read)`).
+2. **Backend — lingkup `stock-balances`** (M-41): `GetStockBalancesQueryHandler` menerapkan `IFieldScope` (hanya gudang kandang dalam lingkup) bila user restricted.
+3. **Test backend** — integration Web.Api:
+   - field-context PPL A hanya berisi siklus PPL A, tanpa kolom nilai;
+   - recording dikirim dua kali dengan `id` sama → satu baris; `id` sama untuk tanggal lain → 409;
+   - lampiran diunggah ulang dengan `id` sama → satu lampiran;
+   - recording untuk siklus PPL lain → 404;
+   - stock-balances PPL hanya berisi gudang kandangnya.
+4. **MobileApp.Core — infrastruktur**:
+   - `ApiClient`: header `Idempotency-Key` pada POST, `PostMultipartAsync` (file + `id`).
+   - Abstraksi `IClock` (tanggal lokal `Asia/Jakarta`), `IPhotoPicker`, `IImageCompressor`, `IFileStore` (folder pending).
+   - `LocalDb` **v2**: tabel `field_context` (json + `fetched_at`), `sync_queue` (`id`, `user_id`, `kind`, `cycle_id`, `date`, payload, path file, status, `attempts`, `next_attempt_at`, `last_error_code/message`, `created_at`) dan `local_entries` (tampilan "Belum terkirim").
+   - `ClearUserDataAsync` tidak menghapus antrean user lain (ditahan + peringatan, §3.3); logout dengan antrean belum terkirim → konfirmasi.
+5. **MobileApp.Core — recording**:
+   - DTO `FieldContext`, `DailyRecording` (+ usage, revisi), `CreateDailyRecordingRequest`.
+   - `ProductionApi`: field-context (disimpan ke `field_context`), list/detail recording (via `ApiCache`), create, upload lampiran.
+   - `RecordingDraft` + validator:
+     - tanggal ≤ hari ini & ≥ chick-in, belum ada di server maupun lokal;
+     - mati + culling ≤ populasi berjalan dikurangi entri lokal;
+     - pemakaian > stok = **peringatan**, bukan blokir.
+     - Stok & populasi di form sudah dikurangi entri lokal yang belum terkirim.
+   - `SyncQueue` (enqueue, edit, hapus, daftar, jumlah per status).
+   - `SyncEngine`:
+     - satu proses pada satu waktu; lampiran dulu, lalu recording;
+     - klasifikasi: `2xx` → Done; jaringan/`5xx`/`429` → Pending + backoff 30 dtk → 5 mnt; `400/404/409` → Gagal; `401` → tahan sampai login;
+     - setelah Done, segarkan field-context & cache recording siklus itu;
+     - event jumlah antrean untuk badge.
+   - `ErrorMessages`:
+     - `DailyRecordings.AlreadyRecorded/FutureDate/IdBelongsToOtherRecording/UsageItemNotAllowed`;
+     - `Cycles.NotRecordable/BeforeChickIn/PopulationExceeded`;
+     - `Stock.Insufficient`, `Items.ConversionToBaseUom`, `Attachments.*`;
+     - `Cycles.NotFound` saat sinkron → "Kandang sudah tidak menjadi tanggung jawab Anda" (§10).
+   - Unit test: migrasi v2, antrean & SyncEngine (urutan, retry/backoff, klasifikasi, header idempotensi, antrean user lain ditahan), validator draft, penggabungan data lokal ke list.
+6. **MobileApp — platform**:
+   - Implementasi `IPhotoPicker` (MAUI `MediaPicker`), kompresi, `IClock`; izin `CAMERA` di manifest.
+   - Pemicu sinkron: koneksi kembali (`IConnectivity.Changed`) & aplikasi kembali ke depan (`Window.Resumed`).
+7. **MobileApp — UI**:
+   - **Input** (`/input`, ganti placeholder `DailyInput`): kartu Recording Harian; Stok Ayam (M3) & Request Pakan (M9) masih "Segera hadir".
+   - **Form Recording** (`/input/recording?cycleId=`):
+     - pilih kandang/siklus (dari field-context), tanggal (default hari ini; tanggal yang sudah terisi ditandai), umur & populasi;
+     - mati, culling, BW + **kalkulator sampel timbang** (total berat ÷ jumlah ekor);
+     - baris pemakaian (item, satuan, qty, stok tersedia + peringatan), catatan, foto;
+     - Simpan → antrean → langsung dikirim bila online → halaman sukses ("Terkirim" / "Tersimpan, akan dikirim saat online");
+     - tombol "Perbarui data" (field-context).
+   - **List recording per siklus** (`/siklus/{id}/recording`, dari tab Siklus di detail Kandang): data server + lokal dengan status Terkirim / Belum terkirim / Gagal; tombol Input untuk PPL.
+   - **Detail recording**: nilai, pemakaian, riwayat revisi, lampiran (server) atau nilai + status + Edit/Hapus (lokal).
+   - **Antrean Sinkron** (`/antrean`, ganti placeholder `SyncQueue`): item Pending/Gagal + pesan, Kirim ulang, Edit, Hapus, "Sinkronkan sekarang"; info antrean milik user lain.
+   - Badge antrean di header `MainLayout`; ringkasan "n belum terkirim" di Beranda.
+8. **Verifikasi** (emulator API 34, `intiplasma_verify` + data demo, `ppl.bdg` / `ppl2.bdg` / `manager.bdg`):
+   - Input recording online + 1 foto → muncul di WebApp Daily Recordings, stok gudang kandang berkurang.
+   - **Mode pesawat** → 2 hari recording + foto → online → terkirim otomatis **tanpa dobel** (cek DB: recording & lampiran).
+   - Konflik: tanggal yang sama diinput dulu di WebApp → item Gagal "sudah ada recording"; stok tidak cukup → Gagal; edit → kirim ulang sukses.
+   - Kandang dipindah ke `ppl2.bdg` saat antrean belum terkirim → Gagal "Kandang sudah tidak menjadi tanggung jawab Anda".
+   - `manager.bdg`: list & detail recording read-only, tanpa tombol Input.
+9. **Dokumentasi**: realisasi §16, status §8/§11, RANGKUMAN.
+
+### 15.4 Di luar lingkup M2
+- Revisi recording dari mobile → M8 (lewat approval). Stok ayam harian → M3. Grafik → M4.
+- Sinkron di latar belakang (WorkManager) → backlog (§3.6).
+- Pembersihan lampiran yatim di server (lampiran sudah terunggah tetapi recording-nya dihapus dari antrean) → backlog.
+
+---
+
+## 16. Realisasi Fase M2 — Recording Harian (offline) (2026-10-09)
+
+### 16.1 Backend
+- **`GET mobile/field-context`** (`Application/Mobile/GetFieldContext.cs`, `Web.Api/Endpoints/Mobile/MobileEndpoints.cs`, tag `Mobile`, permission `production:read`), sesuai M-40:
+  - siklus `Active`/`Harvesting` dalam lingkup cabang + PPL: kandang, peternak, gudang kandang, chick-in, populasi awal & berjalan, tanggal recording terakhir, tanggal recording 14 hari terakhir;
+  - item Feed/OVK aktif + satuan (satuan dasar faktor 1 lebih dulu, lalu konversi);
+  - **kuantitas** stok Feed/OVK di gudang kandang siklus tersebut (tanpa nilai/HPP);
+  - `serverDate` & `generatedAtUtc`.
+- **Lingkup PPL di stok (M-41)**: `GET inventory/stock-balances` hanya gudang kandang dalam lingkup; `GET inventory/stock-card` untuk gudang di luar lingkup → 404 `Warehouses.NotFound`.
+- Endpoint recording, lampiran & idempotensi tidak berubah (sudah siap offline sejak Fase 4/9). **Tidak ada migration.**
+
+### 16.2 MobileApp.Core
+- `ApiClient`: `PostAsync<T>(…, idempotencyKey)` (header `Idempotency-Key`) dan `PostFileAsync<T>` (multipart `file` + `id`).
+- Abstraksi `IClock` (`JakartaClock`, UTC+7) dan `IPhotoPicker`.
+- **`LocalDb` v2**: tabel `sync_queue` (per user; status `Pending`/`Sending`/`Failed`, percobaan, waktu coba berikutnya, kode & pesan error). Baris dihapus setelah server menerima, sehingga tabel ini juga menjadi daftar "Belum terkirim" — tabel `local_entries` & `field_context` dari §3.5 **tidak dibuat** (field-context disimpan di `cache_entries`). `ClearUserDataAsync` tidak menghapus antrean: entri user lain ditahan sampai pemiliknya masuk lagi.
+- **`ProductionApi`** (field-context, list/detail recording lewat `ApiCache`), `PartnershipApi.GetCycleAsync`.
+- **`RecordingDraft` + `RecordingRules`**: tanggal ≤ hari ini & ≥ chick-in, belum ada di server (14 hari) maupun di antrean; mati + culling ≤ populasi berjalan dikurangi entri antrean; pemakaian: gudang kandang wajib ada, item sekali, satuan valid, qty > 0; stok (dikurangi antrean) hanya **peringatan**; maks 5 foto; kalkulator sampel timbang.
+- **`SyncEngine`** (M-42): satu proses pada satu waktu, urut tanggal; foto diunggah dulu (status per foto disimpan, tidak diunggah ulang), lalu recording dengan `Idempotency-Key` = id. Klasifikasi: 2xx → hapus dari antrean + hapus file foto; jaringan/5xx/429 → Pending + backoff 30 dtk → 5 mnt (proses berhenti); 401 → ditahan; 4xx lain → Gagal (entri lain tetap jalan). `Cycles.NotFound` → "Kandang sudah tidak menjadi tanggung jawab Anda…". Setelah ada yang terkirim, field-context & list recording siklus disegarkan. Pemicu: koneksi kembali, timer 30 dtk, aplikasi aktif lagi (`Window.Resumed`), sesudah login, tombol "Sinkronkan".
+- **`RecordingService`** (M-43): simpan/ubah (id tetap) → antrean → langsung dikirim bila online; kirim ulang; hapus (beserta foto); list siklus = server (cache) + lokal, terbaru dulu.
+- `ErrorMessages`: kode recording, siklus, stok, item & lampiran.
+
+### 16.3 MobileApp
+- **Input** (`/input`): kartu Recording Harian (Stok Ayam M3 & Request Pakan M9 masih "Segera hadir") + status recording hari ini per siklus (Belum diisi / Belum terkirim / Gagal / Terkirim).
+- **Form Recording** (`/input/recording?cycleId=` | `?id=` untuk ubah entri antrean): data per tanggal field-context + "Perbarui data", pilih kandang (otomatis bila hanya satu), tanggal (maks hari ini), umur & populasi tersedia, mati/culling, BW + kalkulator, baris pemakaian (satuan default = satuan terbesar, stok tersedia), catatan, foto kamera/galeri (`MediaPicker` MAUI 10: maks 1600 px, JPEG 80, diputar tegak), peringatan stok → tombol "Simpan tetap"; halaman hasil Terkirim / Tersimpan di perangkat / Ditolak server (+ "Ubah data").
+- **Recording per siklus** (`/siklus/{id}/recording`, dari tab Siklus detail Kandang) + **Detail** (`/recording/{id}`: entri lokal dengan Kirim ulang/Ubah/Hapus, atau data server dengan pemakaian, revisi, lampiran). Manager read-only (M-45).
+- **Antrean Sinkron** (`/antrean`): status, pesan error, jumlah percobaan, Kirim ulang/Ubah/Hapus, "Sinkronkan", info entri milik user lain. Badge jumlah antrean di bottom bar + kartu "n data belum terkirim" di Beranda.
+- Manifest: izin `CAMERA`, `READ_EXTERNAL_STORAGE` (≤ API 32), query intent `IMAGE_CAPTURE`.
+- Foto diunggah dengan nama `recording-YYYYMMDD-n.jpg`.
+
+### 16.4 Pengujian & verifikasi
+- **Test: 545 lulus** — 147 domain, 81 application, 14 arsitektur, **103 MobileApp.UnitTests** (+35: aturan draft, `SyncEngine`, `RecordingService`, antrean `LocalDb`), **33 integration Web.Api** (+3 `MobileRecordingTests`: isi field-context & tanpa nilai, replay antrean tanpa dobel + 409 + 404 lingkup, lingkup stock-balances/stock-card), 167 integration Web.App.
+- **API** pada `intiplasma_verify` + data demo: field-context `ppl.bdg` hanya siklus Inti Lembang, `ppl2.bdg` hanya Ahmad 2, `manager.bdg` keduanya; stock-balances PPL hanya gudang kandangnya.
+- **Emulator API 34**:
+  - `ppl.bdg` online: recording 3 mati, 1 culling, BW 650, 3 SAK pakan + 1 foto → "Recording terkirim"; DB: 150 kg pakan, 1 lampiran (≈26 KB).
+  - `ppl2.bdg` **mode pesawat** (tanggal 07–08/10 dikosongkan di DB verifikasi): 07/10 + foto dan 08/10 tersimpan di perangkat (badge 1 → 2); 07/10 kedua ditolak lokal ("sudah ada di antrean"); 09/10 ikut diantre sementara admin lebih dulu menginput 09/10 lewat API.
+  - Mode pesawat dimatikan → sinkron otomatis: 07 & 08/10 terkirim (DB: satu baris per tanggal, foto tertaut), 09/10 **Gagal** "Recording untuk tanggal ini sudah ada…"; dihapus dari antrean → badge hilang.
+  - List recording siklus & detail (tab Lampiran) tampil; `manager.bdg` melihat list tanpa tombol input.
+
+### 16.5 Catatan
+- Perbaikan saat verifikasi: banner offline menutupi tombol paling bawah (ruang bawah ditambah saat offline); tombol outline "Hapus" berubah biru saat ditekan (warna dikunci).
+- Tanggal di `input type=date` ditampilkan WebView sesuai locale perangkat (emulator en-US: `10/09/2026`); nilai yang dikirim tetap ISO.
+- Pemindahan kandang saat antrean belum terkirim (→ Gagal dengan pesan lingkup) diuji di unit test & integration test, tidak diulang di emulator.
+- Lampiran yang sudah terunggah lalu entrinya dihapus dari antrean menjadi lampiran yatim di server (backlog, §15.4).

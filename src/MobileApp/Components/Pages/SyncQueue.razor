@@ -1,0 +1,166 @@
+@page "/antrean"
+@implements IDisposable
+@inject RecordingService Recordings
+@inject SyncEngine Sync
+@inject MobileApp.Core.Abstractions.IConnectivity Connectivity
+
+@* Antrean sinkron (PLAN-MOBILE §3.6 step 6, M-42, M-43): entries waiting or rejected, with their reason. *@
+<AppPage Title="Antrean Sinkron">
+    <div class="d-flex justify-content-between align-items-center mb-16 gap-12">
+        <span class="text-caption-1 text-dark-4">
+            @if (_entries.Count == 0)
+            {
+                <text>Semua data sudah terkirim.</text>
+            }
+            else
+            {
+                <text>@_entries.Count data belum terkirim</text>
+            }
+        </span>
+        <button type="button" class="tf-btn round-full btn-auto" disabled="@(_entries.Count == 0 || Sync.IsRunning || !Connectivity.IsOnline)" @onclick="SyncNowAsync">
+            @(Sync.IsRunning ? "Mengirim…" : "Sinkronkan")
+        </button>
+    </div>
+
+    @if (!Connectivity.IsOnline && _entries.Count > 0)
+    {
+        <div class="alert alert-warning" role="alert">Tidak ada koneksi. Data dikirim otomatis saat online kembali.</div>
+    }
+
+    @if (_heldForOthers > 0)
+    {
+        <div class="alert alert-info" role="alert">
+            @_heldForOthers data milik pengguna lain tersimpan di perangkat ini dan akan dikirim saat pengguna itu masuk kembali.
+        </div>
+    }
+
+    @if (_message is not null)
+    {
+        <div class="alert alert-info" role="alert">@_message</div>
+    }
+
+    @if (_entries.Count == 0)
+    {
+        <div class="empty-state">
+            <i class="icon icon-CheckCircle"></i>
+            <p class="body-2 text-dark-4 mt-8">Tidak ada antrean.</p>
+        </div>
+    }
+
+    @foreach (LocalRecording entry in _entries)
+    {
+        <div class="list-card">
+            <a href="/recording/@entry.Draft.Id" class="d-block">
+                <div class="d-flex justify-content-between align-items-start gap-8">
+                    <div>
+                        <div class="text-caption-2 text-Primary">Recording · @IdFormat.Date(entry.Draft.Date)</div>
+                        <div class="text-button-small text-OnSurface">@entry.Draft.CoopName</div>
+                    </div>
+                    <StatusBadge Text="@Labels.RecordingState(entry.State)" Tone="@Labels.RecordingTone(entry.State)" />
+                </div>
+                <div class="meta">
+                    <span>Mati @IdFormat.Number(entry.Draft.Mortality) · Culling @IdFormat.Number(entry.Draft.Culling)</span>
+                    @if (entry.Draft.Photos.Count > 0)
+                    {
+                        <span><i class="icon icon-camera"></i>@entry.Draft.Photos.Count foto</span>
+                    }
+                    @if (entry.Item.Attempts > 0)
+                    {
+                        <span>Percobaan @entry.Item.Attempts</span>
+                    }
+                </div>
+                @if (entry.Item.ErrorMessage is { } error)
+                {
+                    <div class="field-error">@error</div>
+                }
+            </a>
+            @if (entry.State != RecordingState.Sending)
+            {
+                <div class="d-flex gap-8 mt-12">
+                    <button type="button" class="tf-btn style-1 round-full btn-small" disabled="@(!Connectivity.IsOnline)" @onclick="() => RetryAsync(entry)">Kirim ulang</button>
+                    <a class="tf-btn style-1 round-full btn-small" href="/input/recording?id=@entry.Draft.Id">Ubah</a>
+                    <button type="button" class="tf-btn style-1 round-full btn-small text-danger" @onclick="() => _toDelete = entry">Hapus</button>
+                </div>
+            }
+        </div>
+    }
+</AppPage>
+
+<ConfirmSheet Visible="_toDelete is not null"
+              Title="Hapus dari antrean?"
+              Message="Data dan fotonya dihapus dari perangkat dan tidak akan dikirim ke server."
+              ConfirmText="Hapus"
+              OnClose="CloseDeleteAsync" />
+
+@code {
+    private IReadOnlyList<LocalRecording> _entries = [];
+    private int _heldForOthers;
+    private LocalRecording? _toDelete;
+    private string? _message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Sync.Changed += OnQueueChanged;
+        Connectivity.Changed += OnQueueChanged;
+        await LoadAsync();
+    }
+
+    public void Dispose()
+    {
+        Sync.Changed -= OnQueueChanged;
+        Connectivity.Changed -= OnQueueChanged;
+    }
+
+    private async Task LoadAsync()
+    {
+        _entries = await Recordings.GetLocalListAsync();
+        _heldForOthers = await Recordings.CountHeldForOtherUsersAsync();
+    }
+
+    private async Task SyncNowAsync()
+    {
+        _message = null;
+        SyncRun run = await Sync.RunAsync();
+        await LoadAsync();
+
+        _message = run switch
+        {
+            { Sent: 0, Failed: 0 } => _entries.Count > 0 ? "Belum ada yang terkirim. Periksa koneksi lalu coba lagi." : null,
+            { Failed: 0 } => $"{run.Sent} data terkirim.",
+            _ => $"{run.Sent} data terkirim, {run.Failed} ditolak server."
+        };
+    }
+
+    private async Task RetryAsync(LocalRecording entry)
+    {
+        _message = null;
+        SaveOutcome outcome = await Recordings.RetryAsync(entry.Draft.Id);
+        await LoadAsync();
+
+        _message = outcome.State switch
+        {
+            SaveState.Sent => "Recording terkirim.",
+            SaveState.Failed => null,
+            _ => "Belum terkirim. Data akan dicoba lagi otomatis."
+        };
+    }
+
+    private async Task CloseDeleteAsync(bool confirmed)
+    {
+        LocalRecording? entry = _toDelete;
+        _toDelete = null;
+
+        if (confirmed && entry is not null)
+        {
+            await Recordings.DeleteAsync(entry.Draft.Id);
+            await LoadAsync();
+        }
+    }
+
+    private void OnQueueChanged(object? sender, EventArgs e) =>
+        _ = InvokeAsync(async () =>
+        {
+            await LoadAsync();
+            StateHasChanged();
+        });
+}

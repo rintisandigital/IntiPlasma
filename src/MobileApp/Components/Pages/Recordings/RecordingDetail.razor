@@ -1,0 +1,236 @@
+@page "/recording/{Id:guid}"
+@inject RecordingService Recordings
+@inject ProductionApi Production
+@inject NavigationManager Navigation
+
+@* Detail recording (PLAN-MOBILE §6.2): an entry still on the device (status, edit, delete, send again) or the
+   server's recording with usage, revision history and attachments. *@
+<AppPage Title="Detail Recording" BackTo="@BackTo">
+    @if (_local is { } local)
+    {
+        RecordingDraft draft = local.Draft;
+        <div class="detail-head mb-16">
+            <div class="text-caption-2 text-Primary">@draft.CycleNumber</div>
+            <h4 class="mt-4">@draft.CoopName</h4>
+            <div class="d-flex flex-wrap gap-8 mt-8">
+                <StatusBadge Text="@Labels.RecordingState(local.State)" Tone="@Labels.RecordingTone(local.State)" />
+                <span class="chip"><i class="icon icon-calendar"></i>@IdFormat.Date(draft.Date)</span>
+            </div>
+        </div>
+
+        @if (local.Item.ErrorMessage is { } message)
+        {
+            <div class="alert @(local.State == RecordingState.Failed ? "alert-danger" : "alert-warning")" role="alert">
+                @message
+                @if (local.State == RecordingState.Pending && local.Item.NextAttemptAtUtc is { } next)
+                {
+                    <div class="text-caption-2 mt-4">Dicoba lagi sekitar pukul @next.ToLocalTime().ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture).</div>
+                }
+            </div>
+        }
+
+        <div class="info-list">
+            <div class="row-item"><span class="label">Mati</span><span>@IdFormat.Number(draft.Mortality) ekor</span></div>
+            <div class="row-item"><span class="label">Culling</span><span>@IdFormat.Number(draft.Culling) ekor</span></div>
+            <div class="row-item"><span class="label">BW rata-rata</span><span>@(draft.AverageBodyWeightGram is { } bw ? $"{IdFormat.Number(bw, 1)} g" : "—")</span></div>
+            <div class="row-item"><span class="label">Catatan</span><span class="text-end">@(draft.Notes ?? "—")</span></div>
+        </div>
+
+        <h6 class="mt-24 mb-8">Pemakaian</h6>
+        @if (draft.Usages.Count == 0)
+        {
+            <p class="body-2 text-dark-4">Tidak ada pemakaian.</p>
+        }
+        else
+        {
+            <div class="info-list">
+                @foreach (UsageInput usage in draft.Usages)
+                {
+                    FieldItem? item = _context?.FindItem(usage.ItemId);
+                    <div class="row-item">
+                        <span>@(item?.Name ?? "Item")</span>
+                        <span class="fw-6">@IdFormat.Number(usage.Quantity, 2) @(item?.Uoms.FirstOrDefault(u => u.UomId == usage.UomId)?.Code)</span>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (draft.Photos.Count > 0)
+        {
+            <h6 class="mt-24 mb-8">Foto</h6>
+            <LocalPhotos Photos="draft.Photos" />
+        }
+
+        @if (local.State != RecordingState.Sending)
+        {
+            <div class="d-grid gap-12 mt-24">
+                <button type="button" class="tf-btn round-full" disabled="@_busy" @onclick="RetryAsync">Kirim ulang</button>
+                <a class="tf-btn style-1 round-full" href="/input/recording?id=@draft.Id">Ubah</a>
+                <button type="button" class="tf-btn style-1 round-full text-danger" @onclick="() => _confirmDelete = true">Hapus</button>
+            </div>
+        }
+    }
+    else if (_error is not null)
+    {
+        <ErrorState Error="_error" OnRetry="LoadAsync" />
+    }
+    else if (_server is not { } recording)
+    {
+        <Spinner />
+    }
+    else
+    {
+        <CacheNote CachedAtUtc="_cachedAtUtc" />
+
+        <div class="detail-head mb-16">
+            <h4>@IdFormat.Date(recording.Date)</h4>
+            <div class="d-flex flex-wrap gap-8 mt-8">
+                <StatusBadge Text="Terkirim" Tone="Labels.Tone.Success" />
+                <span class="chip">Umur @recording.AgeDays hari</span>
+                @if (recording.RevisionNumber > 0)
+                {
+                    <span class="chip">Revisi @recording.RevisionNumber</span>
+                }
+            </div>
+        </div>
+
+        <Tabs Items="TabNames" @bind-Active="_tab" />
+
+        @if (_tab == "Data")
+        {
+            <div class="info-list">
+                <div class="row-item"><span class="label">Mati</span><span>@IdFormat.Number(recording.Mortality) ekor</span></div>
+                <div class="row-item"><span class="label">Culling</span><span>@IdFormat.Number(recording.Culling) ekor</span></div>
+                <div class="row-item"><span class="label">BW rata-rata</span><span>@(recording.AverageBodyWeightGram is { } bw ? $"{IdFormat.Number(bw, 1)} g" : "—")</span></div>
+                <div class="row-item"><span class="label">Pakan</span><span>@IdFormat.Number(recording.FeedKg, 2) kg</span></div>
+                <div class="row-item"><span class="label">Catatan</span><span class="text-end">@(recording.Notes ?? "—")</span></div>
+            </div>
+
+            <h6 class="mt-24 mb-8">Pemakaian</h6>
+            @if (recording.Usages is not { Count: > 0 } usages)
+            {
+                <p class="body-2 text-dark-4">Tidak ada pemakaian.</p>
+            }
+            else
+            {
+                <div class="info-list">
+                    @foreach (RecordingUsage usage in usages)
+                    {
+                        <div class="row-item">
+                            <span><span class="text-caption-2 text-dark-4">@usage.ItemCode</span><br />@usage.ItemName</span>
+                            <span class="text-end fw-6">
+                                @IdFormat.Number(usage.Quantity, 2) @usage.UomCode
+                                @if (usage.UomCode != usage.BaseUomCode)
+                                {
+                                    <br /><span class="text-caption-2 text-dark-4">@IdFormat.Number(usage.BaseQuantity, 2) @usage.BaseUomCode</span>
+                                }
+                            </span>
+                        </div>
+                    }
+                </div>
+            }
+        }
+        else if (_tab == "Revisi")
+        {
+            @if (recording.Revisions is not { Count: > 0 } revisions)
+            {
+                <p class="body-2 text-dark-4">Belum pernah direvisi.</p>
+            }
+            else
+            {
+                @foreach (RecordingRevision revision in revisions)
+                {
+                    <div class="list-card">
+                        <div class="text-button-small text-OnSurface">Revisi @revision.RevisionNumber</div>
+                        <div class="text-caption-2 text-dark-4">@IdFormat.DateTime(revision.RevisedAtUtc.ToLocalTime())</div>
+                        <p class="body-2 mt-4">@revision.Reason</p>
+                    </div>
+                }
+            }
+        }
+        else
+        {
+            <AttachmentList Ids="recording.Documents" />
+        }
+    }
+</AppPage>
+
+<ConfirmSheet Visible="_confirmDelete"
+              Title="Hapus recording ini?"
+              Message="Data dan fotonya dihapus dari perangkat dan tidak akan dikirim ke server."
+              ConfirmText="Hapus"
+              OnClose="CloseDeleteAsync" />
+
+@code {
+    private static readonly string[] TabNames = ["Data", "Revisi", "Lampiran"];
+
+    private LocalRecording? _local;
+    private FieldContext? _context;
+    private DailyRecording? _server;
+    private DateTime? _cachedAtUtc;
+    private ApiError? _error;
+    private string _tab = "Data";
+    private bool _busy;
+    private bool _confirmDelete;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private string BackTo => (_local?.Draft.CycleId ?? _server?.CycleId) is { } cycleId ? $"/siklus/{cycleId}/recording" : "/antrean";
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        _local = await Recordings.FindLocalAsync(Id);
+
+        if (_local is not null)
+        {
+            _context = (await Recordings.GetContextAsync(refresh: false)) is { IsSuccess: true } context ? context.Value : null;
+
+            return;
+        }
+
+        CachedResult<DailyRecording> result = await Production.GetRecordingAsync(Id);
+        if (result.IsSuccess)
+        {
+            _server = result.Value;
+            _cachedAtUtc = result.CachedAtUtc;
+        }
+        else
+        {
+            _error = result.Error;
+        }
+    }
+
+    private async Task RetryAsync()
+    {
+        _busy = true;
+        SaveOutcome outcome = await Recordings.RetryAsync(Id);
+        _busy = false;
+
+        await LoadAsync();
+
+        if (outcome.State == SaveState.Sent)
+        {
+            // Now on the server: show it from there.
+            _local = null;
+        }
+    }
+
+    private async Task CloseDeleteAsync(bool confirmed)
+    {
+        _confirmDelete = false;
+        if (!confirmed || _local is null)
+        {
+            return;
+        }
+
+        Guid cycleId = _local.Draft.CycleId;
+        if (await Recordings.DeleteAsync(Id))
+        {
+            Navigation.NavigateTo($"/siklus/{cycleId}/recording", replace: true);
+        }
+    }
+}

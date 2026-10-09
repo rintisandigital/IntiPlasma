@@ -7,14 +7,16 @@
 @* Layout of every page after sign-in: page content (header included) + bottom bar from permissions (§6.1). *@
 @if (Session is { IsSignedIn: true, User: { } user })
 {
-    @if (!_online)
-    {
-        <div class="app-banner offline">Offline — data yang tampil dari penyimpanan perangkat</div>
-    }
+    <div class="@(_online ? null : "is-offline")">
+        @if (!_online)
+        {
+            <div class="app-banner offline">Offline — data yang tampil dari penyimpanan perangkat</div>
+        }
 
-    @Body
+        @Body
 
-    <BottomBar User="user" />
+        <BottomBar User="user" />
+    </div>
 }
 
 @code {

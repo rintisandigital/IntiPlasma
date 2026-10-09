@@ -45,4 +45,5 @@ public static class Tags
     public const string TaxReports = "Finance - Tax Reports";
     public const string Monitoring = "System - Monitoring";
     public const string Attachments = "Attachments";
+    public const string Mobile = "Mobile";
 }

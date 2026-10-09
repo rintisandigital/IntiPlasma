@@ -76,12 +76,17 @@ public sealed record StockCardLine
     public decimal BalanceValue { get; init; }
 }
 
-internal sealed class GetStockBalancesQueryHandler(IDbConnectionFactory dbConnectionFactory, IBranchAccess branchAccess)
+/// <remarks>A PPL (field scope, PLAN-MOBILE M-41) only sees the warehouses of the coops assigned to them.</remarks>
+internal sealed class GetStockBalancesQueryHandler(
+    IDbConnectionFactory dbConnectionFactory,
+    IBranchAccess branchAccess,
+    IFieldScope fieldScope)
     : IQueryHandler<GetStockBalancesQuery, PagedList<StockBalanceResponse>>
 {
-    private const string Filter =
-        """
+    private static readonly string Filter =
+        $"""
         WHERE (@AllBranches OR w.branch_id = ANY(@BranchIds))
+          AND {FieldScopeSql.CoopId("w.coop_id")}
           AND (@BranchId::uuid IS NULL OR w.branch_id = @BranchId)
           AND (@WarehouseId::uuid IS NULL OR s.warehouse_id = @WarehouseId)
           AND (@ItemId::uuid IS NULL OR s.item_id = @ItemId)
@@ -101,6 +106,7 @@ internal sealed class GetStockBalancesQueryHandler(IDbConnectionFactory dbConnec
     public async Task<Result<PagedList<StockBalanceResponse>>> Handle(GetStockBalancesQuery query, CancellationToken cancellationToken)
     {
         BranchScope scope = await branchAccess.GetScopeAsync(cancellationToken);
+        FieldScope field = await fieldScope.GetScopeAsync(cancellationToken);
 
         await using DbConnection connection = await dbConnectionFactory.OpenConnectionAsync(cancellationToken);
 
@@ -122,6 +128,8 @@ internal sealed class GetStockBalancesQueryHandler(IDbConnectionFactory dbConnec
             {
                 scope.AllBranches,
                 scope.BranchIds,
+                FieldRestricted = field.Restricted,
+                FieldUserId = field.UserId,
                 query.BranchId,
                 query.WarehouseId,
                 query.ItemId,
@@ -132,7 +140,10 @@ internal sealed class GetStockBalancesQueryHandler(IDbConnectionFactory dbConnec
     }
 }
 
-internal sealed class GetStockCardQueryHandler(IDbConnectionFactory dbConnectionFactory, IBranchAccess branchAccess)
+internal sealed class GetStockCardQueryHandler(
+    IDbConnectionFactory dbConnectionFactory,
+    IBranchAccess branchAccess,
+    IFieldScope fieldScope)
     : IQueryHandler<GetStockCardQuery, StockCardResponse>
 {
     public async Task<Result<StockCardResponse>> Handle(GetStockCardQuery query, CancellationToken cancellationToken)
@@ -141,7 +152,7 @@ internal sealed class GetStockCardQueryHandler(IDbConnectionFactory dbConnection
 
         const string sql =
             """
-            SELECT w.branch_id FROM master.warehouses w WHERE w.id = @WarehouseId;
+            SELECT w.branch_id AS BranchId, w.coop_id AS CoopId FROM master.warehouses w WHERE w.id = @WarehouseId;
 
             SELECT COALESCE(SUM(e.quantity), 0) AS Quantity, COALESCE(SUM(e.value), 0) AS Value
             FROM inventory.stock_ledger_entries e
@@ -159,13 +170,13 @@ internal sealed class GetStockCardQueryHandler(IDbConnectionFactory dbConnection
         await using SqlMapper.GridReader multi = await connection.QueryMultipleAsync(
             new CommandDefinition(sql, new { query.WarehouseId, query.ItemId, query.From, query.To }, cancellationToken: cancellationToken));
 
-        Guid? branchId = await multi.ReadSingleOrDefaultAsync<Guid?>();
-        if (branchId is null)
+        WarehouseRow? warehouse = await multi.ReadSingleOrDefaultAsync<WarehouseRow>();
+        if (warehouse is null || !await CanAccessAsync(warehouse, cancellationToken))
         {
             return Result.Failure<StockCardResponse>(WarehouseErrors.NotFound(query.WarehouseId));
         }
 
-        Result access = await branchAccess.EnsureAccessAsync(branchId.Value, cancellationToken);
+        Result access = await branchAccess.EnsureAccessAsync(warehouse.BranchId, cancellationToken);
         if (access.IsFailure)
         {
             return Result.Failure<StockCardResponse>(access.Error);
@@ -190,5 +201,18 @@ internal sealed class GetStockCardQueryHandler(IDbConnectionFactory dbConnection
             query.WarehouseId, query.ItemId, query.From, query.To, opening.Quantity, opening.Value, quantity, value, lines);
     }
 
+    /// <summary>
+    /// A PPL only sees the warehouses of the coops assigned to them (PLAN-MOBILE M-41).
+    /// </summary>
+    private async Task<bool> CanAccessAsync(WarehouseRow warehouse, CancellationToken cancellationToken)
+    {
+        FieldScope field = await fieldScope.GetScopeAsync(cancellationToken);
+
+        return !field.Restricted
+            || warehouse.CoopId is { } coopId && await fieldScope.CanAccessCoopAsync(coopId, cancellationToken);
+    }
+
     private sealed record Opening(decimal Quantity, decimal Value);
+
+    private sealed record WarehouseRow(Guid BranchId, Guid? CoopId);
 }

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -15,6 +16,8 @@ namespace MobileApp.Core.Api;
 public sealed class ApiClient(HttpClient httpClient, IAppSettings settings)
 {
     public const string ApiPrefix = "api/v1/";
+
+    public const string IdempotencyKeyHeader = "Idempotency-Key";
 
     /// <summary>
     /// Same conventions as Web.Api: camelCase properties, enums as strings.
@@ -58,6 +61,50 @@ public sealed class ApiClient(HttpClient httpClient, IAppSettings settings)
     public async Task<ApiResult<T>> PostAsync<T>(string path, object? body, CancellationToken cancellationToken = default)
     {
         using HttpRequestMessage request = CreateWithBody(HttpMethod.Post, path, body);
+
+        return await SendAsync<T>(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// A create with the <c>Idempotency-Key</c> header (PLAN-MOBILE §3.6): the offline queue uses the document id, so
+    /// a resend after a lost response is answered with the first result.
+    /// </summary>
+    public async Task<ApiResult<T>> PostAsync<T>(
+        string path,
+        object? body,
+        Guid idempotencyKey,
+        CancellationToken cancellationToken = default)
+    {
+        using HttpRequestMessage request = CreateWithBody(HttpMethod.Post, path, body);
+        request.Headers.Add(IdempotencyKeyHeader, idempotencyKey.ToString());
+
+        return await SendAsync<T>(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// A multipart upload of one file (form field <c>file</c>) with an optional client id (form field <c>id</c>),
+    /// as <c>POST attachments</c> expects.
+    /// </summary>
+    public async Task<ApiResult<T>> PostFileAsync<T>(
+        string path,
+        byte[] content,
+        string fileName,
+        string contentType,
+        Guid? id,
+        CancellationToken cancellationToken = default)
+    {
+        using var form = new MultipartFormDataContent();
+        using var file = new ByteArrayContent(content);
+        file.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        form.Add(file, "file", fileName);
+
+        using var idField = new StringContent(id?.ToString() ?? string.Empty);
+        if (id is not null)
+        {
+            form.Add(idField, "id");
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, BuildUri(settings.ServerUrl, path)) { Content = form };
 
         return await SendAsync<T>(request, cancellationToken);
     }

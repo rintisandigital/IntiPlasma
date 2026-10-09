@@ -54,7 +54,8 @@
             <LoaderList Loader="_cycles" EmptyText="Belum ada siklus di kandang ini." EmptyIcon="icon-timeline"
                         OnLoadMore="() => _cycles.LoadMoreAsync()" OnRetry="() => _cycles.ReloadAsync()">
                 <ItemTemplate Context="cycle">
-                    <div class="list-card @(cycle.Id == _coop.OpenCycleId ? "highlight" : null)">
+                    <a class="list-card @(cycle.Id == _coop.OpenCycleId ? "highlight" : null)"
+                       href="@(cycle.ChickInDate is null ? null : $"/siklus/{cycle.Id}/recording")">
                         <div class="d-flex justify-content-between align-items-start gap-8">
                             <div>
                                 <div class="text-caption-2 text-Primary">@(cycle.ContractCode ?? "Tanpa kontrak")</div>
@@ -74,7 +75,11 @@
                                 <span>Panen @IdFormat.Number(cycle.HarvestedBirds) ekor · @IdFormat.Tons(cycle.HarvestedWeightKg)</span>
                             }
                         </div>
-                    </div>
+                        @if (cycle.ChickInDate is not null)
+                        {
+                            <div class="text-caption-2 text-Primary mt-8">Lihat recording harian ›</div>
+                        }
+                    </a>
                 </ItemTemplate>
             </LoaderList>
         }

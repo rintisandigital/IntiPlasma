@@ -1,5 +1,7 @@
 @implements IDisposable
 @inject NavigationManager Navigation
+@inject RecordingService Recordings
+@inject SyncEngine Sync
 
 @* Template "menubar-footer": first four available features + Lainnya (AppFeatures.BottomBar). *@
 <div class="menubar-footer footer-fixed">
@@ -10,6 +12,10 @@
                 <a href="@feature.Route">
                     <div class="icon">
                         <i class="@feature.Icon"></i>
+                        @if (feature == AppFeatures.SyncQueue && _queued > 0)
+                        {
+                            <span class="bar-badge">@(_queued > 99 ? "99+" : _queued)</span>
+                        }
                     </div>
                     <div class="text-caption-3 text">@feature.Title</div>
                 </a>
@@ -22,9 +28,33 @@
     [Parameter, EditorRequired]
     public CurrentUser User { get; set; } = default!;
 
-    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+    private int _queued;
 
-    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+    protected override async Task OnInitializedAsync()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        Sync.Changed += OnQueueChanged;
+        await CountAsync();
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+        Sync.Changed -= OnQueueChanged;
+    }
+
+    /// <summary>
+    /// Entries of the offline queue not sent yet (badge on "Antrean").
+    /// </summary>
+    private async Task CountAsync() =>
+        _queued = AppFeatures.SyncQueue.IsAvailable(User) ? (await Recordings.GetLocalListAsync()).Count : 0;
+
+    private void OnQueueChanged(object? sender, EventArgs e) =>
+        _ = InvokeAsync(async () =>
+        {
+            await CountAsync();
+            StateHasChanged();
+        });
 
     private bool IsActive(AppFeature feature)
     {

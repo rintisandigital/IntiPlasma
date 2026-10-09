@@ -28,8 +28,37 @@ public sealed class LocalDb(string databasePath) : IDisposable
             json TEXT NOT NULL,
             fetched_at TEXT NOT NULL
         );
+        """,
+
+        // v2 (M2): offline entries waiting to be sent (PLAN-MOBILE §3.6). A row is deleted once the server took it,
+        // so the table also serves as the list of "Belum terkirim" entries.
+        """
+        CREATE TABLE sync_queue (
+            id TEXT NOT NULL PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            cycle_id TEXT NOT NULL,
+            date TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            status TEXT NOT NULL,
+            attempts INTEGER NOT NULL,
+            next_attempt_at TEXT NULL,
+            error_code TEXT NULL,
+            error_message TEXT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE INDEX ix_sync_queue_user ON sync_queue (user_id, date, created_at);
         """
     ];
+
+    private const string QueueSelect =
+        """
+        SELECT id, user_id, kind, cycle_id, date, payload, status, attempts, next_attempt_at, error_code, error_message,
+               created_at, updated_at
+        FROM sync_queue
+        """;
 
     private readonly SemaphoreSlim _initialization = new(1, 1);
     private bool _initialized;
@@ -118,7 +147,8 @@ public sealed class LocalDb(string databasePath) : IDisposable
     }
 
     /// <summary>
-    /// Removes everything that belongs to the signed-in user (on logout or when another user signs in).
+    /// Removes the session and the cached responses (on logout or when another user signs in). The sync queue
+    /// stays: its entries are sent once their owner signs in again (PLAN-MOBILE §3.3).
     /// </summary>
     public async Task ClearUserDataAsync(CancellationToken cancellationToken = default)
     {
@@ -187,6 +217,123 @@ public sealed class LocalDb(string databasePath) : IDisposable
         await ExecuteAsync(connection, null, "DELETE FROM cache_entries;", cancellationToken);
     }
 
+    public async Task SaveQueueItemAsync(SyncItem item, CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        await using SqliteConnection connection = await OpenAsync(cancellationToken);
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO sync_queue (id, user_id, kind, cycle_id, date, payload, status, attempts, next_attempt_at,
+                                    error_code, error_message, created_at, updated_at)
+            VALUES ($id, $userId, $kind, $cycleId, $date, $payload, $status, $attempts, $nextAttemptAt,
+                    $errorCode, $errorMessage, $createdAt, $updatedAt)
+            ON CONFLICT (id) DO UPDATE SET
+                cycle_id = excluded.cycle_id, date = excluded.date, payload = excluded.payload, status = excluded.status,
+                attempts = excluded.attempts, next_attempt_at = excluded.next_attempt_at, error_code = excluded.error_code,
+                error_message = excluded.error_message, updated_at = excluded.updated_at;
+            """;
+        command.Parameters.AddWithValue("$id", item.Id.ToString());
+        command.Parameters.AddWithValue("$userId", item.UserId.ToString());
+        command.Parameters.AddWithValue("$kind", item.Kind);
+        command.Parameters.AddWithValue("$cycleId", item.CycleId.ToString());
+        command.Parameters.AddWithValue("$date", item.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$payload", item.Payload);
+        command.Parameters.AddWithValue("$status", item.Status.ToString());
+        command.Parameters.AddWithValue("$attempts", item.Attempts);
+        command.Parameters.AddWithValue("$nextAttemptAt", (object?)Text(item.NextAttemptAtUtc) ?? DBNull.Value);
+        command.Parameters.AddWithValue("$errorCode", (object?)item.ErrorCode ?? DBNull.Value);
+        command.Parameters.AddWithValue("$errorMessage", (object?)item.ErrorMessage ?? DBNull.Value);
+        command.Parameters.AddWithValue("$createdAt", Text(item.CreatedAtUtc));
+        command.Parameters.AddWithValue("$updatedAt", Text(item.UpdatedAtUtc));
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<SyncItem?> GetQueueItemAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        await using SqliteConnection connection = await OpenAsync(cancellationToken);
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = QueueSelect + " WHERE id = $id;";
+        command.Parameters.AddWithValue("$id", id.ToString());
+
+        return (await ReadQueueAsync(command, cancellationToken)).SingleOrDefault();
+    }
+
+    /// <summary>
+    /// The queue of one user, oldest entry date first (the order in which it is sent).
+    /// </summary>
+    public async Task<IReadOnlyList<SyncItem>> GetQueueAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        await using SqliteConnection connection = await OpenAsync(cancellationToken);
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = QueueSelect + " WHERE user_id = $userId ORDER BY date, created_at;";
+        command.Parameters.AddWithValue("$userId", userId.ToString());
+
+        return await ReadQueueAsync(command, cancellationToken);
+    }
+
+    /// <summary>
+    /// Entries of other users on this device, held until their owner signs in again.
+    /// </summary>
+    public async Task<int> CountQueueOfOtherUsersAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        await using SqliteConnection connection = await OpenAsync(cancellationToken);
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM sync_queue WHERE user_id <> $userId;";
+        command.Parameters.AddWithValue("$userId", userId.ToString());
+
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture);
+    }
+
+    public async Task DeleteQueueItemAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        await using SqliteConnection connection = await OpenAsync(cancellationToken);
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM sync_queue WHERE id = $id;";
+        command.Parameters.AddWithValue("$id", id.ToString());
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task<List<SyncItem>> ReadQueueAsync(SqliteCommand command, CancellationToken cancellationToken)
+    {
+        var items = new List<SyncItem>();
+
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            items.Add(new SyncItem
+            {
+                Id = Guid.Parse(reader.GetString(0)),
+                UserId = Guid.Parse(reader.GetString(1)),
+                Kind = reader.GetString(2),
+                CycleId = Guid.Parse(reader.GetString(3)),
+                Date = DateOnly.ParseExact(reader.GetString(4), "yyyy-MM-dd", CultureInfo.InvariantCulture),
+                Payload = reader.GetString(5),
+                Status = Enum.Parse<SyncStatus>(reader.GetString(6)),
+                Attempts = reader.GetInt32(7),
+                NextAttemptAtUtc = reader.GetValue(8) is string next ? Time(next) : null,
+                ErrorCode = reader.GetValue(9) as string,
+                ErrorMessage = reader.GetValue(10) as string,
+                CreatedAtUtc = Time(reader.GetString(11)),
+                UpdatedAtUtc = Time(reader.GetString(12))
+            });
+        }
+
+        return items;
+    }
+
+    private static string Text(DateTime utc) => utc.ToString("O", CultureInfo.InvariantCulture);
+
+    private static string? Text(DateTime? utc) => utc?.ToString("O", CultureInfo.InvariantCulture);
+
+    private static DateTime Time(string text) => DateTime.Parse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+
     private async Task<SqliteConnection> OpenAsync(CancellationToken cancellationToken)
     {
         var connection = new SqliteConnection(new SqliteConnectionStringBuilder
@@ -225,6 +372,70 @@ public sealed class LocalDb(string databasePath) : IDisposable
         return (T)Convert.ChangeType(value!, typeof(T), CultureInfo.InvariantCulture);
     }
 #pragma warning restore CA2100
+}
+
+public enum SyncStatus
+{
+    /// <summary>
+    /// Waiting to be sent (also after a network failure, until <see cref="SyncItem.NextAttemptAtUtc"/>).
+    /// </summary>
+    Pending,
+
+    /// <summary>
+    /// Being sent right now.
+    /// </summary>
+    Sending,
+
+    /// <summary>
+    /// Rejected by the server; the user edits it and sends it again, or deletes it.
+    /// </summary>
+    Failed
+}
+
+/// <summary>
+/// An entry of the offline queue. <see cref="Id"/> is the id of the document sent to the server.
+/// </summary>
+public sealed record SyncItem
+{
+    public Guid Id { get; init; }
+
+    /// <summary>
+    /// Owner: only sent while this user is signed in.
+    /// </summary>
+    public Guid UserId { get; init; }
+
+    /// <summary>
+    /// One of <see cref="SyncKinds"/>.
+    /// </summary>
+    public string Kind { get; init; } = SyncKinds.Recording;
+
+    public Guid CycleId { get; init; }
+
+    public DateOnly Date { get; init; }
+
+    /// <summary>
+    /// The entry as JSON (e.g. a recording draft with its photos).
+    /// </summary>
+    public string Payload { get; init; } = "{}";
+
+    public SyncStatus Status { get; init; }
+
+    public int Attempts { get; init; }
+
+    public DateTime? NextAttemptAtUtc { get; init; }
+
+    public string? ErrorCode { get; init; }
+
+    public string? ErrorMessage { get; init; }
+
+    public DateTime CreatedAtUtc { get; init; }
+
+    public DateTime UpdatedAtUtc { get; init; }
+}
+
+public static class SyncKinds
+{
+    public const string Recording = "Recording";
 }
 
 /// <param name="Json">The response body as stored (camelCase JSON).</param>

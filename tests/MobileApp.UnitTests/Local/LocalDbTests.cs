@@ -52,6 +52,53 @@ public sealed class LocalDbTests : IDisposable
         (await db.GetValueAsync("current_user")).ShouldBeNull();
     }
 
+    [Fact]
+    public async Task QueueItems_Should_RoundTrip_InSendingOrder_AndSurviveLogout()
+    {
+        // Arrange
+        using var db = new LocalDb(_path);
+        var user = Guid.NewGuid();
+        var now = new DateTime(2026, 10, 9, 3, 0, 0, DateTimeKind.Utc);
+        SyncItem later = Item(user, new DateOnly(2026, 10, 9), now);
+        SyncItem earlier = Item(user, new DateOnly(2026, 10, 8), now) with
+        {
+            Status = SyncStatus.Failed,
+            Attempts = 2,
+            NextAttemptAtUtc = now.AddMinutes(1),
+            ErrorCode = "Stock.Insufficient",
+            ErrorMessage = "Stok tidak cukup"
+        };
+
+        // Act
+        await db.SaveQueueItemAsync(later);
+        await db.SaveQueueItemAsync(earlier);
+        await db.SaveQueueItemAsync(Item(Guid.NewGuid(), new DateOnly(2026, 10, 7), now));
+        await db.SaveQueueItemAsync(later with { Payload = "{\"mortality\":3}" });
+        await db.ClearUserDataAsync();
+
+        // Assert
+        IReadOnlyList<SyncItem> queue = await db.GetQueueAsync(user);
+        queue.Select(i => i.Id).ShouldBe([earlier.Id, later.Id]);
+        queue[0].ShouldBe(earlier);
+        queue[1].Payload.ShouldBe("{\"mortality\":3}");
+        (await db.CountQueueOfOtherUsersAsync(user)).ShouldBe(1);
+
+        await db.DeleteQueueItemAsync(later.Id);
+        (await db.GetQueueItemAsync(later.Id)).ShouldBeNull();
+    }
+
+    private static SyncItem Item(Guid userId, DateOnly date, DateTime now) => new()
+    {
+        Id = Guid.CreateVersion7(),
+        UserId = userId,
+        CycleId = Guid.NewGuid(),
+        Date = date,
+        Payload = "{}",
+        Status = SyncStatus.Pending,
+        CreatedAtUtc = now,
+        UpdatedAtUtc = now
+    };
+
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

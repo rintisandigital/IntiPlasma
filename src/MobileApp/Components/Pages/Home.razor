@@ -1,5 +1,6 @@
 @page "/"
 @inject SessionService Session
+@inject RecordingService Recordings
 
 @* Dashboard (PLAN-MOBILE §6.2). M0 shows the user and the menu; the role-specific content comes in M4. *@
 @if (Session.User is { } user)
@@ -26,6 +27,19 @@
                 </div>
             </div>
 
+            @if (_queued > 0)
+            {
+                <a class="list-card highlight mt-16" href="/antrean">
+                    <div class="d-flex justify-content-between align-items-center gap-8">
+                        <div>
+                            <div class="text-button-small text-OnSurface">@_queued data belum terkirim</div>
+                            <div class="text-caption-2 text-dark-4">Dikirim otomatis saat online. Ketuk untuk melihat antrean.</div>
+                        </div>
+                        <i class="icon icon-upload"></i>
+                    </div>
+                </a>
+            }
+
             <h5 class="mt-24 mb-12">Menu</h5>
             <div class="feature-grid">
                 @foreach (AppFeature feature in MenuTiles(user))
@@ -45,6 +59,10 @@
 }
 
 @code {
+    private int _queued;
+
+    protected override async Task OnInitializedAsync() => _queued = (await Recordings.GetLocalListAsync()).Count;
+
     private static IEnumerable<AppFeature> MenuTiles(CurrentUser user) =>
         AppFeatures.All.Where(f =>
             f.Phase is not null

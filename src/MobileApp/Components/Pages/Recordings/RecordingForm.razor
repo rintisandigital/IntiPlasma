@@ -1,0 +1,488 @@
+@page "/input/recording"
+@implements IDisposable
+@inject RecordingService Recordings
+@inject IPhotoPicker Photos
+@inject MobileApp.Core.Abstractions.IConnectivity Connectivity
+
+@* Input recording harian (PLAN-MOBILE §6.2, §3.6): works offline from the stored field context; saving puts the
+   entry in the sync queue and sends it right away when online. Id = edit an entry that is still in the queue. *@
+<AppPage Title="@(Id is null ? "Recording Harian" : "Ubah Recording")" BackTo="@(Id is null ? "/input" : "/antrean")">
+    @if (_outcome is not null)
+    {
+        <div class="result-state">
+            @switch (_outcome.State)
+            {
+                case SaveState.Sent:
+                    <i class="icon icon-CheckCircle text-success"></i>
+                    <h5 class="mt-16">Recording terkirim</h5>
+                    <p class="body-2 text-dark-4 mt-8">Data sudah tersimpan di server.</p>
+                    break;
+                case SaveState.Queued:
+                    <i class="icon icon-upload text-warning"></i>
+                    <h5 class="mt-16">Tersimpan di perangkat</h5>
+                    <p class="body-2 text-dark-4 mt-8">Recording akan dikirim otomatis saat ada koneksi. @_outcome.Message</p>
+                    break;
+                default:
+                    <i class="icon icon-alert text-danger"></i>
+                    <h5 class="mt-16">Ditolak server</h5>
+                    <p class="body-2 text-dark-4 mt-8">@_outcome.Message</p>
+                    <p class="text-caption-2 text-dark-4 mt-4">Data tetap ada di Antrean; ubah lalu kirim ulang, atau hapus.</p>
+                    break;
+            }
+            <div class="d-grid gap-12 mt-24">
+                @if (_outcome.State == SaveState.Failed)
+                {
+                    <button type="button" class="tf-btn round-full" @onclick="EditAgain">Ubah data</button>
+                }
+                <a class="tf-btn style-1 round-full" href="/siklus/@_draftCycleId/recording">Lihat recording siklus</a>
+                <a class="tf-btn style-1 round-full" href="/input">Kembali ke Input</a>
+            </div>
+        </div>
+    }
+    else if (_loadError is not null)
+    {
+        <div class="empty-state">
+            <i class="icon icon-globe"></i>
+            <p class="body-2 text-dark-4 mt-8">@_loadError</p>
+            <button type="button" class="tf-btn style-1 round-full mt-12" @onclick="() => LoadAsync(refresh: true)">Coba lagi</button>
+        </div>
+    }
+    else if (_context is null)
+    {
+        <Spinner />
+    }
+    else
+    {
+        <div class="d-flex justify-content-between align-items-center mb-12">
+            <span class="text-caption-2 text-dark-4">Data per @IdFormat.DateTime(_context.GeneratedAtUtc.ToLocalTime())</span>
+            <button type="button" class="link-btn" disabled="@(_refreshing || !Connectivity.IsOnline)" @onclick="() => LoadAsync(refresh: true)">
+                @(_refreshing ? "Memperbarui…" : "Perbarui data")
+            </button>
+        </div>
+
+        @if (_context.Cycles.Count == 0)
+        {
+            <div class="empty-state">
+                <i class="icon icon-buildings"></i>
+                <p class="body-2 text-dark-4 mt-8">Tidak ada siklus berjalan di kandang tanggung jawab Anda.</p>
+            </div>
+        }
+        else
+        {
+            <div class="form-section">
+                <label class="label text-caption-1" for="cycle">Kandang / siklus</label>
+                <select id="cycle" class="form-select mt-8" value="@_cycleKey" @onchange="OnCycleChanged">
+                    <option value="">— Pilih kandang —</option>
+                    @foreach (FieldCycle cycle in _context.Cycles)
+                    {
+                        <option value="@cycle.Id">@cycle.CoopName — @cycle.Number</option>
+                    }
+                </select>
+                <FieldError Message="@_check?.ErrorFor(RecordingRules.Cycle)" />
+
+                @if (Cycle is { } selected)
+                {
+                    <div class="meta-line mt-8">
+                        <span>Chick-in @IdFormat.Date(selected.ChickInDate)</span>
+                        <span>Populasi @IdFormat.Number(Population) ekor</span>
+                        <span>Terakhir @(selected.LastRecordingDate is { } last ? IdFormat.Date(last) : "—")</span>
+                    </div>
+                }
+
+                <label class="label text-caption-1 mt-16" for="date">Tanggal</label>
+                <input id="date" type="date" class="form-control mt-8" max="@Recordings.Today.ToString("yyyy-MM-dd")" @bind="_date" />
+                @if (Cycle is { } c)
+                {
+                    <div class="text-caption-2 text-dark-4 mt-4">Umur @c.AgeOn(_date) hari</div>
+                }
+                <FieldError Message="@_check?.ErrorFor(RecordingRules.Date)" />
+            </div>
+
+            <div class="form-section">
+                <h6 class="mb-12">Deplesi & bobot</h6>
+                <div class="row g-12">
+                    <div class="col-6">
+                        <label class="label text-caption-1" for="mortality">Mati (ekor)</label>
+                        <input id="mortality" type="number" inputmode="numeric" min="0" class="form-control mt-8" @bind="_mortality" />
+                    </div>
+                    <div class="col-6">
+                        <label class="label text-caption-1" for="culling">Culling (ekor)</label>
+                        <input id="culling" type="number" inputmode="numeric" min="0" class="form-control mt-8" @bind="_culling" />
+                    </div>
+                </div>
+                <FieldError Message="@_check?.ErrorFor(RecordingRules.Mortality)" />
+
+                <label class="label text-caption-1 mt-16" for="bw">BW rata-rata (gram, opsional)</label>
+                <div class="d-flex gap-8 mt-8">
+                    <input id="bw" type="number" inputmode="decimal" step="any" min="0" class="form-control" @bind="_bodyWeight" />
+                    <button type="button" class="tf-btn style-1 round-full btn-auto" @onclick="() => _showCalculator = !_showCalculator">Timbang</button>
+                </div>
+                @if (_showCalculator)
+                {
+                    <div class="calculator mt-8">
+                        <div class="row g-8">
+                            <div class="col-6">
+                                <label class="text-caption-2" for="sample-kg">Berat sampel (kg)</label>
+                                <input id="sample-kg" type="number" inputmode="decimal" step="any" min="0" class="form-control mt-4" @bind="_sampleKg" />
+                            </div>
+                            <div class="col-6">
+                                <label class="text-caption-2" for="sample-birds">Jumlah ekor</label>
+                                <input id="sample-birds" type="number" inputmode="numeric" min="0" class="form-control mt-4" @bind="_sampleBirds" />
+                            </div>
+                        </div>
+                        <button type="button" class="tf-btn round-full mt-8" disabled="@(RecordingRules.AverageGram(_sampleKg, _sampleBirds) is null)" @onclick="ApplySample">
+                            Pakai @(RecordingRules.AverageGram(_sampleKg, _sampleBirds) is { } g ? $"{IdFormat.Number(g, 1)} g" : "hasil")
+                        </button>
+                    </div>
+                }
+                <FieldError Message="@_check?.ErrorFor(RecordingRules.BodyWeight)" />
+            </div>
+
+            <div class="form-section">
+                <h6 class="mb-12">Pemakaian pakan & OVK</h6>
+                @foreach (UsageRow row in _usages)
+                {
+                    FieldItem? item = Item(row);
+                    <div class="usage-row">
+                        <div class="d-flex gap-8">
+                            <select class="form-select" value="@row.ItemKey" @onchange="e => OnItemChanged(row, e)" aria-label="Item">
+                                <option value="">— Item —</option>
+                                @foreach (FieldItem option in _context.Items)
+                                {
+                                    <option value="@option.Id">@(option.IsFeed ? "Pakan" : "OVK") · @option.Name</option>
+                                }
+                            </select>
+                            <button type="button" class="header-icon-btn" aria-label="Hapus baris" @onclick="() => _usages.Remove(row)">
+                                <i class="icon icon-trash"></i>
+                            </button>
+                        </div>
+                        <div class="d-flex gap-8 mt-8">
+                            <input type="number" inputmode="decimal" step="any" min="0" class="form-control" placeholder="Jumlah" @bind="row.Quantity" aria-label="Jumlah" />
+                            <select class="form-select uom-select" @bind="row.UomKey" aria-label="Satuan">
+                                @foreach (FieldUom uom in item?.Uoms ?? [])
+                                {
+                                    <option value="@uom.UomId">@uom.Code</option>
+                                }
+                            </select>
+                        </div>
+                        @if (item is not null && Cycle is { } stockCycle)
+                        {
+                            <div class="text-caption-2 text-dark-4 mt-4">
+                                Stok gudang kandang: @IdFormat.Number(RecordingRules.AvailableStock(_context, stockCycle, item.Id, _others), 2) @item.BaseUomCode
+                            </div>
+                        }
+                    </div>
+                }
+                <button type="button" class="tf-btn style-1 round-full" @onclick="() => _usages.Add(new UsageRow())">
+                    <i class="icon icon-plus me-1"></i>Tambah pemakaian
+                </button>
+                <FieldError Message="@_check?.ErrorFor(RecordingRules.Usages)" />
+            </div>
+
+            <div class="form-section">
+                <h6 class="mb-12">Catatan & foto</h6>
+                <textarea class="form-control" rows="3" maxlength="1000" placeholder="Catatan (opsional)" @bind="_notes"></textarea>
+
+                @if (_photos.Count > 0)
+                {
+                    <LocalPhotos Photos="_photos" OnRemove="RemovePhoto" />
+                }
+                @if (_photos.Count < RecordingDraft.MaxPhotos)
+                {
+                    <div class="d-flex gap-8 mt-12">
+                        <button type="button" class="tf-btn style-1 round-full" disabled="@_picking" @onclick="() => AddPhotoAsync(camera: true)">
+                            <i class="icon icon-camera me-1"></i>Kamera
+                        </button>
+                        <button type="button" class="tf-btn style-1 round-full" disabled="@_picking" @onclick="() => AddPhotoAsync(camera: false)">
+                            <i class="icon icon-gallery me-1"></i>Galeri
+                        </button>
+                    </div>
+                }
+                <div class="text-caption-2 text-dark-4 mt-4">Maksimal @RecordingDraft.MaxPhotos foto.</div>
+                <FieldError Message="@_check?.ErrorFor(RecordingRules.Photos)" />
+            </div>
+
+            @if (_check is { Warnings.Count: > 0 })
+            {
+                <div class="alert alert-warning" role="alert">
+                    @foreach (string warning in _check.Warnings)
+                    {
+                        <div>@warning</div>
+                    }
+                </div>
+            }
+
+            <button type="button" class="tf-btn round-full w-100 mt-8" disabled="@_saving" @onclick="SaveAsync">
+                @if (_saving)
+                {
+                    <text>Menyimpan…</text>
+                }
+                else if (_check is { IsValid: true, Warnings.Count: > 0 })
+                {
+                    <text>Simpan tetap</text>
+                }
+                else
+                {
+                    <text>@(Connectivity.IsOnline ? "Simpan & kirim" : "Simpan di perangkat")</text>
+                }
+            </button>
+        }
+    }
+</AppPage>
+
+@code {
+    private readonly List<UsageRow> _usages = [];
+    private readonly List<DraftPhoto> _photos = [];
+    private readonly List<Guid> _newPhotos = [];
+    private readonly List<Guid> _removedPhotos = [];
+
+    private FieldContext? _context;
+    private List<RecordingDraft> _others = [];
+    private string? _loadError;
+    private bool _refreshing;
+    private Guid _draftId = Guid.CreateVersion7();
+    private Guid _draftCycleId;
+    private string _cycleKey = string.Empty;
+    private DateOnly _date;
+    private int _mortality;
+    private int _culling;
+    private decimal? _bodyWeight;
+    private bool _showCalculator;
+    private decimal? _sampleKg;
+    private int? _sampleBirds;
+    private string? _notes;
+    private bool _picking;
+    private bool _saving;
+    private bool _saved;
+    private RecordingCheck? _check;
+    private SaveOutcome? _outcome;
+
+    [SupplyParameterFromQuery]
+    public Guid? CycleId { get; set; }
+
+    /// <summary>
+    /// An entry of the sync queue to edit.
+    /// </summary>
+    [SupplyParameterFromQuery]
+    public Guid? Id { get; set; }
+
+    private FieldCycle? Cycle => Guid.TryParse(_cycleKey, out Guid id) ? _context?.FindCycle(id) : null;
+
+    private int Population => Cycle is { } cycle ? RecordingRules.AvailablePopulation(cycle, _others) : 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _date = Recordings.Today;
+
+        if (Id is { } id)
+        {
+            LocalRecording? local = await Recordings.FindLocalAsync(id);
+            if (local is null)
+            {
+                _loadError = "Recording ini sudah terkirim atau dihapus dari antrean.";
+
+                return;
+            }
+
+            Fill(local.Draft);
+        }
+        else if (CycleId is { } cycleId)
+        {
+            _cycleKey = cycleId.ToString();
+        }
+
+        await LoadAsync(refresh: Connectivity.IsOnline);
+    }
+
+    public void Dispose()
+    {
+        // Photos taken for an entry that was never saved.
+        if (!_saved)
+        {
+            Recordings.Files.DeleteAll(_newPhotos);
+        }
+    }
+
+    private async Task LoadAsync(bool refresh)
+    {
+        _refreshing = true;
+        _loadError = null;
+
+        CachedResult<FieldContext> result = await Recordings.GetContextAsync(refresh);
+        if (!result.IsSuccess && refresh)
+        {
+            // No connection or server error: work with the stored copy when there is one.
+            result = await Recordings.GetContextAsync(refresh: false);
+        }
+
+        _refreshing = false;
+
+        if (!result.IsSuccess)
+        {
+            _loadError = result.Error!.IsNetwork
+                ? "Data kandang belum tersimpan di perangkat. Hubungkan ke internet lalu coba lagi."
+                : result.Error.Message;
+
+            return;
+        }
+
+        _context = result.Value;
+        _others = [.. (await Recordings.GetLocalListAsync()).Select(l => l.Draft).Where(d => d.Id != _draftId)];
+
+        if (_context.Cycles.Count == 1 && string.IsNullOrEmpty(_cycleKey))
+        {
+            _cycleKey = _context.Cycles[0].Id.ToString();
+        }
+    }
+
+    private void Fill(RecordingDraft draft)
+    {
+        _draftId = draft.Id;
+        _cycleKey = draft.CycleId.ToString();
+        _date = draft.Date;
+        _mortality = draft.Mortality;
+        _culling = draft.Culling;
+        _bodyWeight = draft.AverageBodyWeightGram;
+        _notes = draft.Notes;
+        _usages.Clear();
+        _usages.AddRange(draft.Usages.Select(u => new UsageRow
+        {
+            ItemKey = u.ItemId.ToString(),
+            UomKey = u.UomId.ToString(),
+            Quantity = u.Quantity
+        }));
+        _photos.Clear();
+        _photos.AddRange(draft.Photos);
+    }
+
+    private void OnCycleChanged(ChangeEventArgs e)
+    {
+        _cycleKey = e.Value?.ToString() ?? string.Empty;
+        _check = null;
+    }
+
+    private void OnItemChanged(UsageRow row, ChangeEventArgs e)
+    {
+        row.ItemKey = e.Value?.ToString() ?? string.Empty;
+
+        // Feed is usually counted in sacks: default to the largest unit of the item.
+        row.UomKey = Item(row)?.Uoms.MaxBy(u => u.Factor)?.UomId.ToString() ?? string.Empty;
+    }
+
+    private FieldItem? Item(UsageRow row) =>
+        Guid.TryParse(row.ItemKey, out Guid id) ? _context?.FindItem(id) : null;
+
+    private void ApplySample()
+    {
+        _bodyWeight = RecordingRules.AverageGram(_sampleKg, _sampleBirds);
+        _showCalculator = false;
+    }
+
+    private async Task AddPhotoAsync(bool camera)
+    {
+        _picking = true;
+        var id = Guid.CreateVersion7();
+        string path = Recordings.Files.Prepare(id);
+
+        bool added = camera ? await Photos.CaptureAsync(path) : await Photos.PickAsync(path);
+        if (added)
+        {
+            _photos.Add(new DraftPhoto(id));
+            _newPhotos.Add(id);
+        }
+        else
+        {
+            Recordings.Files.Delete(id);
+        }
+
+        _picking = false;
+    }
+
+    private void RemovePhoto(DraftPhoto photo)
+    {
+        _photos.Remove(photo);
+
+        if (_newPhotos.Remove(photo.Id))
+        {
+            Recordings.Files.Delete(photo.Id);
+        }
+        else
+        {
+            _removedPhotos.Add(photo.Id);
+        }
+    }
+
+    private RecordingDraft BuildDraft()
+    {
+        FieldCycle? cycle = Cycle;
+
+        return new RecordingDraft
+        {
+            Id = _draftId,
+            CycleId = cycle?.Id ?? Guid.Empty,
+            CycleNumber = cycle?.Number ?? string.Empty,
+            CoopName = cycle?.CoopName ?? string.Empty,
+            Date = _date,
+            Mortality = _mortality,
+            Culling = _culling,
+            AverageBodyWeightGram = _bodyWeight is > 0 ? _bodyWeight : null,
+            Notes = _notes,
+            Usages =
+            [
+                .. _usages.Select(r => new UsageInput(
+                    Guid.TryParse(r.ItemKey, out Guid item) ? item : Guid.Empty,
+                    Guid.TryParse(r.UomKey, out Guid uom) ? uom : Guid.Empty,
+                    r.Quantity ?? 0))
+            ],
+            Photos = [.. _photos]
+        };
+    }
+
+    private async Task SaveAsync()
+    {
+        RecordingDraft draft = BuildDraft();
+        bool acknowledged = _check is { IsValid: true, Warnings.Count: > 0 };
+
+        _check = await Recordings.CheckAsync(_context!, draft);
+        if (!_check.IsValid || (_check.Warnings.Count > 0 && !acknowledged))
+        {
+            return;
+        }
+
+        _saving = true;
+        _outcome = await Recordings.SaveAsync(draft);
+        _saving = false;
+
+        if (_outcome.State != SaveState.Rejected)
+        {
+            _saved = true;
+            _draftCycleId = draft.CycleId;
+            Recordings.Files.DeleteAll(_removedPhotos);
+        }
+        else
+        {
+            _check.Errors[RecordingRules.Cycle] = _outcome.Message ?? "Gagal menyimpan.";
+            _outcome = null;
+        }
+    }
+
+    /// <summary>
+    /// Back to the form after the server rejected the entry; it stays in the queue and is updated on save.
+    /// </summary>
+    private void EditAgain()
+    {
+        _outcome = null;
+        _check = null;
+        _newPhotos.Clear();
+        _removedPhotos.Clear();
+    }
+
+    private sealed class UsageRow
+    {
+        public string ItemKey { get; set; } = string.Empty;
+
+        public string UomKey { get; set; } = string.Empty;
+
+        public decimal? Quantity { get; set; }
+    }
+}

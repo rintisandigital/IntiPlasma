@@ -2,7 +2,9 @@ using Microsoft.Extensions.Logging;
 using MobileApp.Core.Abstractions;
 using MobileApp.Core.Api;
 using MobileApp.Core.Local;
+using MobileApp.Core.Production;
 using MobileApp.Core.Session;
+using MobileApp.Core.Sync;
 using MobileApp.Services;
 
 namespace MobileApp;
@@ -38,6 +40,8 @@ public static class MauiProgram
         services.AddSingleton<Core.Abstractions.IConnectivity, MauiConnectivity>();
         services.AddSingleton<IAppSettings, MauiAppSettings>();
         services.AddSingleton<IExternalLauncher, MauiExternalLauncher>();
+        services.AddSingleton<IPhotoPicker, MauiPhotoPicker>();
+        services.AddSingleton<IClock, JakartaClock>();
 
         services.AddSingleton(_ => new LocalDb(Path.Combine(FileSystem.AppDataDirectory, "intiplasma.db3")));
         services.AddSingleton<TokenStore>();
@@ -60,5 +64,32 @@ public static class MauiProgram
         services.AddSingleton<ApiCache>();
         services.AddSingleton<PartnershipApi>();
         services.AddSingleton<SessionService>();
+
+        // Daily recording offline (M2): the queue only sends for the user who is signed in.
+        services.AddSingleton<ProductionApi>();
+        services.AddSingleton(_ => new PendingFiles(Path.Combine(FileSystem.AppDataDirectory, "pending")));
+        services.AddSingleton(sp => new SyncEngine(
+            sp.GetRequiredService<ApiClient>(),
+            sp.GetRequiredService<ProductionApi>(),
+            sp.GetRequiredService<LocalDb>(),
+            sp.GetRequiredService<PendingFiles>(),
+            sp.GetRequiredService<IClock>(),
+            sp.GetRequiredService<Core.Abstractions.IConnectivity>(),
+            CurrentUserId(sp)));
+        services.AddSingleton(sp => new RecordingService(
+            sp.GetRequiredService<ProductionApi>(),
+            sp.GetRequiredService<LocalDb>(),
+            sp.GetRequiredService<SyncEngine>(),
+            sp.GetRequiredService<PendingFiles>(),
+            sp.GetRequiredService<IClock>(),
+            sp.GetRequiredService<Core.Abstractions.IConnectivity>(),
+            CurrentUserId(sp)));
+    }
+
+    private static Func<Guid?> CurrentUserId(IServiceProvider services)
+    {
+        var session = new Lazy<SessionService>(services.GetRequiredService<SessionService>);
+
+        return () => session.Value is { IsSignedIn: true, User: { } user } ? user.Id : null;
     }
 }

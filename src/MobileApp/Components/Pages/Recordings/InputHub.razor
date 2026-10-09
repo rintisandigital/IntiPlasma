@@ -1,0 +1,129 @@
+@page "/input"
+@inject RecordingService Recordings
+@inject SessionService Session
+@inject MobileApp.Core.Abstractions.IConnectivity Connectivity
+
+@* Menu Input (PLAN-MOBILE §6.1): daily forms of the PPL and, per running cycle, whether today's recording is done. *@
+<AppPage Title="Input Harian">
+    <div class="feature-grid mb-24">
+        @if (Session.Has(AppPermissions.ProductionRecord))
+        {
+            <a class="feature-tile" href="/input/recording">
+                <i class="icon icon-edit"></i>
+                <span>Recording Harian</span>
+            </a>
+        }
+        @if (Session.Has(AppPermissions.ProductionStockReport))
+        {
+            <a class="feature-tile muted" href="/fitur/stok-ayam">
+                <i class="icon icon-chart"></i>
+                <span>Stok Ayam (M3)</span>
+            </a>
+        }
+        @if (Session.Has(AppPermissions.InventoryRequestFeed))
+        {
+            <a class="feature-tile muted" href="/fitur/request-pakan">
+                <i class="icon icon-download"></i>
+                <span>Request Pakan (M9)</span>
+            </a>
+        }
+    </div>
+
+    @if (Session.Has(AppPermissions.ProductionRecord))
+    {
+        <h5 class="mb-12">Recording hari ini</h5>
+
+        @if (_error is not null)
+        {
+            <ErrorState Error="_error" OnRetry="() => LoadAsync(refresh: true)" />
+        }
+        else if (_context is null)
+        {
+            <Spinner />
+        }
+        else if (_context.Cycles.Count == 0)
+        {
+            <div class="empty-state">
+                <i class="icon icon-buildings"></i>
+                <p class="body-2 text-dark-4 mt-8">Tidak ada siklus berjalan di kandang tanggung jawab Anda.</p>
+            </div>
+        }
+        else
+        {
+            <CacheNote CachedAtUtc="_cachedAtUtc" />
+            @foreach (FieldCycle cycle in _context.Cycles)
+            {
+                RecordingState? today = TodayState(cycle);
+                <a class="list-card" href="@(today is null ? $"/input/recording?cycleId={cycle.Id}" : $"/siklus/{cycle.Id}/recording")">
+                    <div class="d-flex justify-content-between align-items-start gap-8">
+                        <div>
+                            <div class="text-caption-2 text-Primary">@cycle.Number</div>
+                            <div class="text-button-small text-OnSurface">@cycle.CoopName</div>
+                        </div>
+                        @if (today is { } state)
+                        {
+                            <StatusBadge Text="@Labels.RecordingState(state)" Tone="@Labels.RecordingTone(state)" />
+                        }
+                        else
+                        {
+                            <StatusBadge Text="Belum diisi" Tone="Labels.Tone.Danger" />
+                        }
+                    </div>
+                    <div class="meta">
+                        <span><i class="icon icon-calendar"></i>Umur @cycle.AgeOn(Recordings.Today) hari</span>
+                        <span><i class="icon icon-human"></i>Populasi @IdFormat.Number(cycle.CurrentPopulation)</span>
+                        <span>Terakhir @(cycle.LastRecordingDate is { } last ? IdFormat.Date(last) : "—")</span>
+                    </div>
+                </a>
+            }
+        }
+    }
+</AppPage>
+
+@code {
+    private FieldContext? _context;
+    private DateTime? _cachedAtUtc;
+    private ApiError? _error;
+    private IReadOnlyList<LocalRecording> _local = [];
+
+    protected override Task OnInitializedAsync() =>
+        Session.Has(AppPermissions.ProductionRecord) ? LoadAsync(Connectivity.IsOnline) : Task.CompletedTask;
+
+    private async Task LoadAsync(bool refresh)
+    {
+        _error = null;
+
+        CachedResult<FieldContext> result = await Recordings.GetContextAsync(refresh);
+        if (!result.IsSuccess && refresh)
+        {
+            result = await Recordings.GetContextAsync(refresh: false);
+        }
+
+        _local = await Recordings.GetLocalListAsync();
+
+        if (result.IsSuccess)
+        {
+            _context = result.Value;
+            _cachedAtUtc = refresh && !result.IsFromCache ? null : result.Value.GeneratedAtUtc;
+        }
+        else
+        {
+            _error = result.Error;
+        }
+    }
+
+    /// <summary>
+    /// Sent when the server has today's date, otherwise the state of a queued entry, otherwise null (not done).
+    /// </summary>
+    private RecordingState? TodayState(FieldCycle cycle)
+    {
+        DateOnly today = Recordings.Today;
+
+        if (cycle.RecordedDates.Contains(today))
+        {
+            return RecordingState.Sent;
+        }
+
+        return _local.FirstOrDefault(l => l.Draft.CycleId == cycle.Id && l.Draft.Date == today)?.State;
+    }
+}
