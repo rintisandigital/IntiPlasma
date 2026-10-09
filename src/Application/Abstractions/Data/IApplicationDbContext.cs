@@ -22,12 +22,14 @@ using Domain.MasterData.Farmers;
 using Domain.MasterData.Items;
 using Domain.MasterData.TaxCodes;
 using Domain.MasterData.Uoms;
+using Domain.MasterData.WeightRanges;
 using Domain.MasterData.Vendors;
 using Domain.MasterData.Warehouses;
 using Domain.Partnership.Contracts;
 using Domain.Partnership.Cycles;
 using Domain.Procurement.PurchaseOrders;
 using Domain.Production.DailyRecordings;
+using Domain.Production.LiveBirdStock;
 using Domain.Roles;
 using Domain.Sales.CreditNotes;
 using Domain.Sales.DeliveryOrders;
@@ -55,6 +57,7 @@ public interface IApplicationDbContext
 
     DbSet<Branch> Branches { get; }
     DbSet<Uom> Uoms { get; }
+    DbSet<WeightRange> WeightRanges { get; }
     DbSet<TaxCode> TaxCodes { get; }
     DbSet<Item> Items { get; }
     DbSet<Warehouse> Warehouses { get; }
@@ -81,6 +84,7 @@ public interface IApplicationDbContext
     DbSet<StockReturn> StockReturns { get; }
 
     DbSet<DailyRecording> DailyRecordings { get; }
+    DbSet<LiveBirdStockEntry> LiveBirdStockEntries { get; }
 
     DbSet<SalesOrder> SalesOrders { get; }
     DbSet<DeliveryOrder> DeliveryOrders { get; }

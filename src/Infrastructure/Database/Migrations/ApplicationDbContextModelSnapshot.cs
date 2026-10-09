@@ -4077,6 +4077,75 @@ namespace Infrastructure.Database.Migrations
                     b.ToTable("warehouses", "master");
                 });
 
+            modelBuilder.Entity("Domain.MasterData.WeightRanges.WeightRange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<decimal?>("MaxWeightKg")
+                        .HasPrecision(8, 3)
+                        .HasColumnType("numeric(8,3)")
+                        .HasColumnName("max_weight_kg");
+
+                    b.Property<decimal?>("MinWeightKg")
+                        .HasPrecision(8, 3)
+                        .HasColumnType("numeric(8,3)")
+                        .HasColumnName("min_weight_kg");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_weight_ranges");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_weight_ranges_code");
+
+                    b.ToTable("weight_ranges", "master");
+                });
+
             modelBuilder.Entity("Domain.Partnership.Contracts.ContractIncentive", b =>
                 {
                     b.Property<Guid>("ContractId")
@@ -4830,6 +4899,92 @@ namespace Infrastructure.Database.Migrations
                         .HasDatabaseName("ix_daily_recording_usages_uom_id");
 
                     b.ToTable("daily_recording_usages", "production");
+                });
+
+            modelBuilder.Entity("Domain.Production.LiveBirdStock.LiveBirdStockEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AgeDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("age_days");
+
+                    b.Property<int>("Birds")
+                        .HasColumnType("integer")
+                        .HasColumnName("birds");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<Guid>("CoopId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("coop_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("CycleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cycle_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<decimal>("WeightKg")
+                        .HasPrecision(14, 3)
+                        .HasColumnType("numeric(14,3)")
+                        .HasColumnName("weight_kg");
+
+                    b.Property<Guid>("WeightRangeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("weight_range_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_live_bird_stock_entries");
+
+                    b.HasIndex("CoopId")
+                        .HasDatabaseName("ix_live_bird_stock_entries_coop_id");
+
+                    b.HasIndex("WeightRangeId")
+                        .HasDatabaseName("ix_live_bird_stock_entries_weight_range_id");
+
+                    b.HasIndex("BranchId", "Date")
+                        .HasDatabaseName("ix_live_bird_stock_entries_branch_id_date");
+
+                    b.HasIndex("CycleId", "Date", "WeightRangeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_bird_stock_entries_cycle_id_date_weight_range_id");
+
+                    b.ToTable("live_bird_stock_entries", "production");
                 });
 
             modelBuilder.Entity("Domain.Roles.Role", b =>
@@ -7026,6 +7181,37 @@ namespace Infrastructure.Database.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_daily_recording_usages_uoms_uom_id");
+                });
+
+            modelBuilder.Entity("Domain.Production.LiveBirdStock.LiveBirdStockEntry", b =>
+                {
+                    b.HasOne("Domain.MasterData.Branches.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_bird_stock_entries_branches_branch_id");
+
+                    b.HasOne("Domain.MasterData.Coops.Coop", null)
+                        .WithMany()
+                        .HasForeignKey("CoopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_bird_stock_entries_coops_coop_id");
+
+                    b.HasOne("Domain.Partnership.Cycles.ProductionCycle", null)
+                        .WithMany()
+                        .HasForeignKey("CycleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_bird_stock_entries_production_cycles_cycle_id");
+
+                    b.HasOne("Domain.MasterData.WeightRanges.WeightRange", null)
+                        .WithMany()
+                        .HasForeignKey("WeightRangeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_bird_stock_entries_weight_ranges_weight_range_id");
                 });
 
             modelBuilder.Entity("Domain.Roles.RolePermission", b =>

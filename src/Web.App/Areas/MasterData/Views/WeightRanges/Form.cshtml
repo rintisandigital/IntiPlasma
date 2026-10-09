@@ -1,0 +1,69 @@
+@model WeightRangeFormViewModel
+@{
+    ViewData["Title"] = Model.IsNew ? "Add Weight Range" : $"Weight Range {Model.Code}";
+    ViewData["Menu"] = MenuCodes.MasterWeightRanges;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel(Model.IsNew ? "Add Weight Range" : $"Weight Range {Model.Code}", "Average weight band [from, below) in kg; leave one side empty for an open band")' />
+
+<div class="row">
+    <div class="col-xl-6 col-lg-8">
+        <form asp-action="@(Model.IsNew ? "Create" : "Edit")" method="post">
+            @if (Model.IsNew)
+            {
+                <form-token />
+            }
+            else
+            {
+                <input type="hidden" asp-for="Id" />
+                <input type="hidden" asp-for="Code" />
+            }
+            <fieldset disabled="@(!Model.CanSave)">
+                <div class="card">
+                    <div class="card-body">
+                        <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label asp-for="Code" class="form-label"></label> <span class="text-danger">*</span>
+                                <input asp-for="Code" class="form-control text-uppercase" disabled="@(!Model.IsNew)">
+                                <span asp-validation-for="Code" class="text-danger fs-13"></span>
+                            </div>
+                            <div class="col-md-8 mb-3">
+                                <label asp-for="Name" class="form-label"></label> <span class="text-danger">*</span>
+                                <input asp-for="Name" class="form-control" placeholder="e.g. 1,6 – 1,8 kg">
+                                <span asp-validation-for="Name" class="text-danger fs-13"></span>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label asp-for="MinWeightKg" class="form-label"></label>
+                                <input asp-for="MinWeightKg" type="number" step="0.001" min="0" class="form-control">
+                                <span asp-validation-for="MinWeightKg" class="text-danger fs-13"></span>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label asp-for="MaxWeightKg" class="form-label"></label>
+                                <input asp-for="MaxWeightKg" type="number" step="0.001" min="0" class="form-control">
+                                <span asp-validation-for="MaxWeightKg" class="text-danger fs-13"></span>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label asp-for="SortOrder" class="form-label"></label>
+                                <input asp-for="SortOrder" type="number" step="1" min="0" class="form-control">
+                                <span asp-validation-for="SortOrder" class="text-danger fs-13"></span>
+                            </div>
+                        </div>
+                        @if (!Model.IsNew)
+                        {
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" role="switch" id="IsActive" name="IsActive" value="true" checked="@(Model.IsActive == true)">
+                                <label class="form-check-label" for="IsActive">Active</label>
+                            </div>
+                            <p class="text-muted fs-13 mb-0">The bounds can no longer change once live bird stock has been reported in this range.</p>
+                        }
+                    </div>
+                </div>
+            </fieldset>
+            <partial name="Partials/_FormButtons" model='new FormButtonsModel(Model.CanSave, Url.Action("Index")!)' />
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

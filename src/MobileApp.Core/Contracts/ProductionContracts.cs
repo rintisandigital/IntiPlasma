@@ -18,6 +18,13 @@ public sealed record FieldContext
 
     public IReadOnlyList<FieldStock> Stock { get; init; } = [];
 
+    /// <summary>
+    /// Active weight ranges for stok ayam harian, in display order (M-52).
+    /// </summary>
+    public IReadOnlyList<WeightRange> WeightRanges { get; init; } = [];
+
+    public WeightRange? FindRange(Guid weightRangeId) => WeightRanges.FirstOrDefault(r => r.Id == weightRangeId);
+
     public FieldCycle? FindCycle(Guid cycleId) => Cycles.FirstOrDefault(c => c.Id == cycleId);
 
     public FieldItem? FindItem(Guid itemId) => Items.FirstOrDefault(i => i.Id == itemId);
@@ -69,6 +76,16 @@ public sealed record FieldCycle
     /// Dates already recorded on the server within the last 14 days.
     /// </summary>
     public IReadOnlyList<DateOnly> RecordedDates { get; init; } = [];
+
+    /// <summary>
+    /// Date of the latest stok ayam report on the server, if any.
+    /// </summary>
+    public DateOnly? LatestStockDate { get; init; }
+
+    /// <summary>
+    /// The server entries of <see cref="LatestStockDate"/>.
+    /// </summary>
+    public IReadOnlyList<FieldStockEntry> LatestStock { get; init; } = [];
 
     public int AgeOn(DateOnly date) => date.DayNumber - ChickInDate.DayNumber;
 }
@@ -166,3 +183,124 @@ public sealed record CreateDailyRecordingRequest(
     IReadOnlyList<Guid> Documents);
 
 public sealed record UsageInput(Guid ItemId, Guid UomId, decimal Quantity);
+
+/// <summary>
+/// Rentang bobot: average weight band [<see cref="MinWeightKg"/>, <see cref="MaxWeightKg"/>) in kg.
+/// </summary>
+public sealed record WeightRange(Guid Id, string Code, string Name, decimal? MinWeightKg, decimal? MaxWeightKg)
+{
+    public bool Contains(decimal averageWeightKg) =>
+        (MinWeightKg is not { } min || averageWeightKg >= min) && (MaxWeightKg is not { } max || averageWeightKg < max);
+}
+
+public sealed record FieldStockEntry(Guid Id, Guid WeightRangeId, int Birds, decimal WeightKg, string? Notes);
+
+/// <summary>
+/// An entry of stok ayam harian from <c>GET production/live-bird-stocks</c>.
+/// </summary>
+public sealed record LiveBirdStockEntry
+{
+    public Guid Id { get; init; }
+
+    public Guid CycleId { get; init; }
+
+    public string CycleNumber { get; init; } = string.Empty;
+
+    public Guid CoopId { get; init; }
+
+    public string CoopName { get; init; } = string.Empty;
+
+    public DateOnly Date { get; init; }
+
+    public int AgeDays { get; init; }
+
+    public Guid WeightRangeId { get; init; }
+
+    public string WeightRangeCode { get; init; } = string.Empty;
+
+    public string WeightRangeName { get; init; } = string.Empty;
+
+    public int Birds { get; init; }
+
+    public decimal WeightKg { get; init; }
+
+    public decimal AverageWeightKg { get; init; }
+
+    public string? Notes { get; init; }
+}
+
+/// <summary>
+/// Body of <c>POST production/live-bird-stocks</c>: the same cycle, date and range again changes that entry.
+/// </summary>
+public sealed record UpsertLiveBirdStockRequest(
+    Guid Id,
+    Guid CycleId,
+    DateOnly Date,
+    Guid WeightRangeId,
+    int Birds,
+    decimal WeightKg,
+    string? Notes);
+
+/// <summary>
+/// <c>GET production/live-bird-stocks/summary</c>: rekap cabang (M-51).
+/// </summary>
+public sealed record LiveBirdStockSummary
+{
+    public DateOnly Date { get; init; }
+
+    public IReadOnlyList<LiveBirdStockRangeTotal> Ranges { get; init; } = [];
+
+    public IReadOnlyList<LiveBirdStockCoop> Coops { get; init; } = [];
+
+    public int TotalBirds { get; init; }
+
+    public decimal TotalWeightKg { get; init; }
+
+    public int ReportedCoops { get; init; }
+}
+
+public sealed record LiveBirdStockRangeTotal(
+    Guid WeightRangeId,
+    string Code,
+    string Name,
+    int Birds,
+    decimal WeightKg,
+    int Coops,
+    decimal AverageWeightKg);
+
+public sealed record LiveBirdStockCoop
+{
+    public Guid CycleId { get; init; }
+
+    public string CycleNumber { get; init; } = string.Empty;
+
+    public string BranchCode { get; init; } = string.Empty;
+
+    public Guid CoopId { get; init; }
+
+    public string CoopCode { get; init; } = string.Empty;
+
+    public string CoopName { get; init; } = string.Empty;
+
+    public string FarmerName { get; init; } = string.Empty;
+
+    public string? FieldOfficerName { get; init; }
+
+    public int AgeDays { get; init; }
+
+    public int Population { get; init; }
+
+    public DateOnly? ReportDate { get; init; }
+
+    public int? DataAgeDays { get; init; }
+
+    public bool IsStale { get; init; }
+
+    public IReadOnlyList<LiveBirdStockCoopRange> Entries { get; init; } = [];
+
+    public int TotalBirds { get; init; }
+
+    public decimal TotalWeightKg { get; init; }
+}
+
+public sealed record LiveBirdStockCoopRange(Guid WeightRangeId, string Code, int Birds, decimal WeightKg, decimal AverageWeightKg);

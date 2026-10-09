@@ -19,7 +19,8 @@ public sealed partial class ProductionTests(WebAppFactory factory)
 {
     public static TheoryData<string> Pages =>
     [
-        "/Production/Cycles", "/Production/Cycles/Create", "/Production/Recordings", "/Production/Harvests"
+        "/Production/Cycles", "/Production/Cycles/Create", "/Production/Recordings", "/Production/Harvests",
+        "/Production/LiveBirdStock", "/MasterData/WeightRanges", "/MasterData/WeightRanges/Create"
     ];
 
     [Theory]
@@ -155,6 +156,36 @@ public sealed partial class ProductionTests(WebAppFactory factory)
         var secondId = Guid.Parse(second.Headers.Location!.ToString().Split('/')[^1]);
         await PostAsync(client, $"/Production/Cycles/Cancel/{secondId}", new() { ["reason"] = "Coop under repair" });
         (await CycleAsync(secondId)).Status.ShouldBe(CycleStatus.Cancelled);
+    }
+
+    /// <summary>
+    /// PLAN-MOBILE M3: weight ranges (no overlap among active ranges) and the live bird stock summary with export.
+    /// </summary>
+    [Fact]
+    public async Task WeightRanges_Should_RejectOverlaps_AndLiveBirdStock_ShouldExport()
+    {
+        HttpClient client = await AdminClientAsync();
+        string s = Guid.NewGuid().ToString("N")[..4].ToUpperInvariant();
+
+        // Far above real broiler weights, so the range never meets the ranges of other tests.
+        HttpResponseMessage created = await PostAsync(client, "/MasterData/WeightRanges/Create", new()
+        {
+            ["Code"] = $"W{s}", ["Name"] = "Test range", ["MinWeightKg"] = "500", ["MaxWeightKg"] = "501", ["SortOrder"] = "90"
+        });
+        created.StatusCode.ShouldBe(HttpStatusCode.Redirect, ErrorOf(await created.Content.ReadAsStringAsync()));
+        (await client.GetStringAsync(new Uri("/MasterData/WeightRanges", UriKind.Relative))).ShouldContain($"W{s}");
+
+        HttpResponseMessage overlapping = await PostAsync(client, "/MasterData/WeightRanges/Create", new()
+        {
+            ["Code"] = $"X{s}", ["Name"] = "Overlap", ["MinWeightKg"] = "500.5", ["MaxWeightKg"] = "502", ["SortOrder"] = "91"
+        });
+        overlapping.StatusCode.ShouldBe(HttpStatusCode.OK);
+        ErrorOf(await overlapping.Content.ReadAsStringAsync()).ShouldContain($"W{s}");
+
+        (await client.GetStringAsync(new Uri($"/Production/LiveBirdStock?date={Today()}", UriKind.Relative))).ShouldContain("Per weight range");
+        HttpResponseMessage export = await client.GetAsync(new Uri($"/Production/LiveBirdStock/Export?format=xlsx&date={Today()}", UriKind.Relative));
+        export.StatusCode.ShouldBe(HttpStatusCode.OK);
+        export.Content.Headers.ContentDisposition!.FileName!.ShouldContain("live-bird-stock-");
     }
 
     private async Task<Guid> CreateCoopAsync(HttpClient client, string s, string prefix, Guid farmerId, Guid branchId)

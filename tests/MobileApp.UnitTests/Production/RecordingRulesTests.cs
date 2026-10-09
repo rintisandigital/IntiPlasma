@@ -133,6 +133,8 @@ internal static class Sample
     public static readonly Guid Ovk = Guid.Parse("0199c3a0-0000-7000-8000-000000000004");
     public static readonly Guid Kg = Guid.Parse("0199c3a0-0000-7000-8000-000000000005");
     public static readonly Guid Sak = Guid.Parse("0199c3a0-0000-7000-8000-000000000006");
+    public static readonly Guid Medium = Guid.Parse("0199c3a0-0000-7000-8000-000000000007");
+    public static readonly Guid Large = Guid.Parse("0199c3a0-0000-7000-8000-000000000008");
 
     public static FieldCycle Cycle() => new()
     {
@@ -157,7 +159,8 @@ internal static class Sample
             new FieldItem(Feed, "PKN-01", "Pakan Starter", "Feed", Kg, "KG", [new FieldUom(Kg, "KG", 1), new FieldUom(Sak, "SAK", 50)]),
             new FieldItem(Ovk, "OVK-01", "Vitamin", "Ovk", Kg, "KG", [new FieldUom(Kg, "KG", 1)])
         ],
-        Stock = [new FieldStock(Warehouse, Feed, 100)]
+        Stock = [new FieldStock(Warehouse, Feed, 100)],
+        WeightRanges = [new WeightRange(Medium, "M", "1,4 – 1,8 kg", 1.4m, 1.8m), new WeightRange(Large, "L", "≥ 1,8 kg", 1.8m, null)]
     };
 
     public static RecordingDraft Draft() => new()

@@ -1,0 +1,117 @@
+@page "/siklus/{CycleId:guid}/stok-ayam"
+@implements IDisposable
+@inject StockService Stock
+@inject PartnershipApi Partnership
+@inject SessionService Session
+@inject SyncEngine Sync
+
+@* Stok ayam per siklus (PLAN-MOBILE M-53): every reported date with its weight ranges, server and queue merged. *@
+<AppPage Title="Stok Ayam" BackTo="@($"/siklus/{CycleId}/recording")">
+    <HeaderAction>
+        @if (CanInput)
+        {
+            <a class="header-icon-btn" href="/stok-ayam/input?cycleId=@CycleId" aria-label="Input stok ayam">
+                <i class="icon icon-plus"></i>
+            </a>
+        }
+    </HeaderAction>
+    <ChildContent>
+        @if (_cycle is not null)
+        {
+            <div class="detail-head mb-16">
+                <div class="text-caption-2 text-Primary">@_cycle.Number</div>
+                <h4 class="mt-4">@_cycle.CoopName</h4>
+                <div class="d-flex flex-wrap gap-8 mt-8">
+                    <StatusBadge Text="@Labels.CycleStatus(_cycle.Status)" Tone="@Labels.CycleTone(_cycle.Status)" />
+                    <span class="chip">Populasi @IdFormat.Number(_cycle.CurrentPopulation)</span>
+                </div>
+            </div>
+        }
+
+        @if (_list is null)
+        {
+            <Spinner />
+        }
+        else
+        {
+            <CacheNote CachedAtUtc="_list.CachedAtUtc" />
+            @if (_list.ServerError is { } error)
+            {
+                <ErrorState Error="error" OnRetry="() => LoadAsync(refresh: true)" />
+            }
+
+            @foreach (IGrouping<DateOnly, StockRow> day in _list.Rows.GroupBy(r => r.Date))
+            {
+                <div class="list-card">
+                    <div class="d-flex justify-content-between align-items-start gap-8">
+                        <div class="text-button-small text-OnSurface">@IdFormat.Date(day.Key)</div>
+                        <div class="text-caption-2 text-dark-4 text-end">
+                            @IdFormat.Number(day.Sum(r => r.Birds)) ekor · @IdFormat.Tons(day.Sum(r => r.WeightKg))
+                        </div>
+                    </div>
+                    <div class="info-list mt-8">
+                        @foreach (StockRow row in day)
+                        {
+                            <div class="row-item">
+                                <span>
+                                    @row.WeightRangeCode
+                                    @if (row.IsLocal)
+                                    {
+                                        <StatusBadge Text="@Labels.RecordingState(row.State)" Tone="@Labels.RecordingTone(row.State)" />
+                                    }
+                                </span>
+                                <span class="text-end">@IdFormat.Number(row.Birds) ekor · @IdFormat.Number(row.WeightKg, 1) kg<br />
+                                    <span class="text-caption-2 text-dark-4">rata-rata @IdFormat.Number(row.AverageWeightKg, 3) kg</span>
+                                </span>
+                            </div>
+                        }
+                    </div>
+                    @if (CanInput)
+                    {
+                        <a class="link-btn d-inline-block mt-8" href="/stok-ayam/input?cycleId=@CycleId&date=@day.Key.ToString("yyyy-MM-dd")">Ubah ›</a>
+                    }
+                </div>
+            }
+            @if (_list.Rows.Count == 0 && _list.ServerError is null)
+            {
+                <div class="empty-state">
+                    <i class="icon icon-chart"></i>
+                    <p class="body-2 text-dark-4 mt-8">Belum ada laporan stok ayam untuk siklus ini.</p>
+                </div>
+            }
+        }
+    </ChildContent>
+</AppPage>
+
+@code {
+    private Cycle? _cycle;
+    private StockList? _list;
+
+    [Parameter]
+    public Guid CycleId { get; set; }
+
+    private bool CanInput =>
+        Session.Has(AppPermissions.ProductionStockReport) && _cycle is { Status: "Active" or "Harvesting" };
+
+    protected override void OnInitialized() => Sync.Changed += OnQueueChanged;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        CachedResult<Cycle> cycle = await Partnership.GetCycleAsync(CycleId);
+        _cycle = cycle.IsSuccess ? cycle.Value : null;
+
+        await LoadAsync(refresh: true);
+    }
+
+    public void Dispose() => Sync.Changed -= OnQueueChanged;
+
+    private async Task LoadAsync(bool refresh) => _list = await Stock.GetCycleRowsAsync(CycleId, refresh);
+
+    private void OnQueueChanged(object? sender, EventArgs e) =>
+        _ = InvokeAsync(async () =>
+        {
+            DateTime? cachedAtUtc = _list?.CachedAtUtc;
+            _list = await Stock.GetCycleRowsAsync(CycleId, refresh: false) with { CachedAtUtc = cachedAtUtc };
+            StateHasChanged();
+        });
+}

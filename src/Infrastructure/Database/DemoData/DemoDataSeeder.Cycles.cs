@@ -159,6 +159,12 @@ public sealed partial class DemoDataSeeder
                 await HarvestAsync(date, age);
             }
 
+            // Stok ayam harian (M-54): the last three days of cycles close to harvest.
+            if (age >= 25 && date >= _s._today.AddDays(-3) && _population > 0)
+            {
+                await ReportLiveBirdStockAsync(date, age);
+            }
+
             await RunReceivablesAsync(date, age);
 
             if (age == _lastHarvestAge + 2)
@@ -420,6 +426,32 @@ public sealed partial class DemoDataSeeder
             {
                 _recordingToRevise = recordingId;
                 _revisedRecording = command;
+            }
+        }
+
+        /// <summary>
+        /// The PPL's estimate of the birds ready for sale: 90% of the population spread around the day's average
+        /// weight (−150 g, ±0, +150 g), each share counted in the weight range of its average.
+        /// </summary>
+        private async Task ReportLiveBirdStockAsync(DateOnly date, int age)
+        {
+            decimal average = BodyWeightGram(age) / 1000m;
+            int ready = (int)(_population * 0.9m);
+            (decimal Share, decimal WeightKg)[] shares = [(0.25m, average - 0.15m), (0.5m, average), (0.25m, average + 0.15m)];
+
+            var perRange = new Dictionary<Guid, (int Birds, decimal WeightKg)>();
+            foreach ((decimal share, decimal weight) in shares)
+            {
+                (Guid rangeId, _, _) = _s._weightRanges.First(r => (r.Min is not { } min || weight >= min) && (r.Max is not { } max || weight < max));
+                int birds = (int)(ready * share);
+                (int Birds, decimal WeightKg) total = perRange.GetValueOrDefault(rangeId);
+                perRange[rangeId] = (total.Birds + birds, total.WeightKg + Math.Round(birds * weight, 1));
+            }
+
+            foreach ((Guid rangeId, (int birds, decimal weightKg)) in perRange.Where(r => r.Value.Birds > 0))
+            {
+                await _s.SendAsync(new UpsertLiveBirdStockEntryCommand(
+                    Guid.CreateVersion7(), _cycleId, date, rangeId, birds, weightKg, null));
             }
         }
 

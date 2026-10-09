@@ -436,6 +436,8 @@ public sealed record SyncItem
 public static class SyncKinds
 {
     public const string Recording = "Recording";
+
+    public const string LiveBirdStock = "LiveBirdStock";
 }
 
 /// <param name="Json">The response body as stored (camelCase JSON).</param>

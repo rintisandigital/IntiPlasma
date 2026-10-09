@@ -25,6 +25,8 @@ public sealed class SyncEngine : IDisposable
 
     public const string AttachmentsPath = "attachments";
 
+    public const string LiveBirdStockPath = "production/live-bird-stocks";
+
     public const string PhotoMissingCode = "Client.PhotoMissing";
 
     /// <summary>
@@ -116,10 +118,10 @@ public sealed class SyncEngine : IDisposable
         {
             int sent = 0;
             int failed = 0;
-            var cycles = new HashSet<Guid>();
+            var sentKinds = new HashSet<(string Kind, Guid CycleId)>();
             DateTime now = _clock.UtcNow;
 
-            foreach (SyncItem item in await _db.GetQueueAsync(userId, cancellationToken))
+            foreach (SyncItem item in SendingOrder(await _db.GetQueueAsync(userId, cancellationToken)))
             {
                 if (onlyId is not null && item.Id != onlyId)
                 {
@@ -138,7 +140,7 @@ public sealed class SyncEngine : IDisposable
                 if (step == Step.Sent)
                 {
                     sent++;
-                    cycles.Add(item.CycleId);
+                    sentKinds.Add((item.Kind, item.CycleId));
                 }
                 else if (step == Step.Failed)
                 {
@@ -154,9 +156,16 @@ public sealed class SyncEngine : IDisposable
             {
                 // Population, stock and recorded dates changed on the server.
                 await _production.GetFieldContextAsync(cancellationToken);
-                foreach (Guid cycleId in cycles)
+                foreach ((string kind, Guid cycleId) in sentKinds)
                 {
-                    await _production.GetRecordingsAsync(cycleId, cancellationToken);
+                    if (kind == SyncKinds.LiveBirdStock)
+                    {
+                        await _production.GetCycleStockAsync(cycleId, cancellationToken);
+                    }
+                    else
+                    {
+                        await _production.GetRecordingsAsync(cycleId, cancellationToken);
+                    }
                 }
             }
 
@@ -165,6 +174,9 @@ public sealed class SyncEngine : IDisposable
         finally
         {
             _gate.Release();
+
+            // Listeners showing "sending…" see the run end.
+            Changed?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -181,10 +193,44 @@ public sealed class SyncEngine : IDisposable
         _gate.Dispose();
     }
 
+    /// <summary>
+    /// Oldest date first; on the same date a recording goes before the live bird stock, which is checked against the
+    /// population the recording changes (PLAN-MOBILE §3.6).
+    /// </summary>
+    internal static IEnumerable<SyncItem> SendingOrder(IEnumerable<SyncItem> queue) =>
+        queue.OrderBy(i => i.Date).ThenBy(i => i.Kind == SyncKinds.Recording ? 0 : 1).ThenBy(i => i.CreatedAtUtc);
+
     private async Task<Step> SendAsync(SyncItem item, CancellationToken cancellationToken)
     {
         await SaveAsync(item with { Status = SyncStatus.Sending }, cancellationToken);
 
+        return item.Kind == SyncKinds.LiveBirdStock
+            ? await SendStockAsync(item, cancellationToken)
+            : await SendRecordingAsync(item, cancellationToken);
+    }
+
+    private async Task<Step> SendStockAsync(SyncItem item, CancellationToken cancellationToken)
+    {
+        StockDraft? draft = JsonSerializer.Deserialize<StockDraft>(item.Payload, ApiClient.JsonOptions);
+        if (draft is null)
+        {
+            return await FailAsync(item, ApiError.UnexpectedCode, "Data antrean rusak; hapus lalu input ulang.", cancellationToken);
+        }
+
+        ApiResult<Guid> saved = await _api.PostAsync<Guid>(LiveBirdStockPath, draft.ToRequest(), draft.Id, cancellationToken);
+        if (!saved.IsSuccess)
+        {
+            return await HandleErrorAsync(item, saved.Error!, cancellationToken);
+        }
+
+        await _db.DeleteQueueItemAsync(item.Id, cancellationToken);
+        Changed?.Invoke(this, EventArgs.Empty);
+
+        return Step.Sent;
+    }
+
+    private async Task<Step> SendRecordingAsync(SyncItem item, CancellationToken cancellationToken)
+    {
         RecordingDraft? draft = JsonSerializer.Deserialize<RecordingDraft>(item.Payload, ApiClient.JsonOptions);
         if (draft is null)
         {
@@ -272,6 +318,12 @@ public sealed class SyncEngine : IDisposable
         await _db.SaveQueueItemAsync(item with { UpdatedAtUtc = _clock.UtcNow }, cancellationToken);
         Changed?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>
+    /// Entries of the signed-in user not on the server yet, every kind (queue badge).
+    /// </summary>
+    public async Task<int> CountAsync(CancellationToken cancellationToken = default) =>
+        _currentUserId() is Guid userId ? (await _db.GetQueueAsync(userId, cancellationToken)).Count : 0;
 
     /// <summary>
     /// Tells listeners (queue badge) that the queue changed outside a run, e.g. an entry was saved offline.

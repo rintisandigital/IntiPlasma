@@ -1,6 +1,7 @@
 @page "/antrean"
 @implements IDisposable
 @inject RecordingService Recordings
+@inject StockService Stock
 @inject SyncEngine Sync
 @inject MobileApp.Core.Abstractions.IConnectivity Connectivity
 
@@ -8,21 +9,21 @@
 <AppPage Title="Antrean Sinkron">
     <div class="d-flex justify-content-between align-items-center mb-16 gap-12">
         <span class="text-caption-1 text-dark-4">
-            @if (_entries.Count == 0)
+            @if (Count == 0)
             {
                 <text>Semua data sudah terkirim.</text>
             }
             else
             {
-                <text>@_entries.Count data belum terkirim</text>
+                <text>@Count data belum terkirim</text>
             }
         </span>
-        <button type="button" class="tf-btn round-full btn-auto" disabled="@(_entries.Count == 0 || Sync.IsRunning || !Connectivity.IsOnline)" @onclick="SyncNowAsync">
+        <button type="button" class="tf-btn round-full btn-auto" disabled="@(Count == 0 || Sync.IsRunning || !Connectivity.IsOnline)" @onclick="SyncNowAsync">
             @(Sync.IsRunning ? "Mengirim…" : "Sinkronkan")
         </button>
     </div>
 
-    @if (!Connectivity.IsOnline && _entries.Count > 0)
+    @if (!Connectivity.IsOnline && Count > 0)
     {
         <div class="alert alert-warning" role="alert">Tidak ada koneksi. Data dikirim otomatis saat online kembali.</div>
     }
@@ -39,7 +40,7 @@
         <div class="alert alert-info" role="alert">@_message</div>
     }
 
-    @if (_entries.Count == 0)
+    @if (Count == 0)
     {
         <div class="empty-state">
             <i class="icon icon-CheckCircle"></i>
@@ -84,7 +85,46 @@
             }
         </div>
     }
+    @foreach (LocalStock entry in _stocks)
+    {
+        <div class="list-card">
+            <a href="/stok-ayam/input?cycleId=@entry.Draft.CycleId&date=@entry.Draft.Date.ToString("yyyy-MM-dd")" class="d-block">
+                <div class="d-flex justify-content-between align-items-start gap-8">
+                    <div>
+                        <div class="text-caption-2 text-Primary">Stok ayam · @IdFormat.Date(entry.Draft.Date) · @entry.Draft.WeightRangeCode</div>
+                        <div class="text-button-small text-OnSurface">@entry.Draft.CoopName</div>
+                    </div>
+                    <StatusBadge Text="@Labels.RecordingState(entry.State)" Tone="@Labels.RecordingTone(entry.State)" />
+                </div>
+                <div class="meta">
+                    <span>@IdFormat.Number(entry.Draft.Birds) ekor · @IdFormat.Number(entry.Draft.WeightKg, 1) kg</span>
+                    @if (entry.Item.Attempts > 0)
+                    {
+                        <span>Percobaan @entry.Item.Attempts</span>
+                    }
+                </div>
+                @if (entry.Item.ErrorMessage is { } error)
+                {
+                    <div class="field-error">@error</div>
+                }
+            </a>
+            @if (entry.State != RecordingState.Sending)
+            {
+                <div class="d-flex gap-8 mt-12">
+                    <button type="button" class="tf-btn style-1 round-full btn-small" disabled="@(!Connectivity.IsOnline)" @onclick="() => RetryStockAsync(entry)">Kirim ulang</button>
+                    <a class="tf-btn style-1 round-full btn-small" href="/stok-ayam/input?cycleId=@entry.Draft.CycleId&date=@entry.Draft.Date.ToString("yyyy-MM-dd")">Ubah</a>
+                    <button type="button" class="tf-btn style-1 round-full btn-small text-danger" @onclick="() => _stockToDelete = entry">Hapus</button>
+                </div>
+            }
+        </div>
+    }
 </AppPage>
+
+<ConfirmSheet Visible="_stockToDelete is not null"
+              Title="Hapus dari antrean?"
+              Message="Entri stok ayam dihapus dari perangkat dan tidak akan dikirim ke server."
+              ConfirmText="Hapus"
+              OnClose="CloseStockDeleteAsync" />
 
 <ConfirmSheet Visible="_toDelete is not null"
               Title="Hapus dari antrean?"
@@ -94,6 +134,10 @@
 
 @code {
     private IReadOnlyList<LocalRecording> _entries = [];
+    private IReadOnlyList<LocalStock> _stocks = [];
+    private LocalStock? _stockToDelete;
+
+    private int Count => _entries.Count + _stocks.Count;
     private int _heldForOthers;
     private LocalRecording? _toDelete;
     private string? _message;
@@ -114,6 +158,7 @@
     private async Task LoadAsync()
     {
         _entries = await Recordings.GetLocalListAsync();
+        _stocks = await Stock.GetLocalListAsync();
         _heldForOthers = await Recordings.CountHeldForOtherUsersAsync();
     }
 
@@ -125,7 +170,7 @@
 
         _message = run switch
         {
-            { Sent: 0, Failed: 0 } => _entries.Count > 0 ? "Belum ada yang terkirim. Periksa koneksi lalu coba lagi." : null,
+            { Sent: 0, Failed: 0 } => Count > 0 ? "Belum ada yang terkirim. Periksa koneksi lalu coba lagi." : null,
             { Failed: 0 } => $"{run.Sent} data terkirim.",
             _ => $"{run.Sent} data terkirim, {run.Failed} ditolak server."
         };
@@ -143,6 +188,32 @@
             SaveState.Failed => null,
             _ => "Belum terkirim. Data akan dicoba lagi otomatis."
         };
+    }
+
+    private async Task RetryStockAsync(LocalStock entry)
+    {
+        _message = null;
+        SaveOutcome outcome = await Stock.RetryAsync(entry.Draft.Id);
+        await LoadAsync();
+
+        _message = outcome.State switch
+        {
+            SaveState.Sent => "Stok ayam terkirim.",
+            SaveState.Failed => null,
+            _ => "Belum terkirim. Data akan dicoba lagi otomatis."
+        };
+    }
+
+    private async Task CloseStockDeleteAsync(bool confirmed)
+    {
+        LocalStock? entry = _stockToDelete;
+        _stockToDelete = null;
+
+        if (confirmed && entry is not null)
+        {
+            await Stock.DeleteLocalAsync(entry.Draft.Id);
+            await LoadAsync();
+        }
     }
 
     private async Task CloseDeleteAsync(bool confirmed)

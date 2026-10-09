@@ -1,0 +1,42 @@
+@model ListViewModel<Application.WeightRanges.WeightRangeResponse>
+@{
+    ViewData["Title"] = "Weight Ranges";
+    ViewData["Menu"] = MenuCodes.MasterWeightRanges;
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Weight Ranges", "Average live weight bands for the daily live bird stock reported by the PPL", MenuCodes.MasterWeightRanges, "Add Range")' />
+
+<div class="card">
+    <div class="card-header">
+        <partial name="Partials/_FilterBar" model='new FilterBarModel(Model.Search, "Search code or name")' />
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Code</th><th>Name</th><th class="text-end">From (kg)</th><th class="text-end">Below (kg)</th>
+                        <th class="text-end">Order</th><th>Status</th><th class="text-end"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.WeightRanges.WeightRangeResponse range in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@range.Code</td>
+                            <td>@range.Name</td>
+                            <td class="text-end">@(range.MinWeightKg is { } min ? Fmt.Number(min, 3) : "—")</td>
+                            <td class="text-end">@(range.MaxWeightKg is { } max ? Fmt.Number(max, 3) : "—")</td>
+                            <td class="text-end">@range.SortOrder</td>
+                            <td><partial name="Partials/_StatusBadge" model='range.IsActive ? "Active" : "Inactive"' /></td>
+                            <td class="text-end"><a asp-action="Edit" asp-route-id="@range.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="7" class="text-center text-muted py-4">No weight ranges found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

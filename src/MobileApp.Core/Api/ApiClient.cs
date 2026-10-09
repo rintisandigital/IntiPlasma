@@ -116,6 +116,13 @@ public sealed class ApiClient(HttpClient httpClient, IAppSettings settings)
         return await SendAsync(request, cancellationToken);
     }
 
+    public async Task<ApiResult> DeleteAsync(string path, CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, BuildUri(settings.ServerUrl, path));
+
+        return await SendAsync(request, cancellationToken);
+    }
+
     public async Task<ApiResult> PutAsync(string path, object? body, CancellationToken cancellationToken = default)
     {
         using HttpRequestMessage request = CreateWithBody(HttpMethod.Put, path, body);

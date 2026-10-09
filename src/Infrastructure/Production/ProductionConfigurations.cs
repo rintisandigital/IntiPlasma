@@ -4,9 +4,11 @@ using Domain.MasterData.Branches;
 using Domain.MasterData.Coops;
 using Domain.MasterData.Items;
 using Domain.MasterData.Uoms;
+using Domain.MasterData.WeightRanges;
 using Domain.MasterData.Warehouses;
 using Domain.Partnership.Cycles;
 using Domain.Production.DailyRecordings;
+using Domain.Production.LiveBirdStock;
 using Infrastructure.Database;
 using Infrastructure.Inventory;
 using Microsoft.EntityFrameworkCore;
@@ -35,6 +37,27 @@ internal sealed class DailyRecordingConfiguration : IEntityTypeConfiguration<Dai
         builder.HasMany(r => r.Revisions).WithOne().HasForeignKey(v => v.DailyRecordingId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(r => r.Usages).HasField("_usages").UsePropertyAccessMode(PropertyAccessMode.Field);
         builder.Navigation(r => r.Revisions).HasField("_revisions").UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class LiveBirdStockEntryConfiguration : IEntityTypeConfiguration<LiveBirdStockEntry>
+{
+    public void Configure(EntityTypeBuilder<LiveBirdStockEntry> builder)
+    {
+        builder.ToTable("live_bird_stock_entries", Schemas.Production);
+        builder.HasKey(e => e.Id);
+        builder.Property(e => e.WeightKg).HasPrecision(14, 3);
+        builder.Property(e => e.Notes).HasMaxLength(500);
+        builder.Ignore(e => e.AverageWeightKg);
+
+        // One entry per cycle, date and weight range (M-24).
+        builder.HasIndex(e => new { e.CycleId, e.Date, e.WeightRangeId }).IsUnique();
+        builder.HasIndex(e => new { e.BranchId, e.Date });
+
+        builder.HasOne<ProductionCycle>().WithMany().HasForeignKey(e => e.CycleId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Branch>().WithMany().HasForeignKey(e => e.BranchId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Coop>().WithMany().HasForeignKey(e => e.CoopId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<WeightRange>().WithMany().HasForeignKey(e => e.WeightRangeId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

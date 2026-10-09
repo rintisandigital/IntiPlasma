@@ -44,7 +44,7 @@ public static class AppFeatures
         u => u.Has(AppPermissions.ProductionRecord) || u.Has(AppPermissions.ProductionStockReport));
 
     public static readonly AppFeature LiveBirdStock = new(
-        "stok-ayam", "Stok Ayam", "icon-chart", "/fitur/stok-ayam", "M3", u => u.Has(AppPermissions.ProductionRead));
+        "stok-ayam", "Stok Ayam", "icon-chart", "/stok-ayam", "M3", u => u.Has(AppPermissions.ProductionRead));
 
     public static readonly AppFeature More = new("lainnya", "Lainnya", "icon-listBullets", "/lainnya", null, _ => true);
 

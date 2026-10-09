@@ -469,7 +469,7 @@ Backend (domain + unit test → command/query + validator → EF config + migrat
 - **Backend**: `GET mobile/field-context`.
 - **Klien**: list & detail recording, form input, foto, `sync_queue` + `local_entries` + `SyncEngine`, Antrean Sinkron.
 
-### Fase M3 — Stok Ayam Harian (offline)
+### Fase M3 — Stok Ayam Harian (offline) ✅ (selesai 2026-10-09, task §17, realisasi §18)
 - **Backend**: `WeightRange` + `LiveBirdStockEntry` (migration `PhaseM3_LiveBirdStock`), use case & endpoint §4.4.
 - **Web.App**: Master Data → **Weight Ranges**; **Production → Live Bird Stock** (rekap + ekspor).
 - **Klien**: input per rentang (offline), list per siklus, "Salin dari kemarin"; rekap Manager.
@@ -539,7 +539,7 @@ Backend (domain + unit test → command/query + validator → EF config + migrat
 - CSS template besar (`styles.css`) + Bootstrap: ukur ukuran & waktu render pertama; buang aturan yang tidak dipakai bila perlu (M10).
 
 ## 11. Status Keputusan
-- **Semua keputusan M-1 s.d. M-39 disepakati** 2026-10-08. Fase **M0 selesai** 2026-10-08 (§12); **M1 selesai** 2026-10-09 (§13 task, §14 realisasi); **M2 selesai** 2026-10-09 (§15 task, §16 realisasi; M-40 s.d. M-45 disepakati); berikutnya **M3**.
+- **Semua keputusan M-1 s.d. M-39 disepakati** 2026-10-08. Fase **M0 selesai** 2026-10-08 (§12); **M1 selesai** 2026-10-09 (§13 task, §14 realisasi); **M2 selesai** 2026-10-09 (§15 task, §16 realisasi; M-40 s.d. M-45 disepakati); **M3 selesai** 2026-10-09 (§17 task, §18 realisasi; M-46 s.d. M-54 disepakati); berikutnya **M4**.
 - 2026-10-09: M-38 direvisi — kontrak memakai lingkup cabang, bukan lingkup PPL.
 
 ---
@@ -858,3 +858,118 @@ Disusun 2026-10-09 dari pemetaan kode. Prasyarat: hasil M1 sudah di-commit (`449
 - Tanggal di `input type=date` ditampilkan WebView sesuai locale perangkat (emulator en-US: `10/09/2026`); nilai yang dikirim tetap ISO.
 - Pemindahan kandang saat antrean belum terkirim (→ Gagal dengan pesan lingkup) diuji di unit test & integration test, tidak diulang di emulator.
 - Lampiran yang sudah terunggah lalu entrinya dihapus dari antrean menjadi lampiran yatim di server (backlog, §15.4).
+
+---
+
+## 17. Daftar Task M3 — Stok Ayam Harian (offline) (urutan)
+
+Disusun 2026-10-09 dari pemetaan kode. Prasyarat: hasil M2 sudah di-commit. Migration baru **`PhaseM3_LiveBirdStock`** (user yang menjalankan migrate).
+
+### 17.1 Temuan yang memengaruhi desain
+- **Permission `production:stock-report` sudah ada** (M0) dan sudah masuk role PPL; Manager cukup `production:read`. Tidak perlu permission baru.
+- **Pola master data** (Uom, TaxCode): aggregate di `Domain/MasterData/*` (`Codes.Normalize`, `IsActive`, tanpa hapus), use case per folder `Application/<Nama>/{Create,Get,Update}`, konfigurasi di `Infrastructure/MasterData/MasterDataConfigurations.cs`, layar Web.App `Areas/MasterData` (Index + Form + Export, `MenuCodes.Master*`, `MenuCatalog.Page(…, CreateEditExport, true)`).
+- **Pola laporan Web.App** dengan filter cabang & ekspor: `Inventory/StockController` (`support.BranchFilterAsync`, `ExportColumn<T>`, `support.ExportAsync` → Excel/PDF). Menu Production saat ini: Cycles, Daily Recordings, Harvests (`production.*`).
+- **Populasi berjalan** = `ProductionCycle.CurrentPopulation` (awal − mati − culling − panen), juga dipakai field-context. Validasi "total ekor ≤ populasi" memakai nilai ini saat simpan; urutan sinkron recording → stok (§3.6) penting karena recording mengurangi populasi.
+- **`SyncEngine` (M2) masih khusus recording** (`RecordingDraft`, path `production/daily-recordings`). Harus digeneralisasi per jenis (`SyncKinds`) dengan urutan **tanggal, lalu Recording sebelum LiveBirdStock**. Tabel `sync_queue` sudah punya kolom `kind`, jadi **skema lokal tidak berubah**.
+- **Field-context (M2)** sudah disiapkan untuk ditambah rentang bobot & entri stok terakhir tanpa mengganti endpoint.
+- Menu mobile: `AppFeatures.LiveBirdStock` (`/fitur/stok-ayam`, `production:read`) sudah ada — tab bawah Manager, di "Lainnya" untuk PPL; kartu "Stok Ayam (M3)" di hub Input masih placeholder.
+- **DemoDataSeeder** mensimulasikan siklus harian (`RecordDayAsync`, BW per umur `BodyWeightGram`) → mudah menambah entri stok ayam untuk siklus yang mendekati panen.
+
+### 17.2 Keputusan tambahan (disepakati 2026-10-09)
+| # | Topik | Usulan |
+|---|---|---|
+| M-46 | Lingkup & perubahan Rentang Bobot | Master **global** (semua cabang). Batas `MinWeightKg` (inklusif) / `MaxWeightKg` (eksklusif) dalam kg, 3 desimal. Rentang aktif tidak boleh tumpang tindih. **Tidak bisa dihapus**, hanya dinonaktifkan; batas min/maks hanya bisa diubah selama rentang belum dipakai entri (nama, urutan, status selalu bisa). |
+| M-47 | Upsert entri | Kunci unik (siklus, tanggal, rentang). `POST` dengan kombinasi yang sudah ada → **memperbarui** entri itu (id lama dipertahankan & dikembalikan); `id` klien yang sudah dipakai kombinasi lain → `409`. Ganti rentang = hapus + entri baru. |
+| M-48 | Lampiran | Entri stok **tanpa foto/lampiran**, hanya catatan (informasi Sales, mengurangi beban sinkron). `IHasDocuments` di §4.4 tidak dipakai. |
+| M-49 | Ubah & hapus | Upsert oleh user ber-`production:stock-report` dalam lingkup kandang (tidak terbatas pembuat, agar PPL pengganti bisa mengoreksi). **Hapus**: entri bertanggal hari ini/kemarin (tanggal server), **wajib online**; entri yang belum terkirim cukup dihapus dari antrean. |
+| M-50 | Validasi populasi | Total ekor semua rentang pada (siklus, tanggal) ≤ populasi berjalan **saat disimpan** (server); klien memakai populasi field-context dikurangi deplesi recording yang belum terkirim. |
+| M-51 | Rekap | Per siklus `Active`/`Harvesting` di cabang: entri dari **tanggal input terakhir ≤ tanggal dipilih** + umur data (hari). Data > 1 hari ditandai basi; siklus tanpa entri tampil "Belum lapor". Per rentang: ekor, kg (ton), jumlah kandang, rata-rata kg; total cabang. |
+| M-52 | Field-context | Ditambah `weightRanges` (aktif, urut `SortOrder`) dan per siklus `latestStock` (tanggal entri terakhir + entrinya) untuk daftar hari ini & "Salin dari kemarin". |
+| M-53 | Layar mobile | PPL: hub Input → **Stok Ayam** (pilih kandang & tanggal → daftar entri per rentang, tambah/ubah lewat sheet, total & sisa populasi tak terlapor, "Salin dari kemarin"); list per siklus di `/siklus/{id}/stok-ayam` (tautan dari halaman recording siklus). Manager: tab **Stok Ayam** = rekap cabang per tanggal → drill-down kandang (read-only). |
+| M-54 | Data demo | Seed 5 rentang (`< 1,4`, `1,4–1,6`, `1,6–1,8`, `1,8–2,0`, `≥ 2,0` kg) dan entri stok 3 hari terakhir untuk siklus berjalan berumur ≥ 25 hari, dibagi dari populasi berjalan sesuai BW simulasi. |
+
+### 17.3 Task
+1. **Domain** + unit test:
+   - `WeightRange` (`Domain/MasterData/WeightRanges`): `Code`, `Name`, `MinWeightKg?`, `MaxWeightKg?`, `SortOrder`, `IsActive`; `Contains(avgKg)`, `Overlaps(other)`; error (`InvalidBounds`, `Overlap`, `InUse`).
+   - `LiveBirdStockEntry` (`Domain/Production/LiveBirdStock`): `Id` (klien), `BranchId`, `CycleId`, `CoopId`, `Date`, `WeightRangeId`, `Birds`, `WeightKg`, `AgeDays`, `Notes`, `CreatedBy/At`, `UpdatedBy/At`; turunan `AverageWeightKg`; `Create`/`Update` dengan validasi M-27 (siklus recordable, tanggal ≥ chick-in, ekor > 0, kg > 0, rata-rata di dalam rentang).
+2. **EF + migration `PhaseM3_LiveBirdStock`**: `master.weight_ranges` (unik `code`), `production.live_bird_stock_entries` (unik `cycle_id, date, weight_range_id`, index `branch_id, date`, FK ke siklus, kandang, rentang). **User yang menjalankan migrate.**
+3. **Application**:
+   - Rentang bobot: `CreateWeightRangeCommand`, `UpdateWeightRangeCommand` (cek tumpang tindih antar rentang aktif & M-46), `GetWeightRangesQuery` (`activeOnly`).
+   - `UpsertLiveBirdStockEntryCommand` (M-47, M-50, lingkup lewat `CycleLoader`), `DeleteLiveBirdStockEntryCommand` (M-49).
+   - `GetLiveBirdStockEntriesQuery` (`cycleId | branchId`, `date | from–to`, lingkup cabang + PPL), `GetLiveBirdStockSummaryQuery` (M-51).
+   - `GetFieldContextQuery` ditambah rentang & `latestStock` (M-52).
+4. **Web.Api**: `GET weight-ranges` (`master-data:read`), `POST production/live-bird-stocks` (`production:stock-report`, idempotency), `DELETE production/live-bird-stocks/{id}`, `GET production/live-bird-stocks`, `GET production/live-bird-stocks/summary?date&branchId` (`production:read`).
+5. **Test backend**: unit (domain rentang & entri, tumpang tindih, upsert/hapus/validasi populasi, lingkup PPL); integration Web.Api (upsert idempotent + update kombinasi sama + 409, total > populasi → 400, data PPL lain 404, rekap memakai tanggal terakhir ≤ tanggal pilih, Manager `POST` → 403).
+6. **Web.App**:
+   - **Master Data → Weight Ranges** (`master.weight-ranges`: list, form, ekspor).
+   - **Production → Live Bird Stock** (`production.live-bird-stock`): filter tanggal & cabang → rekap rentang (ekor, ton, kandang, rata-rata) + tabel per kandang (umur data, sorot basi, "Belum lapor"), ekspor Excel/PDF.
+   - `MenuCatalog` + integration test (`Admin_Should_OpenEveryReleasedMenu`, CRUD rentang, rekap tampil).
+   - **DemoDataSeeder** (M-54) + `docs/DEMO-DATA.md`.
+7. **MobileApp.Core**:
+   - DTO `WeightRange`, `LiveBirdStockEntry`, `LiveBirdStockSummary`, field-context baru; `ProductionApi` (list per siklus, rekap, hapus).
+   - `StockDraft` + `StockRules` (M-24/M-27 lokal: rentang sama di tanggal sama → ubah entri, rata-rata di dalam rentang, total ≤ populasi tersedia) + "salin dari kemarin".
+   - **Generalisasi `SyncEngine`**: handler per `SyncKinds` (Recording, LiveBirdStock), urutan tanggal lalu Recording → LiveBirdStock; `StockService` (simpan/ubah/hapus/list gabungan server + lokal).
+   - `ErrorMessages` untuk kode baru; unit test (aturan, urutan sinkron campuran, upsert lokal).
+8. **MobileApp UI**:
+   - PPL: kartu **Stok Ayam** di hub Input (status hari ini per kandang), halaman input per kandang & tanggal (daftar rentang, sheet ekor + kg → rata-rata & validasi langsung, total, sisa populasi, salin dari kemarin), list per siklus `/siklus/{id}/stok-ayam`, item stok di **Antrean**.
+   - Manager: tab **Stok Ayam** → rekap cabang per tanggal (rentang × ekor/ton/kandang, total) → drill-down kandang.
+9. **Verifikasi** (emulator API 34, `intiplasma_verify` + data demo):
+   - PPL online: input 2 rentang → cocok di WebApp Live Bird Stock; ubah satu rentang → entri yang sama berubah (tidak dobel).
+   - Mode pesawat: recording + stok ayam tanggal yang sama → online → recording terkirim dulu, stok divalidasi terhadap populasi baru; total > populasi → Gagal dengan pesan.
+   - Salin dari kemarin; hapus entri hari ini (online).
+   - Manager: rekap sama dengan WebApp; drill-down kandang; data basi ditandai.
+10. **Dokumentasi**: realisasi §18, status §8/§11, RANGKUMAN, DEMO-DATA.
+
+### 17.4 Di luar lingkup M3
+- Kartu stok ayam di Dashboard → M4. Notifikasi ke tim Sales → backlog.
+- Integrasi rekap stok ayam ke Sales Order (alokasi otomatis) → backlog.
+- API CRUD rentang bobot untuk mobile (hanya `GET`).
+
+---
+
+## 18. Realisasi Fase M3 — Stok Ayam Harian (offline) (2026-10-09)
+
+### 18.1 Backend
+- **Domain**:
+  - `WeightRange` (`Domain/MasterData/WeightRanges`): batas `[MinWeightKg, MaxWeightKg)` 3 desimal, sisi terbuka = null (minimal satu batas), `Contains`, `Overlaps`, `SetBounds`, `Update(name, sortOrder, isActive)`.
+  - `LiveBirdStockEntry` (`Domain/Production/LiveBirdStock`): `Create`/`Update` memvalidasi siklus recordable & ≥ chick-in, rentang aktif, ekor & kg > 0, rata-rata di dalam rentang; rentang & siklus entri tidak bisa diganti (`KeyMismatch`). Tanpa lampiran (M-48).
+- **Migration `PhaseM3_LiveBirdStock`**: `master.weight_ranges` (unik `code`), `production.live_bird_stock_entries` (unik `cycle_id, date, weight_range_id`; index `branch_id, date`; FK siklus, cabang, kandang, rentang). **Belum di-migrate.**
+- **Application**:
+  - `WeightRanges/WeightRangeUseCases.cs`: create/update dengan cek tumpang tindih antar rentang aktif; batas terkunci bila sudah dipakai entri (`WeightRanges.InUse`); `GetWeightRangesQuery(activeOnly)`.
+  - `UpsertLiveBirdStockEntryCommand` (M-47: kombinasi sama → entri lama diubah & id lama dikembalikan; `id` dipakai kombinasi lain → 409; tanggal ≤ server + 1; total ekor semua rentang ≤ populasi berjalan, M-50) dan `DeleteLiveBirdStockEntryCommand` (lingkup PPL, hanya tanggal hari ini/kemarin, M-49).
+  - `GetLiveBirdStockEntriesQuery` & `GetLiveBirdStockSummaryQuery` (M-51; siklus `Active`/`Harvesting` yang sudah chick-in pada tanggal itu, entri tanggal lapor terakhir ≤ tanggal pilih, umur data, total per rentang — rentang aktif + rentang nonaktif yang masih terlapor).
+  - `GetFieldContextQuery` + `weightRanges` aktif dan per siklus `latestStockDate` + `latestStock` (M-52).
+- **Web.Api**: `GET weight-ranges` (`master-data:read`, default aktif saja), `POST production/live-bird-stocks` (`production:stock-report`, idempotency), `DELETE production/live-bird-stocks/{id}`, `GET production/live-bird-stocks`, `GET production/live-bird-stocks/summary` (`production:read`).
+
+### 18.2 Web.App
+- **Master Data → Weight Ranges** (`master.weight-ranges`): list, form (kode, nama, dari/di bawah kg, urutan, aktif), ekspor.
+- **Production → Live Bird Stock** (`production.live-bird-stock`, hak Export): filter tanggal & cabang, kartu total (ekor, ton, kandang lapor), tabel per rentang, tabel per kandang (kolom per rentang, umur data, baris basi disorot, "Not reported"), ekspor Excel/PDF (satu baris per kandang × rentang).
+- **DemoDataSeeder** (M-54): 5 rentang `BB-14 … BB-20UP` dan stok 3 hari terakhir untuk siklus berjalan berumur ≥ 25 hari; `docs/DEMO-DATA.md` diperbarui.
+
+### 18.3 MobileApp.Core & MobileApp
+- **Core**:
+  - DTO `WeightRange`, `LiveBirdStockEntry`, `LiveBirdStockSummary`; field-context baru; `ApiClient.DeleteAsync`; `ProductionApi` (stok per siklus, rekap, hapus).
+  - `StockDraft` + `StockRules` (rata-rata di dalam rentang, total ekor ≤ populasi berjalan dikurangi deplesi recording yang belum terkirim; baris rentang yang sama dianggap diganti).
+  - `StockService`: simpan ke antrean (entri antrean dengan rentang sama diganti, id tetap), kirim langsung bila online, kirim ulang, hapus lokal, hapus server (online), gabungan server + antrean per siklus, `Previous` untuk "Salin".
+  - **`SyncEngine` digeneralisasi** per `SyncKinds` (`Recording`, `LiveBirdStock`), urutan **tanggal → Recording → LiveBirdStock**; setelah terkirim menyegarkan field-context dan list per jenis; `CountAsync` untuk badge; event `Changed` juga saat proses selesai.
+  - `ErrorMessages` untuk kode `LiveBirdStock.*` & `WeightRanges.*`.
+- **Layar**:
+  - **Stok Ayam** (`/stok-ayam`): PPL — status hari ini per kandang (Belum diisi / n rentang / Belum terkirim / Gagal) + tombol input; Manager — rekap tanggal (total, per rentang, per kandang dengan badge Hari ini / Data n hari lalu / Belum lapor, ketuk untuk rincian rentang).
+  - **Input stok** (`/stok-ayam/input?cycleId&date`): pilih kandang & tanggal, umur & populasi tersedia, total & sisa belum terlapor, kartu per rentang (Isi / Ubah / Hapus / Batalkan perubahan) dengan rata-rata & validasi langsung, **Salin dari {tanggal}** bila tanggal itu kosong. Hapus entri server hanya tampil saat online dan untuk hari ini/kemarin.
+  - **Riwayat per siklus** (`/siklus/{id}/stok-ayam`, tautan dari halaman recording siklus) dikelompokkan per tanggal.
+  - **Antrean** menampilkan entri stok (kirim ulang/ubah/hapus); badge & kartu Beranda menghitung semua jenis.
+
+### 18.4 Pengujian & verifikasi
+- **Test: 578 lulus** — 162 domain (+15), 83 application (+2), 14 arsitektur, 109 MobileApp.UnitTests (+6), 39 integration Web.Api (+6 `LiveBirdStockTests`; setup bersama `FieldScenarioTest`), 171 integration Web.App (+4).
+- **Demo data** di `intiplasma_verify`: 736 command, 7 entri stok untuk SKL/BDG/2026/IX/0001 (06–08/10).
+- **Emulator API 34**:
+  - `ppl2.bdg`: "Salin dari 08/10/2026 (2 rentang)" → 2 entri hari ini terkirim; ubah BB-20 → baris yang sama di DB berubah (1.900 ekor / 3.600 kg, tidak dobel); rata-rata di luar rentang ditandai merah & ditolak sebelum simpan.
+  - **Mode pesawat**: recording hari ini (mati 5) + ubah BB-20UP (700 ekor) → Antrean berisi 2 item (badge 2), tombol hapus entri server disembunyikan → online → keduanya terkirim otomatis, recording 1 detik lebih dulu dari stok; tetap 2 entri hari ini.
+  - Hapus entri BB-20UP hari ini (online) → terhapus di server.
+  - `manager.bdg`: tab Stok Ayam — 1.900 ekor · 3,60 ton, kandang lapor 1/2, BB-20 1 kandang, Ahmad 2 "Hari ini" (populasi 2.864 sudah dikurangi recording), Inti Lembang "Belum lapor", rincian rentang saat diketuk.
+
+### 18.5 Catatan
+- Perbaikan saat verifikasi: tombol "Mengirim…" di Antrean tidak kembali setelah sinkron (event terakhir terkirim sebelum kunci dilepas → kini juga dikirim setelah proses selesai); pesan sukses di input stok memakai `alert-success` (`alert-info` template berwarna magenta).
+- Halaman Live Bird Stock Web.App diuji lewat integration test (render + ekspor), tidak dibuka manual; datanya dari query rekap yang sama dengan mobile.
+- `/stok-ayam` untuk PPL ada di menu "Lainnya" (tab bawah PPL sudah penuh), jadi tab Lainnya yang tersorot.
+- Validasi "data basi" (> 1 hari) dan "Belum lapor" diuji di integration test; di emulator hanya "Belum lapor" yang terlihat.

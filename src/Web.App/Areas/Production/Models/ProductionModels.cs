@@ -5,6 +5,7 @@ using Application.Documents;
 using Application.Inventory;
 using Application.Production;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Web.App.Areas.Inventory.Models;
 
 namespace Web.App.Areas.Production.Models;
@@ -262,4 +263,54 @@ public sealed class HarvestFormViewModel
     public string? Notes { get; set; }
 
     public List<Guid> Documents { get; set; } = [];
+}
+
+// ---- Live bird stock (PLAN-MOBILE M-28, M-51) --------------------------------------------------------------
+
+public sealed class LiveBirdStockViewModel
+{
+    public DateOnly Date { get; init; }
+
+    public IReadOnlyList<SelectListItem> BranchOptions { get; init; } = [];
+
+    public LiveBirdStockSummaryResponse? Summary { get; init; }
+
+    public string? Error { get; init; }
+}
+
+/// <summary>
+/// One line of the export: a coop and weight range, or the coop alone when it has not reported.
+/// </summary>
+public sealed record LiveBirdStockExportRow(
+    string Branch,
+    string Coop,
+    string Cycle,
+    int AgeDays,
+    int Population,
+    DateOnly? ReportDate,
+    int? DataAgeDays,
+    string? WeightRange,
+    int? Birds,
+    decimal? WeightKg,
+    decimal? AverageWeightKg)
+{
+    public static IReadOnlyList<LiveBirdStockExportRow> From(LiveBirdStockSummaryResponse summary) =>
+    [
+        .. summary.Coops.SelectMany(c => c.Entries.Count == 0
+            ? [Row(c, null)]
+            : c.Entries.Select(e => Row(c, e)))
+    ];
+
+    private static LiveBirdStockExportRow Row(LiveBirdStockCoopSummary coop, LiveBirdStockCoopRange? entry) => new(
+        coop.BranchCode,
+        $"{coop.CoopCode} {coop.CoopName}",
+        coop.CycleNumber,
+        coop.AgeDays,
+        coop.Population,
+        coop.ReportDate,
+        coop.DataAgeDays,
+        entry?.Code ?? "Not reported",
+        entry?.Birds,
+        entry?.WeightKg,
+        entry?.AverageWeightKg);
 }

@@ -1,0 +1,156 @@
+@model LiveBirdStockViewModel
+@{
+    ViewData["Title"] = "Live Bird Stock";
+    ViewData["Menu"] = MenuCodes.ProductionLiveBirdStock;
+    Application.Production.LiveBirdStockSummaryResponse? summary = Model.Summary;
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Live Bird Stock", "Birds ready for sale per weight range, from the latest report of each running cycle (entered by the PPL on the mobile app)", MenuCodes.ProductionLiveBirdStock)' />
+
+<div class="card">
+    <div class="card-header">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <input type="date" name="date" value="@Model.Date.ToString("yyyy-MM-dd")" class="form-control" aria-label="Date">
+            </div>
+            <div class="col-md-3">
+                <select name="branch" class="form-select" asp-items="Model.BranchOptions" aria-label="Branch"></select>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="ti ti-filter"></i></button>
+                <a asp-action="Index" class="btn btn-light">Today</a>
+            </div>
+        </form>
+    </div>
+
+    @if (Model.Error is not null)
+    {
+        <div class="card-body"><div class="alert alert-danger mb-0">@Model.Error</div></div>
+    }
+    else if (summary is not null)
+    {
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="border rounded p-3">
+                        <div class="text-muted fs-13">Birds ready</div>
+                        <div class="fs-4 fw-semibold">@Fmt.Number(summary.TotalBirds)</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="border rounded p-3">
+                        <div class="text-muted fs-13">Weight</div>
+                        <div class="fs-4 fw-semibold">@Fmt.Number(summary.TotalWeightKg / 1000m, 2) ton</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="border rounded p-3">
+                        <div class="text-muted fs-13">Coops reported</div>
+                        <div class="fs-4 fw-semibold">@summary.ReportedCoops / @summary.Coops.Count</div>
+                    </div>
+                </div>
+            </div>
+
+            <h6 class="mt-4 mb-2">Per weight range</h6>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="thead-light">
+                        <tr><th>Range</th><th class="text-end">Birds</th><th class="text-end">Weight (ton)</th><th class="text-end">Average (kg)</th><th class="text-end">Coops</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (Application.Production.LiveBirdStockRangeTotal range in summary.Ranges)
+                        {
+                            <tr>
+                                <td><span class="fw-semibold">@range.Code</span> <span class="text-muted">@range.Name</span></td>
+                                <td class="text-end">@Fmt.Number(range.Birds)</td>
+                                <td class="text-end">@Fmt.Number(range.WeightKg / 1000m, 2)</td>
+                                <td class="text-end">@(range.Birds == 0 ? "—" : Fmt.Number(range.AverageWeightKg, 3))</td>
+                                <td class="text-end">@range.Coops</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr class="fw-semibold">
+                            <td>Total</td>
+                            <td class="text-end">@Fmt.Number(summary.TotalBirds)</td>
+                            <td class="text-end">@Fmt.Number(summary.TotalWeightKg / 1000m, 2)</td>
+                            <td class="text-end">@(summary.TotalBirds == 0 ? "—" : Fmt.Number(summary.TotalWeightKg / summary.TotalBirds, 3))</td>
+                            <td class="text-end">@summary.ReportedCoops</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <div class="card-body p-0 border-top">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>Coop</th>
+                            <th>Cycle</th>
+                            <th class="text-end">Age</th>
+                            <th class="text-end">Population</th>
+                            <th>Report</th>
+                            @foreach (Application.Production.LiveBirdStockRangeTotal range in summary.Ranges)
+                            {
+                                <th class="text-end" title="@range.Name">@range.Code</th>
+                            }
+                            <th class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (Application.Production.LiveBirdStockCoopSummary coop in summary.Coops)
+                        {
+                            <tr class="@(coop.IsStale ? "table-warning" : null)">
+                                <td>
+                                    <div class="fw-semibold">@coop.CoopCode @coop.CoopName</div>
+                                    <div class="text-muted fs-13">@coop.BranchCode · @coop.FarmerName@(coop.FieldOfficerName is { } ppl ? $" · PPL {ppl}" : null)</div>
+                                </td>
+                                <td>@coop.CycleNumber</td>
+                                <td class="text-end">@coop.AgeDays</td>
+                                <td class="text-end">@Fmt.Number(coop.Population)</td>
+                                <td>
+                                    @if (coop.ReportDate is { } reported)
+                                    {
+                                        <span>@Fmt.Date(reported)</span>
+                                        @if (coop.DataAgeDays > 0)
+                                        {
+                                            <span class="badge @(coop.IsStale ? "bg-warning" : "bg-light text-dark") ms-1">@coop.DataAgeDays d old</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Not reported</span>
+                                    }
+                                </td>
+                                @foreach (Application.Production.LiveBirdStockRangeTotal range in summary.Ranges)
+                                {
+                                    Application.Production.LiveBirdStockCoopRange? entry = coop.Entries.FirstOrDefault(e => e.WeightRangeId == range.WeightRangeId);
+                                    <td class="text-end">
+                                        @if (entry is not null)
+                                        {
+                                            <div>@Fmt.Number(entry.Birds)</div>
+                                            <div class="text-muted fs-13">@Fmt.Number(entry.WeightKg, 1) kg</div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">—</span>
+                                        }
+                                    </td>
+                                }
+                                <td class="text-end fw-semibold">
+                                    <div>@Fmt.Number(coop.TotalBirds)</div>
+                                    <div class="text-muted fs-13">@Fmt.Number(coop.TotalWeightKg, 1) kg</div>
+                                </td>
+                            </tr>
+                        }
+                        @if (summary.Coops.Count == 0)
+                        {
+                            <tr><td colspan="@(6 + summary.Ranges.Count)" class="text-center text-muted py-4">No running cycles on this date.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>

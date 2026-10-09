@@ -10,7 +10,8 @@ namespace Application.Mobile;
 /// <summary>
 /// Data the mobile app needs to fill in daily forms offline (PLAN-MOBILE §3.6, M-40): the running cycles in the
 /// caller's scope with their population and recent recording dates, the feed/OVK items with their units, and the
-/// quantity in stock of the coop warehouses. Values and costs are left out on purpose.
+/// quantity in stock of the coop warehouses (values and costs are left out on purpose), and for stok ayam harian
+/// (M-52) the active weight ranges and each cycle's latest report.
 /// </summary>
 public sealed record GetFieldContextQuery : IQuery<FieldContextResponse>;
 
@@ -20,7 +21,8 @@ public sealed record FieldContextResponse(
     DateTime GeneratedAtUtc,
     IReadOnlyList<FieldCycleResponse> Cycles,
     IReadOnlyList<FieldItemResponse> Items,
-    IReadOnlyList<FieldStockResponse> Stock);
+    IReadOnlyList<FieldStockResponse> Stock,
+    IReadOnlyList<FieldWeightRangeResponse> WeightRanges);
 
 public sealed record FieldCycleResponse
 {
@@ -62,7 +64,24 @@ public sealed record FieldCycleResponse
     /// Dates already recorded within <see cref="GetFieldContextQueryHandler.RecentDays"/> days of the server date.
     /// </summary>
     public IReadOnlyList<DateOnly> RecordedDates { get; init; } = [];
+
+    /// <summary>
+    /// Date of the latest stok ayam report (M-52); null when the cycle has none.
+    /// </summary>
+    public DateOnly? LatestStockDate { get; init; }
+
+    /// <summary>
+    /// The entries of <see cref="LatestStockDate"/>: today's list, or the base for "Salin dari kemarin".
+    /// </summary>
+    public IReadOnlyList<FieldStockEntryResponse> LatestStock { get; init; } = [];
 }
+
+/// <summary>
+/// Active weight range for stok ayam harian, in display order.
+/// </summary>
+public sealed record FieldWeightRangeResponse(Guid Id, string Code, string Name, decimal? MinWeightKg, decimal? MaxWeightKg);
+
+public sealed record FieldStockEntryResponse(Guid Id, Guid WeightRangeId, int Birds, decimal WeightKg, string? Notes);
 
 /// <param name="Category"><c>Feed</c> or <c>Ovk</c>.</param>
 /// <param name="Uoms">Units the item can be recorded in, the base unit first (factor 1).</param>
@@ -104,7 +123,8 @@ internal sealed class GetFieldContextQueryHandler(
                 c.id AS CoopId, c.code AS CoopCode, c.name AS CoopName, f.id AS FarmerId, f.name AS FarmerName,
                 w.id AS WarehouseId, pc.chick_in_date AS ChickInDate, pc.initial_population AS InitialPopulation,
                 pc.initial_population - pc.total_mortality - pc.total_culling - pc.harvested_birds AS CurrentPopulation,
-                (SELECT MAX(r.date) FROM production.daily_recordings r WHERE r.cycle_id = pc.id) AS LastRecordingDate
+                (SELECT MAX(r.date) FROM production.daily_recordings r WHERE r.cycle_id = pc.id) AS LastRecordingDate,
+                (SELECT MAX(s.date) FROM production.live_bird_stock_entries s WHERE s.cycle_id = pc.id) AS LatestStockDate
          FROM fc_cycles pc
          JOIN master.coops c ON c.id = pc.coop_id
          JOIN master.farmers f ON f.id = pc.farmer_id
@@ -138,6 +158,17 @@ internal sealed class GetFieldContextQueryHandler(
          WHERE s.quantity <> 0
            AND i.category IN ('Feed', 'Ovk')
            AND w.coop_id IN (SELECT coop_id FROM fc_cycles);
+
+         SELECT s.cycle_id AS CycleId, s.id AS Id, s.weight_range_id AS WeightRangeId, s.birds AS Birds,
+                s.weight_kg AS WeightKg, s.notes AS Notes
+         FROM production.live_bird_stock_entries s
+         JOIN fc_cycles pc ON pc.id = s.cycle_id
+         WHERE s.date = (SELECT MAX(l.date) FROM production.live_bird_stock_entries l WHERE l.cycle_id = s.cycle_id);
+
+         SELECT r.id AS Id, r.code AS Code, r.name AS Name, r.min_weight_kg AS MinWeightKg, r.max_weight_kg AS MaxWeightKg
+         FROM master.weight_ranges r
+         WHERE r.is_active
+         ORDER BY r.sort_order, r.code;
          """;
 
     public async Task<Result<FieldContextResponse>> Handle(GetFieldContextQuery query, CancellationToken cancellationToken)
@@ -168,13 +199,21 @@ internal sealed class GetFieldContextQueryHandler(
         List<ItemRow> items = [.. await multi.ReadAsync<ItemRow>()];
         ILookup<Guid, ConversionRow> conversions = (await multi.ReadAsync<ConversionRow>()).ToLookup(c => c.ItemId);
         List<FieldStockResponse> stock = [.. await multi.ReadAsync<FieldStockResponse>()];
+        ILookup<Guid, StockEntryRow> latestStock = (await multi.ReadAsync<StockEntryRow>()).ToLookup(e => e.CycleId);
+        List<FieldWeightRangeResponse> weightRanges = [.. await multi.ReadAsync<FieldWeightRangeResponse>()];
 
         await transaction.CommitAsync(cancellationToken);
 
         return new FieldContextResponse(
             serverDate,
             utcNow,
-            [.. cycles.Select(c => c with { RecordedDates = [.. recorded[c.Id]] })],
+            [
+                .. cycles.Select(c => c with
+                {
+                    RecordedDates = [.. recorded[c.Id]],
+                    LatestStock = [.. latestStock[c.Id].Select(e => new FieldStockEntryResponse(e.Id, e.WeightRangeId, e.Birds, e.WeightKg, e.Notes))]
+                })
+            ],
             [
                 .. items.Select(i => new FieldItemResponse(
                     i.Id,
@@ -188,10 +227,13 @@ internal sealed class GetFieldContextQueryHandler(
                         .. conversions[i.Id].Select(c => new FieldUomResponse(c.UomId, c.Code, c.Factor))
                     ]))
             ],
-            stock);
+            stock,
+            weightRanges);
     }
 
     internal sealed record RecordedDateRow(Guid CycleId, DateOnly Date);
+
+    internal sealed record StockEntryRow(Guid CycleId, Guid Id, Guid WeightRangeId, int Birds, decimal WeightKg, string? Notes);
 
     internal sealed record ItemRow(Guid Id, string Code, string Name, string Category, Guid BaseUomId, string BaseUomCode);
 

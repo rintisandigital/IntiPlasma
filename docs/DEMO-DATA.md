@@ -54,6 +54,7 @@ Untuk **mengulang dari awal**, hapus database lalu buat lagi (`DROP DATABASE int
 - Gudang induk per cabang. Gudang kandang (`GK-…`) dibuat otomatis lewat outbox.
 - Vendor: CPI, Japfa, Medion (toleransi harga 2%), dan UD Sekam.
 - Customer: RPA, bakul, CV Cianjur, dan satu warung dengan limit 0.
+- Rentang bobot (stok ayam harian, M3): `BB-14` < 1,4 kg, `BB-16` 1,4–1,6, `BB-18` 1,6–1,8, `BB-20` 1,8–2,0, `BB-20UP` ≥ 2,0 kg.
 
 **Kemitraan**
 - 7 peternak (2 inti, 5 plasma), 8 kandang.
@@ -75,6 +76,8 @@ Untuk **mengulang dari awal**, hapus database lalu buat lagi (`DROP DATABASE int
 | KDG-CJR-01 | Harga kontrak | 5.000 | **Settled**, PV plasma **Approved** (belum dibayar) | Performa buruk (FCR ±1,77, deplesi >6%) sehingga terkena **potongan deplesi** |
 | KDG-CJR-INTI | Inti | 7.000 | **Closed** | **Uang muka** customer diterapkan ke invoice; sisa piutang dibayar sebagian |
 | KDG-CJR-02 | Harga kontrak | 3.500 | **Active** (±12 hari) | Invoice vendor belum dibayar (aging hutang) |
+
+**Stok ayam harian** (M3): untuk siklus berjalan berumur ≥ 25 hari (KDG-BDG-02), entri 3 hari terakhir per rentang bobot — 90% populasi dibagi di sekitar BW simulasi hari itu.
 
 **Pekerjaan terbuka** (untuk mengisi daftar "Waiting for action" di dashboard):
 - jurnal manual Draft,

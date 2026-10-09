@@ -25,6 +25,66 @@ internal sealed class ProductionEndpoints : IEndpoint
     {
         MapDailyRecordings(app.MapGroup("production/daily-recordings").WithTags(Tags.DailyRecordings));
         MapCycleProduction(app.MapGroup("cycles").WithTags(Tags.Cycles));
+        MapLiveBirdStock(app.MapGroup("production/live-bird-stocks").WithTags(Tags.LiveBirdStock));
+    }
+
+    /// <summary>
+    /// Stok ayam harian (PLAN-MOBILE §4.4): entries per weight range, upserted by the PPL (offline queue), and the
+    /// branch summary for the Manager and Sales.
+    /// </summary>
+    private static void MapLiveBirdStock(RouteGroupBuilder group)
+    {
+        group.MapGet("", async (
+            Guid? cycleId,
+            Guid? branchId,
+            DateOnly? date,
+            DateOnly? from,
+            DateOnly? to,
+            IQueryHandler<GetLiveBirdStockEntriesQuery, IReadOnlyList<LiveBirdStockEntryResponse>> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<IReadOnlyList<LiveBirdStockEntryResponse>> result = await handler.Handle(
+                new GetLiveBirdStockEntriesQuery(cycleId, branchId, date, from, to), cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.ProductionRead);
+
+        group.MapGet("summary", async (
+            DateOnly date,
+            Guid? branchId,
+            IQueryHandler<GetLiveBirdStockSummaryQuery, LiveBirdStockSummaryResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<LiveBirdStockSummaryResponse> result = await handler.Handle(
+                new GetLiveBirdStockSummaryQuery(date, branchId), cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.ProductionRead);
+
+        group.MapPost("", async (
+            UpsertLiveBirdStockEntryCommand command,
+            ICommandHandler<UpsertLiveBirdStockEntryCommand, Guid> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<Guid> result = await handler.Handle(command, cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.ProductionStockReport)
+        .WithIdempotency();
+
+        group.MapDelete("{entryId:guid}", async (
+            Guid entryId,
+            ICommandHandler<DeleteLiveBirdStockEntryCommand> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result result = await handler.Handle(new DeleteLiveBirdStockEntryCommand(entryId), cancellationToken);
+
+            return result.Match(Results.NoContent, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.ProductionStockReport);
     }
 
     private static void MapDailyRecordings(RouteGroupBuilder group)

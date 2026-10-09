@@ -1,6 +1,5 @@
 @implements IDisposable
 @inject NavigationManager Navigation
-@inject RecordingService Recordings
 @inject SyncEngine Sync
 
 @* Template "menubar-footer": first four available features + Lainnya (AppFeatures.BottomBar). *@
@@ -47,7 +46,7 @@
     /// Entries of the offline queue not sent yet (badge on "Antrean").
     /// </summary>
     private async Task CountAsync() =>
-        _queued = AppFeatures.SyncQueue.IsAvailable(User) ? (await Recordings.GetLocalListAsync()).Count : 0;
+        _queued = AppFeatures.SyncQueue.IsAvailable(User) ? await Sync.CountAsync() : 0;
 
     private void OnQueueChanged(object? sender, EventArgs e) =>
         _ = InvokeAsync(async () =>

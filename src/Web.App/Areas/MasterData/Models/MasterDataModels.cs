@@ -41,6 +41,31 @@ public sealed class UomFormViewModel : MasterFormViewModel
     public string Name { get; set; } = string.Empty;
 }
 
+// ---- Weight ranges (PLAN-MOBILE M-23, M-46) -----------------------------------------------------------------
+
+public sealed class WeightRangeFormViewModel : MasterFormViewModel
+{
+    [Required]
+    [StringLength(20)]
+    public string Code { get; set; } = string.Empty;
+
+    [Required]
+    [StringLength(100)]
+    public string Name { get; set; } = string.Empty;
+
+    [Display(Name = "From (kg, inclusive)")]
+    [Range(0, 99_999)]
+    public decimal? MinWeightKg { get; set; }
+
+    [Display(Name = "Below (kg, exclusive)")]
+    [Range(0, 99_999)]
+    public decimal? MaxWeightKg { get; set; }
+
+    [Display(Name = "Sort order")]
+    [Range(0, 9_999)]
+    public int SortOrder { get; set; }
+}
+
 // ---- Tax codes ---------------------------------------------------------------------------------------------
 
 public sealed class TaxCodeFormViewModel : MasterFormViewModel

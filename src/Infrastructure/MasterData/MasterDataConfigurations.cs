@@ -6,6 +6,7 @@ using Domain.MasterData.Farmers;
 using Domain.MasterData.Items;
 using Domain.MasterData.TaxCodes;
 using Domain.MasterData.Uoms;
+using Domain.MasterData.WeightRanges;
 using Domain.MasterData.Vendors;
 using Domain.MasterData.Warehouses;
 using Domain.Users;
@@ -26,6 +27,20 @@ internal sealed class BranchConfiguration : IEntityTypeConfiguration<Branch>
         builder.Property(b => b.Address).HasMaxLength(500);
         builder.Property(b => b.Phone).HasMaxLength(30);
         builder.HasIndex(b => b.Code).IsUnique();
+    }
+}
+
+internal sealed class WeightRangeConfiguration : IEntityTypeConfiguration<WeightRange>
+{
+    public void Configure(EntityTypeBuilder<WeightRange> builder)
+    {
+        builder.ToTable("weight_ranges", Schemas.MasterData);
+        builder.HasKey(r => r.Id);
+        builder.Property(r => r.Code).HasMaxLength(20);
+        builder.Property(r => r.Name).HasMaxLength(100);
+        builder.Property(r => r.MinWeightKg).HasPrecision(8, WeightRange.WeightDecimals);
+        builder.Property(r => r.MaxWeightKg).HasPrecision(8, WeightRange.WeightDecimals);
+        builder.HasIndex(r => r.Code).IsUnique();
     }
 }
 

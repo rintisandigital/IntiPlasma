@@ -20,6 +20,7 @@ public static class MenuCodes
     public const string MasterWarehouses = "master.warehouses";
     public const string MasterVendors = "master.vendors";
     public const string MasterCustomers = "master.customers";
+    public const string MasterWeightRanges = "master.weight-ranges";
     public const string PartnershipFarmers = "partnership.farmers";
     public const string PartnershipCoops = "partnership.coops";
     public const string PartnershipFieldOfficers = "partnership.field-officers";
@@ -46,6 +47,7 @@ public static class MenuCodes
     public const string ProductionCycles = "production.cycles";
     public const string ProductionRecordings = "production.recordings";
     public const string ProductionHarvests = "production.harvests";
+    public const string ProductionLiveBirdStock = "production.live-bird-stock";
     public const string SalesOrders = "sales.orders";
     public const string SalesDeliveries = "sales.deliveries";
     public const string SalesInvoices = "sales.invoices";
@@ -100,6 +102,7 @@ public static class MenuCatalog
         Page("master", "master.warehouses", "Warehouses", "/MasterData/Warehouses", CreateEditExport, true);
         Page("master", "master.vendors", "Vendors", "/MasterData/Vendors", CreateEditExport, true);
         Page("master", "master.customers", "Customers", "/MasterData/Customers", CreateEditExport, true);
+        Page("master", "master.weight-ranges", "Weight Ranges", "/MasterData/WeightRanges", CreateEditExport, true);
 
         Group("partnership", "Partnership", "ti ti-users-group", 30);
         Page("partnership", "partnership.farmers", "Farmers", "/Partnership/Farmers", CreateEditExport, true);
@@ -121,6 +124,7 @@ public static class MenuCatalog
         Page("production", "production.cycles", "Cycles & Chick-in", "/Production/Cycles", CreateEditExport, true);
         Page("production", "production.recordings", "Daily Recordings", "/Production/Recordings", CreateEditExport, true);
         Page("production", "production.harvests", "Harvests", "/Production/Harvests", CreateEditExport, true);
+        Page("production", "production.live-bird-stock", "Live Bird Stock", "/Production/LiveBirdStock", MenuRights.Export, true);
 
         Group("sales", "Sales", "ti ti-receipt", 70);
         Page("sales", "sales.orders", "Sales Orders", "/Sales/SalesOrders", CreateEditExport, true);

@@ -84,6 +84,14 @@ public static class MauiProgram
             sp.GetRequiredService<IClock>(),
             sp.GetRequiredService<Core.Abstractions.IConnectivity>(),
             CurrentUserId(sp)));
+        services.AddSingleton(sp => new StockService(
+            sp.GetRequiredService<ProductionApi>(),
+            sp.GetRequiredService<LocalDb>(),
+            sp.GetRequiredService<SyncEngine>(),
+            sp.GetRequiredService<RecordingService>(),
+            sp.GetRequiredService<IClock>(),
+            sp.GetRequiredService<Core.Abstractions.IConnectivity>(),
+            CurrentUserId(sp)));
     }
 
     private static Func<Guid?> CurrentUserId(IServiceProvider services)

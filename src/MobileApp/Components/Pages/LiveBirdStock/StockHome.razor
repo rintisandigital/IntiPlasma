@@ -1,0 +1,253 @@
+@page "/stok-ayam"
+@inject SessionService Session
+@inject StockService Stock
+@inject RecordingService Recordings
+@inject ProductionApi Production
+@inject MobileApp.Core.Abstractions.IConnectivity Connectivity
+
+@* Stok ayam (PLAN-MOBILE M-53): the PPL see today's report per coop and open the input; the Manager sees the branch
+   summary per weight range with a drill-down per coop (M-51, read-only). *@
+<AppPage Title="Stok Ayam" BackTo="@BackTo">
+    @if (IsReporter)
+    {
+        <a class="tf-btn round-full mb-16" href="/stok-ayam/input"><i class="icon icon-plus me-1"></i>Input stok ayam</a>
+
+        @if (_error is not null)
+        {
+            <ErrorState Error="_error" OnRetry="() => LoadPplAsync(refresh: true)" />
+        }
+        else if (_context is null)
+        {
+            <Spinner />
+        }
+        else
+        {
+            <h5 class="mb-12">Hari ini</h5>
+            @foreach (FieldCycle cycle in _context.Cycles)
+            {
+                (string text, Labels.Tone tone) = TodayStatus(cycle);
+                <a class="list-card" href="/stok-ayam/input?cycleId=@cycle.Id">
+                    <div class="d-flex justify-content-between align-items-start gap-8">
+                        <div>
+                            <div class="text-caption-2 text-Primary">@cycle.Number</div>
+                            <div class="text-button-small text-OnSurface">@cycle.CoopName</div>
+                        </div>
+                        <StatusBadge Text="@text" Tone="@tone" />
+                    </div>
+                    <div class="meta">
+                        <span>Umur @cycle.AgeOn(Stock.Today) hari</span>
+                        <span>Populasi @IdFormat.Number(cycle.CurrentPopulation)</span>
+                        <span>Terakhir @(cycle.LatestStockDate is { } last ? IdFormat.Date(last) : "—")</span>
+                    </div>
+                </a>
+            }
+        }
+    }
+    else
+    {
+        <div class="d-flex gap-8 align-items-center mb-12">
+            <input type="date" class="form-control" max="@Stock.Today.ToString("yyyy-MM-dd")" value="@_date.ToString("yyyy-MM-dd")" @onchange="OnDateChangedAsync" aria-label="Tanggal" />
+        </div>
+
+        @if (_summaryError is not null)
+        {
+            <ErrorState Error="_summaryError" OnRetry="LoadSummaryAsync" />
+        }
+        else if (_summary is null)
+        {
+            <Spinner />
+        }
+        else
+        {
+            LiveBirdStockSummary summary = _summary;
+            <CacheNote CachedAtUtc="_cachedAtUtc" />
+
+            <div class="stock-total mb-16">
+                <div>
+                    <div class="text-caption-2 text-dark-4">Siap jual</div>
+                    <div class="text-button-small text-OnSurface">@IdFormat.Number(summary.TotalBirds) ekor · @IdFormat.Tons(summary.TotalWeightKg)</div>
+                </div>
+                <div class="text-end">
+                    <div class="text-caption-2 text-dark-4">Kandang lapor</div>
+                    <div class="text-button-small text-OnSurface">@summary.ReportedCoops / @summary.Coops.Count</div>
+                </div>
+            </div>
+
+            <div class="info-list mb-16">
+                @foreach (LiveBirdStockRangeTotal range in summary.Ranges)
+                {
+                    <div class="row-item">
+                        <span><span class="text-caption-2 text-dark-4">@range.Code</span><br />@range.Name</span>
+                        <span class="text-end">
+                            <span class="fw-6">@IdFormat.Number(range.Birds) ekor</span><br />
+                            <span class="text-caption-2 text-dark-4">@IdFormat.Tons(range.WeightKg) · @range.Coops kandang</span>
+                        </span>
+                    </div>
+                }
+            </div>
+
+            <h5 class="mb-12">Per kandang</h5>
+            @foreach (LiveBirdStockCoop coop in summary.Coops)
+            {
+                <div class="list-card @(coop.IsStale ? "highlight" : null)" @onclick="() => Toggle(coop.CycleId)">
+                    <div class="d-flex justify-content-between align-items-start gap-8">
+                        <div>
+                            <div class="text-caption-2 text-Primary">@coop.CoopCode · @coop.BranchCode</div>
+                            <div class="text-button-small text-OnSurface">@coop.CoopName</div>
+                        </div>
+                        @if (coop.ReportDate is null)
+                        {
+                            <StatusBadge Text="Belum lapor" Tone="Labels.Tone.Danger" />
+                        }
+                        else if (coop.DataAgeDays > 0)
+                        {
+                            <StatusBadge Text="@($"Data {coop.DataAgeDays} hari lalu")" Tone="@(coop.IsStale ? Labels.Tone.Warning : Labels.Tone.Info)" />
+                        }
+                        else
+                        {
+                            <StatusBadge Text="Hari ini" Tone="Labels.Tone.Success" />
+                        }
+                    </div>
+                    <div class="meta">
+                        <span>Umur @coop.AgeDays hari</span>
+                        <span>@IdFormat.Number(coop.TotalBirds) / @IdFormat.Number(coop.Population) ekor</span>
+                        <span>@IdFormat.Tons(coop.TotalWeightKg)</span>
+                        @if (coop.FieldOfficerName is { } ppl)
+                        {
+                            <span>PPL @ppl</span>
+                        }
+                    </div>
+                    @if (_expanded.Contains(coop.CycleId) && coop.Entries.Count > 0)
+                    {
+                        <div class="info-list mt-8">
+                            @foreach (LiveBirdStockCoopRange entry in coop.Entries)
+                            {
+                                <div class="row-item">
+                                    <span>@entry.Code</span>
+                                    <span class="text-end">@IdFormat.Number(entry.Birds) ekor · @IdFormat.Number(entry.WeightKg, 1) kg<br />
+                                        <span class="text-caption-2 text-dark-4">rata-rata @IdFormat.Number(entry.AverageWeightKg, 3) kg</span>
+                                    </span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            @if (summary.Coops.Count == 0)
+            {
+                <div class="empty-state">
+                    <i class="icon icon-chart"></i>
+                    <p class="body-2 text-dark-4 mt-8">Tidak ada siklus berjalan pada tanggal ini.</p>
+                </div>
+            }
+        }
+    }
+</AppPage>
+
+@code {
+    private readonly HashSet<Guid> _expanded = [];
+
+    private FieldContext? _context;
+    private IReadOnlyList<LocalStock> _local = [];
+    private ApiError? _error;
+    private DateOnly _date;
+    private LiveBirdStockSummary? _summary;
+    private DateTime? _cachedAtUtc;
+    private ApiError? _summaryError;
+
+    private bool IsReporter => Session.Has(AppPermissions.ProductionStockReport);
+
+    private string? BackTo =>
+        Session.User is { } user && AppFeatures.BottomBar(user).Contains(AppFeatures.LiveBirdStock) ? null : "/lainnya";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _date = Stock.Today;
+
+        if (IsReporter)
+        {
+            await LoadPplAsync(Connectivity.IsOnline);
+        }
+        else
+        {
+            await LoadSummaryAsync();
+        }
+    }
+
+    private async Task LoadPplAsync(bool refresh)
+    {
+        _error = null;
+
+        CachedResult<FieldContext> result = await Recordings.GetContextAsync(refresh);
+        if (!result.IsSuccess && refresh)
+        {
+            result = await Recordings.GetContextAsync(refresh: false);
+        }
+
+        _local = await Stock.GetLocalListAsync();
+
+        if (result.IsSuccess)
+        {
+            _context = result.Value;
+        }
+        else
+        {
+            _error = result.Error;
+        }
+    }
+
+    private (string Text, Labels.Tone Tone) TodayStatus(FieldCycle cycle)
+    {
+        DateOnly today = Stock.Today;
+        List<LocalStock> queued = [.. _local.Where(l => l.Draft.CycleId == cycle.Id && l.Draft.Date == today)];
+
+        if (queued.Exists(l => l.State == RecordingState.Failed))
+        {
+            return ("Gagal", Labels.Tone.Danger);
+        }
+
+        if (queued.Count > 0)
+        {
+            return ("Belum terkirim", Labels.Tone.Warning);
+        }
+
+        return cycle.LatestStockDate == today
+            ? ($"{cycle.LatestStock.Count} rentang", Labels.Tone.Success)
+            : ("Belum diisi", Labels.Tone.Danger);
+    }
+
+    private async Task LoadSummaryAsync()
+    {
+        _summaryError = null;
+        _summary = null;
+
+        CachedResult<LiveBirdStockSummary> result = await Production.GetStockSummaryAsync(_date, null);
+        if (result.IsSuccess)
+        {
+            _summary = result.Value;
+            _cachedAtUtc = result.CachedAtUtc;
+        }
+        else
+        {
+            _summaryError = result.Error;
+        }
+    }
+
+    private async Task OnDateChangedAsync(ChangeEventArgs e)
+    {
+        if (DateOnly.TryParse(e.Value?.ToString(), System.Globalization.CultureInfo.InvariantCulture, out DateOnly date))
+        {
+            _date = date;
+            _expanded.Clear();
+            await LoadSummaryAsync();
+        }
+    }
+
+    private void Toggle(Guid cycleId)
+    {
+        if (!_expanded.Remove(cycleId))
+        {
+            _expanded.Add(cycleId);
+        }
+    }
+}

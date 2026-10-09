@@ -228,7 +228,7 @@ public sealed class SyncEngineTests : IDisposable
         var db = new LocalDb(_dbPath);
         _resources.Add(db);
         var files = new PendingFiles(_filesPath);
-        var production = new ProductionApi(new ApiCache(api.Client, db));
+        var production = new ProductionApi(new ApiCache(api.Client, db), api.Client);
         var engine = new SyncEngine(api.Client, production, db, files, _clock, _connectivity, () => User);
         _resources.Add(engine);
 

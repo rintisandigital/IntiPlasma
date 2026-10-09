@@ -1,6 +1,6 @@
 @page "/"
 @inject SessionService Session
-@inject RecordingService Recordings
+@inject SyncEngine Sync
 
 @* Dashboard (PLAN-MOBILE §6.2). M0 shows the user and the menu; the role-specific content comes in M4. *@
 @if (Session.User is { } user)
@@ -61,7 +61,7 @@
 @code {
     private int _queued;
 
-    protected override async Task OnInitializedAsync() => _queued = (await Recordings.GetLocalListAsync()).Count;
+    protected override async Task OnInitializedAsync() => _queued = await Sync.CountAsync();
 
     private static IEnumerable<AppFeature> MenuTiles(CurrentUser user) =>
         AppFeatures.All.Where(f =>

@@ -19,6 +19,7 @@ using Application.TaxCodes.Create;
 using Application.Users.Manage;
 using Application.Vendors.Create;
 using Application.Warehouses.Create;
+using Application.WeightRanges;
 using Domain.Access;
 using Domain.Finance.Accounts;
 using Domain.Finance.CashBank;
@@ -54,6 +55,11 @@ public sealed partial class DemoDataSeeder
     private Guid _ndibVaccine;
     private Guid _gumboroVaccine;
     private Guid _vitamin;
+
+    /// <summary>
+    /// Rentang bobot for the live bird stock (M-54): id with the lower and upper bound in kg.
+    /// </summary>
+    private readonly List<(Guid Id, decimal? Min, decimal? Max)> _weightRanges = [];
     private Guid _liveBird;
     private Guid _vendorCharoen;
     private Guid _vendorJapfa;
@@ -158,6 +164,18 @@ public sealed partial class DemoDataSeeder
 
     private async Task SetUpMasterDataAsync()
     {
+        foreach ((string code, string name, decimal? min, decimal? max, int order) in new (string, string, decimal?, decimal?, int)[]
+        {
+            ("BB-14", "< 1,4 kg", null, 1.4m, 10),
+            ("BB-16", "1,4 – 1,6 kg", 1.4m, 1.6m, 20),
+            ("BB-18", "1,6 – 1,8 kg", 1.6m, 1.8m, 30),
+            ("BB-20", "1,8 – 2,0 kg", 1.8m, 2.0m, 40),
+            ("BB-20UP", "≥ 2,0 kg", 2.0m, null, 50)
+        })
+        {
+            _weightRanges.Add((await SendAsync(new CreateWeightRangeCommand(code, name, min, max, order)), min, max));
+        }
+
         // Rates as data (decision #5/#11): PPN 12% with "DPP nilai lain" entered as an effective 11% with ratio 1.
         var taxFrom = new DateOnly(2025, 1, 1);
         _ppn = await SendAsync(new CreateTaxCodeCommand(

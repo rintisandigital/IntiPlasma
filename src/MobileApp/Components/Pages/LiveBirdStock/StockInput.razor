@@ -1,0 +1,423 @@
+@page "/stok-ayam/input"
+@implements IDisposable
+@inject StockService Stock
+@inject RecordingService Recordings
+@inject SyncEngine Sync
+@inject MobileApp.Core.Abstractions.IConnectivity Connectivity
+
+@* Input stok ayam harian (PLAN-MOBILE §6.2, M-24, M-53): one entry per weight range for a coop and date, offline
+   through the sync queue; the same range again changes its entry. *@
+<AppPage Title="Stok Ayam Harian" BackTo="/stok-ayam">
+    @if (_loadError is not null)
+    {
+        <div class="empty-state">
+            <i class="icon icon-globe"></i>
+            <p class="body-2 text-dark-4 mt-8">@_loadError</p>
+            <button type="button" class="tf-btn style-1 round-full mt-12" @onclick="() => LoadAsync(refresh: true)">Coba lagi</button>
+        </div>
+    }
+    else if (_context is null)
+    {
+        <Spinner />
+    }
+    else if (_context.Cycles.Count == 0 || _context.WeightRanges.Count == 0)
+    {
+        <div class="empty-state">
+            <i class="icon icon-chart"></i>
+            <p class="body-2 text-dark-4 mt-8">
+                @(_context.Cycles.Count == 0
+                    ? "Tidak ada siklus berjalan di kandang tanggung jawab Anda."
+                    : "Rentang bobot belum diatur. Hubungi admin (WebApp → Master Data → Weight Ranges).")
+            </p>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex justify-content-between align-items-center mb-12">
+            <span class="text-caption-2 text-dark-4">Data per @IdFormat.DateTime(_context.GeneratedAtUtc.ToLocalTime())</span>
+            <button type="button" class="link-btn" disabled="@(!Connectivity.IsOnline)" @onclick="() => LoadAsync(refresh: true)">Perbarui data</button>
+        </div>
+
+        <div class="form-section">
+            <label class="label text-caption-1" for="cycle">Kandang / siklus</label>
+            <select id="cycle" class="form-select mt-8" value="@_cycleKey" @onchange="OnCycleChangedAsync">
+                <option value="">— Pilih kandang —</option>
+                @foreach (FieldCycle cycle in _context.Cycles)
+                {
+                    <option value="@cycle.Id">@cycle.CoopName — @cycle.Number</option>
+                }
+            </select>
+
+            <label class="label text-caption-1 mt-16" for="date">Tanggal</label>
+            <input id="date" type="date" class="form-control mt-8" max="@Stock.Today.ToString("yyyy-MM-dd")" value="@_date.ToString("yyyy-MM-dd")" @onchange="OnDateChanged" />
+
+            @if (Cycle is { } selected)
+            {
+                <div class="meta-line mt-8">
+                    <span>Umur @selected.AgeOn(_date) hari</span>
+                    <span>Populasi @IdFormat.Number(_population) ekor</span>
+                </div>
+            }
+        </div>
+
+        @if (Cycle is not null && _list is not null)
+        {
+            <CacheNote CachedAtUtc="_list.CachedAtUtc" />
+
+            <div class="stock-total mb-16">
+                <div>
+                    <div class="text-caption-2 text-dark-4">Total dilaporkan</div>
+                    <div class="text-button-small text-OnSurface">@IdFormat.Number(TotalBirds) ekor · @IdFormat.Tons(TotalWeightKg)</div>
+                </div>
+                <div class="text-end">
+                    <div class="text-caption-2 text-dark-4">Belum terlapor</div>
+                    <div class="text-button-small @(Unreported < 0 ? "text-danger" : "text-OnSurface")">@IdFormat.Number(Unreported) ekor</div>
+                </div>
+            </div>
+
+            @if (_message is not null)
+            {
+                <div class="alert @(_messageIsError ? "alert-danger" : "alert-success")" role="alert">@_message</div>
+            }
+
+            @if (_rows.Count == 0 && _previous.Rows.Count > 0)
+            {
+                <button type="button" class="tf-btn style-1 round-full mb-16" disabled="@_busy" @onclick="CopyPreviousAsync">
+                    Salin dari @IdFormat.Date(_previous.Date!.Value) (@_previous.Rows.Count rentang)
+                </button>
+            }
+
+            @foreach (WeightRange range in _context.WeightRanges)
+            {
+                StockRow? row = _rows.FirstOrDefault(r => r.WeightRangeId == range.Id);
+                <div class="list-card">
+                    <div class="d-flex justify-content-between align-items-start gap-8">
+                        <div>
+                            <div class="text-caption-2 text-Primary">@range.Code</div>
+                            <div class="text-button-small text-OnSurface">@range.Name</div>
+                        </div>
+                        @if (row is not null)
+                        {
+                            <StatusBadge Text="@Labels.RecordingState(row.State)" Tone="@Labels.RecordingTone(row.State)" />
+                        }
+                    </div>
+
+                    @if (_editing == range.Id)
+                    {
+                        <div class="row g-8 mt-8">
+                            <div class="col-6">
+                                <label class="text-caption-2" for="birds">Ekoran (ekor)</label>
+                                <input id="birds" type="number" inputmode="numeric" min="1" class="form-control mt-4" @bind="_birds" @bind:event="oninput" />
+                            </div>
+                            <div class="col-6">
+                                <label class="text-caption-2" for="weight">Tonase (kg)</label>
+                                <input id="weight" type="number" inputmode="decimal" step="any" min="0" class="form-control mt-4" @bind="_weightKg" @bind:event="oninput" />
+                            </div>
+                        </div>
+                        @if (_birds is > 0 && _weightKg is > 0)
+                        {
+                            decimal average = Math.Round(_weightKg.Value / _birds.Value, 3);
+                            <div class="text-caption-2 mt-4 @(range.Contains(average) ? "text-success" : "text-danger")">
+                                Rata-rata @IdFormat.Number(average, 3) kg @(range.Contains(average) ? "✓" : "— di luar rentang")
+                            </div>
+                        }
+                        <input type="text" class="form-control mt-8" maxlength="500" placeholder="Catatan (opsional)" @bind="_notes" />
+                        <FieldError Message="@(_check?.ErrorFor(StockRules.Figures) ?? _check?.ErrorFor(StockRules.Date) ?? _check?.ErrorFor(StockRules.Range))" />
+                        <div class="d-flex gap-8 mt-12">
+                            <button type="button" class="tf-btn round-full btn-small" disabled="@_busy" @onclick="() => SaveAsync(range)">
+                                @(_busy ? "Menyimpan…" : "Simpan")
+                            </button>
+                            <button type="button" class="tf-btn style-1 round-full btn-small" @onclick="CancelEdit">Batal</button>
+                        </div>
+                    }
+                    else if (row is not null)
+                    {
+                        <div class="meta">
+                            <span>@IdFormat.Number(row.Birds) ekor</span>
+                            <span>@IdFormat.Number(row.WeightKg, 1) kg</span>
+                            <span>rata-rata @IdFormat.Number(row.AverageWeightKg, 3) kg</span>
+                        </div>
+                        @if (row.Error is { } error && row.State == RecordingState.Failed)
+                        {
+                            <div class="field-error">@error</div>
+                        }
+                        @if (row.State != RecordingState.Sending)
+                        {
+                            <div class="d-flex gap-8 mt-12">
+                                <button type="button" class="tf-btn style-1 round-full btn-small" @onclick="() => Edit(range, row)">Ubah</button>
+                                @if (row.IsLocal)
+                                {
+                                    <button type="button" class="tf-btn style-1 round-full btn-small text-danger" @onclick="() => _toDelete = row">
+                                        @(row.ServerId is null ? "Hapus" : "Batalkan perubahan")
+                                    </button>
+                                }
+                                else if (CanDeleteOnServer)
+                                {
+                                    <button type="button" class="tf-btn style-1 round-full btn-small text-danger" @onclick="() => _toDelete = row">Hapus</button>
+                                }
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <button type="button" class="tf-btn style-1 round-full btn-small mt-12" @onclick="() => Edit(range, null)">
+                            <i class="icon icon-plus me-1"></i>Isi
+                        </button>
+                    }
+                </div>
+            }
+
+            <a class="link-btn d-inline-block mt-8" href="/siklus/@Cycle.Id/stok-ayam">Riwayat stok ayam siklus ini ›</a>
+        }
+    }
+</AppPage>
+
+<ConfirmSheet Visible="_toDelete is not null"
+              Title="@(_toDelete?.IsLocal == true ? "Hapus dari antrean?" : "Hapus entri stok ayam?")"
+              Message="@(_toDelete?.IsLocal == true ? "Entri yang belum terkirim dihapus dari perangkat." : "Entri dihapus dari server.")"
+              ConfirmText="Hapus"
+              OnClose="CloseDeleteAsync" />
+
+@code {
+    private FieldContext? _context;
+    private string? _loadError;
+    private string _cycleKey = string.Empty;
+    private DateOnly _date;
+    private StockList? _list;
+    private IReadOnlyList<StockRow> _rows = [];
+    private (DateOnly? Date, IReadOnlyList<StockRow> Rows) _previous = (null, []);
+    private int _population;
+    private Guid? _editing;
+    private int? _birds;
+    private decimal? _weightKg;
+    private string? _notes;
+    private bool _busy;
+    private RecordingCheck? _check;
+    private string? _message;
+    private bool _messageIsError;
+    private StockRow? _toDelete;
+
+    [SupplyParameterFromQuery]
+    public Guid? CycleId { get; set; }
+
+    [SupplyParameterFromQuery]
+    public DateOnly? Date { get; set; }
+
+    private FieldCycle? Cycle => Guid.TryParse(_cycleKey, out Guid id) ? _context?.FindCycle(id) : null;
+
+    private int TotalBirds => _rows.Sum(r => r.Birds);
+
+    private decimal TotalWeightKg => _rows.Sum(r => r.WeightKg);
+
+    private int Unreported => _population - TotalBirds;
+
+    private bool CanDeleteOnServer => Connectivity.IsOnline && _date >= Stock.Today.AddDays(-1);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _date = Date ?? Stock.Today;
+        _cycleKey = CycleId?.ToString() ?? string.Empty;
+        Sync.Changed += OnQueueChanged;
+
+        await LoadAsync(refresh: Connectivity.IsOnline);
+    }
+
+    public void Dispose() => Sync.Changed -= OnQueueChanged;
+
+    private async Task LoadAsync(bool refresh)
+    {
+        _loadError = null;
+
+        CachedResult<FieldContext> result = await Recordings.GetContextAsync(refresh);
+        if (!result.IsSuccess && refresh)
+        {
+            result = await Recordings.GetContextAsync(refresh: false);
+        }
+
+        if (!result.IsSuccess)
+        {
+            _loadError = result.Error!.IsNetwork
+                ? "Data kandang belum tersimpan di perangkat. Hubungkan ke internet lalu coba lagi."
+                : result.Error.Message;
+
+            return;
+        }
+
+        _context = result.Value;
+        if (_context.Cycles.Count == 1 && string.IsNullOrEmpty(_cycleKey))
+        {
+            _cycleKey = _context.Cycles[0].Id.ToString();
+        }
+
+        await LoadRowsAsync(refresh);
+    }
+
+    private async Task LoadRowsAsync(bool refresh)
+    {
+        _list = null;
+        _rows = [];
+        _previous = (null, []);
+
+        if (Cycle is not { } cycle)
+        {
+            return;
+        }
+
+        _list = await Stock.GetCycleRowsAsync(cycle.Id, refresh);
+        _rows = _list.On(_date);
+        _previous = StockService.Previous(_list, _date);
+
+        IReadOnlyList<LocalRecording> pending = await Recordings.GetLocalListAsync(cycle.Id);
+        _population = RecordingRules.AvailablePopulation(cycle, [.. pending.Select(p => p.Draft)]);
+    }
+
+    private async Task OnCycleChangedAsync(ChangeEventArgs e)
+    {
+        _cycleKey = e.Value?.ToString() ?? string.Empty;
+        CancelEdit();
+        await LoadRowsAsync(Connectivity.IsOnline);
+    }
+
+    private void OnDateChanged(ChangeEventArgs e)
+    {
+        if (DateOnly.TryParse(e.Value?.ToString(), System.Globalization.CultureInfo.InvariantCulture, out DateOnly date))
+        {
+            _date = date;
+            CancelEdit();
+            if (_list is not null)
+            {
+                _rows = _list.On(_date);
+                _previous = StockService.Previous(_list, _date);
+            }
+        }
+    }
+
+    private void Edit(WeightRange range, StockRow? row)
+    {
+        _editing = range.Id;
+        _birds = row?.Birds;
+        _weightKg = row?.WeightKg;
+        _notes = row?.Notes;
+        _check = null;
+        _message = null;
+    }
+
+    private void CancelEdit()
+    {
+        _editing = null;
+        _check = null;
+    }
+
+    private StockDraft Draft(WeightRange range, int birds, decimal weightKg, string? notes) => new()
+    {
+        CycleId = Cycle!.Id,
+        CycleNumber = Cycle.Number,
+        CoopName = Cycle.CoopName,
+        Date = _date,
+        WeightRangeId = range.Id,
+        WeightRangeCode = range.Code,
+        Birds = birds,
+        WeightKg = weightKg,
+        Notes = notes
+    };
+
+    private async Task SaveAsync(WeightRange range)
+    {
+        StockDraft draft = Draft(range, _birds ?? 0, _weightKg ?? 0, _notes);
+
+        _check = await Stock.CheckAsync(_context!, draft, _rows);
+        if (!_check.IsValid)
+        {
+            return;
+        }
+
+        _busy = true;
+        SaveOutcome outcome = await Stock.SaveAsync(draft);
+        _busy = false;
+
+        Show(outcome);
+        if (outcome.State != SaveState.Rejected)
+        {
+            _editing = null;
+            await LoadRowsAsync(refresh: outcome.State == SaveState.Sent);
+        }
+    }
+
+    private async Task CopyPreviousAsync()
+    {
+        _busy = true;
+        int saved = 0;
+        var rows = new List<StockRow>(_rows);
+
+        foreach (StockRow source in _previous.Rows)
+        {
+            if (_context!.FindRange(source.WeightRangeId) is not { } range)
+            {
+                continue;
+            }
+
+            StockDraft draft = Draft(range, source.Birds, source.WeightKg, source.Notes);
+            RecordingCheck check = await Stock.CheckAsync(_context, draft, rows);
+            if (!check.IsValid)
+            {
+                continue;
+            }
+
+            SaveOutcome outcome = await Stock.SaveAsync(draft);
+            if (outcome.State is SaveState.Sent or SaveState.Queued)
+            {
+                saved++;
+                rows.Add(new StockRow(draft.Id, null, _date, range.Id, range.Code, draft.Birds, draft.WeightKg, null, RecordingState.Pending, null));
+            }
+        }
+
+        _busy = false;
+        _message = $"{saved} dari {_previous.Rows.Count} rentang disalin. Periksa dan ubah angka bila perlu.";
+        _messageIsError = saved < _previous.Rows.Count;
+        await LoadRowsAsync(refresh: Connectivity.IsOnline);
+    }
+
+    private async Task CloseDeleteAsync(bool confirmed)
+    {
+        StockRow? row = _toDelete;
+        _toDelete = null;
+        if (!confirmed || row is null || Cycle is not { } cycle)
+        {
+            return;
+        }
+
+        if (row.IsLocal)
+        {
+            await Stock.DeleteLocalAsync(row.Id);
+            await LoadRowsAsync(refresh: false);
+
+            return;
+        }
+
+        ApiResult result = await Stock.DeleteServerAsync(row.ServerId!.Value, cycle.Id);
+        _message = result.IsSuccess ? "Entri dihapus." : result.Error!.Message;
+        _messageIsError = !result.IsSuccess;
+        await LoadRowsAsync(refresh: false);
+    }
+
+    private void Show(SaveOutcome outcome)
+    {
+        (_message, _messageIsError) = outcome.State switch
+        {
+            SaveState.Sent => ("Stok ayam terkirim.", false),
+            SaveState.Queued => ("Tersimpan di perangkat; dikirim otomatis saat online.", false),
+            SaveState.Failed => (outcome.Message ?? "Ditolak server.", true),
+            _ => (outcome.Message ?? "Gagal menyimpan.", true)
+        };
+    }
+
+    private void OnQueueChanged(object? sender, EventArgs e) =>
+        _ = InvokeAsync(async () =>
+        {
+            if (_editing is null && !_busy && Cycle is not null)
+            {
+                await LoadRowsAsync(refresh: false);
+                StateHasChanged();
+            }
+        });
+}

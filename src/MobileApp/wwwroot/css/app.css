@@ -549,3 +549,13 @@ h1:focus, h2:focus, h4:focus {
   background-color: var(--White);
   color: var(--Red) !important;
 }
+
+/* Live bird stock (M3) */
+.stock-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background-color: var(--Primary-soft);
+}
