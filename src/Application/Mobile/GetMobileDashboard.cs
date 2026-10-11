@@ -2,9 +2,11 @@ using System.Data.Common;
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.BreedStandards;
 using Application.Production;
 using Dapper;
 using Domain.MasterData.Branches;
+using Domain.MasterData.BreedStandards;
 using Domain.Partnership.Cycles;
 using SharedKernel;
 
@@ -38,6 +40,7 @@ public sealed record DashboardThresholds(
 /// <param name="Ip">Average IP weighted by the current population.</param>
 /// <param name="StockReportExpected">Cycles old enough to report stok ayam daily.</param>
 /// <param name="StockReportedToday">Of <paramref name="StockReportExpected"/>, those that reported on the date.</param>
+/// <param name="CyclesBelowStandard">Cycles flagged <see cref="DashboardFlags.BelowStandard"/> (M-77).</param>
 public sealed record DashboardKpi(
     int ActiveCycles,
     int InitialPopulation,
@@ -49,7 +52,8 @@ public sealed record DashboardKpi(
     int StockReportExpected,
     int StockReportedToday,
     int CyclesAtRisk,
-    decimal FeedStockKg);
+    decimal FeedStockKg,
+    int CyclesBelowStandard);
 
 /// <param name="AgeDays">Age on the dashboard date.</param>
 /// <param name="Population">Current population (initial minus deaths, culls and harvested birds).</param>
@@ -58,6 +62,8 @@ public sealed record DashboardKpi(
 /// <param name="AverageDailyFeedKg">Average feed of the latest recordings with feed usage; null without any.</param>
 /// <param name="FeedDaysLeft">Days the feed stock lasts at that average; null when unknown.</param>
 /// <param name="Flags">Risk flags, see <see cref="DashboardFlags"/>.</param>
+/// <param name="StandardName">The breed standard compared with (the cycle's own or the default); null without one.</param>
+/// <param name="Standard">The latest figures against the standard (M-77).</param>
 public sealed record DashboardCycleResponse(
     Guid CycleId,
     string Number,
@@ -82,7 +88,9 @@ public sealed record DashboardCycleResponse(
     decimal? AverageDailyFeedKg,
     decimal? FeedDaysLeft,
     IReadOnlyList<DashboardFeedStock> FeedStock,
-    IReadOnlyList<string> Flags);
+    IReadOnlyList<string> Flags,
+    string? StandardName,
+    StandardStatus? Standard);
 
 /// <param name="Quantity">In the item's base unit.</param>
 /// <param name="PackUomCode">The item's largest unit (e.g. SAK), to show the stock in packs; null without conversions.</param>
@@ -105,6 +113,11 @@ public static class DashboardFlags
     public const string FeedLow = "FeedLow";
     public const string HighDepletion = "HighDepletion";
     public const string NoStockReport = "NoStockReport";
+
+    /// <summary>
+    /// Body weight, FCR or depletion beyond the breed standard thresholds (M-77).
+    /// </summary>
+    public const string BelowStandard = "BelowStandard";
 }
 
 public static class MobileDashboardErrors
@@ -119,7 +132,8 @@ internal sealed class GetMobileDashboardQueryHandler(
     IBranchAccess branchAccess,
     IFieldScope fieldScope,
     IDateTimeProvider dateTimeProvider,
-    MobileDashboardOptions options)
+    MobileDashboardOptions options,
+    BreedStandardOptions standardOptions)
     : IQueryHandler<GetMobileDashboardQuery, MobileDashboardResponse>
 {
     /// <summary>
@@ -131,6 +145,7 @@ internal sealed class GetMobileDashboardQueryHandler(
         $"""
          CREATE TEMP TABLE md_cycles ON COMMIT DROP AS
          SELECT pc.id, pc.number, pc.status, pc.branch_id, pc.coop_id, pc.farmer_id, pc.chick_in_date, pc.initial_population,
+                pc.breed_standard_id,
                 pc.initial_population - pc.total_mortality - pc.total_culling - pc.harvested_birds AS population
          FROM partnership.production_cycles pc
          WHERE pc.status IN ('Active', 'Harvesting')
@@ -143,6 +158,7 @@ internal sealed class GetMobileDashboardQueryHandler(
                 c.id AS CoopId, c.code AS CoopCode, c.name AS CoopName, f.name AS FarmerName,
                 NULLIF(trim(concat(u.first_name, ' ', u.last_name)), '') AS FieldOfficerName,
                 pc.chick_in_date AS ChickInDate, pc.initial_population AS InitialPopulation, pc.population AS Population,
+                pc.breed_standard_id AS BreedStandardId,
                 (SELECT max(s.date) FROM production.live_bird_stock_entries s
                  WHERE s.cycle_id = pc.id AND s.date <= @Date) AS LatestStockDate
          FROM md_cycles pc
@@ -225,6 +241,9 @@ internal sealed class GetMobileDashboardQueryHandler(
         ILookup<Guid, HarvestRow> harvests = (await multi.ReadAsync<HarvestRow>()).ToLookup(h => h.CycleId);
         ILookup<Guid, FeedRow> feed = (await multi.ReadAsync<FeedRow>()).ToLookup(f => f.CoopId);
 
+        BreedStandardSet standards = await BreedStandardReader.LoadAsync(
+            connection, cycles.Where(c => c.BreedStandardId is not null).Select(c => c.BreedStandardId!.Value), cancellationToken, transaction);
+
         await transaction.CommitAsync(cancellationToken);
 
         List<DashboardCycleResponse> results =
@@ -235,7 +254,9 @@ internal sealed class GetMobileDashboardQueryHandler(
                 [.. recordings[c.CycleId].Select(r => new RecordedDay(r.Date, r.AgeDays, r.Mortality, r.Culling, r.FeedKg, r.AverageBodyWeightGram))],
                 [.. harvests[c.CycleId].Select(h => new HarvestedBatch(h.Date, h.Birds, h.WeightKg))],
                 [.. feed[c.CoopId].Select(f => new DashboardFeedStock(f.ItemId, f.ItemCode, f.ItemName, f.Quantity, f.BaseUomCode, f.PackUomCode, f.PackFactor))],
-                options))
+                standards.Resolve(c.BreedStandardId, null)?.Snapshot,
+                options,
+                standardOptions.Thresholds))
         ];
 
         return new MobileDashboardResponse(
@@ -261,6 +282,7 @@ internal sealed class GetMobileDashboardQueryHandler(
         public DateOnly ChickInDate { get; init; }
         public int InitialPopulation { get; init; }
         public int Population { get; init; }
+        public Guid? BreedStandardId { get; init; }
         public DateOnly? LatestStockDate { get; init; }
     }
 
@@ -301,7 +323,9 @@ internal static class MobileDashboardCalculator
         IReadOnlyList<RecordedDay> recordings,
         IReadOnlyCollection<HarvestedBatch> harvests,
         IReadOnlyList<DashboardFeedStock> feedStock,
-        MobileDashboardOptions options)
+        BreedStandardSnapshot? standard,
+        MobileDashboardOptions options,
+        StandardThresholds thresholds)
     {
         List<DailyPerformance> days = CyclePerformanceBuilder.BuildDays(cycle.InitialPopulation, recordings, harvests);
         CyclePerformance performance = CyclePerformanceBuilder.Current(cycle.InitialPopulation, days);
@@ -316,6 +340,8 @@ internal static class MobileDashboardCalculator
 
         bool stockReportedToday = cycle.LatestStockDate == date;
 
+        StandardStatus? status = StandardComparer.Latest(days, standard, cycle.InitialPopulation, thresholds);
+
         var flags = new List<string>();
         if (date.DayNumber - (lastRecording ?? cycle.ChickInDate).DayNumber > options.RecordingLateDays)
         {
@@ -327,9 +353,15 @@ internal static class MobileDashboardCalculator
             flags.Add(DashboardFlags.FeedLow);
         }
 
-        if (performance.DepletionPercent >= options.DepletionWarningPercent)
+        // The absolute depletion limit stays as a safety net; past the standard it is already BelowStandard (M-77).
+        if (performance.DepletionPercent >= options.DepletionWarningPercent && status?.DepletionAbove != true)
         {
             flags.Add(DashboardFlags.HighDepletion);
+        }
+
+        if (status?.BelowStandard == true)
+        {
+            flags.Add(DashboardFlags.BelowStandard);
         }
 
         if (ageDays >= options.StockReportFromAgeDays && !stockReportedToday)
@@ -361,7 +393,9 @@ internal static class MobileDashboardCalculator
             averageFeed,
             daysLeft,
             feedStock,
-            flags);
+            flags,
+            standard?.Name,
+            status);
     }
 
     public static DashboardKpi BuildKpi(IReadOnlyList<DashboardCycleResponse> cycles, MobileDashboardOptions options)
@@ -390,7 +424,8 @@ internal static class MobileDashboardCalculator
             expected.Count,
             expected.Count(c => c.StockReportedToday),
             cycles.Count(c => c.Flags.Count > 0),
-            cycles.Sum(c => c.FeedStockKg));
+            cycles.Sum(c => c.FeedStockKg),
+            cycles.Count(c => c.Flags.Contains(DashboardFlags.BelowStandard)));
     }
 
     private static decimal Round(decimal value) => decimal.Round(value, Decimals, MidpointRounding.AwayFromZero);

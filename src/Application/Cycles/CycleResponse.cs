@@ -22,12 +22,17 @@ public sealed record CycleResponse
                pc.harvested_weight_kg AS HarvestedWeightKg,
                COALESCE(pc.initial_population, 0) - pc.total_mortality - pc.total_culling - pc.harvested_birds AS CurrentPopulation,
                pc.closed_date AS ClosedDate,
-               pc.documents AS Documents
+               pc.documents AS Documents,
+               pc.breed_standard_id AS BreedStandardId,
+               COALESCE(pc.closing_standard ->> 'name', bs.name) AS BreedStandardName,
+               pc.breed_standard_id IS NULL AS BreedStandardIsDefault
         FROM partnership.production_cycles pc
         JOIN master.branches b ON b.id = pc.branch_id
         JOIN master.farmers f ON f.id = pc.farmer_id
         JOIN master.coops c ON c.id = pc.coop_id
         LEFT JOIN partnership.contracts ct ON ct.id = pc.contract_id
+        LEFT JOIN master.breed_standards bs ON bs.id = COALESCE(
+            pc.breed_standard_id, (SELECT d.id FROM master.breed_standards d WHERE d.is_default LIMIT 1))
         """;
 
     public Guid Id { get; init; }
@@ -81,6 +86,18 @@ public sealed record CycleResponse
     public int CurrentPopulation { get; init; }
 
     public DateOnly? ClosedDate { get; init; }
+
+    /// <summary>
+    /// The cycle's own breed standard (PLAN-MOBILE M-71); null = the default standard.
+    /// </summary>
+    public Guid? BreedStandardId { get; init; }
+
+    /// <summary>
+    /// Name of the effective standard: the one frozen at closing, the cycle's own, or the default; null when there is none.
+    /// </summary>
+    public string? BreedStandardName { get; init; }
+
+    public bool BreedStandardIsDefault { get; init; }
 
     /// <summary>
     /// Contract terms frozen when the cycle was planned (detail endpoint only).

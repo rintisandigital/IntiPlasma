@@ -3,10 +3,12 @@
 ## Cycles & Chick-in
 Tahapan siklus: **Planned → DOC in coop → Chick-in → Harvesting → Closed** (→ *Settled* untuk plasma setelah settlement).
 
-1. **Add** (rencana): pilih kandang dan (untuk plasma) kontrak aktif. Satu kandang hanya boleh punya satu siklus terbuka.
+1. **Add** (rencana): pilih kandang, (untuk plasma) kontrak aktif, dan **Breed standard** (kosong = standar default). Satu kandang hanya boleh punya satu siklus terbuka.
 2. Terima/transfer **DOC** ke gudang kandang (Goods Receipt langsung ke kandang atau Stock Transfer).
 3. **Chick-in**: tanggal & jumlah DOC ditebar → populasi awal.
 4. Halaman siklus memuat KPI dan tab **Recordings, Harvests, Coop Stock, Performance** (grafik deplesi, FCR, ADG, IP), **Cost**, **Attachments**.
+   - Tab **Performance** membandingkan siklus dengan **breed standard**: garis standar abu-abu putus-putus, kolom Std BW / BW dev. / Std FCR / Std deplesi, dan ringkasan terakhir dengan status **On standard / Below standard**. Di bawah standar bila BW kurang > 5%, FCR lebih > 0,05, atau deplesi lebih > 1 poin dari standar (konfigurasi `Production:Standard`). BW & FCR hanya dinilai pada hari penimbangan.
+   - **Change standard** mengganti standar siklus (atau kembali ke default) sampai siklus *Settled*. Saat siklus **Close**, standar yang dipakai disalin ke siklus, sehingga perubahan master sesudahnya tidak mengubah siklus yang sudah tutup.
 5. **Close**: hanya bila populasi 0, gudang kandang kosong, dan semua panen sudah ditagih lewat invoice terposting. Biaya final dibekukan dan jurnal penyesuaian HPP dibuat. **Print PDF** ringkasan siklus.
 6. **Cancel** (dengan alasan) untuk siklus yang batal sebelum berjalan.
 

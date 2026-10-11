@@ -47,6 +47,11 @@ public sealed record DashboardKpi
     public int CyclesAtRisk { get; init; }
 
     public decimal FeedStockKg { get; init; }
+
+    /// <summary>
+    /// Cycles flagged <see cref="DashboardFlags.BelowStandard"/> (M-77).
+    /// </summary>
+    public int CyclesBelowStandard { get; init; }
 }
 
 public sealed record DashboardCycle
@@ -105,6 +110,16 @@ public sealed record DashboardCycle
     /// </summary>
     public IReadOnlyList<string> Flags { get; init; } = [];
 
+    /// <summary>
+    /// The breed standard compared with; null without one.
+    /// </summary>
+    public string? StandardName { get; init; }
+
+    /// <summary>
+    /// The latest figures against the standard (M-77).
+    /// </summary>
+    public StandardStatus? Standard { get; init; }
+
     public int AgeOn(DateOnly date) => date.DayNumber - ChickInDate.DayNumber;
 }
 
@@ -128,6 +143,7 @@ public static class DashboardFlags
     public const string FeedLow = "FeedLow";
     public const string HighDepletion = "HighDepletion";
     public const string NoStockReport = "NoStockReport";
+    public const string BelowStandard = "BelowStandard";
 }
 
 /// <summary>
@@ -178,6 +194,87 @@ public sealed record CyclePerformanceReport
     public IReadOnlyList<DailyPerformance> Days { get; init; } = [];
 
     public IReadOnlyList<CycleHarvest> Harvests { get; init; } = [];
+
+    /// <summary>
+    /// The breed standard compared with (M-74); null when there is none.
+    /// </summary>
+    public PerformanceStandard? Standard { get; init; }
+
+    /// <summary>
+    /// The server's latest figures against the standard (without queued recordings).
+    /// </summary>
+    public StandardStatus? StandardStatus { get; init; }
+}
+
+/// <summary>
+/// The breed standard of a cycle in <c>cycles/{id}/performance</c>: the whole curve and the thresholds, so queued
+/// recordings are compared the same way as on the server (M-74, M-76).
+/// </summary>
+public sealed record PerformanceStandard
+{
+    public Guid Id { get; init; }
+
+    public string Code { get; init; } = string.Empty;
+
+    public string Name { get; init; } = string.Empty;
+
+    public string? Strain { get; init; }
+
+    /// <summary>
+    /// The cycle has no standard of its own and uses the default.
+    /// </summary>
+    public bool IsDefault { get; init; }
+
+    /// <summary>
+    /// Copied when the cycle closed.
+    /// </summary>
+    public bool IsFrozen { get; init; }
+
+    public StandardThresholds Thresholds { get; init; } = StandardThresholds.Default;
+
+    /// <summary>
+    /// Ordered by age.
+    /// </summary>
+    public IReadOnlyList<StandardRow> Rows { get; init; } = [];
+}
+
+public sealed record StandardThresholds(decimal BodyWeightBelowPercent, decimal FcrAbove, decimal DepletionAbovePoints)
+{
+    public static readonly StandardThresholds Default = new(5m, 0.05m, 1m);
+}
+
+public sealed record StandardRow(
+    int AgeDays,
+    decimal BodyWeightGram,
+    decimal? Fcr,
+    decimal? DepletionPercent,
+    decimal? DailyFeedGram,
+    decimal? CumulativeFeedGram);
+
+/// <summary>
+/// The latest figures against the standard: body weight and FCR at the last weighing, depletion and feed at the last
+/// recording (server <c>StandardStatus</c>, calculated on the device by <see cref="Production.StandardCalculator"/>).
+/// </summary>
+public sealed record StandardStatus(
+    int? WeighingAgeDays,
+    decimal? BodyWeightGram,
+    decimal? StandardBodyWeightGram,
+    decimal? BodyWeightPercent,
+    decimal? Fcr,
+    decimal? StandardFcr,
+    decimal? FcrDeviation,
+    int AgeDays,
+    decimal DepletionPercent,
+    decimal? StandardDepletionPercent,
+    decimal? DepletionPoints,
+    decimal? CumulativeFeedGram,
+    decimal? StandardCumulativeFeedGram,
+    decimal? CumulativeFeedPercent,
+    bool BodyWeightBelow,
+    bool FcrAbove,
+    bool DepletionAbove)
+{
+    public bool BelowStandard => BodyWeightBelow || FcrAbove || DepletionAbove;
 }
 
 public sealed record DailyPerformance(

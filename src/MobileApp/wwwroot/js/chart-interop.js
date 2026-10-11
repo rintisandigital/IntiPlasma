@@ -1,6 +1,7 @@
 // Chart.js bridge for the production charts (PLAN-MOBILE M-67). The chart spec is built and tested in
 // MobileApp.Core (PerformanceCharts); this file only draws it. Values from recordings that are not sent yet
-// (dataset.localFrom onwards) are drawn dashed with hollow points.
+// (dataset.localFrom onwards) are drawn dashed with hollow points; the breed standard (dataset.isStandard) is a thin
+// grey dashed line.
 (function () {
     const charts = new WeakMap();
 
@@ -8,6 +9,25 @@
     Chart.defaults.color = "#6c757d";
 
     function dataset(d) {
+        if (d.isStandard) {
+            // Breed standard (M-78): a thin dashed reference line without points.
+            return {
+                label: d.label,
+                data: d.data,
+                type: "line",
+                yAxisID: d.axis,
+                order: 0,
+                borderColor: d.color,
+                backgroundColor: d.color,
+                borderWidth: 1.5,
+                borderDash: [6, 4],
+                pointRadius: 0,
+                pointHoverRadius: 3,
+                spanGaps: true,
+                tension: 0.2
+            };
+        }
+
         const isLine = d.type === "line";
         const localFrom = d.localFrom;
         const isLocal = (index) => localFrom !== null && localFrom !== undefined && index >= localFrom;

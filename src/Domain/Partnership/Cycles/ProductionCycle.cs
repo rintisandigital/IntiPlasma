@@ -1,4 +1,5 @@
 using Domain.Common;
+using Domain.MasterData.BreedStandards;
 using Domain.MasterData.Coops;
 using Domain.MasterData.Farmers;
 using Domain.Partnership.Contracts;
@@ -24,7 +25,8 @@ public sealed class ProductionCycle : AggregateRoot, IHasDocuments
         PartnershipContract? contract,
         DateOnly plannedChickInDate,
         int plannedPopulation,
-        string? notes)
+        string? notes,
+        Guid? breedStandardId)
         : base(id)
     {
         Number = number;
@@ -36,6 +38,7 @@ public sealed class ProductionCycle : AggregateRoot, IHasDocuments
         PlannedChickInDate = plannedChickInDate;
         PlannedPopulation = plannedPopulation;
         Notes = notes;
+        BreedStandardId = breedStandardId;
         Status = CycleStatus.Planned;
     }
 
@@ -82,6 +85,17 @@ public sealed class ProductionCycle : AggregateRoot, IHasDocuments
     /// Final cost (HPP) frozen when the cycle is closed; null for cycles closed before cost tracking existed.
     /// </summary>
     public CycleCostSummary? ClosingCost { get; private set; }
+
+    /// <summary>
+    /// Breed standard the performance is compared with (PLAN-MOBILE M-71); null = the default standard.
+    /// </summary>
+    public Guid? BreedStandardId { get; private set; }
+
+    /// <summary>
+    /// The effective breed standard frozen when the cycle is closed, so later changes to the master do not change
+    /// a closed cycle; null for cycles closed before breed standards existed or when there was no standard.
+    /// </summary>
+    public BreedStandardSnapshot? ClosingStandard { get; private set; }
 
     public IReadOnlyCollection<CycleHarvest> Harvests => [.. _harvests];
 
@@ -176,7 +190,8 @@ public sealed class ProductionCycle : AggregateRoot, IHasDocuments
     /// Closes a fully harvested cycle. The caller checks that no sapronak is left in the coop warehouse
     /// and calculates the performance from the recordings and the cost from the stock card.
     /// </summary>
-    public Result Close(CyclePerformance performance, CycleCostSummary cost)
+    /// <param name="standard">The effective breed standard (the cycle's own or the default), frozen on the cycle.</param>
+    public Result Close(CyclePerformance performance, CycleCostSummary cost, BreedStandardSnapshot? standard = null)
     {
         if (Status != CycleStatus.Harvesting)
         {
@@ -191,9 +206,31 @@ public sealed class ProductionCycle : AggregateRoot, IHasDocuments
         ClosedDate = _harvests.Max(h => h.Date);
         ClosingPerformance = performance;
         ClosingCost = cost;
+        ClosingStandard = standard;
         Status = CycleStatus.Closed;
 
         Raise(new CycleClosedDomainEvent(Id));
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Changes the breed standard (M-71) until the cycle is settled. On a closed cycle the frozen standard is
+    /// replaced by <paramref name="effective"/> — the new standard, or the default when it is cleared.
+    /// </summary>
+    public Result SetBreedStandard(Guid? breedStandardId, BreedStandardSnapshot? effective)
+    {
+        if (Status is CycleStatus.Settled or CycleStatus.Cancelled)
+        {
+            return Result.Failure(CycleErrors.StandardLocked(Status));
+        }
+
+        BreedStandardId = breedStandardId;
+
+        if (Status == CycleStatus.Closed)
+        {
+            ClosingStandard = effective;
+        }
 
         return Result.Success();
     }
@@ -233,7 +270,8 @@ public sealed class ProductionCycle : AggregateRoot, IHasDocuments
         PartnershipContract? contract,
         DateOnly plannedChickInDate,
         int plannedPopulation,
-        string? notes)
+        string? notes,
+        Guid? breedStandardId = null)
     {
         if (!coop.IsActive)
         {
@@ -262,7 +300,7 @@ public sealed class ProductionCycle : AggregateRoot, IHasDocuments
         }
 
         var cycle = new ProductionCycle(
-            Guid.CreateVersion7(), number, coop, contract, plannedChickInDate, plannedPopulation, notes);
+            Guid.CreateVersion7(), number, coop, contract, plannedChickInDate, plannedPopulation, notes, breedStandardId);
 
         cycle.Raise(new CyclePlannedDomainEvent(cycle.Id));
 

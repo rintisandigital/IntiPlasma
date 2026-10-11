@@ -3,7 +3,9 @@ using System.Text.Json;
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.BreedStandards;
 using Dapper;
+using Domain.MasterData.BreedStandards;
 using Domain.Partnership.Cycles;
 using Domain.Production.DailyRecordings;
 using SharedKernel;
@@ -93,7 +95,18 @@ public sealed record CyclePerformanceResponse(
     CyclePerformance Current,
     CyclePerformance? Closing,
     IReadOnlyList<DailyPerformance> Days,
-    IReadOnlyList<HarvestResponse> Harvests);
+    IReadOnlyList<HarvestResponse> Harvests)
+{
+    /// <summary>
+    /// The breed standard compared with (PLAN-MOBILE M-74); null when there is no standard at all.
+    /// </summary>
+    public PerformanceStandardResponse? Standard { get; init; }
+
+    /// <summary>
+    /// The latest figures against the standard; null without a standard or recordings.
+    /// </summary>
+    public StandardStatus? StandardStatus { get; init; }
+}
 
 public sealed record DailyPerformance(
     DateOnly Date,
@@ -102,7 +115,18 @@ public sealed record DailyPerformance(
     int Culling,
     decimal FeedKg,
     decimal? AverageBodyWeightGram,
-    CyclePerformance Cumulative);
+    CyclePerformance Cumulative)
+{
+    /// <summary>
+    /// The breed standard at this age (interpolated); null without a standard for the age.
+    /// </summary>
+    public StandardValue? Standard { get; init; }
+
+    /// <summary>
+    /// Actual against <see cref="Standard"/>; body weight and FCR only on days with a weighing.
+    /// </summary>
+    public StandardDeviation? Deviation { get; init; }
+}
 
 /// <remarks>Init properties rather than a positional record: Dapper cannot bind the documents array to a constructor.</remarks>
 public sealed record HarvestResponse
@@ -238,7 +262,8 @@ internal sealed class GetDailyRecordingByIdQueryHandler(
 internal sealed class GetCyclePerformanceQueryHandler(
     IDbConnectionFactory dbConnectionFactory,
     IBranchAccess branchAccess,
-    IFieldScope fieldScope)
+    IFieldScope fieldScope,
+    BreedStandardOptions standardOptions)
     : IQueryHandler<GetCyclePerformanceQuery, CyclePerformanceResponse>
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -251,7 +276,8 @@ internal sealed class GetCyclePerformanceQueryHandler(
             """
             SELECT c.id AS Id, c.number AS Number, c.status AS Status, c.branch_id AS BranchId, c.chick_in_date AS ChickInDate,
                    c.initial_population AS InitialPopulation, c.closed_date AS ClosedDate,
-                   c.closing_performance::text AS ClosingPerformance
+                   c.closing_performance::text AS ClosingPerformance,
+                   c.breed_standard_id AS BreedStandardId, c.closing_standard::text AS ClosingStandard
             FROM partnership.production_cycles c
             WHERE c.id = @CycleId;
 
@@ -289,10 +315,17 @@ internal sealed class GetCyclePerformanceQueryHandler(
         List<RecordedDay> recordings = [.. await multi.ReadAsync<RecordedDay>()];
         List<HarvestResponse> harvests = [.. await multi.ReadAsync<HarvestResponse>()];
 
-        List<DailyPerformance> days = CyclePerformanceBuilder.BuildDays(
-            cycle.InitialPopulation ?? 0,
-            recordings,
-            [.. harvests.Select(h => new HarvestedBatch(h.Date, h.Birds, h.WeightKg))]);
+        BreedStandardSet standards = await BreedStandardReader.LoadAsync(
+            connection, cycle.BreedStandardId is Guid id ? [id] : [], cancellationToken);
+        EffectiveStandard? standard = standards.Resolve(cycle.BreedStandardId, cycle.ClosingStandard);
+
+        List<DailyPerformance> days = StandardComparer.Annotate(
+            CyclePerformanceBuilder.BuildDays(
+                cycle.InitialPopulation ?? 0,
+                recordings,
+                [.. harvests.Select(h => new HarvestedBatch(h.Date, h.Birds, h.WeightKg))]),
+            standard?.Snapshot,
+            cycle.InitialPopulation ?? 0);
 
         CyclePerformance current = CyclePerformanceBuilder.Current(cycle.InitialPopulation ?? 0, days);
 
@@ -300,8 +333,14 @@ internal sealed class GetCyclePerformanceQueryHandler(
             ? null
             : JsonSerializer.Deserialize<CyclePerformance>(cycle.ClosingPerformance, JsonOptions);
 
+        StandardThresholds thresholds = standardOptions.Thresholds;
+
         return new CyclePerformanceResponse(
-            cycle.Id, cycle.Number, cycle.Status, cycle.ChickInDate, cycle.ClosedDate, current, closing, days, harvests);
+            cycle.Id, cycle.Number, cycle.Status, cycle.ChickInDate, cycle.ClosedDate, current, closing, days, harvests)
+        {
+            Standard = StandardComparer.ToResponse(standard, thresholds),
+            StandardStatus = StandardComparer.Latest(days, standard?.Snapshot, cycle.InitialPopulation ?? 0, thresholds)
+        };
     }
 
     internal sealed class CycleRow
@@ -314,6 +353,8 @@ internal sealed class GetCyclePerformanceQueryHandler(
         public int? InitialPopulation { get; set; }
         public DateOnly? ClosedDate { get; set; }
         public string? ClosingPerformance { get; set; }
+        public Guid? BreedStandardId { get; set; }
+        public string? ClosingStandard { get; set; }
     }
 }
 

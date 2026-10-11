@@ -47,5 +47,6 @@ public static class Tags
     public const string Attachments = "Attachments";
     public const string Mobile = "Mobile";
     public const string WeightRanges = "Weight Ranges";
+    public const string BreedStandards = "Breed Standards";
     public const string LiveBirdStock = "Production - Live Bird Stock";
 }

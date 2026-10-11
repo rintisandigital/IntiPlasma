@@ -6,8 +6,8 @@
 @inject SyncEngine Sync
 @inject NavigationManager Navigation
 
-@* Grafik produksi (PLAN-MOBILE M-64 s.d. M-68): one metric of a cycle per day of age or per week, recordings not sent
-   yet drawn dashed, and up to two more cycles to compare. *@
+@* Grafik produksi (PLAN-MOBILE M-64 s.d. M-68, M-78): one metric of a cycle per day of age or per week, recordings
+   not sent yet drawn dashed, the breed standard as a grey dashed line, and up to two more cycles to compare. *@
 <AppPage Title="Grafik Produksi" BackTo="@BackTo">
     @if (_cyclesError is not null && _cycles.Count == 0)
     {
@@ -68,8 +68,13 @@
                 {
                     <p class="text-caption-2 text-dark-4 mt-4">Garis putus-putus = recording yang belum terkirim.</p>
                 }
+                @if (_standard is not null && PerformanceCharts.HasStandard(_metric))
+                {
+                    <p class="text-caption-2 text-dark-4 mt-4">Garis abu-abu putus-putus = standar @_standard.Name@(_series.Count > 1 ? $" ({main.Label})" : null).</p>
+                }
 
                 @Summary(main)
+                @StandardSummary(main)
             }
 
             <div class="d-flex justify-content-between align-items-center mt-20 mb-8">
@@ -121,6 +126,7 @@
     private ChartMetric _metric = ChartMetric.BodyWeight;
     private bool _weekly;
     private ChartSpec? _chart;
+    private PerformanceStandard? _standard;
 
     [SupplyParameterFromQuery]
     public Guid? CycleId { get; set; }
@@ -181,6 +187,7 @@
         IReadOnlyList<LocalRecording> local = await Recordings.GetLocalListAsync();
         var series = new List<CycleSeries>();
         DateTime? cachedAt = null;
+        PerformanceStandard? standard = null;
 
         foreach (Guid cycleId in (IEnumerable<Guid>)[main, .. _compared])
         {
@@ -194,6 +201,11 @@
 
             cachedAt ??= result.CachedAtUtc;
             CyclePerformanceReport report = result.Value;
+            if (series.Count == 0)
+            {
+                standard = report.Standard;
+            }
+
             series.Add(new CycleSeries(
                 cycleId,
                 SeriesLabel(report),
@@ -202,11 +214,12 @@
         }
 
         _series = series;
+        _standard = standard;
         _cachedAtUtc = cachedAt;
         Redraw();
     }
 
-    private void Redraw() => _chart = _series.Count > 0 ? PerformanceCharts.Build(_metric, _weekly, _series) : null;
+    private void Redraw() => _chart = _series.Count > 0 ? PerformanceCharts.Build(_metric, _weekly, _series, _standard) : null;
 
     private void SetMetric(ChartMetric metric)
     {
@@ -270,16 +283,65 @@
         </div>
     };
 
-    private static RenderFragment DayTable(CycleSeries series) => __builder =>
+    /// <summary>
+    /// The latest figures against the breed standard, queued recordings included (M-78).
+    /// </summary>
+    private RenderFragment StandardSummary(CycleSeries series) => __builder =>
+    {
+        if (StandardCalculator.Latest(series.Days, _standard, series.InitialPopulation) is not { } status)
+        {
+            return;
+        }
+
+        <div class="list-card mt-12">
+            <div class="d-flex justify-content-between align-items-start gap-8">
+                <div>
+                    <div class="text-caption-2 text-dark-4">Standar@(_standard!.IsDefault ? " (default)" : null)</div>
+                    <div class="text-button-small text-OnSurface">@_standard.Name</div>
+                </div>
+                <StatusBadge Text="@(status.BelowStandard ? "Di bawah standar" : "Sesuai standar")" Tone="@(status.BelowStandard ? Labels.Tone.Danger : Labels.Tone.Success)" />
+            </div>
+            <div class="kpi-mini mt-8">
+                <div class="@(status.BodyWeightBelow ? "text-danger" : null)">
+                    <span>BW@(status.WeighingAgeDays is { } age ? $" umur {age}" : null)</span>
+                    <b>@IdFormat.Optional(status.BodyWeightGram) g</b>
+                    <span>std @IdFormat.Optional(status.StandardBodyWeightGram) (@IdFormat.Deviation(status.BodyWeightPercent, 1, "%"))</span>
+                </div>
+                <div class="@(status.FcrAbove ? "text-danger" : null)">
+                    <span>FCR</span>
+                    <b>@IdFormat.Optional(status.Fcr, 3)</b>
+                    <span>std @IdFormat.Optional(status.StandardFcr, 3) (@IdFormat.Deviation(status.FcrDeviation, 3))</span>
+                </div>
+                <div class="@(status.DepletionAbove ? "text-danger" : null)">
+                    <span>Deplesi</span>
+                    <b>@IdFormat.Number(status.DepletionPercent, 2)%</b>
+                    <span>std @IdFormat.Optional(status.StandardDepletionPercent, 2)% (@IdFormat.Deviation(status.DepletionPoints, 2, " poin"))</span>
+                </div>
+                <div>
+                    <span>Pakan kum.</span>
+                    <b>@IdFormat.Optional(status.CumulativeFeedGram) g/ekor</b>
+                    <span>std @IdFormat.Optional(status.StandardCumulativeFeedGram) (@IdFormat.Deviation(status.CumulativeFeedPercent, 1, "%"))</span>
+                </div>
+            </div>
+            <p class="text-caption-2 text-dark-4 mt-8 mb-0">
+                BW & FCR dinilai pada hari penimbangan terakhir. Di bawah standar bila BW kurang &gt; @IdFormat.Number(_standard.Thresholds.BodyWeightBelowPercent, 1)%,
+                FCR lebih &gt; @IdFormat.Number(_standard.Thresholds.FcrAbove, 2), atau deplesi lebih &gt; @IdFormat.Number(_standard.Thresholds.DepletionAbovePoints, 1) poin.
+            </p>
+        </div>
+    };
+
+    private RenderFragment DayTable(CycleSeries series) => __builder =>
     {
         <div class="table-responsive">
             <table class="table table-sm perf-table">
                 <thead>
-                    <tr><th>Umur</th><th>Tanggal</th><th>Mati</th><th>Cull</th><th>Pakan kg</th><th>BW g</th><th>Deplesi %</th><th>FCR</th><th>IP</th></tr>
+                    <tr><th>Umur</th><th>Tanggal</th><th>Mati</th><th>Cull</th><th>Pakan kg</th><th>BW g</th><th>Std BW</th><th>Dev BW</th><th>Deplesi %</th><th>Std depl.</th><th>FCR</th><th>Std FCR</th><th>IP</th></tr>
                 </thead>
                 <tbody>
                     @foreach (PerformancePoint day in series.Days.Reverse())
                     {
+                        StandardValue? std = _standard is null ? null : StandardCalculator.ValueAt(_standard, day.AgeDays);
+                        StandardDeviation? deviation = StandardCalculator.DayDeviation(_standard, day, series.InitialPopulation);
                         <tr class="@(day.IsLocal ? "local" : null)">
                             <td>@day.AgeDays</td>
                             <td>@IdFormat.Date(day.Date)</td>
@@ -287,8 +349,12 @@
                             <td>@day.Culling</td>
                             <td>@IdFormat.Number(day.FeedKg, 1)</td>
                             <td>@IdFormat.Optional(day.AverageBodyWeightGram)</td>
-                            <td>@IdFormat.Number(day.Cumulative.DepletionPercent, 2)</td>
-                            <td>@IdFormat.Optional(day.Cumulative.Fcr, 3)</td>
+                            <td>@IdFormat.Optional(std?.BodyWeightGram)</td>
+                            <td class="@(deviation?.IsBodyWeightBelow(_standard!.Thresholds) == true ? "text-danger" : null)">@IdFormat.Deviation(deviation?.BodyWeightPercent, 1, "%")</td>
+                            <td class="@(deviation?.IsDepletionAbove(_standard!.Thresholds) == true ? "text-danger" : null)">@IdFormat.Number(day.Cumulative.DepletionPercent, 2)</td>
+                            <td>@IdFormat.Optional(std?.DepletionPercent, 2)</td>
+                            <td class="@(deviation?.IsFcrAbove(_standard!.Thresholds) == true ? "text-danger" : null)">@IdFormat.Optional(day.Cumulative.Fcr, 3)</td>
+                            <td>@IdFormat.Optional(std?.Fcr, 3)</td>
                             <td>@IdFormat.Optional(day.Cumulative.Ip)</td>
                         </tr>
                     }
@@ -297,12 +363,12 @@
         </div>
     };
 
-    private static RenderFragment WeekTable(CycleSeries series) => __builder =>
+    private RenderFragment WeekTable(CycleSeries series) => __builder =>
     {
         <div class="table-responsive">
             <table class="table table-sm perf-table">
                 <thead>
-                    <tr><th>Minggu</th><th>Umur</th><th>Pakan kg</th><th>g/ekor</th><th>Mati+cull</th><th>BW g</th><th>+BW g</th><th>Deplesi %</th><th>FCR</th><th>IP</th></tr>
+                    <tr><th>Minggu</th><th>Umur</th><th>Pakan kg</th><th>g/ekor</th><th>Mati+cull</th><th>BW g</th><th>Std BW</th><th>+BW g</th><th>Deplesi %</th><th>FCR</th><th>IP</th></tr>
                 </thead>
                 <tbody>
                     @foreach (WeekPerformance week in series.Weeks.Reverse())
@@ -320,6 +386,7 @@
                             <td>@IdFormat.Number(week.FeedGramPerBird)</td>
                             <td>@week.Depleted (@IdFormat.Number(week.DepletedPercent, 2)%)</td>
                             <td>@IdFormat.Optional(week.BodyWeightGram)</td>
+                            <td>@IdFormat.Optional(_standard is null ? null : StandardCalculator.ValueAt(_standard, week.Week * 7)?.BodyWeightGram)</td>
                             <td>@IdFormat.Optional(week.BodyWeightGainGram)</td>
                             <td>@IdFormat.Number(week.Cumulative.DepletionPercent, 2)</td>
                             <td>@IdFormat.Optional(week.Cumulative.Fcr, 3)</td>

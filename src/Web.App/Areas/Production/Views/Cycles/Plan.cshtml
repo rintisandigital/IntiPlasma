@@ -50,6 +50,17 @@
                             <input asp-for="PlannedPopulation" type="number" min="1" step="1" class="form-control">
                             <span asp-validation-for="PlannedPopulation" class="text-danger fs-13"></span>
                         </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="BreedStandardId" class="form-label"></label>
+                            <select asp-for="BreedStandardId" class="form-select">
+                                <option value="">Default standard@(Model.BreedStandards.FirstOrDefault(s => s.IsDefault) is { } preset ? $" ({preset.Name})" : " (none set)")</option>
+                                @foreach (Application.BreedStandards.BreedStandardResponse standard in Model.BreedStandards.Where(s => !s.IsDefault))
+                                {
+                                    <option value="@standard.Id">@standard.Name@(standard.Strain is null ? "" : $" · {standard.Strain}")</option>
+                                }
+                            </select>
+                            <span class="form-text">The performance is compared with this standard.</span>
+                        </div>
                         <div class="col-12 mb-3">
                             <label asp-for="Notes" class="form-label"></label>
                             <textarea asp-for="Notes" rows="2" class="form-control"></textarea>

@@ -1,0 +1,159 @@
+@model BreedStandardFormViewModel
+@{
+    ViewData["Title"] = Model.IsNew ? "Add Breed Standard" : $"Breed Standard {Model.Code}";
+    ViewData["Menu"] = MenuCodes.MasterBreedStandards;
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel(Model.IsNew ? "Add Breed Standard" : $"Breed Standard {Model.Code}", "Target figures at the end of each day of age; ages between two rows are interpolated")' />
+
+@if (!Model.IsNew)
+{
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        @if (Model.IsDefault)
+        {
+            <span class="badge bg-primary align-self-center">Default standard</span>
+        }
+        else if (Model.CanSave && Model.IsActive == true)
+        {
+            <form asp-action="SetDefault" asp-route-id="@Model.Id" method="post">
+                <button type="submit" class="btn btn-sm btn-outline-primary"><i class="ti ti-star me-1"></i>Make default</button>
+            </form>
+        }
+        <a asp-action="ExportRows" asp-route-id="@Model.Id" asp-menu="@MenuCodes.MasterBreedStandards" asp-right="Export" class="btn btn-sm btn-light"><i class="ti ti-download me-1"></i>Download rows (CSV)</a>
+        <span class="text-muted fs-13 align-self-center">Chosen by @Model.CycleCount cycle(s).</span>
+    </div>
+}
+
+<form asp-action="@(Model.IsNew ? "Create" : "Edit")" method="post">
+    @if (Model.IsNew)
+    {
+        <form-token />
+    }
+    else
+    {
+        <input type="hidden" asp-for="Id" />
+        <input type="hidden" asp-for="Code" />
+    }
+    <fieldset disabled="@(!Model.CanSave)">
+        <div class="card">
+            <div class="card-body">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="Code" class="form-label"></label> <span class="text-danger">*</span>
+                        <input asp-for="Code" class="form-control text-uppercase" disabled="@(!Model.IsNew)">
+                        <span asp-validation-for="Code" class="text-danger fs-13"></span>
+                    </div>
+                    <div class="col-md-5 mb-3">
+                        <label asp-for="Name" class="form-label"></label> <span class="text-danger">*</span>
+                        <input asp-for="Name" class="form-control" placeholder="e.g. CP 707 — 2024">
+                        <span asp-validation-for="Name" class="text-danger fs-13"></span>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label asp-for="Strain" class="form-label"></label>
+                        <input asp-for="Strain" class="form-control" placeholder="e.g. CP 707, Cobb 500">
+                        <span asp-validation-for="Strain" class="text-danger fs-13"></span>
+                    </div>
+                    <div class="col-12 mb-3">
+                        <label asp-for="Notes" class="form-label"></label>
+                        <textarea asp-for="Notes" rows="2" class="form-control" placeholder="Source of the figures, e.g. the breeder's performance objectives"></textarea>
+                        <span asp-validation-for="Notes" class="text-danger fs-13"></span>
+                    </div>
+                </div>
+                @if (!Model.IsNew)
+                {
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="IsActive" name="IsActive" value="true" checked="@(Model.IsActive == true)">
+                        <label class="form-check-label" for="IsActive">Active</label>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h5 class="card-title mb-0">Rows per age</h5>
+                @if (Model.CanSave)
+                {
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-collection-add="Rows"><i class="ti ti-plus me-1"></i>Add row</button>
+                }
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table mb-0" data-collection="Rows">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>Age (days) *</th><th>Body weight (g) *</th><th>FCR</th><th>Depletion (%)</th>
+                                <th>Feed / day (g)</th><th>Cum. feed (g)</th><th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="collection-empty"><td colspan="7" class="text-center text-muted py-3">No rows.</td></tr>
+                            @for (int i = 0; i < Model.Rows.Count; i++)
+                            {
+                                BreedStandardRowInput row = Model.Rows[i];
+                                <tr class="collection-row">
+                                    <td><input type="number" name="Rows[@i].AgeDays" value="@row.AgeDays" step="1" min="0" max="@Domain.MasterData.BreedStandards.BreedStandard.MaxAgeDays" class="form-control form-control-sm" aria-label="Age"></td>
+                                    <td><input type="number" name="Rows[@i].BodyWeightGram" value="@row.BodyWeightGram" step="0.01" min="0" class="form-control form-control-sm" aria-label="Body weight"></td>
+                                    <td><input type="number" name="Rows[@i].Fcr" value="@row.Fcr" step="0.001" min="0" class="form-control form-control-sm" aria-label="FCR"></td>
+                                    <td><input type="number" name="Rows[@i].DepletionPercent" value="@row.DepletionPercent" step="0.001" min="0" max="100" class="form-control form-control-sm" aria-label="Depletion"></td>
+                                    <td><input type="number" name="Rows[@i].DailyFeedGram" value="@row.DailyFeedGram" step="0.01" min="0" class="form-control form-control-sm" aria-label="Feed per day"></td>
+                                    <td><input type="number" name="Rows[@i].CumulativeFeedGram" value="@row.CumulativeFeedGram" step="0.01" min="0" class="form-control form-control-sm" aria-label="Cumulative feed"></td>
+                                    <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer text-muted fs-13">
+                Body weight, depletion and cumulative feed may not decrease with age. When every row has the feed per day and the
+                ages run day by day, the cumulative feed is calculated.
+                @if (Model.IsNew)
+                {
+                    <div class="mt-3">
+                        <label asp-for="RowsCsv" class="form-label text-body"></label>
+                        <textarea asp-for="RowsCsv" rows="4" class="form-control form-control-sm font-monospace" placeholder="@Application.BreedStandards.BreedStandardCsv.Header&#10;0,42,,0,,0&#10;7,190,0.85,0.8,,160"></textarea>
+                        <span class="form-text">Optional: pasted rows replace the table above.</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </fieldset>
+    <partial name="Partials/_FormButtons" model='new FormButtonsModel(Model.CanSave, Url.Action("Index")!)' />
+</form>
+
+@if (!Model.IsNew && Model.CanSave)
+{
+    <div class="card mt-3">
+        <div class="card-header"><h6 class="mb-0">Import rows (CSV)</h6></div>
+        <div class="card-body">
+            <form asp-action="Import" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data">
+                <input type="file" name="file" accept=".csv,text/csv,text/plain" class="form-control form-control-sm mb-2" aria-label="CSV file">
+                <textarea name="csv" rows="3" class="form-control form-control-sm font-monospace mb-2" placeholder="…or paste: @Application.BreedStandards.BreedStandardCsv.Header"></textarea>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="form-text m-0">
+                        Header <code>@Application.BreedStandards.BreedStandardCsv.Header</code> (only <code>age</code> and <code>bw</code> required).
+                        Separator <code>,</code> with decimal point, or <code>;</code> with decimal point or comma. Replaces all rows.
+                    </span>
+                    <button type="submit" class="btn btn-sm btn-primary ms-2"><i class="ti ti-upload me-1"></i>Import</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+<template data-collection-template="Rows">
+    <tr class="collection-row">
+        <td><input type="number" name="Rows[__i__].AgeDays" step="1" min="0" max="@Domain.MasterData.BreedStandards.BreedStandard.MaxAgeDays" class="form-control form-control-sm" aria-label="Age"></td>
+        <td><input type="number" name="Rows[__i__].BodyWeightGram" step="0.01" min="0" class="form-control form-control-sm" aria-label="Body weight"></td>
+        <td><input type="number" name="Rows[__i__].Fcr" step="0.001" min="0" class="form-control form-control-sm" aria-label="FCR"></td>
+        <td><input type="number" name="Rows[__i__].DepletionPercent" step="0.001" min="0" max="100" class="form-control form-control-sm" aria-label="Depletion"></td>
+        <td><input type="number" name="Rows[__i__].DailyFeedGram" step="0.01" min="0" class="form-control form-control-sm" aria-label="Feed per day"></td>
+        <td><input type="number" name="Rows[__i__].CumulativeFeedGram" step="0.01" min="0" class="form-control form-control-sm" aria-label="Cumulative feed"></td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove"><i class="ti ti-trash"></i></button></td>
+    </tr>
+</template>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -267,6 +267,15 @@
                     <div><span>IP</span><b>@IdFormat.Optional(p.Ip)</b></div>
                 </div>
 
+                @if (cycle.Standard is { } standard)
+                {
+                    <div class="meta">
+                        <span class="@(standard.BelowStandard ? "text-danger fw-6" : null)">
+                            vs standar: BW @IdFormat.Deviation(standard.BodyWeightPercent, 1, "%") · FCR @IdFormat.Deviation(standard.FcrDeviation, 3) · deplesi @IdFormat.Deviation(standard.DepletionPoints, 2, " poin")
+                        </span>
+                    </div>
+                }
+
                 <div class="meta">
                     <span class="@(feedLow ? "text-danger fw-6" : null)">
                         Stok pakan @IdFormat.Feed(cycle.FeedStockKg, cycle.FeedStock)
@@ -312,6 +321,9 @@
             <div class="kpi-tile @(stockDone < stockExpected ? "warn" : null)">
                 <span class="label">Stok ayam hari ini</span><span class="value">@stockDone / @stockExpected</span>
             </div>
+            <div class="kpi-tile @(kpi.CyclesBelowStandard > 0 ? "warn" : null)">
+                <span class="label">Di bawah standar</span><span class="value">@kpi.CyclesBelowStandard / @kpi.ActiveCycles</span>
+            </div>
         </div>
 
         <h5 class="mb-12">Siklus berisiko (@view.AtRisk.Count)</h5>
@@ -339,6 +351,10 @@
                 <div class="meta">
                     <span>Deplesi @IdFormat.Number(cycle.Performance.DepletionPercent, 2)%</span>
                     <span>FCR @IdFormat.Optional(cycle.Performance.Fcr, 3)</span>
+                    @if (cycle.Standard is { BelowStandard: true } standard)
+                    {
+                        <span>vs standar: BW @IdFormat.Deviation(standard.BodyWeightPercent, 1, "%") · FCR @IdFormat.Deviation(standard.FcrDeviation, 3) · deplesi @IdFormat.Deviation(standard.DepletionPoints, 2, " poin")</span>
+                    }
                     <span>Recording terakhir @(cycle.LastRecordingDate is { } last ? IdFormat.Date(last) : "—")</span>
                     @if (cycle.FeedDaysLeft is { } days)
                     {

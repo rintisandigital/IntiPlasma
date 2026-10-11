@@ -34,6 +34,21 @@ public static class IdFormat
     public static string Optional(decimal? value, int decimals = 0) => value is { } v ? Number(v, decimals) : "–";
 
     /// <summary>
+    /// A deviation with its sign, e.g. <c>+1,5%</c> or <c>-3,6%</c>; "–" when unknown.
+    /// </summary>
+    public static string Deviation(decimal? value, int decimals, string suffix = "")
+    {
+        if (value is not { } v)
+        {
+            return "–";
+        }
+
+        string sign = v > 0 ? "+" : string.Empty;
+
+        return $"{sign}{Number(v, decimals)}{suffix}";
+    }
+
+    /// <summary>
     /// Feed stock in kg, plus packs when every item has the same largest unit, e.g. <c>900 kg (18 SAK)</c>.
     /// </summary>
     public static string Feed(decimal kilograms, IReadOnlyCollection<Contracts.DashboardFeedStock> items)

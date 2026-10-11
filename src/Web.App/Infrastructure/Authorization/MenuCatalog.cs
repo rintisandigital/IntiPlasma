@@ -21,6 +21,7 @@ public static class MenuCodes
     public const string MasterVendors = "master.vendors";
     public const string MasterCustomers = "master.customers";
     public const string MasterWeightRanges = "master.weight-ranges";
+    public const string MasterBreedStandards = "master.breed-standards";
     public const string PartnershipFarmers = "partnership.farmers";
     public const string PartnershipCoops = "partnership.coops";
     public const string PartnershipFieldOfficers = "partnership.field-officers";
@@ -103,6 +104,7 @@ public static class MenuCatalog
         Page("master", "master.vendors", "Vendors", "/MasterData/Vendors", CreateEditExport, true);
         Page("master", "master.customers", "Customers", "/MasterData/Customers", CreateEditExport, true);
         Page("master", "master.weight-ranges", "Weight Ranges", "/MasterData/WeightRanges", CreateEditExport, true);
+        Page("master", "master.breed-standards", "Breed Standards", "/MasterData/BreedStandards", CreateEditExport, true);
 
         Group("partnership", "Partnership", "ti ti-users-group", 30);
         Page("partnership", "partnership.farmers", "Farmers", "/Partnership/Farmers", CreateEditExport, true);

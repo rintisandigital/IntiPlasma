@@ -254,6 +254,13 @@
 ### Fase M4 — Grafik & Dashboard ✅ (2026-10-09; detail: PLAN-MOBILE §19–§20)
 - API: `GET mobile/dashboard?date&branchId` (lingkup PPL/cabang; per siklus berjalan: performa kumulatif, status recording & stok ayam hari ini, stok pakan + rata-rata 3 recording terakhir + estimasi sisa hari, flag `RecordingLate`/`FeedLow`/`HighDepletion`/`NoStockReport`; KPI gabungan). Ambang di `Mobile:Dashboard`. Akumulasi harian `performance` dipindah ke `CyclePerformanceBuilder` (dipakai bersama). Tidak ada migration.
 - Mobile: **Beranda** PPL (tugas hari ini + antrean lokal, kandang saya, stok pakan) & Manager (KPI cabang, siklus berisiko, stok ayam per rentang), offline dari cache; **Grafik Produksi** (Chart.js 4.5 lokal): BW, deplesi, FCR, pakan, mati, IP — harian/mingguan (minggu = umur 7n−6…7n), recording belum terkirim putus-putus (rumus diporting ke Core), bandingkan ≤ 3 siklus. Logo header Beranda tidak lagi gepeng.
+### Fase M5 — Breed Standard ✅ (2026-10-11; detail: PLAN-MOBILE §21–§22)
+- Migration **`PhaseM5_BreedStandard`**: `master.breed_standards` + `master.breed_standard_rows` (per umur 0–70: BW g, FCR, deplesi %, pakan harian & kumulatif g/ekor), `production_cycles.breed_standard_id` dan `closing_standard` (jsonb, salinan standar saat Close). **Belum di-migrate.**
+- Standar efektif siklus = salinan saat tutup → standar siklus → standar **default**; umur di antara baris diinterpolasi linear. Ambang "di bawah standar" di `Production:Standard` (BW −5%, FCR +0,05, deplesi +1 poin); BW & FCR hanya dinilai pada hari penimbangan.
+- API: `GET breed-standards`, `GET breed-standards/{id}`, `PUT cycles/{id}/breed-standard` (`cycles:manage`), `POST cycles` menerima `breedStandardId`; `cycles/{id}/performance` menambah `standard` (kurva + ambang), `standardStatus`, `days[].standard/deviation`; dashboard menambah flag `BelowStandard`, `cycles[].standard`, KPI `cyclesBelowStandard`.
+- Web.App: **Master Data → Breed Standards** (form + tabel baris, impor/ekspor CSV, default), standar di form Plan, **Change standard** & garis/kolom standar di tab Performance. Demo data: standar `CP707-CONTOH` (angka ilustrasi).
+- Mobile: garis standar di Grafik (BW, deplesi, FCR, pakan; harian/mingguan; diperpanjang 7 hari ke depan), kartu standar + badge "Di bawah standar" (termasuk recording yang belum terkirim, dihitung di perangkat), kolom Std/Dev di tabel; Beranda PPL "vs standar", Manager KPI "Di bawah standar x/y".
+
 ## 5. Alur Akuntansi yang Sudah Berjalan
 
 | Transaksi | Jurnal otomatis |
@@ -328,19 +335,20 @@ Semua event di katalog kini sudah dipakai.
 - **MobileApp**: CSS template memberi anak pertama & terakhir `.header-avt` `width: 100%` → logo melar dan tombol di kanan terdorong keluar layar; override per elemen (`.header-avt > .header-logo-text`, `.header-avt > .header-right`).
 - **MobileApp**: Chart.js dipanggil lewat `wwwroot/js/chart-interop.js` (`intiplasmaCharts.render/destroy`); spesifikasi grafik dibentuk & diuji di Core (`PerformanceCharts`), JS hanya menggambar.
 - **Dashboard**: tanggal server = UTC; "hari ini" dashboard memakai tanggal Asia/Jakarta (UTC+7) atau parameter `date` dari klien.
+- **Breed standard** bersifat global dan hanya satu yang default: integration test yang membuat standar default memakai kurva longgar agar tidak memberi flag `BelowStandard` pada siklus test lain. Deviasi BW/FCR hanya pada hari penimbangan (BW di hari lain dibawa maju dari penimbangan terakhir).
 - **MobileApp**: `MediaPicker.PickPhotoAsync` usang di MAUI 10 → `PickPhotosAsync` + `SelectionLimit = 1`; resize/kompresi/rotasi cukup lewat `MediaPickerOptions` (`MaximumWidth/Height`, `CompressionQuality`, `RotateImage`).
 
 ## 7. Cara Kerja & Verifikasi
 
 - Setiap fase: domain + unit test invariant → command/query + validator → EF config + migration → endpoint + permission → **verifikasi end-to-end** ke PostgreSQL lokal pada database sementara `intiplasma_verify` (dibuat & dihapus otomatis; database `intiplasma` milik user tidak disentuh).
 - User yang melakukan **commit & migrate** setelah tiap fase.
-- Status test saat ini: **602 test lulus** (162 domain, 92 application, 14 arsitektur, 122 MobileApp.UnitTests, 41 integration Web.Api, 171 integration Web.App).
+- Status test saat ini: **628 test lulus** (170 domain, 100 application, 14 arsitektur, 129 MobileApp.UnitTests, 43 integration Web.Api, 172 integration Web.App).
 - Verifikasi mobile (M0): emulator Android **API 34** (`intiplasma_api34`; image API 26 terlalu tua untuk WebView) + Web.Api `:5000` pada `intiplasma_verify`, diarahkan dengan `adb` (tap/teks/screencap). Integration test butuh mesin Podman berjalan (`podman machine start`).
 - Integration test (Testcontainers) **sudah bisa dijalankan** di mesin dev (container runtime tersedia) — `dotnet test IntiPlasma.slnx`.
 - Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario, Fase 7: 32 skenario, Fase 8: 35 skenario, Fase 9: 79 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
 - ⚠️ Sejak W0 Web.Api tidak memproses outbox: verifikasi yang hanya menjalankan API perlu `BackgroundJobs__Enabled=true`.
 - Verifikasi WebApp (W0: 49 skenario, W1: 36 skenario, W2: 40 skenario, W3: 48 skenario, W4: 51 skenario, W5: 42 skenario, W6: 42 skenario, W7: 62 skenario, W8: 44 skenario, W9: 44 skenario, W10: 53 + 7 restart/rate-limit + 20 container + regresi W0–W9) memakai **Playwright** (dipasang di scratchpad, bukan di repo) terhadap Web.App :5098 + Web.Api :5099 pada `intiplasma_verify`; interaksi halaman lewat frame `content-frame`.
-- Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`, `Phase8_ReportingClosing`, `Phase9_Attachments`, `PhaseW0_UserStatus`, `PhaseW1_AccessControl`, `PhaseW10_Hardening`.
+- Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`, `Phase8_ReportingClosing`, `Phase9_Attachments`, `PhaseW0_UserStatus`, `PhaseW1_AccessControl`, `PhaseW10_Hardening`, `Coop_Profile`, `PhaseM1_FieldOfficerScope`, `PhaseM3_LiveBirdStock`, `PhaseM5_BreedStandard`.
 
 ## 8. Catatan Terbuka / Hutang Teknis
 
@@ -376,7 +384,7 @@ Semua event di katalog kini sudah dipakai.
 
 Seluruh fase rencana awal (0–8) selesai di sisi API. Kandidat berikutnya (urutan bisa disepakati):
 - **Klien**: MVC WebApp Admin Office (keputusan #4) — rencana di [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (Fase W0–W10; aplikasi langsung via Infrastructure, mainboard + iframe, Akses Menu & Akses Cabang per user, background job di Web.App, ekspor ClosedXML/QuestPDF, UI English) — dan mobile app PPL (recording offline sudah siap di API).
-- **Mobile app PPL & Manager** — rencana di [PLAN-MOBILE.md](PLAN-MOBILE.md) (Fase M0–M10; MAUI Blazor Hybrid via Web.Api + JWT, Android dulu, UI Bahasa Indonesia dari template `docs/html-template-mobile`, recording & stok ayam harian per rentang bobot (offline, informasi Sales; WebApp Production → Live Bird Stock), request pengiriman pakan tanpa approval, breed standard, **modul approval berjenjang** untuk farmer/kandang baru, perubahan NIK/rekening, aktivasi kontrak, revisi recording & mutasi pakan). Semua keputusan M-1 s.d. M-39 disepakati 2026-10-08; berikutnya Fase M0.
+- **Mobile app PPL & Manager** — rencana di [PLAN-MOBILE.md](PLAN-MOBILE.md) (Fase M0–M10; MAUI Blazor Hybrid via Web.Api + JWT, Android dulu, UI Bahasa Indonesia dari template `docs/html-template-mobile`, recording & stok ayam harian per rentang bobot (offline, informasi Sales; WebApp Production → Live Bird Stock), request pengiriman pakan tanpa approval, breed standard, **modul approval berjenjang** untuk farmer/kandang baru, perubahan NIK/rekening, aktivasi kontrak, revisi recording & mutasi pakan). Semua keputusan M-1 s.d. M-39 disepakati 2026-10-08; Fase M0–M5 selesai (2026-10-11), berikutnya Fase M6 (approval berjenjang).
 - **Pajak**: ekspor XML Coretax (e-Faktur & e-Bupot) setelah format dikonfirmasi konsultan pajak; input tarif final PPN/PPh.
 - **Akuntansi lanjutan**: hutang non-PO (jasa) & nota debit vendor; transaksi antar cabang (akun antar-cabang); alokasi overhead ke siklus; sub-ledger piutang plasma per peternak; aset tetap & penyusutan.
 - **Operasional/infra**: Redis untuk idempotency & cache (multi-instance), integration test per modul (Testcontainers sudah jalan), observabilitas (Seq/OTel).

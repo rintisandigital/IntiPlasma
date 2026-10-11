@@ -1,11 +1,13 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Paging;
+using Application.BreedStandards;
 using Application.Costing;
 using Application.Cycles;
 using Application.Cycles.Cancel;
 using Application.Cycles.Get;
 using Application.Cycles.GetById;
 using Application.Cycles.Plan;
+using Application.Cycles.SetBreedStandard;
 using Application.Cycles.Start;
 using Application.Documents;
 using Application.Inventory;
@@ -108,6 +110,7 @@ public sealed class CyclesController(
         [FromServices] IQueryHandler<GetCycleCostQuery, CycleCostResponse> costQuery,
         [FromServices] IQueryHandler<GetDailyRecordingsQuery, IReadOnlyList<DailyRecordingResponse>> recordingsQuery,
         [FromServices] IQueryHandler<GetPlasmaSettlementsQuery, IReadOnlyList<PlasmaSettlementResponse>> settlementsQuery,
+        [FromServices] IQueryHandler<GetBreedStandardsQuery, IReadOnlyList<BreedStandardResponse>> standardsQuery,
         CancellationToken cancellationToken)
     {
         Result<CycleResponse> result = await cycleQuery.Handle(new GetCycleByIdQuery(id), cancellationToken);
@@ -130,9 +133,18 @@ public sealed class CyclesController(
             settlement = settlements.IsSuccess ? settlements.Value.FirstOrDefault(s => s.Status != "Cancelled") : null;
         }
 
+        bool canEdit = await support.CanAsync(MenuCode, MenuRights.Edit);
+        IReadOnlyList<BreedStandardResponse> standards = [];
+        if (canEdit && cycle.Status is not (nameof(CycleStatus.Settled) or nameof(CycleStatus.Cancelled)))
+        {
+            Result<IReadOnlyList<BreedStandardResponse>> active = await standardsQuery.Handle(new GetBreedStandardsQuery(ActiveOnly: true), cancellationToken);
+            standards = active.IsSuccess ? active.Value : [];
+        }
+
         return View(new CycleDetailsViewModel
         {
             Cycle = cycle,
+            BreedStandards = standards,
             Performance = performance.IsSuccess ? performance.Value : null,
             Cost = cost.IsSuccess ? cost.Value : null,
             Recordings = recordings.IsSuccess ? recordings.Value : [],
@@ -140,7 +152,7 @@ public sealed class CyclesController(
             CoopWarehouseId = warehouseId,
             Attachments = await support.AttachmentsAsync(cycle.Documents, cancellationToken),
             Tab = tab ?? "overview",
-            CanEdit = await support.CanAsync(MenuCode, MenuRights.Edit),
+            CanEdit = canEdit,
             CanRecord = await support.CanAsync(MenuCodes.ProductionRecordings, MenuRights.Create),
             CanHarvest = await support.CanAsync(MenuCodes.ProductionHarvests, MenuRights.Create),
             CanPrint = await support.CanAsync(MenuCode, MenuRights.Export),
@@ -153,20 +165,29 @@ public sealed class CyclesController(
 
     [HttpGet]
     [MenuAccess(MenuCode, MenuRights.Create)]
-    public IActionResult Create() =>
-        View("Plan", new PlanCycleFormViewModel { PlannedChickInDate = formatter.Today() });
+    public async Task<IActionResult> Create(
+        [FromServices] IQueryHandler<GetBreedStandardsQuery, IReadOnlyList<BreedStandardResponse>> standardsQuery,
+        CancellationToken cancellationToken) =>
+        View("Plan", new PlanCycleFormViewModel
+        {
+            PlannedChickInDate = formatter.Today(),
+            BreedStandards = await ActiveStandardsAsync(standardsQuery, cancellationToken)
+        });
 
     [HttpPost]
     [MenuAccess(MenuCode, MenuRights.Create)]
     public async Task<IActionResult> Create(
         PlanCycleFormViewModel model,
         [FromServices] ICommandHandler<PlanCycleCommand, PlanCycleResponse> handler,
+        [FromServices] IQueryHandler<GetBreedStandardsQuery, IReadOnlyList<BreedStandardResponse>> standardsQuery,
         CancellationToken cancellationToken)
     {
         if (ModelState.IsValid)
         {
             Result<PlanCycleResponse> result = await handler.Handle(
-                new PlanCycleCommand(model.CoopId!.Value, model.ContractId, model.PlannedChickInDate!.Value, model.PlannedPopulation!.Value, model.Notes),
+                new PlanCycleCommand(
+                    model.CoopId!.Value, model.ContractId, model.PlannedChickInDate!.Value, model.PlannedPopulation!.Value, model.Notes,
+                    model.BreedStandardId),
                 cancellationToken);
 
             if (result.IsSuccess)
@@ -178,7 +199,43 @@ public sealed class CyclesController(
             AddErrors(result.Error);
         }
 
+        model.BreedStandards = await ActiveStandardsAsync(standardsQuery, cancellationToken);
+
         return View("Plan", model);
+    }
+
+    /// <summary>
+    /// Changes the breed standard the performance is compared with (PLAN-MOBILE M-71); empty = the default.
+    /// </summary>
+    [HttpPost]
+    [MenuAccess(MenuCode, MenuRights.Edit)]
+    public async Task<IActionResult> BreedStandard(
+        Guid id,
+        Guid? breedStandardId,
+        [FromServices] ICommandHandler<SetCycleBreedStandardCommand> handler,
+        CancellationToken cancellationToken)
+    {
+        Result result = await handler.Handle(new SetCycleBreedStandardCommand(id, breedStandardId), cancellationToken);
+
+        if (result.IsSuccess)
+        {
+            NotifySuccess("The breed standard of the cycle has been changed.");
+        }
+        else
+        {
+            NotifyError(result.Error.Description);
+        }
+
+        return RedirectToAction(nameof(Details), new { id, tab = "performance" });
+    }
+
+    private static async Task<IReadOnlyList<BreedStandardResponse>> ActiveStandardsAsync(
+        IQueryHandler<GetBreedStandardsQuery, IReadOnlyList<BreedStandardResponse>> standardsQuery,
+        CancellationToken cancellationToken)
+    {
+        Result<IReadOnlyList<BreedStandardResponse>> result = await standardsQuery.Handle(new GetBreedStandardsQuery(ActiveOnly: true), cancellationToken);
+
+        return result.IsSuccess ? result.Value : [];
     }
 
     [HttpGet]

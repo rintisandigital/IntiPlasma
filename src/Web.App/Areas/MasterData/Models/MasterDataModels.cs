@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Domain.MasterData.BreedStandards;
 using Domain.MasterData.Items;
 using Domain.MasterData.TaxCodes;
 using Domain.MasterData.Warehouses;
@@ -64,6 +65,55 @@ public sealed class WeightRangeFormViewModel : MasterFormViewModel
     [Display(Name = "Sort order")]
     [Range(0, 9_999)]
     public int SortOrder { get; set; }
+}
+
+// ---- Breed standards ---------------------------------------------------------------------------------------
+
+public sealed class BreedStandardFormViewModel : MasterFormViewModel
+{
+    [Required]
+    [StringLength(20)]
+    public string Code { get; set; } = string.Empty;
+
+    [Required]
+    [StringLength(100)]
+    public string Name { get; set; } = string.Empty;
+
+    [StringLength(100)]
+    public string? Strain { get; set; }
+
+    [StringLength(1000)]
+    public string? Notes { get; set; }
+
+    /// <summary>
+    /// On create: rows pasted as CSV instead of the table (age,bw,fcr,depletion,daily_feed,cum_feed).
+    /// </summary>
+    [Display(Name = "Rows as CSV")]
+    public string? RowsCsv { get; set; }
+
+    public List<BreedStandardRowInput> Rows { get; set; } = [];
+
+    [BindNever]
+    public bool IsDefault { get; set; }
+
+    [BindNever]
+    public int CycleCount { get; set; }
+}
+
+public sealed class BreedStandardRowInput
+{
+    [Range(0, BreedStandard.MaxAgeDays)]
+    public int? AgeDays { get; set; }
+
+    public decimal? BodyWeightGram { get; set; }
+
+    public decimal? Fcr { get; set; }
+
+    public decimal? DepletionPercent { get; set; }
+
+    public decimal? DailyFeedGram { get; set; }
+
+    public decimal? CumulativeFeedGram { get; set; }
 }
 
 // ---- Tax codes ---------------------------------------------------------------------------------------------

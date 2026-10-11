@@ -1,5 +1,6 @@
 using Application.Access.BranchAccessProfiles;
 using Application.Branches.Create;
+using Application.BreedStandards;
 using Application.Common;
 using Application.Contracts;
 using Application.Contracts.ChangeStatus;
@@ -20,6 +21,7 @@ using Application.Users.Manage;
 using Application.Vendors.Create;
 using Application.Warehouses.Create;
 using Application.WeightRanges;
+using Domain.MasterData.BreedStandards;
 using Domain.Access;
 using Domain.Finance.Accounts;
 using Domain.Finance.CashBank;
@@ -60,6 +62,11 @@ public sealed partial class DemoDataSeeder
     /// Rentang bobot for the live bird stock (M-54): id with the lower and upper bound in kg.
     /// </summary>
     private readonly List<(Guid Id, decimal? Min, decimal? Max)> _weightRanges = [];
+
+    /// <summary>
+    /// The example breed standard (M-80), the default and chosen by every demo cycle.
+    /// </summary>
+    private Guid _breedStandard;
     private Guid _liveBird;
     private Guid _vendorCharoen;
     private Guid _vendorJapfa;
@@ -175,6 +182,14 @@ public sealed partial class DemoDataSeeder
         {
             _weightRanges.Add((await SendAsync(new CreateWeightRangeCommand(code, name, min, max, order)), min, max));
         }
+
+        _breedStandard = await SendAsync(new CreateBreedStandardCommand(
+            "CP707-CONTOH",
+            "CP 707 (contoh)",
+            "CP 707",
+            "Angka ilustrasi untuk data demo, diturunkan dari kurva pertumbuhan data dummy; bukan standar resmi breeder. "
+            + "Impor angka resmi dari manual breeder lewat CSV.",
+            ExampleStandardRows()));
 
         // Rates as data (decision #5/#11): PPN 12% with "DPP nilai lain" entered as an effective 11% with ratio 1.
         var taxFrom = new DateOnly(2025, 1, 1);
@@ -300,6 +315,30 @@ public sealed partial class DemoDataSeeder
     }
 
     private void AddCycle(CycleSpec spec) => _cycles.Add(new CycleRun(this, spec, _cycles.Count + 1));
+
+    /// <summary>
+    /// Weekly rows 0-42 days following the growth (BW = 42 + 1,62 × umur²), feed (13 + 4,3 × umur g/ekor/hari) and
+    /// mortality curves of the demo cycles, so a cycle with average figures is on standard.
+    /// </summary>
+    private static List<StandardPoint> ExampleStandardRows()
+    {
+        decimal[] depletion = [0m, 2.0m, 2.6m, 3.2m, 3.9m, 4.6m, 5.3m];
+        var rows = new List<StandardPoint>();
+
+        for (int week = 0; week <= 6; week++)
+        {
+            int age = week * 7;
+            decimal bodyWeight = 42m + 1.62m * age * age;
+            decimal cumulativeFeed = Enumerable.Range(1, age).Sum(a => 13m + 4.3m * a);
+            decimal? fcr = age == 0
+                ? null
+                : Math.Round(cumulativeFeed / ((1 - depletion[week] / 100m) * bodyWeight), 3);
+
+            rows.Add(new StandardPoint(age, bodyWeight, fcr, depletion[week], age == 0 ? 0m : 13m + 4.3m * age, cumulativeFeed));
+        }
+
+        return rows;
+    }
 
     private async Task<Guid> CreateItemAsync(
         string code, string name, ItemCategory category, string baseUom, Guid? taxCodeId, params (string Uom, decimal Factor)[] conversions)

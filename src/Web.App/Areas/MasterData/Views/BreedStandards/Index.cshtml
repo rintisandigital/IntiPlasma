@@ -1,0 +1,53 @@
+@model ListViewModel<Application.BreedStandards.BreedStandardResponse>
+@{
+    ViewData["Title"] = "Breed Standards";
+    ViewData["Menu"] = MenuCodes.MasterBreedStandards;
+}
+<partial name="Partials/_ListHeader" model='new ListHeaderModel("Breed Standards", "Target body weight, FCR, depletion and feed per age of a strain, compared with the cycle performance", MenuCodes.MasterBreedStandards, "Add Standard")' />
+
+<div class="card">
+    <div class="card-header">
+        <partial name="Partials/_FilterBar" model='new FilterBarModel(Model.Search, "Search code, name or strain")' />
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Code</th><th>Name</th><th>Strain</th><th class="text-end">Ages</th><th class="text-end">Up to age</th>
+                        <th class="text-end">Cycles</th><th>Status</th><th class="text-end"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.BreedStandards.BreedStandardResponse standard in Model.Rows.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@standard.Code</td>
+                            <td>
+                                @standard.Name
+                                @if (standard.IsDefault)
+                                {
+                                    <span class="badge bg-primary ms-1">Default</span>
+                                }
+                            </td>
+                            <td>@(standard.Strain ?? "—")</td>
+                            <td class="text-end">@standard.RowCount</td>
+                            <td class="text-end">@(standard.MaxAgeDays is { } age ? $"{age} days" : "—")</td>
+                            <td class="text-end">@standard.CycleCount</td>
+                            <td><partial name="Partials/_StatusBadge" model='standard.IsActive ? "Active" : "Inactive"' /></td>
+                            <td class="text-end"><a asp-action="Edit" asp-route-id="@standard.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Items.Count == 0)
+                    {
+                        <tr><td colspan="8" class="text-center text-muted py-4">No breed standards found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer text-muted fs-13">
+        Cycles without a standard of their own use the default standard. A closed cycle keeps a copy of its standard, so
+        later changes here only affect running cycles.
+    </div>
+</div>

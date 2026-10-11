@@ -1,11 +1,13 @@
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.BreedStandards;
 using Application.Costing;
 using Application.Documents;
 using Application.Inventory;
 using Application.Sales;
 using Domain.Documents.Attachments;
+using Domain.MasterData.BreedStandards;
 using Domain.MasterData.Items;
 using Domain.MasterData.Warehouses;
 using Domain.Partnership.Cycles;
@@ -148,7 +150,10 @@ internal sealed class CloseCycleCommandHandler(
 
         CycleCostSummary cost = await CycleCosting.SummarizeAsync(context, cycle.Value, cancellationToken);
 
-        Result closed = cycle.Value.Close(performance, cost);
+        BreedStandardSnapshot? standard = await BreedStandardReader.FindEffectiveAsync(
+            context, cycle.Value.BreedStandardId, cancellationToken);
+
+        Result closed = cycle.Value.Close(performance, cost, standard);
         if (closed.IsFailure)
         {
             return Result.Failure<CyclePerformance>(closed.Error);

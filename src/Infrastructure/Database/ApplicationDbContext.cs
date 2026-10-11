@@ -18,6 +18,7 @@ using Domain.Inventory.Stock;
 using Domain.Inventory.StockReturns;
 using Domain.Inventory.StockTransfers;
 using Domain.MasterData.Branches;
+using Domain.MasterData.BreedStandards;
 using Domain.MasterData.Coops;
 using Domain.MasterData.Customers;
 using Domain.MasterData.Farmers;
@@ -81,6 +82,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
 
     public DbSet<Uom> Uoms { get; set; }
     public DbSet<WeightRange> WeightRanges { get; set; }
+    public DbSet<BreedStandard> BreedStandards { get; set; }
 
     public DbSet<TaxCode> TaxCodes { get; set; }
 

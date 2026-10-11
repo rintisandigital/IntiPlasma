@@ -1,5 +1,6 @@
 using Application.Coops;
 using Domain.MasterData.Branches;
+using Domain.MasterData.BreedStandards;
 using Domain.MasterData.Coops;
 using Domain.MasterData.Customers;
 using Domain.MasterData.Farmers;
@@ -41,6 +42,37 @@ internal sealed class WeightRangeConfiguration : IEntityTypeConfiguration<Weight
         builder.Property(r => r.MinWeightKg).HasPrecision(8, WeightRange.WeightDecimals);
         builder.Property(r => r.MaxWeightKg).HasPrecision(8, WeightRange.WeightDecimals);
         builder.HasIndex(r => r.Code).IsUnique();
+    }
+}
+
+internal sealed class BreedStandardConfiguration : IEntityTypeConfiguration<BreedStandard>
+{
+    public void Configure(EntityTypeBuilder<BreedStandard> builder)
+    {
+        builder.ToTable("breed_standards", Schemas.MasterData);
+        builder.HasKey(s => s.Id);
+        builder.Property(s => s.Code).HasMaxLength(20);
+        builder.Property(s => s.Name).HasMaxLength(100);
+        builder.Property(s => s.Strain).HasMaxLength(100);
+        builder.Property(s => s.Notes).HasMaxLength(1000);
+        builder.HasIndex(s => s.Code).IsUnique();
+
+        builder.HasMany(s => s.Rows).WithOne().HasForeignKey(r => r.BreedStandardId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(s => s.Rows).HasField("_rows").UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class BreedStandardRowConfiguration : IEntityTypeConfiguration<BreedStandardRow>
+{
+    public void Configure(EntityTypeBuilder<BreedStandardRow> builder)
+    {
+        builder.ToTable("breed_standard_rows", Schemas.MasterData);
+        builder.HasKey(r => new { r.BreedStandardId, r.AgeDays });
+        builder.Property(r => r.BodyWeightGram).HasPrecision(8, 2);
+        builder.Property(r => r.Fcr).HasPrecision(6, 3);
+        builder.Property(r => r.DepletionPercent).HasPrecision(6, 3);
+        builder.Property(r => r.DailyFeedGram).HasPrecision(8, 2);
+        builder.Property(r => r.CumulativeFeedGram).HasPrecision(10, 2);
     }
 }
 

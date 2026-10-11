@@ -6,6 +6,7 @@ using Application.Abstractions.Caching;
 using Application.Abstractions.Data;
 using Application.Abstractions.Numbering;
 using Application.Abstractions.Storage;
+using Application.BreedStandards;
 using Application.Mobile;
 using Application.Users;
 using Dapper;
@@ -196,6 +197,10 @@ public static class DependencyInjection
         // Thresholds of the mobile dashboard (PLAN-MOBILE M-58).
         services.AddOptions<MobileDashboardOptions>().Bind(configuration.GetSection(MobileDashboardOptions.SectionName));
         services.AddTransient(sp => sp.GetRequiredService<IOptions<MobileDashboardOptions>>().Value);
+
+        // Thresholds of the breed standard comparison (PLAN-MOBILE M-76).
+        services.AddOptions<BreedStandardOptions>().Bind(configuration.GetSection(BreedStandardOptions.SectionName));
+        services.AddTransient(sp => sp.GetRequiredService<IOptions<BreedStandardOptions>>().Value);
 
         return services;
     }

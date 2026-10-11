@@ -39,6 +39,15 @@ public sealed class PlanCycleFormViewModel
 
     [StringLength(1000)]
     public string? Notes { get; set; }
+
+    /// <summary>
+    /// Empty = the default breed standard (PLAN-MOBILE M-71).
+    /// </summary>
+    [Display(Name = "Breed standard")]
+    public Guid? BreedStandardId { get; set; }
+
+    [BindNever]
+    public IReadOnlyList<Application.BreedStandards.BreedStandardResponse> BreedStandards { get; set; } = [];
 }
 
 public sealed class ChickInFormViewModel
@@ -97,6 +106,13 @@ public sealed class CycleDetailsViewModel
     public Guid? CoopWarehouseId { get; init; }
 
     public IReadOnlyList<AttachmentResponse> Attachments { get; init; } = [];
+
+    /// <summary>
+    /// Active breed standards to change the cycle's standard to; empty when it cannot change.
+    /// </summary>
+    public IReadOnlyList<Application.BreedStandards.BreedStandardResponse> BreedStandards { get; init; } = [];
+
+    public bool CanChangeStandard => CanEdit && Cycle.Status is not ("Settled" or "Cancelled");
 
     public string Tab { get; init; } = "overview";
 

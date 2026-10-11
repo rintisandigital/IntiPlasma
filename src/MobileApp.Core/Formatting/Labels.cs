@@ -93,6 +93,7 @@ public static class Labels
         Contracts.DashboardFlags.FeedLow => "Pakan menipis",
         Contracts.DashboardFlags.HighDepletion => "Deplesi tinggi",
         Contracts.DashboardFlags.NoStockReport => "Stok ayam belum lapor",
+        Contracts.DashboardFlags.BelowStandard => "Di bawah standar",
         _ => flag
     };
 

@@ -11,6 +11,8 @@ Master tidak dihapus; nonaktifkan lewat switch **Active** agar riwayat tetap utu
 | **Warehouses** | Gudang induk per cabang. Gudang kandang (`GK-…`) dibuat otomatis saat kandang dibuat. |
 | **Vendors** | NPWP/NITKU, rekening, **toleransi selisih harga** invoice (%) — default 0. |
 | **Customers** | NPWP/NITKU, **credit limit** (0 = tanpa kredit). |
+| **Weight Ranges** | Rentang bobot rata-rata untuk laporan stok ayam harian PPL; rentang aktif tidak boleh tumpang tindih. |
+| **Breed Standards** | Standar performa strain per umur: BW (g, wajib), FCR, deplesi % kumulatif, pakan per hari & kumulatif (g/ekor). Baris diisi di tabel atau **Import rows (CSV)** — header `age,bw,fcr,depletion,daily_feed,cum_feed`, pemisah `,` (desimal titik) atau `;` (desimal titik/koma); impor **mengganti semua baris**. **Download rows (CSV)** untuk template. Umur di antara dua baris diinterpolasi. Satu standar aktif menjadi **default** (**Make default**) untuk siklus yang tidak memilih standar. Standar yang sudah dipakai tidak dihapus, cukup dinonaktifkan; standar default tidak bisa dinonaktifkan. |
 
 ## Partnership
 | Menu | Catatan |

@@ -59,6 +59,12 @@ internal sealed class PlanCycleCommandHandler(
             }
         }
 
+        Result standard = await CycleStandardRules.EnsureUsableAsync(context, command.BreedStandardId, cancellationToken);
+        if (standard.IsFailure)
+        {
+            return Result.Failure<PlanCycleResponse>(standard.Error);
+        }
+
         string branchCode = await context.Branches
             .Where(b => b.Id == coop.BranchId)
             .Select(b => b.Code)
@@ -77,7 +83,8 @@ internal sealed class PlanCycleCommandHandler(
             DocumentPrefix, branchCode, command.PlannedChickInDate, cancellationToken);
 
         ProductionCycle cycle = ProductionCycle.Plan(
-            number, coop, farmer, contract, command.PlannedChickInDate, command.PlannedPopulation, command.Notes).Value;
+            number, coop, farmer, contract, command.PlannedChickInDate, command.PlannedPopulation, command.Notes,
+            command.BreedStandardId).Value;
 
         context.ProductionCycles.Add(cycle);
 

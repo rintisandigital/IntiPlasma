@@ -3262,6 +3262,116 @@ namespace Infrastructure.Database.Migrations
                     b.ToTable("branches", "master");
                 });
 
+            modelBuilder.Entity("Domain.MasterData.BreedStandards.BreedStandard", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_default");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("Strain")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("strain");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_breed_standards");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_breed_standards_code");
+
+                    b.ToTable("breed_standards", "master");
+                });
+
+            modelBuilder.Entity("Domain.MasterData.BreedStandards.BreedStandardRow", b =>
+                {
+                    b.Property<Guid>("BreedStandardId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("breed_standard_id");
+
+                    b.Property<int>("AgeDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("age_days");
+
+                    b.Property<decimal>("BodyWeightGram")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)")
+                        .HasColumnName("body_weight_gram");
+
+                    b.Property<decimal?>("CumulativeFeedGram")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("cumulative_feed_gram");
+
+                    b.Property<decimal?>("DailyFeedGram")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)")
+                        .HasColumnName("daily_feed_gram");
+
+                    b.Property<decimal?>("DepletionPercent")
+                        .HasPrecision(6, 3)
+                        .HasColumnType("numeric(6,3)")
+                        .HasColumnName("depletion_percent");
+
+                    b.Property<decimal?>("Fcr")
+                        .HasPrecision(6, 3)
+                        .HasColumnType("numeric(6,3)")
+                        .HasColumnName("fcr");
+
+                    b.HasKey("BreedStandardId", "AgeDays")
+                        .HasName("pk_breed_standard_rows");
+
+                    b.ToTable("breed_standard_rows", "master");
+                });
+
             modelBuilder.Entity("Domain.MasterData.Coops.Coop", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4428,6 +4538,10 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("branch_id");
 
+                    b.Property<Guid?>("BreedStandardId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("breed_standard_id");
+
                     b.Property<string>("CancellationReason")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -4448,6 +4562,10 @@ namespace Infrastructure.Database.Migrations
                     b.Property<string>("ClosingPerformance")
                         .HasColumnType("jsonb")
                         .HasColumnName("closing_performance");
+
+                    b.Property<string>("ClosingStandard")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("closing_standard");
 
                     b.Property<Guid?>("ContractId")
                         .HasColumnType("uuid")
@@ -4545,6 +4663,9 @@ namespace Infrastructure.Database.Migrations
 
                     b.HasIndex("BranchId")
                         .HasDatabaseName("ix_production_cycles_branch_id");
+
+                    b.HasIndex("BreedStandardId")
+                        .HasDatabaseName("ix_production_cycles_breed_standard_id");
 
                     b.HasIndex("ContractId")
                         .HasDatabaseName("ix_production_cycles_contract_id");
@@ -6887,6 +7008,16 @@ namespace Infrastructure.Database.Migrations
                         .HasConstraintName("fk_stock_transfer_lines_uoms_uom_id");
                 });
 
+            modelBuilder.Entity("Domain.MasterData.BreedStandards.BreedStandardRow", b =>
+                {
+                    b.HasOne("Domain.MasterData.BreedStandards.BreedStandard", null)
+                        .WithMany("Rows")
+                        .HasForeignKey("BreedStandardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_breed_standard_rows_breed_standards_breed_standard_id");
+                });
+
             modelBuilder.Entity("Domain.MasterData.Coops.Coop", b =>
                 {
                     b.HasOne("Domain.MasterData.Branches.Branch", null)
@@ -7056,6 +7187,12 @@ namespace Infrastructure.Database.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_production_cycles_branches_branch_id");
+
+                    b.HasOne("Domain.MasterData.BreedStandards.BreedStandard", null)
+                        .WithMany()
+                        .HasForeignKey("BreedStandardId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_production_cycles_breed_standards_breed_standard_id");
 
                     b.HasOne("Domain.Partnership.Contracts.PartnershipContract", null)
                         .WithMany()
@@ -7548,6 +7685,11 @@ namespace Infrastructure.Database.Migrations
             modelBuilder.Entity("Domain.Inventory.StockTransfers.StockTransfer", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Domain.MasterData.BreedStandards.BreedStandard", b =>
+                {
+                    b.Navigation("Rows");
                 });
 
             modelBuilder.Entity("Domain.MasterData.Items.Item", b =>

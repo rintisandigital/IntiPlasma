@@ -1,5 +1,6 @@
 using Application.Mobile;
 using Application.Production;
+using Domain.MasterData.BreedStandards;
 using Domain.Partnership.Cycles;
 
 namespace Application.UnitTests.Mobile;
@@ -9,6 +10,11 @@ public sealed class MobileDashboardCalculatorTests
     private static readonly DateOnly ChickIn = new(2026, 9, 10);
     private static readonly DateOnly Today = new(2026, 10, 9);
     private static readonly MobileDashboardOptions Options = new();
+
+    // Age 18-20: 900-1.000 g, FCR 1,3, depletion 2-3%.
+    private static readonly BreedStandardSnapshot Standard = new(
+        Guid.NewGuid(), "STD", "CP 707", "CP 707",
+        [new StandardPoint(18, 900m, 1.3m, 2m, null, null), new StandardPoint(20, 1_000m, 1.3m, 3m, null, null)]);
 
     [Fact]
     public void BuildDays_Should_CarryBodyWeight_AndCountHarvestFromItsDate()
@@ -84,6 +90,43 @@ public sealed class MobileDashboardCalculatorTests
     }
 
     [Fact]
+    public void Cycle_Should_FlagBelowStandard_FromTheLastWeighing()
+    {
+        // Weighed 900 g at age 18 (standard 900 g); today (age 20) the carried-forward weight is not judged.
+        DashboardCycleResponse onTarget = Build(
+            Cycle(ageDays: 20), [Day(2, feedKg: 1_000, bodyWeightGram: 900), Day(0, feedKg: 100)], feedKg: 0, Standard);
+
+        onTarget.StandardName.ShouldBe("CP 707");
+        onTarget.Standard!.WeighingAgeDays.ShouldBe(18);
+        onTarget.Standard.BodyWeightPercent.ShouldBe(0m);
+        onTarget.Standard.AgeDays.ShouldBe(20);
+        onTarget.Flags.ShouldNotContain(DashboardFlags.BelowStandard);
+
+        // 940 g at age 20 = 6% under 1.000 g.
+        DashboardCycleResponse light = Build(
+            Cycle(ageDays: 20), [Day(0, feedKg: 900, bodyWeightGram: 940)], feedKg: 0, Standard);
+
+        light.Standard!.BodyWeightBelow.ShouldBeTrue();
+        light.Flags.ShouldContain(DashboardFlags.BelowStandard);
+
+        Build(Cycle(ageDays: 20), [Day(0)], feedKg: 0).Standard.ShouldBeNull();
+    }
+
+    [Fact]
+    public void HighDepletion_Should_NotRepeat_WhenAlreadyBelowStandard()
+    {
+        // 5% dead at age 20: above both the absolute 5% limit and the standard 3% + 1 point.
+        DashboardCycleResponse withStandard = Build(Cycle(ageDays: 10), [Day(0, mortality: 50)], feedKg: 0, Standard);
+
+        withStandard.Standard!.DepletionAbove.ShouldBeTrue();
+        withStandard.Flags.ShouldContain(DashboardFlags.BelowStandard);
+        withStandard.Flags.ShouldNotContain(DashboardFlags.HighDepletion);
+
+        DashboardKpi kpi = MobileDashboardCalculator.BuildKpi([withStandard, Build(Cycle(ageDays: 10), [Day(0)], feedKg: 0)], Options);
+        kpi.CyclesBelowStandard.ShouldBe(1);
+    }
+
+    [Fact]
     public void Cycle_Should_ExpectStockReport_FromAge21()
     {
         Build(Cycle(ageDays: 20), [Day(0)], feedKg: 0).Flags.ShouldNotContain(DashboardFlags.NoStockReport);
@@ -135,14 +178,17 @@ public sealed class MobileDashboardCalculatorTests
     private static DashboardCycleResponse Build(
         GetMobileDashboardQueryHandler.CycleRow cycle,
         IReadOnlyList<RecordedDay> days,
-        decimal feedKg) =>
+        decimal feedKg,
+        BreedStandardSnapshot? standard = null) =>
         MobileDashboardCalculator.BuildCycle(
             cycle,
             Today,
             days,
             [],
             feedKg == 0 ? [] : [new DashboardFeedStock(Guid.NewGuid(), "PK", "Pakan", feedKg, "KG", "SAK", 50m)],
-            Options);
+            standard,
+            Options,
+            StandardThresholds.Default);
 
     private static GetMobileDashboardQueryHandler.CycleRow Cycle(int ageDays) => new()
     {

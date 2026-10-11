@@ -478,7 +478,7 @@ Backend (domain + unit test → command/query + validator → EF config + migrat
 - **Backend**: `GetMobileDashboardQuery` (ambang dari `Mobile:Dashboard`), `GET mobile/dashboard`.
 - **Klien**: Dashboard PPL & Manager, Grafik produksi (Chart.js), perbandingan siklus.
 
-### Fase M5 — Breed Standard
+### Fase M5 — Breed Standard ✅ (selesai 2026-10-11, task §21, realisasi §22)
 - **Backend**: `BreedStandard` (strain + baris per umur: BW gram, FCR, deplesi %, pakan kumulatif g/ekor), strain di siklus (migration `PhaseM5_BreedStandard`); `performance` menambah `standard[]` & deviasi; dashboard memakai standar.
 - **Web.App**: Production → **Breed Standards** (CRUD + impor CSV), strain di form siklus, garis standar di tab Performance.
 - **Klien**: garis standar & deviasi di grafik, indikator di/bawah standar.
@@ -539,7 +539,7 @@ Backend (domain + unit test → command/query + validator → EF config + migrat
 - CSS template besar (`styles.css`) + Bootstrap: ukur ukuran & waktu render pertama; buang aturan yang tidak dipakai bila perlu (M10).
 
 ## 11. Status Keputusan
-- **Semua keputusan M-1 s.d. M-39 disepakati** 2026-10-08. Fase **M0 selesai** 2026-10-08 (§12); **M1 selesai** 2026-10-09 (§13 task, §14 realisasi); **M2 selesai** 2026-10-09 (§15 task, §16 realisasi; M-40 s.d. M-45 disepakati); **M3 selesai** 2026-10-09 (§17 task, §18 realisasi; M-46 s.d. M-54 disepakati); **M4 selesai** 2026-10-09 (§19 task, §20 realisasi; M-55 s.d. M-68 disepakati); berikutnya **M5**.
+- **Semua keputusan M-1 s.d. M-39 disepakati** 2026-10-08. Fase **M0 selesai** 2026-10-08 (§12); **M1 selesai** 2026-10-09 (§13 task, §14 realisasi); **M2 selesai** 2026-10-09 (§15 task, §16 realisasi; M-40 s.d. M-45 disepakati); **M3 selesai** 2026-10-09 (§17 task, §18 realisasi; M-46 s.d. M-54 disepakati); **M4 selesai** 2026-10-09 (§19 task, §20 realisasi; M-55 s.d. M-68 disepakati); **M5 selesai** 2026-10-11 (§21 task, §22 realisasi; M-69 s.d. M-80 disepakati, M-71 direvisi dengan snapshot saat Close); berikutnya **M6**.
 - 2026-10-09: M-38 direvisi — kontrak memakai lingkup cabang, bukan lingkup PPL.
 
 ---
@@ -1091,3 +1091,102 @@ Disusun 2026-10-09 dari pemetaan kode. Prasyarat: hasil M3 sudah di-commit (`8a4
 - Ringkasan grafik menampilkan umur pada recording terakhir (mis. 34 hari), sedangkan kartu Beranda menampilkan umur hari ini (35 hari).
 - "Recording hari ini x/y" hanya menghitung yang sudah di server; entri antrean tampil sebagai "Belum terkirim" pada kartu kandang.
 - Standar breed, flag `BelowStandard`, kartu approval & request pakan menyusul di M5/M6/M9 tanpa mengganti endpoint.
+
+---
+
+## 21. Daftar Task M5 — Breed Standard (urutan)
+
+Disusun 2026-10-11 dari pemetaan kode. Prasyarat: hasil M4 sudah di-commit (`0bcbf75`). Ada **migration** `PhaseM5_BreedStandard`; skema SQLite lokal **tidak** berubah (standar ikut respons `performance` yang sudah di-cache lewat `ApiCache`).
+
+### 21.1 Temuan yang memengaruhi desain
+- **Belum ada konsep strain/breed sama sekali** di Domain, Application, maupun DB. Strain saat ini hanya tersirat dari **item DOC** saat chick-in (`StartCycleCommand.Lines[].ItemId`, data demo `DOC-CP707` "DOC Broiler CP 707"); `ProductionCycle` tidak menyimpan item DOC-nya.
+- **`ProductionCycle`** dibuat lewat `Plan` (`PlanCycleCommand`: kandang, kontrak, tanggal & populasi rencana, catatan) lalu `Start` (chick-in). Belum ada perintah "ubah siklus", jadi field baru perlu metode & command sendiri agar siklus yang **sudah berjalan** (data lama & demo) bisa diberi standar.
+- **Pola master global sudah ada**: `WeightRange` (M3). Aggregate-nya di `Domain/MasterData`, use case dalam satu file `Application/WeightRanges/WeightRangeUseCases.cs`, konfigurasi EF di `Infrastructure/MasterData/MasterDataConfigurations.cs`, endpoint `GET weight-ranges` (`master-data:read`), Web.App `Areas/MasterData/Controllers/WeightRangesController.cs`, menu `master.weight-ranges` di `MenuCatalog`, permission `master-data:read/manage`. Breed Standard bisa mengikuti pola yang sama.
+- **Pola impor CSV sudah ada**: `BankReconciliationsController.Import` (upload `IFormFile` atau tempel teks, batas ukuran, parsing di `ImportStatementLinesCommand`). ClosedXML sudah dipakai untuk ekspor.
+- **`GET cycles/{id}/performance`** (`GetCyclePerformanceQueryHandler`, `ProductionQueries.cs`) memakai `CyclePerformanceBuilder.BuildDays`, yang **membawa maju BW** dari penimbangan terakhir ke hari-hari tanpa penimbangan. Kalau BW bawaan itu dibandingkan dengan standar umur berikutnya, deviasinya palsu (BW standar naik ±60 g/hari). Karena itu deviasi BW dihitung **hanya pada hari ada penimbangan** (`AverageBodyWeightGram` hari itu terisi), dan "deviasi terakhir" memakai penimbangan terakhir.
+- **Dashboard** (`Application/Mobile/GetMobileDashboard.cs`): flag `HighDepletion` memakai ambang absolut `DepletionWarningPercent` = 5 % ("sementara sampai standar breed M5", M-58). `DashboardFlags` dan logikanya ada di `MobileDashboardCalculator` (tanpa DB, diuji unit). Klien menerima salinan ambang lewat `DashboardThresholds`.
+- **Klien**: `PerformanceCalculator` (porting rumus, M-65) + `WithLocal` (titik antrean), `WeeklyPerformance` (M-68), `PerformanceCharts` (spesifikasi Chart.js per metrik; pakan kumulatif g/ekor = pakan kg × 1000 ÷ **populasi awal**), `PerformanceChart.razor`, Beranda `Home.razor`. Deviasi titik lokal (offline) harus dihitung di klien, jadi kurva standar perlu ikut dalam respons `performance`.
+- **Web.App tab Performance** (`Areas/Production/Views/Cycles/Details.cshtml`): 2 grafik Chart.js inline ("Population & depletion", "Body weight vs feed") + tabel harian; form `Plan.cshtml` (`PlanCycleFormViewModel`).
+
+### 21.2 Keputusan tambahan (disepakati 2026-10-11)
+| # | Topik | Usulan |
+|---|---|---|
+| M-69 | Model Breed Standard | Aggregate `BreedStandard` (master **global**, berlaku untuk semua cabang): `Code`, `Name` (mis. "CP 707 — 2024"), `Strain` (teks bebas, mis. "CP 707", "Cobb 500"), `Notes`, `IsActive`, `IsDefault` (hanya satu standar aktif yang boleh default). Baris per umur `BreedStandardRow`: `AgeDays` (0–70, unik), `BodyWeightGram` (wajib), `Fcr`, `DepletionPercent` (kumulatif), `DailyFeedGram` (g/ekor/hari), `CumulativeFeedGram` (g/ekor); semua kolom selain BW opsional. Validasi: BW tidak turun seiring umur, deplesi & pakan kumulatif tidak turun, minimal 1 baris. Standar yang sudah dipakai siklus dinonaktifkan, tidak dihapus. |
+| M-70 | Umur tanpa baris | Standar boleh tidak berisi semua hari (mis. hanya mingguan 0, 7, 14, …). Nilai untuk umur di antara dua baris **diinterpolasi linear**; setelah umur terakhir tidak ada standar (null) dan tidak diekstrapolasi. |
+| M-71 | Standar di siklus | `ProductionCycle.BreedStandardId` (nullable). Dipilih di **form Plan** (default terisi standar `IsDefault`) dan bisa **diubah** lewat aksi "Ubah standar" di detail siklus selama status **belum Settled/Cancelled** (tidak memengaruhi keuangan; tercatat di audit). Siklus tanpa standar (data lama) **memakai standar default** saat dibaca, sehingga migration tidak perlu mengisi data. Pemetaan otomatis dari item DOC → backlog. **Revisi 2026-10-11 — snapshot**: saat siklus **Close**, standar efektif (standar siklus, atau default bila kosong) **disalin** ke `ProductionCycle.ClosingStandard` (jsonb: id, kode, nama, strain, baris), sama seperti `ClosingPerformance`. Siklus Closed/Settled membaca snapshot, sehingga perubahan baris master, perubahan default, atau nonaktifnya standar **tidak mengubah** siklus yang sudah tutup. "Ubah standar" pada siklus Closed (belum Settled) memperbarui snapshot; setelah Settled terkunci. Siklus Planned/Active/Harvesting tetap membaca master secara langsung (koreksi master langsung terlihat). Siklus yang sudah Closed/Settled sebelum M5 (tanpa snapshot) menampilkan standar default saat ini dengan label "(default)". |
+| M-72 | Menu & hak Web.App | **Master Data → Breed Standards** (konsisten dengan Weight Ranges, sama-sama master global) dengan permission `master-data:read`/`master-data:manage`, **tanpa permission baru**. (§8 menyebut Production → Breed Standards; usulan ini memindahkannya ke Master Data.) Mengubah standar di siklus memakai hak edit siklus yang sudah ada. |
+| M-73 | Isi & impor | Form header + tabel baris yang bisa diedit (tambah/hapus baris). **Impor CSV** (upload atau tempel) dengan header `age,bw,fcr,depletion,daily_feed,cum_feed` (pemisah `,` atau `;`, desimal titik) mengganti **seluruh** baris standar setelah lolos validasi (error ditampilkan per baris). **Ekspor** Excel/CSV bisa dipakai sebagai template. Bila `cum_feed` kosong tetapi `daily_feed` lengkap sejak umur awal, kumulatif dihitung otomatis. |
+| M-74 | Respons `performance` | Tambah `standard`: `{id, code, name, strain, isDefault, rows[]}` (kurva lengkap, untuk garis sampai umur panen); null bila tidak ada standar sama sekali. Setiap `days[]` mendapat `standard` `{bodyWeightGram, fcr, depletionPercent, cumulativeFeedGram}` (hasil interpolasi) dan `deviation` `{bodyWeightPercent, fcr, depletionPoints, cumulativeFeedPercent}`. **Deviasi BW hanya di hari ada penimbangan** (§21.1). `current` mendapat deviasi dari data terakhir. Endpoint baru `GET breed-standards?activeOnly` (`master-data:read`) untuk pemilih di WebApp/klien. |
+| M-75 | Rumus deviasi | BW % = (aktual − standar) ÷ standar × 100; FCR = aktual − standar (selisih absolut, 3 desimal); deplesi = aktual − standar (**poin persen**); pakan kumulatif % = (aktual g/ekor − standar) ÷ standar × 100, dengan aktual = pakan kumulatif kg × 1000 ÷ **populasi awal** (sama dengan definisi grafik M4). |
+| M-76 | Status "di bawah standar" | Ambang di konfigurasi `Production:Standard` (dipakai API dan ikut dikirim ke klien dalam respons): `BodyWeightBelowPercent` = **5** (BW lebih rendah dari standar −5 %), `FcrAbove` = **0,05**, `DepletionAbovePoints` = **1,0**. Indikator per metrik: **Sesuai standar** (hijau) atau **Di bawah standar** (merah; untuk FCR & deplesi artinya lebih tinggi dari standar). Siklus dianggap **di bawah standar** bila salah satu metrik melewati ambang pada data terakhir. |
+| M-77 | Dashboard | Flag baru **`BelowStandard`** (M-59) di `GET mobile/dashboard` + `cycles[].standard` (nama standar, BW standar pada umur penimbangan terakhir, deviasi BW/FCR/deplesi). `HighDepletion` (ambang absolut 5 %) **tetap ada** sebagai jaring pengaman; bila standar ada dan deplesi melewati standar, cukup tampil `BelowStandard` (tidak dobel). KPI Manager menambah **"Di bawah standar x/y"**. |
+| M-78 | Grafik mobile | Garis **standar** abu-abu putus-putus untuk **BW**, **Deplesi %**, **FCR**, dan **Pakan kumulatif g/ekor** (Mati harian & IP tanpa standar). Garis membentang sampai umur hari ini + 7 atau umur terakhir standar (mana yang lebih kecil), agar sumbu tidak memadat. Mode mingguan memakai standar umur 7n. Ringkasan: "BW 1.850 g · standar 1.920 g (−3,6 %)" + badge indikator; tabel harian menambah kolom Std & Dev. Mode **Bandingkan** hanya menampilkan garis standar siklus pertama (legenda "Standar <nama>"). Deviasi titik lokal (offline) dihitung di klien dari `standard.rows`. |
+| M-79 | Web.App Performance | Tab Performance: garis standar di grafik BW, kolom Std BW / Dev % / Std FCR / Std deplesi di tabel harian, kartu ringkas deviasi terakhir. Header detail siklus menampilkan nama standar (+ "(default)" bila memakai default). |
+| M-80 | Data demo | `DemoDataSeeder` membuat satu standar **"CP 707 (contoh)"** (umur 0–42) berisi angka **ilustrasi** yang ditandai sebagai contoh di `Notes`, dijadikan default, dan dipasang ke siklus demo. Angka standar resmi strain diimpor sendiri oleh pengguna dari manual breeder lewat CSV (M-73). |
+
+### 21.3 Task
+1. **Domain**: `Domain/MasterData/BreedStandards/BreedStandard.cs` (+ `BreedStandardRow`, `BreedStandardErrors`): create/update header, `ReplaceRows` (validasi M-69), `SetDefault`, `ValueAt(age)` dengan interpolasi (M-70). `ProductionCycle.BreedStandardId` + `ClosingStandard` (snapshot, M-71) + `SetBreedStandard(Guid?, snapshot)` (ditolak bila Settled/Cancelled; di status Closed memperbarui snapshot); `Close` menerima snapshot standar efektif. Deviasi & status (M-75, M-76) sebagai fungsi murni di Domain, dipakai performance & dashboard.
+2. **Infrastructure**: konfigurasi EF (`master.breed_standards`, `master.breed_standard_rows` unik `(breed_standard_id, age_days)`, index unik parsial untuk satu `is_default` aktif), FK `production_cycles.breed_standard_id`; `IApplicationDbContext`; options `Production:Standard` (`appsettings.json` Web.Api & Web.App, `docs/DEPLOY.md`); migration **`PhaseM5_BreedStandard`**.
+3. **Application**:
+   - `Application/BreedStandards/BreedStandardUseCases.cs`: command `Create`/`Update`/`ImportRows` (CSV)/`SetDefault` + validator, `GetBreedStandardsQuery(activeOnly)`, `GetBreedStandardByIdQuery` (dengan baris).
+   - `PlanCycleCommand` menerima `BreedStandardId?`; `SetCycleBreedStandardCommand` baru.
+   - `GetCyclePerformanceQuery`: muat standar efektif (siklus, atau default), isi `standard`, `days[].standard/deviation`, dan deviasi `current` (M-74).
+   - `GetMobileDashboard`: standar per siklus, flag `BelowStandard`, KPI "di bawah standar x/y" (M-77). `CycleResponse` (list/detail siklus) menambah `breedStandardId/Name`.
+4. **Web.Api**: `GET breed-standards`, `GET breed-standards/{id}` (`master-data:read`); body `POST cycles` menerima `breedStandardId`; `PUT cycles/{id}/breed-standard` (hak edit siklus).
+5. **Web.App**: Master Data → **Breed Standards** (list, create/edit + grid baris, impor CSV, ekspor, set default) + entri `MenuCatalog`; dropdown standar di form Plan; aksi "Ubah standar" dan garis/kolom standar di tab Performance (M-79); `DemoDataSeeder` (M-80) + `docs/DEMO-DATA.md`.
+6. **Test backend**:
+   - Unit Domain: validasi baris (BW turun, umur duplikat, deplesi turun), interpolasi & umur di luar rentang, deviasi & status, `SetBreedStandard` per status, snapshot saat Close.
+   - Integration: ubah baris master & ganti default setelah siklus Closed → `performance` siklus itu tetap memakai snapshot; siklus Active ikut berubah.
+   - Unit Application: parser CSV (header, `;`, error per baris, kumulatif dari harian), flag `BelowStandard` yang tidak dobel dengan `HighDepletion`, deviasi BW hanya di hari penimbangan.
+   - Integration Web.Api: `performance` memakai standar default untuk siklus tanpa standar dan standar terpilih setelah diubah; dashboard `BelowStandard`; `GET breed-standards` hanya yang aktif; PPL tanpa hak tidak bisa mengubah standar siklus.
+   - Integration Web.App: CRUD + impor CSV, Plan dengan standar, tab Performance dengan standar.
+7. **MobileApp.Core**: DTO `BreedStandard`, `StandardPoint`, `PerformanceDeviation`; `PerformanceCalculator` menghitung standar & deviasi titik lokal (porting interpolasi + rumus M-75, angka test sama dengan Domain); `PerformanceCharts` menambah dataset standar (harian/mingguan, satu siklus & bandingkan, M-78); `DashboardService`/`Labels` untuk `BelowStandard` & indikator. Unit test: interpolasi sama dengan Domain, deviasi titik lokal, dataset standar, label flag.
+8. **MobileApp UI**: `PerformanceChart.razor` (garis standar, ringkasan deviasi + badge, kolom Std/Dev di tabel); Beranda PPL (badge di kartu kandang) & Manager (KPI "Di bawah standar", alasan di siklus berisiko); nama standar di detail siklus pada halaman Kandang.
+9. **Verifikasi** (emulator API 34, `intiplasma_verify` + data demo, `ppl.bdg` / `ppl2.bdg` / `manager.bdg`):
+   - Web.App: buat standar lewat impor CSV, set default, ubah standar siklus demo; garis & deviasi di tab Performance cocok dengan hitungan manual.
+   - API: deviasi hari terakhir = hitungan manual dari DB + baris standar (termasuk umur hasil interpolasi).
+   - Emulator: grafik BW/FCR/Deplesi/Pakan dengan garis standar (harian & mingguan); mode pesawat → recording baru dengan BW jauh di bawah standar tampil putus-putus dengan deviasi & badge merah; setelah online angka server sama; Beranda Manager menampilkan `BelowStandard` (kondisinya dibuat di DB verifikasi).
+10. **Dokumentasi**: realisasi §22, status §8/§11, `docs/user-guide` WebApp (Breed Standards), RANGKUMAN.
+
+### 21.4 Di luar lingkup M5
+- Pemetaan otomatis item DOC → standar saat chick-in → backlog (M-71).
+- Standar per cabang/musim, standar suhu/kelembapan/air minum, standar harga → tidak direncanakan.
+- Notifikasi push saat siklus di bawah standar → backlog (sama dengan M4).
+- Pengaruh standar ke bonus FCR/IP di settlement plasma → tidak diubah (settlement tetap memakai kontrak).
+- Edit standar dari mobile → tidak (mobile hanya membaca).
+
+---
+
+## 22. Realisasi Fase M5 — Breed Standard (2026-10-11)
+
+### 22.1 Backend
+- **Domain** (`Domain/MasterData/BreedStandards`): aggregate `BreedStandard` (kode, nama, strain, catatan, aktif, default) + `BreedStandardRow` (kunci `(standar, umur)`; baris yang umurnya tetap diperbarui di tempat). Validasi M-69: umur 0–70 unik, BW wajib > 0, BW/deplesi/pakan kumulatif tidak turun; pakan kumulatif dihitung dari pakan harian bila semua baris berurutan per hari dan tidak ada kumulatif. Standar default tidak bisa dinonaktifkan. `BreedStandardSnapshot.ValueAt` (interpolasi linear per kolom, M-70), `StandardDeviation` + `StandardThresholds` (M-75, M-76).
+- **`ProductionCycle`**: `BreedStandardId`, `ClosingStandard` (jsonb), `SetBreedStandard` (ditolak saat Settled/Cancelled; saat Closed memperbarui salinan), `Plan(..., breedStandardId)`, `Close(..., standard)` — `CloseCycleCommand` menyalin standar efektif (standar siklus atau default).
+- **Migration `PhaseM5_BreedStandard`**: `master.breed_standards`, `master.breed_standard_rows`, `partnership.production_cycles.breed_standard_id` (FK) & `closing_standard`. Satu default dijaga di aplikasi (`SetDefault` melepas default lain), tidak dengan index unik.
+- **Application**: `BreedStandardUseCases` (create — standar pertama otomatis default, update + ganti baris, impor CSV, set default, list, detail), `BreedStandardCsv` (parse/tulis; `;` menerima desimal koma; error per baris), `BreedStandardReader` (memuat standar + default untuk query; standar efektif untuk command), `SetCycleBreedStandardCommand`, `PlanCycleCommand.BreedStandardId`, `StandardComparer` (deviasi harian + `StandardStatus`: BW & FCR dari penimbangan terakhir, deplesi & pakan dari recording terakhir). `CycleResponse` + `breedStandardId/Name/IsDefault`.
+- **`cycles/{id}/performance`**: `standard` (`id, code, name, strain, isDefault, isFrozen, thresholds, rows[]`), `standardStatus`, `days[].standard` & `days[].deviation` (BW/FCR hanya di hari penimbangan). Siklus tutup memakai salinan (`isFrozen`).
+- **`mobile/dashboard`**: `cycles[].standardName` & `cycles[].standard`, flag **`BelowStandard`**, KPI `cyclesBelowStandard`; `HighDepletion` tidak muncul bila deplesi sudah melewati standar.
+- **Web.Api**: `GET breed-standards?activeOnly`, `GET breed-standards/{id}` (`master-data:read`), `PUT cycles/{id}/breed-standard` (`cycles:manage`; PPL tidak punya hak ini).
+- **Konfigurasi** `Production:Standard` (`BodyWeightBelowPercent` 5, `FcrAbove` 0,05, `DepletionAbovePoints` 1) di `appsettings.json` Web.Api & Web.App + `docs/DEPLOY.md`.
+
+### 22.2 Web.App
+- **Master Data → Breed Standards** (`master.breed-standards`): list (default, jumlah umur, umur maks, jumlah siklus), form header + tabel baris (tambah/hapus), CSV ditempel saat membuat, **Import rows (CSV)** (upload/tempel, mengganti semua baris), **Download rows (CSV)**, **Make default**, ekspor daftar.
+- **Cycles**: pilihan standar di form Plan (kosong = default), "Breed standard" di Overview, tab **Performance**: kartu standar + status On/Below standard + **Change standard**, garis standar BW & deplesi di grafik, kolom Std depl. / Std BW / BW dev. / Std FCR (merah bila melewati ambang).
+- **DemoDataSeeder**: standar `CP707-CONTOH` "CP 707 (contoh)" — baris mingguan 0–42 diturunkan dari kurva data dummy, ditandai bukan angka resmi — dipilih semua siklus demo; `docs/DEMO-DATA.md` & user guide (03 Master Data, 05 Production) diperbarui.
+
+### 22.3 MobileApp.Core & MobileApp
+- **Core**: DTO `PerformanceStandard`, `StandardRow`, `StandardThresholds`, `StandardStatus`; `CyclePerformanceReport.Standard/StandardStatus`, `DashboardCycle.StandardName/Standard`, `DashboardKpi.CyclesBelowStandard`, `Cycle.BreedStandardName`. `StandardCalculator` (porting interpolasi & deviasi; `Latest` & `DayDeviation` juga untuk recording antrean). `PerformanceCharts.Build(..., standard)`: dataset standar (`IsStandard`) untuk BW, deplesi, FCR, pakan (satu siklus: kg kumulatif di sumbu kanan; bandingkan: g/ekor milik siklus pertama), harian diperpanjang 7 hari ke depan, mingguan pada umur 7n. `IdFormat.Deviation`, label flag "Di bawah standar".
+- **MobileApp**: `chart-interop.js` menggambar standar sebagai garis abu-abu putus-putus tanpa titik; **Grafik**: keterangan garis standar, kartu standar (BW umur penimbangan, FCR, deplesi, pakan kumulatif vs standar + badge Sesuai/Di bawah standar), kolom Std BW / Dev BW / Std depl. / Std FCR (harian) & Std BW (mingguan); **Beranda** PPL baris "vs standar" (merah bila di bawah), Manager kartu KPI "Di bawah standar x/y" dan alasan di siklus berisiko; nama standar di daftar siklus Kandang.
+
+### 22.4 Pengujian & verifikasi
+- **Test: 628 lulus** — 170 domain (+8 `BreedStandardTests`), 100 application (+6 handler/CSV/perbandingan, +2 dashboard), 14 arsitektur, 129 MobileApp.UnitTests (+7 `StandardTests`: interpolasi & deviasi = angka test Domain, recording antrean di bawah standar, garis standar harian/mingguan/pakan kg), 43 integration Web.Api (+2: default → standar siklus, PPL 403, standar nonaktif 400, dashboard `BelowStandard`, list aktif; siklus tutup tetap memakai salinan setelah master diubah), 172 integration Web.App (+1: buat dari CSV, impor `;`/desimal koma, CSV salah ditolak, ekspor, edit, default tidak bisa dinonaktifkan, Plan dengan standar, Change standard, tab Performance).
+- **API** pada `intiplasma_verify` + data demo: standar `CP707-CONTOH` default dengan 7 baris, dipilih 8 siklus; Inti Lembang umur 20: standar BW 699,72 g / FCR 1,74 / deplesi 3,114% / pakan 1.175,9 g = interpolasi manual baris 14–21; aktual (BW 692, deplesi 2,975%, pakan 1.136,2 g/ekor) = query DB → deviasi BW −1,103%, tidak di bawah standar.
+- **Emulator API 34**:
+  - `ppl.bdg`: Beranda "vs standar: BW -1,1% · FCR -0,048 · deplesi -0,14 poin"; Grafik BW harian dengan garis standar sampai umur 27, Pakan mingguan dengan standar kg kumulatif.
+  - Mode pesawat → recording umur 21 (mati 40, BW 650 g) → titik lokal putus-putus, kartu standar "Di bawah standar" (BW -14,1% merah, FCR +0,082 merah, deplesi +0,28 poin); online → terkirim, server sama persis (−14,069% / +0,082 / +0,275) dan Beranda menampilkan flag "Di bawah standar".
+  - `manager.bdg`: KPI "Di bawah standar 1/2", Inti Lembang di siklus berisiko dengan baris "vs standar".
+
+### 22.5 Catatan
+- Siklus yang sudah Closed/Settled sebelum M5 tidak punya salinan standar → menampilkan standar default saat ini (label default).
+- Garis standar mingguan memakai nilai umur 7n, sedangkan minggu berjalan memakai hari terakhir yang tercatat (mis. umur 20 di minggu 3).
+- Angka standar demo diturunkan dari kurva data dummy agar siklus demo berada di sekitar standar; FCR-nya turun seiring umur (tidak realistis) — impor standar resmi breeder sebelum dipakai.

@@ -74,6 +74,10 @@
                             {
                                 <span>Panen @IdFormat.Number(cycle.HarvestedBirds) ekor · @IdFormat.Tons(cycle.HarvestedWeightKg)</span>
                             }
+                            @if (cycle.BreedStandardName is not null)
+                            {
+                                <span>Standar @cycle.BreedStandardName@(cycle.BreedStandardIsDefault ? " (default)" : null)</span>
+                            }
                         </div>
                         @if (cycle.ChickInDate is not null)
                         {

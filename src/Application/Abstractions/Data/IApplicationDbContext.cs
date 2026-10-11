@@ -16,6 +16,7 @@ using Domain.Inventory.Stock;
 using Domain.Inventory.StockReturns;
 using Domain.Inventory.StockTransfers;
 using Domain.MasterData.Branches;
+using Domain.MasterData.BreedStandards;
 using Domain.MasterData.Coops;
 using Domain.MasterData.Customers;
 using Domain.MasterData.Farmers;
@@ -58,6 +59,7 @@ public interface IApplicationDbContext
     DbSet<Branch> Branches { get; }
     DbSet<Uom> Uoms { get; }
     DbSet<WeightRange> WeightRanges { get; }
+    DbSet<BreedStandard> BreedStandards { get; }
     DbSet<TaxCode> TaxCodes { get; }
     DbSet<Item> Items { get; }
     DbSet<Warehouse> Warehouses { get; }

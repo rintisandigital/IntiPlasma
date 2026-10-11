@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Domain.MasterData.Branches;
+using Domain.MasterData.BreedStandards;
 using Domain.MasterData.Coops;
 using Domain.MasterData.Farmers;
 using Domain.MasterData.Items;
@@ -118,6 +119,12 @@ internal sealed class ProductionCycleConfiguration : IEntityTypeConfiguration<Pr
                 cost => JsonSerializer.Serialize(cost, SnapshotSerializerOptions),
                 json => JsonSerializer.Deserialize<CycleCostSummary>(json, SnapshotSerializerOptions));
 
+        builder.Property(c => c.ClosingStandard)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                standard => JsonSerializer.Serialize(standard, SnapshotSerializerOptions),
+                json => JsonSerializer.Deserialize<BreedStandardSnapshot>(json, SnapshotSerializerOptions));
+
         builder.HasMany(c => c.Harvests).WithOne().HasForeignKey(h => h.CycleId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(c => c.Harvests).HasField("_harvests").UsePropertyAccessMode(PropertyAccessMode.Field);
 
@@ -125,5 +132,6 @@ internal sealed class ProductionCycleConfiguration : IEntityTypeConfiguration<Pr
         builder.HasOne<Farmer>().WithMany().HasForeignKey(c => c.FarmerId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Coop>().WithMany().HasForeignKey(c => c.CoopId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<PartnershipContract>().WithMany().HasForeignKey(c => c.ContractId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<BreedStandard>().WithMany().HasForeignKey(c => c.BreedStandardId).OnDelete(DeleteBehavior.Restrict);
     }
 }

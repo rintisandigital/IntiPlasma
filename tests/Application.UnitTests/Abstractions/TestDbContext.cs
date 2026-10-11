@@ -18,6 +18,7 @@ using Domain.Inventory.Stock;
 using Domain.Inventory.StockReturns;
 using Domain.Inventory.StockTransfers;
 using Domain.MasterData.Branches;
+using Domain.MasterData.BreedStandards;
 using Domain.MasterData.Coops;
 using Domain.MasterData.Customers;
 using Domain.MasterData.Farmers;
@@ -71,6 +72,8 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
 
     public DbSet<Uom> Uoms { get; set; }
     public DbSet<WeightRange> WeightRanges { get; set; }
+
+    public DbSet<BreedStandard> BreedStandards { get; set; }
 
     public DbSet<TaxCode> TaxCodes { get; set; }
 
@@ -163,6 +166,8 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
 
         modelBuilder.Entity<Item>().Navigation(i => i.Conversions).HasField("_conversions");
         modelBuilder.Entity<ItemUomConversion>().HasKey(c => new { c.ItemId, c.UomId });
+        modelBuilder.Entity<BreedStandard>().Navigation(s => s.Rows).HasField("_rows");
+        modelBuilder.Entity<BreedStandardRow>().HasKey(r => new { r.BreedStandardId, r.AgeDays });
 
         modelBuilder.Entity<Vendor>().OwnsOne(v => v.TaxIdentity);
         modelBuilder.Entity<Vendor>().OwnsOne(v => v.BankAccount);
@@ -258,6 +263,9 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
             b.Property(c => c.ClosingCost).HasConversion(
                 cost => JsonSerializer.Serialize(cost, JsonSerializerOptions.Web),
                 json => JsonSerializer.Deserialize<CycleCostSummary>(json, JsonSerializerOptions.Web));
+            b.Property(c => c.ClosingStandard).HasConversion(
+                standard => JsonSerializer.Serialize(standard, JsonSerializerOptions.Web),
+                json => JsonSerializer.Deserialize<BreedStandardSnapshot>(json, JsonSerializerOptions.Web));
         });
 
         modelBuilder.Entity<DailyRecording>(b =>

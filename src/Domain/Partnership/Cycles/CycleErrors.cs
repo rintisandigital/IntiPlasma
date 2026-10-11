@@ -26,6 +26,10 @@ public static class CycleErrors
         "Cycles.InvalidTransition",
         $"A cycle cannot move from {from} to {to}");
 
+    public static Error StandardLocked(CycleStatus status) => Error.Problem(
+        "Cycles.StandardLocked",
+        $"The breed standard of a {status} cycle cannot change");
+
     public static readonly Error FarmerMismatch = Error.Problem(
         "Cycles.FarmerMismatch",
         "The coop does not belong to the farmer");

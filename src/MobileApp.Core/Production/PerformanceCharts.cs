@@ -1,3 +1,5 @@
+using MobileApp.Core.Contracts;
+
 namespace MobileApp.Core.Production;
 
 /// <summary>
@@ -36,6 +38,7 @@ public sealed record ChartSpec(
 /// <param name="Axis"><c>y</c> or <c>y1</c>.</param>
 /// <param name="LocalFrom">Index of the first value from a recording that is not sent yet: drawn dashed from there on.</param>
 /// <param name="Stack">Bars with the same stack are stacked.</param>
+/// <param name="IsStandard">The breed standard line: drawn thin and dashed without points (M-78).</param>
 public sealed record ChartDataset(
     string Label,
     IReadOnlyList<decimal?> Data,
@@ -43,17 +46,27 @@ public sealed record ChartDataset(
     string Axis,
     string Color,
     int? LocalFrom,
-    string? Stack = null);
+    string? Stack = null,
+    bool IsStandard = false);
 
 /// <summary>
 /// Builds the chart of a metric for one cycle (detail series) or for up to three cycles (one line each, M-66), per
-/// day of age or per week (M-68).
+/// day of age or per week (M-68), with the breed standard of the (first) cycle as a dashed line for body weight,
+/// depletion, FCR and feed (M-78).
 /// </summary>
 public static class PerformanceCharts
 {
     public const int MaxCompared = 3;
 
     public static readonly IReadOnlyList<string> CompareColors = ["#0984E3", "#E17055", "#00B894"];
+
+    /// <summary>
+    /// The standard line runs this many days past the last recording (but not past the standard), to show where the
+    /// cycle is heading without squeezing the chart.
+    /// </summary>
+    public const int StandardLookAheadDays = 7;
+
+    private const string StandardColor = "#95A5A6";
 
     private const string Primary = "#0984E3";
     private const string Light = "#74B9FF";
@@ -70,28 +83,84 @@ public static class PerformanceCharts
         _ => "IP"
     };
 
-    public static ChartSpec Build(ChartMetric metric, bool weekly, IReadOnlyList<CycleSeries> cycles)
+    public static bool HasStandard(ChartMetric metric) =>
+        metric is ChartMetric.BodyWeight or ChartMetric.Depletion or ChartMetric.Fcr or ChartMetric.Feed;
+
+    /// <param name="standard">Breed standard of the first cycle; drawn for the metrics that have one.</param>
+    public static ChartSpec Build(ChartMetric metric, bool weekly, IReadOnlyList<CycleSeries> cycles, PerformanceStandard? standard = null)
     {
+        PerformanceStandard? line = standard is { Rows.Count: > 0 } && HasStandard(metric) ? standard : null;
+        int? extendTo = line is null ? null : ExtendTo(cycles, line);
+
         if (weekly)
         {
-            List<int> weeks = [.. cycles.SelectMany(c => c.Weeks).Select(w => w.Week).Distinct().Order()];
-            Axis<WeekPerformance> axis = new([.. weeks.Select(w => $"M{w}")], "Minggu", c => c.Weeks, w => weeks.IndexOf(w.Week), w => w.HasLocal);
-
-            if (cycles.Count == 1)
-            {
-                return WeeklySingle(metric, axis, cycles[0]);
-            }
+            IEnumerable<int> extraWeeks = extendTo is { } lastAge ? Enumerable.Range(1, WeekPerformance.WeekOf(lastAge)) : [];
+            List<int> weeks = [.. cycles.SelectMany(c => c.Weeks).Select(w => w.Week).Concat(extraWeeks).Distinct().Order()];
+            Axis<WeekPerformance> axis = new([.. weeks.Select(w => $"M{w}")], [.. weeks.Select(w => w * 7)], "Minggu", c => c.Weeks, w => weeks.IndexOf(w.Week), w => w.HasLocal);
 
             string unit = metric == ChartMetric.Mortality ? "% deplesi per minggu" : CompareUnit(metric);
+            ChartSpec weeklySpec = cycles.Count == 1 ? WeeklySingle(metric, axis, cycles[0]) : Compare(metric, axis, cycles, WeeklyValue, unit);
 
-            return Compare(metric, axis, cycles, WeeklyValue, unit);
+            return WithStandard(weeklySpec, metric, axis.Ages, line, cycles);
         }
 
-        List<int> ages = [.. cycles.SelectMany(c => c.Days).Select(d => d.AgeDays).Distinct().Order()];
-        Axis<PerformancePoint> days = new([.. ages.Select(a => a.ToString(System.Globalization.CultureInfo.InvariantCulture))], "Umur (hari)", c => c.Days, d => ages.IndexOf(d.AgeDays), d => d.IsLocal);
+        List<int> recorded = [.. cycles.SelectMany(c => c.Days).Select(d => d.AgeDays)];
+        IEnumerable<int> extraAges = extendTo is { } until && recorded.Count > 0 && until > recorded.Max()
+            ? Enumerable.Range(recorded.Max() + 1, until - recorded.Max())
+            : [];
+        List<int> ages = [.. recorded.Concat(extraAges).Distinct().Order()];
+        Axis<PerformancePoint> days = new([.. ages.Select(a => a.ToString(System.Globalization.CultureInfo.InvariantCulture))], ages, "Umur (hari)", c => c.Days, d => ages.IndexOf(d.AgeDays), d => d.IsLocal);
 
-        return cycles.Count == 1 ? DailySingle(metric, days, cycles[0]) : Compare(metric, days, cycles, DailyValue, CompareUnit(metric));
+        ChartSpec spec = cycles.Count == 1 ? DailySingle(metric, days, cycles[0]) : Compare(metric, days, cycles, DailyValue, CompareUnit(metric));
+
+        return WithStandard(spec, metric, days.Ages, line, cycles);
     }
+
+    /// <summary>
+    /// The last age of the standard line: a week past the last recording, within the standard.
+    /// </summary>
+    private static int? ExtendTo(IReadOnlyList<CycleSeries> cycles, PerformanceStandard standard)
+    {
+        List<PerformancePoint> all = [.. cycles.SelectMany(c => c.Days)];
+
+        return all.Count == 0 ? null : Math.Min(all.Max(d => d.AgeDays) + StandardLookAheadDays, standard.Rows[^1].AgeDays);
+    }
+
+    private static ChartSpec WithStandard(
+        ChartSpec spec,
+        ChartMetric metric,
+        IReadOnlyList<int> ages,
+        PerformanceStandard? standard,
+        IReadOnlyList<CycleSeries> cycles)
+    {
+        if (standard is null)
+        {
+            return spec;
+        }
+
+        // A single cycle's feed chart shows kg on the right axis; comparisons show grams per bird.
+        bool feedInKg = metric == ChartMetric.Feed && cycles.Count == 1;
+        int population = cycles[0].InitialPopulation;
+
+        decimal? Value(StandardValue v) => metric switch
+        {
+            ChartMetric.BodyWeight => v.BodyWeightGram,
+            ChartMetric.Depletion => v.DepletionPercent,
+            ChartMetric.Fcr => v.Fcr,
+            _ => feedInKg ? Kilograms(v.CumulativeFeedGram, population) : v.CumulativeFeedGram
+        };
+
+        decimal?[] data = [.. ages.Select(a => StandardCalculator.ValueAt(standard, a) is { } v ? Value(v) : null)];
+        string label = feedInKg ? $"Standar {standard.Name} (kg kumulatif)" : $"Standar {standard.Name}";
+
+        return spec with
+        {
+            Datasets = [.. spec.Datasets, new ChartDataset(label, data, "line", feedInKg ? "y1" : "y", StandardColor, null, IsStandard: true)]
+        };
+    }
+
+    private static decimal? Kilograms(decimal? gramPerBird, int birds) =>
+        gramPerBird is { } gram ? decimal.Round(gram * birds / 1000m, 1, MidpointRounding.AwayFromZero) : null;
 
     private static ChartSpec DailySingle(ChartMetric metric, Axis<PerformancePoint> axis, CycleSeries cycle) => metric switch
     {
@@ -226,8 +295,10 @@ public static class PerformanceCharts
     /// <summary>
     /// The x axis (ages or weeks) and how to place a cycle's points on it.
     /// </summary>
+    /// <param name="Ages">The age of each label (week n = age 7n), to place the standard.</param>
     private sealed record Axis<T>(
         IReadOnlyList<string> Labels,
+        IReadOnlyList<int> Ages,
         string XTitle,
         Func<CycleSeries, IReadOnlyList<T>> Points,
         Func<T, int> IndexOf,

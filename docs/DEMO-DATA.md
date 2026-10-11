@@ -55,6 +55,7 @@ Untuk **mengulang dari awal**, hapus database lalu buat lagi (`DROP DATABASE int
 - Vendor: CPI, Japfa, Medion (toleransi harga 2%), dan UD Sekam.
 - Customer: RPA, bakul, CV Cianjur, dan satu warung dengan limit 0.
 - Rentang bobot (stok ayam harian, M3): `BB-14` < 1,4 kg, `BB-16` 1,4–1,6, `BB-18` 1,6–1,8, `BB-20` 1,8–2,0, `BB-20UP` ≥ 2,0 kg.
+- Breed standard (M5): `CP707-CONTOH` "CP 707 (contoh)", default dan dipilih semua siklus demo; baris mingguan umur 0–42 diturunkan dari kurva data dummy (BW 42 + 1,62 × umur² g, pakan 13 + 4,3 × umur g/ekor/hari). **Bukan angka resmi breeder** — impor standar resmi lewat CSV.
 
 **Kemitraan**
 - 7 peternak (2 inti, 5 plasma), 8 kandang.

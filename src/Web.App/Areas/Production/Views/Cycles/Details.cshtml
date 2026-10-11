@@ -12,6 +12,19 @@
     IReadOnlyList<Application.Production.HarvestResponse> harvests = Model.Performance?.Harvests ?? [];
     IReadOnlyList<Application.Production.DailyPerformance> days = Model.Performance?.Days ?? [];
     string Num(decimal? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "null";
+    Application.Production.PerformanceStandardResponse? standard = Model.Performance?.Standard;
+    Application.Production.StandardStatus? standardStatus = Model.Performance?.StandardStatus;
+    Domain.MasterData.BreedStandards.StandardThresholds thresholds = standard?.Thresholds ?? Domain.MasterData.BreedStandards.StandardThresholds.Default;
+    string Signed(decimal? value, int decimals, string suffix = "")
+    {
+        if (value is not { } v)
+        {
+            return "—";
+        }
+
+        string sign = v > 0 ? "+" : "";
+        return $"{sign}{Fmt.Number(v, decimals)}{suffix}";
+    }
 }
 <div class="page-header">
     <div class="add-item d-flex">
@@ -145,6 +158,7 @@ else
                 <div class="col-md-3 mb-3"><div class="text-muted fs-13">Mortality / culling</div><div class="fw-semibold">@Fmt.Number(cycle.TotalMortality) / @Fmt.Number(cycle.TotalCulling)</div></div>
                 <div class="col-md-3 mb-3"><div class="text-muted fs-13">Closed</div><div class="fw-semibold">@(cycle.ClosedDate is { } closed ? Fmt.Date(closed) : "—")</div></div>
                 <div class="col-md-3 mb-3"><div class="text-muted fs-13">Contract</div><div class="fw-semibold">@(cycle.ContractCode ?? "— (inti)")</div></div>
+                <div class="col-md-3 mb-3"><div class="text-muted fs-13">Breed standard</div><div class="fw-semibold">@(cycle.BreedStandardName ?? "—")@(cycle.BreedStandardIsDefault && cycle.BreedStandardName is not null ? " (default)" : "")</div></div>
                 @if (!string.IsNullOrWhiteSpace(cycle.Notes))
                 {
                     <div class="col-md-9 mb-3"><div class="text-muted fs-13">Notes</div><div style="white-space: pre-line">@cycle.Notes</div></div>
@@ -242,6 +256,89 @@ else
     </div>
 
     <div class="tab-pane fade @Show("performance")" id="tab-performance" role="tabpanel">
+        <div class="card"><div class="card-body">
+            <div class="d-flex flex-wrap align-items-center gap-3">
+                <div>
+                    <div class="text-muted fs-13">Breed standard</div>
+                    <div class="fw-semibold">
+                        @if (standard is null)
+                        {
+                            <span>— no standard; add one under Master Data → Breed Standards</span>
+                        }
+                        else
+                        {
+                            @standard.Name@(standard.Strain is null ? "" : $" · {standard.Strain}")
+                            @if (standard.IsDefault)
+                            {
+                                <span class="badge bg-light text-dark ms-1">default</span>
+                            }
+                            @if (standard.IsFrozen)
+                            {
+                                <span class="badge bg-light text-dark ms-1" title="Copied when the cycle closed; later changes to the master do not apply">frozen at closing</span>
+                            }
+                        }
+                    </div>
+                </div>
+                @if (standardStatus is not null)
+                {
+                    <div>
+                        @if (standardStatus.BelowStandard)
+                        {
+                            <span class="badge bg-danger">Below standard</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-success">On standard</span>
+                        }
+                    </div>
+                }
+                @if (Model.CanChangeStandard)
+                {
+                    <form asp-action="BreedStandard" asp-route-id="@cycle.Id" method="post" class="d-flex gap-2 ms-auto">
+                        <select name="breedStandardId" class="form-select form-select-sm" aria-label="Breed standard">
+                            <option value="">Default standard</option>
+                            @foreach (Application.BreedStandards.BreedStandardResponse option in Model.BreedStandards)
+                            {
+                                <option value="@option.Id" selected="@(option.Id == cycle.BreedStandardId)">@option.Name</option>
+                            }
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">Change standard</button>
+                    </form>
+                }
+            </div>
+            @if (standardStatus is not null)
+            {
+                <div class="row mt-3">
+                    <div class="col-md-3 mb-2">
+                        <div class="text-muted fs-13">Body weight@(standardStatus.WeighingAgeDays is { } wa ? $" (age {wa})" : "")</div>
+                        <div class="fw-semibold @(standardStatus.BodyWeightBelow ? "text-danger" : "")">
+                            @(standardStatus.BodyWeightGram is { } bw ? $"{Fmt.Number(bw, 0)} g" : "—") · std @(standardStatus.StandardBodyWeightGram is { } sbw ? $"{Fmt.Number(sbw, 0)} g" : "—") (@Signed(standardStatus.BodyWeightPercent, 1, "%"))
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <div class="text-muted fs-13">FCR</div>
+                        <div class="fw-semibold @(standardStatus.FcrAbove ? "text-danger" : "")">
+                            @(standardStatus.Fcr is { } fcr ? Fmt.Number(fcr, 3) : "—") · std @(standardStatus.StandardFcr is { } sf ? Fmt.Number(sf, 3) : "—") (@Signed(standardStatus.FcrDeviation, 3))
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <div class="text-muted fs-13">Depletion (age @standardStatus.AgeDays)</div>
+                        <div class="fw-semibold @(standardStatus.DepletionAbove ? "text-danger" : "")">
+                            @Fmt.Number(standardStatus.DepletionPercent, 2)% · std @(standardStatus.StandardDepletionPercent is { } sd ? $"{Fmt.Number(sd, 2)}%" : "—") (@Signed(standardStatus.DepletionPoints, 2, " pt"))
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <div class="text-muted fs-13">Cumulative feed per bird</div>
+                        <div class="fw-semibold">
+                            @(standardStatus.CumulativeFeedGram is { } cf ? $"{Fmt.Number(cf, 0)} g" : "—") · std @(standardStatus.StandardCumulativeFeedGram is { } scf ? $"{Fmt.Number(scf, 0)} g" : "—") (@Signed(standardStatus.CumulativeFeedPercent, 1, "%"))
+                        </div>
+                    </div>
+                </div>
+                <div class="text-muted fs-12">
+                    Below standard: body weight more than @Fmt.Number(thresholds.BodyWeightBelowPercent, 1)% under, FCR more than @Fmt.Number(thresholds.FcrAbove, 2) above, or depletion more than @Fmt.Number(thresholds.DepletionAbovePoints, 1) point above the standard. Body weight and FCR are judged on weighing days only.
+                </div>
+            }
+        </div></div>
         @if (days.Count == 0)
         {
             <div class="alert alert-light border">Performance appears after the chick-in and the first daily recording.</div>
@@ -255,7 +352,7 @@ else
             <div class="card"><div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-sm mb-0">
-                        <thead class="thead-light"><tr><th>Date</th><th class="text-end">Age</th><th class="text-end">Population</th><th class="text-end">Depletion %</th><th class="text-end">Feed cum. (kg)</th><th class="text-end">BW (kg)</th><th class="text-end">FCR</th><th class="text-end">ADG (g)</th><th class="text-end">IP</th></tr></thead>
+                        <thead class="thead-light"><tr><th>Date</th><th class="text-end">Age</th><th class="text-end">Population</th><th class="text-end">Depletion %</th><th class="text-end">Std depl. %</th><th class="text-end">Feed cum. (kg)</th><th class="text-end">BW (kg)</th><th class="text-end">Std BW (kg)</th><th class="text-end">BW dev.</th><th class="text-end">FCR</th><th class="text-end">Std FCR</th><th class="text-end">ADG (g)</th><th class="text-end">IP</th></tr></thead>
                         <tbody>
                             @foreach (Application.Production.DailyPerformance day in days.Reverse())
                             {
@@ -263,10 +360,14 @@ else
                                     <td>@Fmt.Date(day.Date)</td>
                                     <td class="text-end">@day.AgeDays</td>
                                     <td class="text-end">@Fmt.Number(day.Cumulative.Population)</td>
-                                    <td class="text-end">@Fmt.Number(day.Cumulative.DepletionPercent, 2)</td>
+                                    <td class="text-end @(day.Deviation?.IsDepletionAbove(thresholds) == true ? "text-danger" : "")">@Fmt.Number(day.Cumulative.DepletionPercent, 2)</td>
+                                    <td class="text-end text-muted">@(day.Standard?.DepletionPercent is { } sd ? Fmt.Number(sd, 2) : "—")</td>
                                     <td class="text-end">@Fmt.Number(day.Cumulative.FeedKg, 1)</td>
                                     <td class="text-end">@(day.Cumulative.AverageWeightKg is { } w ? Fmt.Number(w, 3) : "—")</td>
-                                    <td class="text-end">@(day.Cumulative.Fcr is { } f ? Fmt.Number(f, 3) : "—")</td>
+                                    <td class="text-end text-muted">@(day.Standard?.BodyWeightGram is { } sbw ? Fmt.Number(sbw / 1000m, 3) : "—")</td>
+                                    <td class="text-end @(day.Deviation?.IsBodyWeightBelow(thresholds) == true ? "text-danger" : "")">@Signed(day.Deviation?.BodyWeightPercent, 1, "%")</td>
+                                    <td class="text-end @(day.Deviation?.IsFcrAbove(thresholds) == true ? "text-danger" : "")">@(day.Cumulative.Fcr is { } f ? Fmt.Number(f, 3) : "—")</td>
+                                    <td class="text-end text-muted">@(day.Standard?.Fcr is { } sf ? Fmt.Number(sf, 3) : "—")</td>
                                     <td class="text-end">@(day.Cumulative.AdgGram is { } a ? Fmt.Number(a, 1) : "—")</td>
                                     <td class="text-end">@(day.Cumulative.Ip is { } i ? Fmt.Number(i, 0) : "—")</td>
                                 </tr>
@@ -383,6 +484,10 @@ else
                 var depletion = [@Html.Raw(string.Join(",", days.Select(d => Num(d.Cumulative.DepletionPercent))))];
                 var weight = [@Html.Raw(string.Join(",", days.Select(d => Num(d.Cumulative.AverageWeightKg))))];
                 var feed = [@Html.Raw(string.Join(",", days.Select(d => Num(d.Cumulative.FeedKg))))];
+                var standardWeight = [@Html.Raw(string.Join(",", days.Select(d => Num(d.Standard?.BodyWeightGram / 1000m))))];
+                var standardDepletion = [@Html.Raw(string.Join(",", days.Select(d => Num(d.Standard?.DepletionPercent))))];
+                var hasStandard = @(standard is null ? "false" : "true");
+                var standardStyle = { borderColor: '#95a5a6', borderDash: [6, 4], pointRadius: 0, spanGaps: true, tension: 0.2 };
                 var primary = getComputedStyle(document.documentElement).getPropertyValue('--ip-primary').trim() || '#0984E3';
 
                 new Chart(document.getElementById('chart-population'), {
@@ -392,7 +497,7 @@ else
                         datasets: [
                             { label: 'Population', data: population, borderColor: primary, yAxisID: 'y', tension: 0.2 },
                             { label: 'Depletion %', data: depletion, borderColor: '#e74c3c', yAxisID: 'y1', tension: 0.2 }
-                        ]
+                        ].concat(hasStandard ? [Object.assign({ label: 'Standard depletion %', data: standardDepletion, yAxisID: 'y1' }, standardStyle)] : [])
                     },
                     options: { scales: { x: { title: { display: true, text: 'Age (days)' } }, y1: { position: 'right', grid: { drawOnChartArea: false } } } }
                 });
@@ -404,7 +509,7 @@ else
                         datasets: [
                             { label: 'Body weight (kg)', data: weight, borderColor: '#27ae60', yAxisID: 'y', spanGaps: true, tension: 0.2 },
                             { label: 'Feed cumulative (kg)', data: feed, borderColor: '#f39c12', yAxisID: 'y1', tension: 0.2 }
-                        ]
+                        ].concat(hasStandard ? [Object.assign({ label: 'Standard body weight (kg)', data: standardWeight, yAxisID: 'y' }, standardStyle)] : [])
                     },
                     options: { scales: { x: { title: { display: true, text: 'Age (days)' } }, y1: { position: 'right', grid: { drawOnChartArea: false } } } }
                 });

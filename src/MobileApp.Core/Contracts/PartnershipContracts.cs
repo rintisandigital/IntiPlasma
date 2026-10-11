@@ -219,6 +219,13 @@ public sealed record Cycle
     public int CurrentPopulation { get; init; }
 
     public DateOnly? ClosedDate { get; init; }
+
+    /// <summary>
+    /// The breed standard the cycle is compared with (its own, the default, or the one frozen at closing).
+    /// </summary>
+    public string? BreedStandardName { get; init; }
+
+    public bool BreedStandardIsDefault { get; init; }
 }
 
 /// <summary>

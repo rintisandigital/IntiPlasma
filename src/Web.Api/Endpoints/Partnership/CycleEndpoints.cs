@@ -5,6 +5,7 @@ using Application.Cycles.Cancel;
 using Application.Cycles.Get;
 using Application.Cycles.GetById;
 using Application.Cycles.Plan;
+using Application.Cycles.SetBreedStandard;
 using Application.Cycles.Start;
 using Domain.Partnership.Cycles;
 using Domain.Roles;
@@ -19,6 +20,9 @@ internal sealed class CycleEndpoints : IEndpoint
     public sealed record StartRequest(DateOnly ChickInDate, IReadOnlyList<ChickInLine> Lines, IReadOnlyList<Guid>? Documents = null);
 
     public sealed record CancelRequest(string Reason);
+
+    /// <param name="BreedStandardId">Null = use the default standard.</param>
+    public sealed record SetBreedStandardRequest(Guid? BreedStandardId);
 
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
@@ -88,6 +92,18 @@ internal sealed class CycleEndpoints : IEndpoint
             CancellationToken cancellationToken) =>
         {
             Result result = await handler.Handle(new CancelCycleCommand(cycleId, request.Reason), cancellationToken);
+
+            return result.Match(Results.NoContent, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.CyclesManage);
+
+        group.MapPut("{cycleId:guid}/breed-standard", async (
+            Guid cycleId,
+            SetBreedStandardRequest request,
+            ICommandHandler<SetCycleBreedStandardCommand> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result result = await handler.Handle(new SetCycleBreedStandardCommand(cycleId, request.BreedStandardId), cancellationToken);
 
             return result.Match(Results.NoContent, CustomResults.Problem);
         })

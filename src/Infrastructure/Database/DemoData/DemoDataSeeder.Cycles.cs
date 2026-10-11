@@ -216,7 +216,7 @@ public sealed partial class DemoDataSeeder
         private async Task PlanAndOrderAsync(DateOnly date)
         {
             PlanCycleResponse cycle = await _s.SendAsync(new PlanCycleCommand(
-                _coop.Id, _spec.ContractId, _chickIn, _spec.Population, "Rencana chick-in DOC CP 707"));
+                _coop.Id, _spec.ContractId, _chickIn, _spec.Population, "Rencana chick-in DOC CP 707", _s._breedStandard));
             _cycleId = cycle.Id;
 
             Guid feedVendor = _spec.FeedVendor == CycleVendor.Japfa ? _s._vendorJapfa : _s._vendorCharoen;
