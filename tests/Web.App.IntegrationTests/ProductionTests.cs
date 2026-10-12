@@ -51,6 +51,7 @@ public sealed partial class ProductionTests(WebAppFactory factory)
         Guid vendorId = await QueryAsync(db => db.Vendors.Where(v => v.Code == $"V{s}").Select(v => v.Id).SingleAsync());
         await PostAsync(client, "/Partnership/Farmers/Create", new() { ["Code"] = $"F{s}", ["Name"] = "Inti farm", ["Type"] = "Inti", ["BranchId"] = branchId.ToString() });
         Guid farmerId = await QueryAsync(db => db.Farmers.Where(f => f.Code == $"F{s}").Select(f => f.Id).SingleAsync());
+        await factory.ApproveAsync(farmerId);
         Guid coopId = await CreateCoopAsync(client, s, "K", farmerId, branchId);
         Guid otherCoopId = await CreateCoopAsync(client, s, "L", farmerId, branchId);
         Guid warehouseId = await QueryAsync(db => db.Warehouses.Where(w => w.CoopId == coopId).Select(w => w.Id).SingleAsync());
@@ -195,6 +196,7 @@ public sealed partial class ProductionTests(WebAppFactory factory)
             ["FarmerId"] = farmerId.ToString(), ["Code"] = $"{prefix}{s}", ["Name"] = $"Coop {prefix}", ["Capacity"] = "5000", ["HouseType"] = "ClosedHouse"
         });
         Guid coopId = await QueryAsync(db => db.Coops.Where(c => c.Code == $"{prefix}{s}").Select(c => c.Id).SingleAsync());
+        await factory.ApproveAsync(coopId);
 
         using IServiceScope scope = factory.Services.CreateScope();
         ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

@@ -190,11 +190,13 @@ public sealed partial class CostingTests(WebAppFactory factory)
             ["Code"] = $"F{s}", ["Name"] = $"Plasma {s}", ["Type"] = "Plasma", ["BranchId"] = branchId.ToString(), ["Nik"] = "3201010101010001"
         });
         Guid farmerId = await QueryAsync(db => db.Farmers.Where(f => f.Code == $"F{s}").Select(f => f.Id).SingleAsync());
+        await factory.ApproveAsync(farmerId);
         await PostAsync(client, "/Partnership/Coops/Create", new()
         {
             ["FarmerId"] = farmerId.ToString(), ["Code"] = $"K{s}", ["Name"] = "Coop", ["Capacity"] = "5000", ["HouseType"] = "ClosedHouse"
         });
         Guid coopId = await QueryAsync(db => db.Coops.Where(c => c.Code == $"K{s}").Select(c => c.Id).SingleAsync());
+        await factory.ApproveAsync(coopId);
         await AddAsync(Warehouse.CreateForCoop($"GK-K{s}", "Gudang Kandang", branchId, coopId, null));
         Guid coopWarehouseId = await QueryAsync(db => db.Warehouses.Where(w => w.CoopId == coopId).Select(w => w.Id).SingleAsync());
 
@@ -203,7 +205,8 @@ public sealed partial class CostingTests(WebAppFactory factory)
             [new ContractTerms.InputPrice(docId, new Money(8_000m))],
             [new ContractTerms.LiveBirdPrice(0m, 5m, new Money(20_000m))],
             [])).Value;
-        contract.Activate().IsSuccess.ShouldBeTrue();
+        contract.Submit().IsSuccess.ShouldBeTrue();
+        contract.Approve().IsSuccess.ShouldBeTrue();
         await AddAsync(contract);
 
         Guid ledgerAccountId = await AccountAsync(client, $"1-19{s}", $"Bank {s}");

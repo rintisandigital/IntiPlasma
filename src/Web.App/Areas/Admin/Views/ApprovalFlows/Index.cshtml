@@ -1,0 +1,93 @@
+@using Application.Approvals
+@using Web.App.Areas.Approvals.Models
+@model ApprovalFlowListViewModel
+@{
+    ViewData["Title"] = "Approval Flows";
+    ViewData["Menu"] = MenuCodes.AdminApprovalFlows;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Approval Flows</h4>
+            <h6>Levels and approvers per document type; a branch flow overrides the default flow of all branches</h6>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-action="ReplaceApprover" asp-menu="@MenuCodes.AdminApprovalFlows" asp-right="Edit" class="btn btn-outline-primary">
+            <i class="ti ti-replace me-1"></i>Replace approver
+        </a>
+        <a asp-action="Create" asp-menu="@MenuCodes.AdminApprovalFlows" asp-right="Create" class="btn btn-primary">
+            <i class="ti ti-circle-plus me-1"></i>Add Flow
+        </a>
+    </div>
+</div>
+
+@{
+    var missingDefault = ApprovalLabels.DocumentTypeOptions().Where(t => !Model.Flows.Any(f => f.BranchId == null && f.IsActive && f.DocumentType == t.Value)).ToList();
+}
+@if (missingDefault.Count > 0)
+{
+    <div class="alert alert-warning">
+        No active default flow for: <strong>@string.Join(", ", missingDefault.Select(t => t.Text))</strong>.
+        Branches without their own flow cannot submit these documents (the user sees "Alur approval belum dikonfigurasi").
+    </div>
+}
+
+<div class="card">
+    <div class="card-header">
+        <form method="get" class="row g-2">
+            <div class="col-md-3">
+                <select name="type" class="form-select form-select-sm" aria-label="Document type" data-autosubmit>
+                    <option value="">All document types</option>
+                    @foreach (Microsoft.AspNetCore.Mvc.Rendering.SelectListItem type in ApprovalLabels.DocumentTypeOptions(Model.DocumentType))
+                    {
+                        <option value="@type.Value" selected="@type.Selected">@type.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="branch" class="form-select form-select-sm" asp-items="Model.BranchOptions" aria-label="Branch" data-autosubmit></select>
+            </div>
+        </form>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="thead-light"><tr><th>Document type</th><th>Branch</th><th>Name</th><th>Levels</th><th>Status</th><th class="text-end"></th></tr></thead>
+                <tbody>
+                    @foreach (ApprovalFlowResponse flow in Model.Flows)
+                    {
+                        <tr>
+                            <td>@ApprovalLabels.DocumentType(flow.DocumentType)</td>
+                            <td>@(flow.BranchCode ?? "Default (all branches)")</td>
+                            <td>@flow.Name</td>
+                            <td>
+                                @foreach (ApprovalFlowLevelResponse level in flow.Levels)
+                                {
+                                    <div class="fs-13">
+                                        <span class="fw-semibold">@level.LevelNo. @level.Name:</span>
+                                        @string.Join(", ", level.Approvers.Select(a => a.CanDecide ? a.Name : a.Name + " ✗"))
+                                        @if (level.IsStuck)
+                                        {
+                                            <span class="badge bg-danger">Stuck</span>
+                                        }
+                                    </div>
+                                }
+                            </td>
+                            <td><partial name="Partials/_StatusBadge" model='flow.IsActive ? "Active" : "Inactive"' /></td>
+                            <td class="text-end text-nowrap">
+                                <a asp-action="Create" asp-route-copyFrom="@flow.Id" asp-menu="@MenuCodes.AdminApprovalFlows" asp-right="Create" class="btn btn-sm btn-light" title="Copy to a branch"><i class="ti ti-copy"></i></a>
+                                <a asp-action="Edit" asp-route-id="@flow.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a>
+                            </td>
+                        </tr>
+                    }
+                    @if (Model.Flows.Count == 0)
+                    {
+                        <tr><td colspan="6" class="text-center text-muted py-4">No approval flows yet.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer text-muted fs-13">✗ = inactive or without <code>approvals:decide</code>. "Stuck" levels have nobody who can decide them: replace the approver.</div>
+</div>

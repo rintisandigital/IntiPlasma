@@ -83,7 +83,7 @@
                         <div class="form-text">The mobile app shows this record to this PPL only (and to managers of the branch).</div>
                         <span asp-validation-for="FieldOfficerUserId" class="text-danger fs-13"></span>
                     </div>
-                    @if (!Model.IsNew)
+                    @if (!Model.IsNew && Model.IsApproved)
                     {
                         <div class="col-12">
                             <div class="form-check form-switch">
@@ -114,6 +114,8 @@
 
     <partial name="Partials/_FormButtons" model='new FormButtonsModel(Model.CanSave, Url.Action("Index")!)' />
 </form>
+
+<partial name="Partials/_RegistrationCard" model="Model" />
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />

@@ -46,6 +46,7 @@ public sealed partial class DemoDataSeeder
     private readonly DateOnly _start;
     private Guid _adminId;
     private Guid _checkerId;
+    private Guid _branchHeadId;
     private int _commands;
 
     private DemoDataSeeder(IServiceProvider services, ILogger logger, CancellationToken cancellationToken)

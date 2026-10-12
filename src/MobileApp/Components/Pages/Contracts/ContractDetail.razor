@@ -24,6 +24,8 @@
             </div>
         </div>
 
+        <ApprovalBanner Item="_contract" />
+
         <Tabs Items="TabNames" @bind-Active="_tab" />
 
         @if (_tab == "Umum")
@@ -101,6 +103,10 @@
                 <p class="body-2 text-dark-4">Tidak ada insentif atau potongan.</p>
             }
         }
+        else if (_tab == "Approval")
+        {
+            <ApprovalTab Resource="contracts" DocumentId="_contract.Id" OnChanged="LoadAsync" />
+        }
         else
         {
             <AttachmentList Ids="_contract.Documents" />
@@ -109,7 +115,7 @@
 </AppPage>
 
 @code {
-    private static readonly string[] TabNames = ["Umum", "Harga", "Insentif", "Lampiran"];
+    private static readonly string[] TabNames = ["Umum", "Harga", "Insentif", "Approval", "Lampiran"];
 
     private Contract? _contract;
     private DateTime? _cachedAtUtc;

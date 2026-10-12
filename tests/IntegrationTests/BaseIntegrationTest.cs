@@ -1,5 +1,9 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Domain.Approvals;
+using Infrastructure.Database;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace IntegrationTests;
 
@@ -10,12 +14,18 @@ public abstract class BaseIntegrationTest
 
     protected BaseIntegrationTest(IntegrationTestWebAppFactory factory)
     {
+        Factory = factory;
         Services = factory.Services;
         HttpClient = factory.CreateClient();
         HttpClient.BaseAddress = new Uri(HttpClient.BaseAddress!, "api/v1/");
     }
 
     protected HttpClient HttpClient { get; }
+
+    /// <summary>
+    /// For a second client, e.g. two users acting at the same time.
+    /// </summary>
+    protected IntegrationTestWebAppFactory Factory { get; }
 
     /// <summary>
     /// The API's services, for arranging data that would take many requests to build (stock, running cycles).
@@ -86,5 +96,40 @@ public abstract class BaseIntegrationTest
     protected void Authenticate(string accessToken)
     {
         HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+    }
+
+    /// <summary>
+    /// Approves every level of the document's pending request as the default approver (seeded flows), then restores
+    /// the caller's authentication.
+    /// </summary>
+    protected async Task ApproveAsync(Guid documentId)
+    {
+        AuthenticationHeaderValue? previous = HttpClient.DefaultRequestHeaders.Authorization;
+        AccessTokens tokens = await LoginAsync(IntegrationTestWebAppFactory.ApproverEmail, IntegrationTestWebAppFactory.ApproverPassword);
+        Authenticate(tokens.AccessToken);
+
+        try
+        {
+            while (await PendingRequestAsync(documentId) is { } requestId)
+            {
+                HttpResponseMessage response = await HttpClient.PostAsJsonAsync($"approvals/{requestId}/approve", new { });
+                response.EnsureSuccessStatusCode();
+            }
+        }
+        finally
+        {
+            HttpClient.DefaultRequestHeaders.Authorization = previous;
+        }
+    }
+
+    protected async Task<Guid?> PendingRequestAsync(Guid documentId)
+    {
+        using IServiceScope scope = Services.CreateScope();
+        ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        return await db.ApprovalRequests
+            .Where(r => r.DocumentId == documentId && r.Status == ApprovalStatus.Pending)
+            .Select(r => (Guid?)r.Id)
+            .SingleOrDefaultAsync();
     }
 }

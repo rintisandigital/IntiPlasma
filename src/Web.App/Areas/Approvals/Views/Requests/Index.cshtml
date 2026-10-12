@@ -1,0 +1,55 @@
+@using Domain.Approvals
+@model ApprovalListViewModel
+@{
+    ViewData["Title"] = "Approval Requests";
+    ViewData["Menu"] = MenuCodes.ApprovalsRequests;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Approval Requests</h4>
+            <h6>Every request of your branches; "Stuck" = no active approver can decide the current level</h6>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/Admin/ApprovalFlows/ReplaceApprover" asp-menu="@MenuCodes.AdminApprovalFlows" asp-right="Edit" class="btn btn-outline-primary">
+            <i class="ti ti-replace me-1"></i>Replace approver
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3"><input type="search" name="search" value="@Model.Search" class="form-control form-control-sm" placeholder="Search code or name" aria-label="Search"></div>
+            <div class="col-md-2">
+                <select name="branch" class="form-select form-select-sm" asp-items="Model.BranchOptions" aria-label="Branch" data-autosubmit></select>
+            </div>
+            <div class="col-md-2">
+                <select name="type" class="form-select form-select-sm" aria-label="Type" data-autosubmit>
+                    <option value="">All types</option>
+                    @foreach (Microsoft.AspNetCore.Mvc.Rendering.SelectListItem type in ApprovalLabels.DocumentTypeOptions())
+                    {
+                        <option value="@type.Value" selected="@(Model.DocumentType == type.Value)">@type.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="status" class="form-select form-select-sm" aria-label="Status" data-autosubmit>
+                    <option value="">All statuses</option>
+                    @foreach (ApprovalStatus status in Enum.GetValues<ApprovalStatus>())
+                    {
+                        <option value="@status" selected="@(Model.Status == status.ToString())">@status</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2 form-check ms-2">
+                <input type="checkbox" id="stuck" name="stuck" value="true" class="form-check-input" checked="@Model.StuckOnly" data-autosubmit>
+                <label for="stuck" class="form-check-label">Stuck only</label>
+            </div>
+        </form>
+    </div>
+    <div class="card-body p-0">
+        <partial name="_RequestTable" model="Model" />
+    </div>
+</div>

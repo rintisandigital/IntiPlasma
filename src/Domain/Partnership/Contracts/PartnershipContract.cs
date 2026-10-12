@@ -10,8 +10,8 @@ namespace Domain.Partnership.Contracts;
 /// harvest is bought back at a guaranteed price per kg (by weight range).</item>
 /// <item><see cref="ContractScheme.ProfitSharing"/>: the cycle profit is shared by percentage.</item>
 /// </list>
-/// Terms are editable only while the contract is a draft. Once active, a contract is immutable;
-/// changed terms need a new contract. Production cycles take a snapshot of the terms when they are planned.
+/// Terms are editable only while the contract is a draft or rejected. A contract becomes active only through the
+/// approval module (submit → approve, M-85). Once active, a contract is immutable; changed terms need a new contract. Production cycles take a snapshot of the terms when they are planned.
 /// </summary>
 public sealed class PartnershipContract : AggregateRoot, IHasDocuments
 {
@@ -75,7 +75,7 @@ public sealed class PartnershipContract : AggregateRoot, IHasDocuments
 
     public Result UpdateTerms(ContractTerms terms)
     {
-        if (Status != ContractStatus.Draft)
+        if (Status is not (ContractStatus.Draft or ContractStatus.Rejected))
         {
             return Result.Failure(ContractErrors.NotDraft(Id));
         }
@@ -83,16 +83,38 @@ public sealed class PartnershipContract : AggregateRoot, IHasDocuments
         return ApplyTerms(terms);
     }
 
-    public Result Activate()
+    public Result Submit()
     {
-        if (Status != ContractStatus.Draft)
+        if (Status is not (ContractStatus.Draft or ContractStatus.Rejected))
         {
-            return Result.Failure(ContractErrors.NotDraft(Id));
+            return Result.Failure(ContractErrors.NotSubmittable(Id));
         }
 
-        if (Scheme == ContractScheme.PriceContract && (_inputPrices.Count == 0 || _liveBirdPrices.Count == 0))
+        Result complete = EnsureComplete();
+        if (complete.IsFailure)
         {
-            return Result.Failure(ContractErrors.PriceContractIncomplete);
+            return complete;
+        }
+
+        Status = ContractStatus.PendingApproval;
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// The activation request was approved (replaces the former direct activation).
+    /// </summary>
+    public Result Approve()
+    {
+        if (Status != ContractStatus.PendingApproval)
+        {
+            return Result.Failure(ContractErrors.NotPendingApproval(Id));
+        }
+
+        Result complete = EnsureComplete();
+        if (complete.IsFailure)
+        {
+            return complete;
         }
 
         Status = ContractStatus.Active;
@@ -101,6 +123,13 @@ public sealed class PartnershipContract : AggregateRoot, IHasDocuments
 
         return Result.Success();
     }
+
+    public Result Reject() => Decide(ContractStatus.Rejected);
+
+    /// <summary>
+    /// The requester cancelled the request: the contract is a draft again.
+    /// </summary>
+    public Result ReturnToDraft() => Decide(ContractStatus.Draft);
 
     public Result Deactivate()
     {
@@ -128,6 +157,23 @@ public sealed class PartnershipContract : AggregateRoot, IHasDocuments
             [.. _liveBirdPrices.Select(p => new ContractSnapshot.LiveBirdPrice(p.MinWeightKg, p.MaxWeightKg, p.PricePerKg))],
             [.. _incentives.Select(i => new ContractSnapshot.Incentive(
                 i.Name, i.Kind, i.Metric, i.RangeFrom, i.RangeTo, i.Amount, i.Basis))]);
+
+    private Result Decide(ContractStatus status)
+    {
+        if (Status != ContractStatus.PendingApproval)
+        {
+            return Result.Failure(ContractErrors.NotPendingApproval(Id));
+        }
+
+        Status = status;
+
+        return Result.Success();
+    }
+
+    private Result EnsureComplete() =>
+        Scheme == ContractScheme.PriceContract && (_inputPrices.Count == 0 || _liveBirdPrices.Count == 0)
+            ? Result.Failure(ContractErrors.PriceContractIncomplete)
+            : Result.Success();
 
     private Result ApplyTerms(ContractTerms terms)
     {

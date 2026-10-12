@@ -15,7 +15,7 @@ public sealed class Farmer : AggregateRoot, IHasDocuments
         Code = code;
         Type = type;
         BranchId = branchId;
-        IsActive = true;
+        RegistrationStatus = RegistrationStatus.Draft;
     }
 
     private Farmer()
@@ -41,7 +41,17 @@ public sealed class Farmer : AggregateRoot, IHasDocuments
     /// </summary>
     public BankAccount BankAccount { get; private set; } = BankAccount.None;
 
+    /// <summary>
+    /// Only true once the farmer is approved (M-81).
+    /// </summary>
     public bool IsActive { get; private set; }
+
+    public RegistrationStatus RegistrationStatus { get; private set; }
+
+    /// <summary>
+    /// New NIK or bank account of an approved farmer waiting for approval (M-84); the current values stay in use.
+    /// </summary>
+    public FarmerPendingChange? PendingChange { get; private set; }
 
     /// <summary>
     /// PPL (petugas penyuluh lapangan) responsible for this farmer. Users limited to their assigned data
@@ -73,12 +83,126 @@ public sealed class Farmer : AggregateRoot, IHasDocuments
     {
         var farmer = new Farmer(Guid.CreateVersion7(), Codes.Normalize(code), type, branchId);
 
-        Result result = farmer.Update(name, nik, taxIdentity, address, phone, bankAccount, isActive: true);
+        Result result = farmer.Apply(name, nik, taxIdentity, address, phone, bankAccount, isActive: false);
 
         return result.IsSuccess ? farmer : Result.Failure<Farmer>(result.Error);
     }
 
-    public Result Update(
+    /// <summary>
+    /// Changes the farmer. Not allowed while waiting for approval (M-83). For an approved farmer a different NIK or
+    /// bank account is not applied but kept as <see cref="PendingChange"/> for a FarmerChange request (M-84); the value
+    /// is then <c>true</c>. Only an approved farmer can be active.
+    /// </summary>
+    public Result<bool> Update(
+        string name,
+        string? nik,
+        TaxIdentity taxIdentity,
+        string? address,
+        string? phone,
+        BankAccount bankAccount,
+        bool isActive)
+    {
+        Result editable = Registration.Edit(RegistrationStatus, nameof(Farmer), Id);
+        if (editable.IsFailure)
+        {
+            return Result.Failure<bool>(editable.Error);
+        }
+
+        string? normalizedNik = Digits.Normalize(nik);
+        bool proposeChange = RegistrationStatus == RegistrationStatus.Approved
+            && (normalizedNik != Nik || bankAccount != BankAccount);
+
+        if (proposeChange && PendingChange is not null)
+        {
+            return Result.Failure<bool>(FarmerErrors.ChangePending);
+        }
+
+        Result valid = Validate(normalizedNik);
+        if (valid.IsFailure)
+        {
+            return Result.Failure<bool>(valid.Error);
+        }
+
+        Result result = proposeChange
+            ? Apply(name, Nik, taxIdentity, address, phone, BankAccount, isActive)
+            : Apply(name, nik, taxIdentity, address, phone, bankAccount, isActive);
+
+        if (result.IsFailure)
+        {
+            return Result.Failure<bool>(result.Error);
+        }
+
+        if (proposeChange)
+        {
+            PendingChange = FarmerPendingChange.Create(normalizedNik, bankAccount);
+        }
+
+        return proposeChange;
+    }
+
+    public Result Submit()
+    {
+        Result result = Registration.Submit(RegistrationStatus, nameof(Farmer), Id);
+        if (result.IsSuccess)
+        {
+            RegistrationStatus = RegistrationStatus.PendingApproval;
+        }
+
+        return result;
+    }
+
+    public Result Approve()
+    {
+        Result result = Registration.Decide(RegistrationStatus, nameof(Farmer), Id);
+        if (result.IsSuccess)
+        {
+            RegistrationStatus = RegistrationStatus.Approved;
+            IsActive = true;
+        }
+
+        return result;
+    }
+
+    public Result Reject()
+    {
+        Result result = Registration.Decide(RegistrationStatus, nameof(Farmer), Id);
+        if (result.IsSuccess)
+        {
+            RegistrationStatus = RegistrationStatus.Rejected;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// The requester cancelled the request: the farmer can be edited and submitted again.
+    /// </summary>
+    public Result ReturnToDraft()
+    {
+        Result result = Registration.Decide(RegistrationStatus, nameof(Farmer), Id);
+        if (result.IsSuccess)
+        {
+            RegistrationStatus = RegistrationStatus.Draft;
+        }
+
+        return result;
+    }
+
+    public void ApplyPendingChange()
+    {
+        if (PendingChange is null)
+        {
+            return;
+        }
+
+        Nik = PendingChange.Nik;
+        BankAccount = PendingChange.ToBankAccount();
+        PendingChange = null;
+    }
+
+    public void DiscardPendingChange() => PendingChange = null;
+
+    private Result Apply(
         string name,
         string? nik,
         TaxIdentity taxIdentity,
@@ -89,14 +213,10 @@ public sealed class Farmer : AggregateRoot, IHasDocuments
     {
         string? normalizedNik = Digits.Normalize(nik);
 
-        if (normalizedNik is not null && !Digits.IsDigits(normalizedNik, 16))
+        Result valid = Validate(normalizedNik);
+        if (valid.IsFailure)
         {
-            return Result.Failure(CommonErrors.InvalidNik);
-        }
-
-        if (Type == FarmerType.Plasma && normalizedNik is null)
-        {
-            return Result.Failure(FarmerErrors.PlasmaRequiresNik);
+            return valid;
         }
 
         Name = name.Trim();
@@ -105,8 +225,20 @@ public sealed class Farmer : AggregateRoot, IHasDocuments
         Address = address;
         Phone = phone;
         BankAccount = bankAccount;
-        IsActive = isActive;
+        IsActive = isActive && RegistrationStatus == RegistrationStatus.Approved;
 
         return Result.Success();
+    }
+
+    private Result Validate(string? normalizedNik)
+    {
+        if (normalizedNik is not null && !Digits.IsDigits(normalizedNik, 16))
+        {
+            return Result.Failure(CommonErrors.InvalidNik);
+        }
+
+        return Type == FarmerType.Plasma && normalizedNik is null
+            ? Result.Failure(FarmerErrors.PlasmaRequiresNik)
+            : Result.Success();
     }
 }

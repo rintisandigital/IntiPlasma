@@ -1,0 +1,152 @@
+@page "/approval/{Id:guid}"
+@inject ApprovalsApi Approvals
+@inject NavigationManager Navigation
+@inject SessionService Session
+
+@* Detail pengajuan + Setujui (catatan opsional) / Tolak (alasan wajib), PLAN-MOBILE M-92. Aksi wajib online. *@
+<AppPage Title="Detail Pengajuan" BackTo="@(Session.Has(AppPermissions.ApprovalsDecide) ? "/approval" : "/pengajuan")">
+    @if (_error is not null && _detail is null)
+    {
+        <ErrorState Error="_error" OnRetry="LoadAsync" />
+    }
+    else if (_detail is null)
+    {
+        <Spinner />
+    }
+    else
+    {
+        ApprovalRequest request = _detail.Request;
+        <CacheNote CachedAtUtc="_cachedAtUtc" />
+
+        <div class="detail-head mb-16">
+            <div class="text-caption-2 text-Primary">@Labels.ApprovalDocumentType(request.DocumentType) · @request.BranchName</div>
+            <h4 class="mt-4">@request.DocumentCode — @request.DocumentTitle</h4>
+            @if (request.Summary is not null)
+            {
+                <div class="text-caption-1 text-dark-4 mt-4">@Labels.ApprovalSummary(request.DocumentType, request.Summary)</div>
+            }
+            <div class="d-flex flex-wrap gap-8 mt-8">
+                <StatusBadge Text="@Labels.ApprovalStatus(request.Status)" Tone="@Labels.ApprovalTone(request.Status)" />
+                @if (DocumentRoute(request) is { } route)
+                {
+                    <a class="chip" href="@route"><i class="icon icon-bookTxt"></i>Buka dokumen</a>
+                }
+            </div>
+        </div>
+
+        @if (_detail.CanDecide)
+        {
+            <div class="form-section decision-box">
+                <h6 class="mb-8">Keputusan Anda · Level @request.CurrentLevel dari @request.LevelCount</h6>
+                @if (_detail.DecidesOnBehalfOf is { } onBehalf)
+                {
+                    <div class="alert alert-info py-2">Anda memutuskan atas nama <strong>@onBehalf</strong> (delegasi).</div>
+                }
+                <label class="text-caption-1 mb-4" for="decision-note">Catatan (opsional untuk Setujui, wajib untuk Tolak)</label>
+                <textarea id="decision-note" class="form-control mb-12" maxlength="500" @bind="_note" @bind:event="oninput"></textarea>
+                @if (_message is not null)
+                {
+                    <div class="alert alert-danger py-2">@_message</div>
+                }
+                <div class="d-flex gap-12">
+                    <button type="button" class="tf-btn style-1 round-full w-100" disabled="@_busy" @onclick="() => _confirm = Decision.Reject">
+                        Tolak
+                    </button>
+                    <button type="button" class="tf-btn round-full w-100" disabled="@_busy" @onclick="() => _confirm = Decision.Approve">
+                        Setujui
+                    </button>
+                </div>
+            </div>
+        }
+
+        <h6 class="mt-16 mb-8">Riwayat approval</h6>
+        <ApprovalTimeline Requests="[_detail]" ShowActions="_detail.CanCancel" OnChanged="LoadAsync" />
+    }
+</AppPage>
+
+<ConfirmSheet Visible="_confirm is not null"
+              Title="@(_confirm == Decision.Approve ? "Setujui pengajuan?" : "Tolak pengajuan?")"
+              Message="@(_confirm == Decision.Approve ? "Pengajuan lanjut ke level berikutnya, atau disetujui bila ini level terakhir." : "Pengajuan ditolak dan pengaju melihat alasan Anda.")"
+              ConfirmText="@(_confirm == Decision.Approve ? "Setujui" : "Tolak")" OnClose="DecideAsync" />
+
+@code {
+    private enum Decision
+    {
+        Approve,
+        Reject
+    }
+
+    private ApprovalDetail? _detail;
+    private DateTime? _cachedAtUtc;
+    private ApiError? _error;
+    private string? _note;
+    private string? _message;
+    private Decision? _confirm;
+    private bool _busy;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+
+        CachedResult<ApprovalDetail> result = await Approvals.GetRequestAsync(Id);
+        if (result.IsSuccess)
+        {
+            _detail = result.Value;
+            _cachedAtUtc = result.CachedAtUtc;
+        }
+        else
+        {
+            _error = result.Error;
+        }
+    }
+
+    private async Task DecideAsync(bool confirmed)
+    {
+        Decision? decision = _confirm;
+        _confirm = null;
+
+        if (!confirmed || decision is null)
+        {
+            return;
+        }
+
+        if (decision == Decision.Reject && string.IsNullOrWhiteSpace(_note))
+        {
+            _message = "Alasan penolakan wajib diisi.";
+            return;
+        }
+
+        _busy = true;
+        _message = null;
+
+        ApiResult result = decision == Decision.Approve
+            ? await Approvals.ApproveAsync(Id, _note)
+            : await Approvals.RejectAsync(Id, _note!);
+
+        _busy = false;
+
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo("/approval");
+            return;
+        }
+
+        // The request may have moved on meanwhile (another approver, a cancellation): show its current state.
+        await LoadAsync();
+
+        _message = result.Error!.Message;
+    }
+
+    private static string? DocumentRoute(ApprovalRequest request) => request.DocumentType switch
+    {
+        "Farmer" or "FarmerChange" => $"/peternak/{request.DocumentId}",
+        "Coop" => $"/kandang/{request.DocumentId}",
+        "Contract" => $"/kontrak/{request.DocumentId}",
+        _ => null
+    };
+}

@@ -32,7 +32,8 @@ public sealed class UserIndexViewModel
     public IReadOnlyList<SelectListItem> BranchProfiles { get; init; } = [];
 }
 
-public sealed record UserDetailsViewModel(UserResponse User, bool IsCurrentUser)
+/// <param name="ApprovalUsage">Flows and pending requests where the user is an approver (PLAN-MOBILE M-99).</param>
+public sealed record UserDetailsViewModel(UserResponse User, bool IsCurrentUser, Application.Approvals.ApproverUsageResponse? ApprovalUsage = null)
 {
     public bool IsLockedOut => User.LockoutEndUtc > DateTime.UtcNow;
 }
@@ -397,4 +398,27 @@ public sealed class BranchFormViewModel
 
     [Display(Name = "Active")]
     public bool? IsActive { get; set; }
+
+    /// <summary>
+    /// "branch" sets up the branch's own approval flows on create (PLAN-MOBILE M-97); otherwise the default flows apply.
+    /// </summary>
+    public string? ApprovalSetup { get; set; }
+
+    public List<Web.App.Areas.Approvals.Models.ApprovalLevelRow> ApprovalLevels { get; set; } = [];
+
+    public List<Domain.Approvals.ApprovalDocumentType> ApprovalDocumentTypes { get; set; } = [];
+
+    /// <summary>
+    /// Adds the new branch to the branch access profile of approvers who cannot see it yet.
+    /// </summary>
+    public bool? GrantBranchAccess { get; set; }
+
+    [BindNever]
+    public IReadOnlyDictionary<Guid, string> ApproverNames { get; set; } = new Dictionary<Guid, string>();
+
+    /// <summary>
+    /// Edit page: the flows used by the branch, per document type (own flow or the default).
+    /// </summary>
+    [BindNever]
+    public IReadOnlyList<Application.Approvals.ApprovalFlowResponse> ApprovalFlows { get; set; } = [];
 }

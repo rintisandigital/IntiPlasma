@@ -60,13 +60,20 @@ public sealed class UsersController(AdminLookups lookups) : AppController
     public async Task<IActionResult> Details(
         Guid id,
         [FromServices] IQueryHandler<GetUserByIdQuery, UserResponse> query,
+        [FromServices] IQueryHandler<Application.Approvals.GetApproverUsageQuery, Application.Approvals.ApproverUsageResponse> usageQuery,
         CancellationToken cancellationToken)
     {
         Result<UserResponse> result = await query.Handle(new GetUserByIdQuery(id), cancellationToken);
 
-        return result.IsFailure
-            ? NotFound()
-            : View(new UserDetailsViewModel(result.Value, result.Value.Id == User.GetUserId()));
+        if (result.IsFailure)
+        {
+            return NotFound();
+        }
+
+        Result<Application.Approvals.ApproverUsageResponse> usage =
+            await usageQuery.Handle(new Application.Approvals.GetApproverUsageQuery(id), cancellationToken);
+
+        return View(new UserDetailsViewModel(result.Value, result.Value.Id == User.GetUserId(), usage.IsSuccess ? usage.Value : null));
     }
 
     [HttpGet]

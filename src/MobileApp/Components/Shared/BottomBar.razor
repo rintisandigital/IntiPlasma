@@ -1,6 +1,7 @@
 @implements IDisposable
 @inject NavigationManager Navigation
 @inject SyncEngine Sync
+@inject ApprovalsApi Approvals
 
 @* Template "menubar-footer": first four available features + Lainnya (AppFeatures.BottomBar). *@
 <div class="menubar-footer footer-fixed">
@@ -15,6 +16,10 @@
                         {
                             <span class="bar-badge">@(_queued > 99 ? "99+" : _queued)</span>
                         }
+                        @if (feature == AppFeatures.Approvals && _waiting > 0)
+                        {
+                            <span class="bar-badge">@(_waiting > 99 ? "99+" : _waiting)</span>
+                        }
                     </div>
                     <div class="text-caption-3 text">@feature.Title</div>
                 </a>
@@ -28,12 +33,14 @@
     public CurrentUser User { get; set; } = default!;
 
     private int _queued;
+    private int _waiting;
 
     protected override async Task OnInitializedAsync()
     {
         Navigation.LocationChanged += OnLocationChanged;
         Sync.Changed += OnQueueChanged;
         await CountAsync();
+        await CountApprovalsAsync();
     }
 
     public void Dispose()
@@ -74,5 +81,28 @@
         return path.StartsWith(feature.Route, StringComparison.OrdinalIgnoreCase);
     }
 
-    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => _ = InvokeAsync(StateHasChanged);
+    /// <summary>
+    /// Requests waiting for the user (badge on "Approval", M-92); kept when offline.
+    /// </summary>
+    private async Task CountApprovalsAsync()
+    {
+        if (!AppFeatures.Approvals.IsAvailable(User))
+        {
+            return;
+        }
+
+        ApiResult<ApprovalInboxCount> result = await Approvals.GetInboxCountAsync();
+        if (result.IsSuccess)
+        {
+            _waiting = result.Value.Total;
+        }
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) =>
+        _ = InvokeAsync(async () =>
+        {
+            StateHasChanged();
+            await CountApprovalsAsync();
+            StateHasChanged();
+        });
 }

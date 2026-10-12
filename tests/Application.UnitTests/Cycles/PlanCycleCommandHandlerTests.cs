@@ -112,8 +112,8 @@ public sealed class PlanCycleCommandHandlerTests : BaseHandlerTest
     {
         var branch = Branch.Create("BDG", "Cabang Bandung", null, null);
         Farmer farmer = Farmer.Create("INT-01", "Farm Inti", FarmerType.Inti, branch.Id, null,
-            TaxIdentity.None, null, null, BankAccount.None).Value;
-        Coop coop = Coop.Create(farmer, "KDG-01", "Kandang 1", 10_000, HouseType.ClosedHouse, null, null, null).Value;
+            TaxIdentity.None, null, null, BankAccount.None).Value.Approved();
+        Coop coop = Coop.Create(farmer, "KDG-01", "Kandang 1", 10_000, HouseType.ClosedHouse, null, null, null).Value.Approved(farmer);
 
         context.Branches.Add(branch);
         context.Farmers.Add(farmer);

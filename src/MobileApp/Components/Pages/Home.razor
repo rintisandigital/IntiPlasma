@@ -225,6 +225,8 @@
             </div>
         </div>
 
+        @MySubmissionsCard(view.Dashboard.Approvals)
+
         <h5 class="mb-12">Kandang saya</h5>
         @if (view.Tasks.Count == 0)
         {
@@ -301,6 +303,56 @@
         }
     };
 
+    /// <summary>
+    /// Approval menunggu saya per jenis (Manager, M-93).
+    /// </summary>
+    private static RenderFragment WaitingForMeCard(DashboardApprovals approvals) => __builder =>
+    {
+        <a class="list-card mb-16 d-block" href="/approval">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="text-button-small text-OnSurface"><i class="icon icon-CheckCircle me-1"></i>Approval menunggu saya</div>
+                <StatusBadge Text="@IdFormat.Number(approvals.WaitingForMe)" Tone="@(approvals.WaitingForMe > 0 ? Labels.Tone.Warning : Labels.Tone.Neutral)" />
+            </div>
+            @if (approvals.WaitingByDocumentType.Count > 0)
+            {
+                <div class="meta">
+                    @foreach ((string type, int count) in approvals.WaitingByDocumentType)
+                    {
+                        <span>@Labels.ApprovalDocumentType(type): @count</span>
+                    }
+                </div>
+            }
+        </a>
+    };
+
+    /// <summary>
+    /// Pengajuan saya: menunggu dan ditolak 7 hari terakhir dengan alasannya (PPL, M-93).
+    /// </summary>
+    private static RenderFragment MySubmissionsCard(DashboardApprovals approvals) => __builder =>
+    {
+        if (approvals.MyPending == 0 && approvals.MyRejected.Count == 0)
+        {
+            return;
+        }
+
+        <div class="list-card mb-16">
+            <a class="d-flex justify-content-between align-items-center" href="/pengajuan">
+                <div class="text-button-small text-OnSurface"><i class="icon icon-timeline me-1"></i>Pengajuan saya</div>
+                <StatusBadge Text="@($"{approvals.MyPending} menunggu")" Tone="Labels.Tone.Warning" />
+            </a>
+            @foreach (DashboardRejectedRequest rejected in approvals.MyRejected)
+            {
+                <a class="d-block mt-8" href="/approval/@rejected.RequestId">
+                    <div class="text-caption-1 text-Red">Ditolak: @Labels.ApprovalDocumentType(rejected.DocumentType) @rejected.DocumentCode</div>
+                    @if (rejected.RejectReason is not null)
+                    {
+                        <div class="text-caption-2 text-dark-4">@rejected.RejectReason</div>
+                    }
+                </a>
+            }
+        </div>
+    };
+
     private RenderFragment ManagerDashboard(DashboardView view) => __builder =>
     {
         DashboardKpi kpi = view.Dashboard.Kpi;
@@ -325,6 +377,8 @@
                 <span class="label">Di bawah standar</span><span class="value">@kpi.CyclesBelowStandard / @kpi.ActiveCycles</span>
             </div>
         </div>
+
+        @WaitingForMeCard(view.Dashboard.Approvals)
 
         <h5 class="mb-12">Siklus berisiko (@view.AtRisk.Count)</h5>
         @if (view.AtRisk.Count == 0)

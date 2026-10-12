@@ -17,6 +17,11 @@ public sealed record MobileDashboard
     public DashboardKpi Kpi { get; init; } = new();
 
     public IReadOnlyList<DashboardCycle> Cycles { get; init; } = [];
+
+    /// <summary>
+    /// Requests waiting for the user and the user's own submissions (M-93).
+    /// </summary>
+    public DashboardApprovals Approvals { get; init; } = new();
 }
 
 public sealed record DashboardThresholds(int FeedWarningDays, int RecordingLateDays, decimal DepletionWarningPercent, int StockReportFromAgeDays);

@@ -20,7 +20,7 @@
             <div class="text-caption-2 text-Primary">@_farmer.Code · @_farmer.Type · @_farmer.BranchCode</div>
             <h4 class="mt-4">@_farmer.Name</h4>
             <div class="d-flex flex-wrap gap-8 mt-8">
-                <StatusBadge Text="@Labels.Active(_farmer.IsActive)" Tone="@(_farmer.IsActive ? Labels.Tone.Success : Labels.Tone.Neutral)" />
+                <StatusBadge Text="@Labels.RecordStatus(_farmer.RegistrationStatus, _farmer.IsActive)" Tone="@Labels.RecordTone(_farmer.RegistrationStatus, _farmer.IsActive)" />
                 @if (_farmer.FieldOfficerName is { } ppl)
                 {
                     <span class="chip"><i class="icon icon-user-line"></i>PPL: @ppl</span>
@@ -43,6 +43,8 @@
             </div>
         }
 
+        <ApprovalBanner Item="_farmer" />
+
         <Tabs Items="TabNames" @bind-Active="_tab" />
 
         @if (_tab == "Data")
@@ -54,6 +56,17 @@
                 <div class="row-item"><span class="label">Telepon</span><span>@(_farmer.Phone ?? "—")</span></div>
                 <div class="row-item"><span class="label">Alamat</span><span class="text-end">@(_farmer.Address ?? "—")</span></div>
             </div>
+
+            @if (_farmer.PendingChange is { } change)
+            {
+                <div class="alert alert-info py-2 mt-12">
+                    Perubahan menunggu approval: NIK @Labels.MaskNik(change.Nik)
+                    @if (change.BankAccount.AccountNumber is not null)
+                    {
+                        <text> · rekening @change.BankAccount.BankName @change.BankAccount.AccountNumber</text>
+                    }
+                </div>
+            }
 
             <h6 class="mt-20 mb-8">Rekening</h6>
             <div class="info-list">
@@ -71,6 +84,10 @@
                 </ItemTemplate>
             </LoaderList>
         }
+        else if (_tab == "Approval")
+        {
+            <ApprovalTab Resource="farmers" DocumentId="_farmer.Id" OnChanged="LoadAsync" />
+        }
         else
         {
             <AttachmentList Ids="_farmer.Documents" />
@@ -79,7 +96,7 @@
 </AppPage>
 
 @code {
-    private static readonly string[] TabNames = ["Data", "Kandang", "Lampiran"];
+    private static readonly string[] TabNames = ["Data", "Kandang", "Approval", "Lampiran"];
 
     private Farmer? _farmer;
     private DateTime? _cachedAtUtc;

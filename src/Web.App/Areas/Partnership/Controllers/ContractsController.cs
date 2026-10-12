@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Paging;
+using Application.Approvals;
 using Application.Contracts;
 using Application.Contracts.ChangeStatus;
 using Application.Contracts.Create;
@@ -28,8 +29,9 @@ namespace Web.App.Areas.Partnership.Controllers;
 
 /// <summary>
 /// Partnership contracts (keputusan #1): price contract (sapronak contract prices + guaranteed live bird prices
-/// per weight range) or profit sharing (plasma share %), with bonuses/deductions. Draft → Active → Inactive;
-/// only drafts can be edited.
+/// per weight range) or profit sharing (plasma share %), with bonuses/deductions. Draft → (submit) PendingApproval →
+/// Active through the approval module (PLAN-MOBILE M-85), or Rejected → edit → submit again; Active → Inactive.
+/// Only drafts and rejected contracts can be edited.
 /// </summary>
 [Area("Partnership")]
 [MenuAccess(MenuCodes.PartnershipContracts)]
@@ -37,7 +39,8 @@ public sealed class ContractsController(
     PageSupport support,
     IQueryHandler<GetContractsQuery, PagedList<ContractResponse>> contractsQuery,
     IQueryHandler<GetContractByIdQuery, ContractResponse> contractQuery,
-    IQueryHandler<GetTaxCodesQuery, IReadOnlyList<TaxCodeResponse>> taxCodesQuery) : AppController
+    IQueryHandler<GetTaxCodesQuery, IReadOnlyList<TaxCodeResponse>> taxCodesQuery,
+    IQueryHandler<GetContractApprovalsQuery, IReadOnlyList<ApprovalDetailResponse>> approvalsQuery) : AppController
 {
     private const string MenuCode = MenuCodes.PartnershipContracts;
     private const string DocumentType = "Contract";
@@ -100,13 +103,16 @@ public sealed class ContractsController(
 
         ContractResponse contract = result.Value;
         bool canEdit = await support.CanAsync(MenuCode, MenuRights.Edit);
+        Result<IReadOnlyList<ApprovalDetailResponse>> approvals =
+            await approvalsQuery.Handle(new GetContractApprovalsQuery(id), cancellationToken);
 
         return View(new ContractDetailsViewModel(
             contract,
             await support.AttachmentsAsync(contract.Documents, cancellationToken),
-            CanEditDraft: canEdit && contract.Status == nameof(ContractStatus.Draft),
+            CanEditDraft: canEdit && IsEditable(contract.Status),
             CanChangeStatus: canEdit,
-            CanManageAttachments: canEdit));
+            CanManageAttachments: canEdit,
+            approvals.IsSuccess ? approvals.Value : []));
     }
 
     [HttpGet]
@@ -152,9 +158,9 @@ public sealed class ContractsController(
             return result.Error.Type == ErrorType.Forbidden ? Forbid() : NotFound();
         }
 
-        if (result.Value.Status != nameof(ContractStatus.Draft))
+        if (!IsEditable(result.Value.Status))
         {
-            NotifyError("Only draft contracts can be changed.");
+            NotifyError("Only draft or rejected contracts can be changed.");
             return RedirectToAction(nameof(Details), new { id });
         }
 
@@ -184,21 +190,24 @@ public sealed class ContractsController(
         return View("Form", await WithOptionsAsync(model, cancellationToken));
     }
 
+    /// <summary>
+    /// Submits the contract for activation; it becomes active once every approval level approves (M-85).
+    /// </summary>
     [HttpPost]
     [MenuAccess(MenuCode, MenuRights.Edit)]
-    [WorkflowAction("activate")]
-    public async Task<IActionResult> Activate(
+    [WorkflowAction("submit")]
+    public async Task<IActionResult> Submit(
         Guid id,
         [FromServices] IWorkflowActionService workflow,
-        [FromServices] ICommandHandler<ActivateContractCommand> handler,
+        [FromServices] ICommandHandler<SubmitContractCommand, Guid> handler,
         CancellationToken cancellationToken)
     {
         Result result = await workflow.ExecuteAsync(
-            new WorkflowActionRequest(DocumentType, id, "activate"),
-            ct => handler.Handle(new ActivateContractCommand(id), ct),
+            new WorkflowActionRequest(DocumentType, id, "submit"),
+            async ct => await handler.Handle(new SubmitContractCommand(id), ct),
             cancellationToken);
 
-        return AfterAction(id, result, "The contract is now active and can be used by new cycles.");
+        return AfterAction(id, result, "The contract has been submitted for approval; it becomes active once approved.");
     }
 
     [HttpPost]
@@ -252,6 +261,9 @@ public sealed class ContractsController(
 
         return support.Exports.Document(header, container => ContractPdf.Compose(container, contract, formatter));
     }
+
+    private static bool IsEditable(string status) =>
+        status is nameof(ContractStatus.Draft) or nameof(ContractStatus.Rejected);
 
     private RedirectToActionResult AfterAction(Guid id, Result result, string successMessage)
     {

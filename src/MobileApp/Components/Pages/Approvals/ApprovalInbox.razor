@@ -1,0 +1,103 @@
+@page "/approval"
+@inject ApprovalsApi Approvals
+
+@* Inbox approval Manager (PLAN-MOBILE §6.2, M-92): pengajuan yang menunggu keputusan saya, per jenis. *@
+<AppPage Title="Approval">
+    <div class="segmented mb-12">
+        @foreach ((string? key, string title) in Types)
+        {
+            <button type="button" class="@(_type == key ? "active" : null)" @onclick="() => SelectAsync(key)">
+                @title
+                @if (Count(key) is > 0 and var count)
+                {
+                    <span class="bar-badge position-static ms-1">@count</span>
+                }
+            </button>
+        }
+    </div>
+
+    <LoaderList Loader="_loader" EmptyText="Tidak ada pengajuan yang menunggu Anda." EmptyIcon="icon-CheckCircle"
+                OnLoadMore="() => _loader.LoadMoreAsync()" OnRetry="ReloadAsync">
+        <ItemTemplate Context="request">
+            <a class="list-card" href="/approval/@request.Id">
+                <div class="d-flex justify-content-between align-items-start gap-8">
+                    <div>
+                        <div class="text-caption-2 text-Primary">@Labels.ApprovalDocumentType(request.DocumentType) · @request.BranchCode</div>
+                        <div class="text-button-small text-OnSurface">@request.DocumentCode — @request.DocumentTitle</div>
+                    </div>
+                    <StatusBadge Text="@($"Level {request.CurrentLevel}/{request.LevelCount}")" Tone="Labels.Tone.Warning" />
+                </div>
+                @if (request.Summary is not null)
+                {
+                    <div class="text-caption-2 text-dark-4 mt-4">@Labels.ApprovalSummary(request.DocumentType, request.Summary)</div>
+                }
+                <div class="meta">
+                    <span><i class="icon icon-user-line"></i>@request.RequestedByName</span>
+                    <span><i class="icon icon-clock"></i>@Waiting(request.RequestedAtUtc)</span>
+                </div>
+            </a>
+        </ItemTemplate>
+    </LoaderList>
+</AppPage>
+
+@code {
+    private static readonly (string? Key, string Title)[] Types =
+    [
+        (null, "Semua"),
+        ("Farmer", "Peternak"),
+        ("FarmerChange", "Perubahan"),
+        ("Coop", "Kandang"),
+        ("Contract", "Kontrak")
+    ];
+
+    private PagedLoader<ApprovalRequest> _loader = default!;
+    private ApprovalInboxCount? _counts;
+    private string? _type;
+
+    protected override Task OnInitializedAsync()
+    {
+        _loader = new PagedLoader<ApprovalRequest>((page, ct) => Approvals.GetInboxAsync(_type, page, ct));
+
+        return ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        ApiResult<ApprovalInboxCount> counts = await Approvals.GetInboxCountAsync();
+        _counts = counts.IsSuccess ? counts.Value : _counts;
+
+        await _loader.ReloadAsync();
+    }
+
+    private Task SelectAsync(string? type)
+    {
+        _type = type;
+
+        return _loader.ReloadAsync();
+    }
+
+    private int? Count(string? type)
+    {
+        if (_counts is null)
+        {
+            return null;
+        }
+
+        return type is null ? _counts.Total : _counts.ByDocumentType.GetValueOrDefault(type);
+    }
+
+    /// <summary>
+    /// How long the request has been waiting, e.g. "2 hari" or "5 jam".
+    /// </summary>
+    private static string Waiting(DateTime requestedAtUtc)
+    {
+        TimeSpan age = DateTime.UtcNow - requestedAtUtc;
+
+        if (age.TotalDays >= 1)
+        {
+            return $"menunggu {(int)age.TotalDays} hari";
+        }
+
+        return age.TotalHours >= 1 ? $"menunggu {(int)age.TotalHours} jam" : "baru saja";
+    }
+}

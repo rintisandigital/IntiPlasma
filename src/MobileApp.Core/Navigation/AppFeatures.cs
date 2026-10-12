@@ -37,7 +37,7 @@ public static class AppFeatures
             || u.Has(AppPermissions.InventoryRequestFeed));
 
     public static readonly AppFeature Approvals = new(
-        "approval", "Approval", "icon-CheckCircle", "/fitur/approval", "M6", u => u.Has(AppPermissions.ApprovalsDecide));
+        "approval", "Approval", "icon-CheckCircle", "/approval", "M6", u => u.Has(AppPermissions.ApprovalsDecide));
 
     public static readonly AppFeature SyncQueue = new(
         "antrean", "Antrean", "icon-upload", "/antrean", "M2",
@@ -66,11 +66,14 @@ public static class AppFeatures
         u => u.Has(AppPermissions.InventoryRequestFeedMutation));
 
     public static readonly AppFeature MySubmissions = new(
-        "pengajuan", "Pengajuan Saya", "icon-timeline", "/fitur/pengajuan", "M6",
+        "pengajuan", "Pengajuan Saya", "icon-timeline", "/pengajuan", "M6",
         u => u.Has(AppPermissions.FarmersManage)
             || u.Has(AppPermissions.ContractsManage)
             || u.Has(AppPermissions.ProductionRevise)
             || u.Has(AppPermissions.InventoryRequestFeedMutation));
+
+    public static readonly AppFeature Delegations = new(
+        "delegasi", "Delegasi Approval", "icon-shareFat", "/delegasi", "M6", u => u.Has(AppPermissions.ApprovalsDecide));
 
     public static readonly AppFeature Profile = new("profil", "Profil", "icon-profile", "/profil", null, _ => true);
 
@@ -86,7 +89,7 @@ public static class AppFeatures
     /// Entries that only appear in "Lainnya".
     /// </summary>
     public static readonly IReadOnlyList<AppFeature> MoreEntries =
-        [Farmers, Contracts, Performance, FeedRequests, FeedMutations, MySubmissions, Profile, Settings];
+        [Farmers, Contracts, Performance, FeedRequests, FeedMutations, MySubmissions, Delegations, Profile, Settings];
 
     public static readonly IReadOnlyList<AppFeature> All = [.. BottomCandidates, More, .. MoreEntries];
 

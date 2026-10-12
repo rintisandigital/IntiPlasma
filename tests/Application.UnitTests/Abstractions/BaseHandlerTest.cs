@@ -2,8 +2,10 @@ using Application.Abstractions.Authentication;
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Storage;
+using Application.Approvals;
 using Application.Documents;
 using Application.Users;
+using Domain.Approvals;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
@@ -52,6 +54,35 @@ public abstract class BaseHandlerTest
 
         return new AttachmentService(
             context, storage ?? new InMemoryFileStorage(), branchAccess, NoFieldScope(), user, clock, NullLogger<AttachmentService>.Instance);
+    }
+
+    /// <summary>
+    /// The real approval service; requests are submitted by <paramref name="userId"/>.
+    /// </summary>
+    internal static IApprovalService CreateApprovals(IApplicationDbContext context, Guid? userId = null)
+    {
+        IUserContext user = Substitute.For<IUserContext>();
+        user.UserId.Returns(userId ?? Guid.NewGuid());
+
+        IDateTimeProvider clock = Substitute.For<IDateTimeProvider>();
+        clock.UtcNow.Returns(_ => DateTime.UtcNow);
+
+        return new ApprovalService(context, user, clock);
+    }
+
+    /// <summary>
+    /// A default one-level flow for every document type, so documents can be submitted.
+    /// </summary>
+    protected static async Task SeedDefaultApprovalFlowsAsync(TestDbContext context, params Guid[] approverIds)
+    {
+        foreach (ApprovalDocumentType documentType in Enum.GetValues<ApprovalDocumentType>())
+        {
+            context.ApprovalFlows.Add(ApprovalFlow.Create(
+                documentType, null, documentType.ToString(),
+                [new ApprovalLevelDefinition("Verifikasi", approverIds.Length > 0 ? approverIds : [Guid.NewGuid()])]).Value);
+        }
+
+        await context.SaveChangesAsync();
     }
 
     /// <summary>

@@ -1,8 +1,10 @@
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Approvals;
 using Application.Documents;
 using Application.Users.FieldOfficers;
+using Domain.Approvals;
 using Domain.Documents.Attachments;
 using Domain.MasterData.Coops;
 using Domain.MasterData.Farmers;
@@ -15,7 +17,8 @@ internal sealed class CreateCoopCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
     IFieldScope fieldScope,
-    IAttachmentService attachments)
+    IAttachmentService attachments,
+    IApprovalService approvals)
     : ICommandHandler<CreateCoopCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateCoopCommand command, CancellationToken cancellationToken)
@@ -65,6 +68,20 @@ internal sealed class CreateCoopCommandHandler(
         if (await context.Coops.AnyAsync(c => c.Code == coop.Value.Code, cancellationToken))
         {
             return Result.Failure<Guid>(CoopErrors.CodeNotUnique(coop.Value.Code));
+        }
+
+        // Saved and submitted for approval at once; without a configured flow nothing is saved (M-82).
+        Result submitted = coop.Value.Submit(farmer);
+        if (submitted.IsFailure)
+        {
+            return Result.Failure<Guid>(submitted.Error);
+        }
+
+        Result<ApprovalRequest> request = await approvals.SubmitAsync(
+            ApprovalSubmissions.ForCoop(coop.Value, farmer), cancellationToken);
+        if (request.IsFailure)
+        {
+            return Result.Failure<Guid>(request.Error);
         }
 
         Result documents = await attachments.ApplyDocumentsAsync(

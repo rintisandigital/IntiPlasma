@@ -1,3 +1,5 @@
+@using Application.Approvals
+@using Web.App.Areas.Approvals.Models
 @model BranchFormViewModel
 @{
     bool isNew = Model.Id is null;
@@ -56,12 +58,99 @@
                         <label class="form-check-label" for="IsActive">Active</label>
                     </div>
                 }
+                @if (isNew)
+                {
+                    <hr />
+                    <h6 class="mb-2">Approval flow</h6>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" id="ApprovalSetup_default" name="ApprovalSetup" value="default" checked="@(Model.ApprovalSetup != "branch")">
+                        <label class="form-check-label" for="ApprovalSetup_default">Use the default approval flows (all branches)</label>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" id="ApprovalSetup_branch" name="ApprovalSetup" value="branch" checked="@(Model.ApprovalSetup == "branch")">
+                        <label class="form-check-label" for="ApprovalSetup_branch">Set up this branch's own approval flow</label>
+                    </div>
+                    <div class="border rounded p-3 mb-3" id="branch-approval">
+                        <div class="mb-2">
+                            <span class="form-label d-block">For document types</span>
+                            @foreach (Microsoft.AspNetCore.Mvc.Rendering.SelectListItem type in ApprovalLabels.DocumentTypeOptions())
+                            {
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="type-@type.Value" name="ApprovalDocumentTypes" value="@type.Value"
+                                           checked="@Model.ApprovalDocumentTypes.Any(t => t.ToString() == type.Value)">
+                                    <label class="form-check-label" for="type-@type.Value">@type.Text</label>
+                                </div>
+                            }
+                        </div>
+                        <partial name="Partials/_ApprovalLevelsEditor" model='new ApprovalLevelsEditorModel("ApprovalLevels", Model.ApprovalLevels, Model.ApproverNames, null)' />
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="GrantBranchAccess" name="GrantBranchAccess" value="true" checked="@(Model.GrantBranchAccess == true)">
+                            <label class="form-check-label" for="GrantBranchAccess">Add this branch to the branch access profile of approvers who cannot see it yet</label>
+                        </div>
+                        <div class="form-text">Approvers must have access to the branch to decide its requests. The flows can be changed later in Administration → Approval Flows.</div>
+                    </div>
+                }
                 <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Save</button>
             </div>
         </form>
     </div>
+    @if (!isNew)
+    {
+        <div class="col-xl-6 col-lg-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Approval flows</h5>
+                    <a href="/Admin/ApprovalFlows?branch=@Model.Id" asp-menu="@MenuCodes.AdminApprovalFlows" class="btn btn-sm btn-light">Manage</a>
+                </div>
+                <div class="card-body">
+                    @foreach (Microsoft.AspNetCore.Mvc.Rendering.SelectListItem type in ApprovalLabels.DocumentTypeOptions())
+                    {
+                        ApprovalFlowResponse? flow = Model.ApprovalFlows.FirstOrDefault(f => f.DocumentType == type.Value);
+                        <div class="mb-2">
+                            <div class="fw-semibold">@type.Text</div>
+                            @if (flow is null)
+                            {
+                                <div class="text-danger fs-13"><i class="ti ti-alert-triangle me-1"></i>No flow: documents of this type cannot be submitted.</div>
+                            }
+                            else
+                            {
+                                <div class="fs-13 text-muted">
+                                    @(flow.BranchId is null ? "Default flow" : "Branch flow"):
+                                    @string.Join(" → ", flow.Levels.Select(l => $"{l.Name} ({string.Join(", ", l.Approvers.Select(a => a.Name))})"))
+                                    @if (flow.HasStuckLevel)
+                                    {
+                                        <span class="badge bg-danger">Stuck</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
 </div>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    @if (isNew)
+    {
+        <script>
+            // The level editor only counts (and is only validated) for the branch's own flows.
+            (function () {
+                var box = document.getElementById('branch-approval');
+                var own = document.getElementById('ApprovalSetup_branch');
+                function toggle() {
+                    box.hidden = !own.checked;
+                    box.querySelectorAll('input, select, button').forEach(function (e) {
+                        e.disabled = !own.checked;
+                        if (e.tomselect) { if (own.checked) { e.tomselect.enable(); } else { e.tomselect.disable(); } }
+                    });
+                }
+                document.querySelectorAll('input[name="ApprovalSetup"]').forEach(function (r) { r.addEventListener('change', toggle); });
+                window.addEventListener('load', toggle);
+                toggle();
+            })();
+        </script>
+    }
 }

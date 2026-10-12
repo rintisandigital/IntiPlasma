@@ -1,8 +1,10 @@
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Approvals;
 using Application.Documents;
 using Application.Users.FieldOfficers;
+using Domain.Approvals;
 using Domain.Common;
 using Domain.Documents.Attachments;
 using Domain.MasterData.Branches;
@@ -16,7 +18,8 @@ internal sealed class CreateFarmerCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
     IFieldScope fieldScope,
-    IAttachmentService attachments)
+    IAttachmentService attachments,
+    IApprovalService approvals)
     : ICommandHandler<CreateFarmerCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(CreateFarmerCommand command, CancellationToken cancellationToken)
@@ -75,6 +78,20 @@ internal sealed class CreateFarmerCommandHandler(
         if (await context.Farmers.AnyAsync(f => f.Code == farmer.Value.Code, cancellationToken))
         {
             return Result.Failure<Guid>(FarmerErrors.CodeNotUnique(farmer.Value.Code));
+        }
+
+        // Saved and submitted for approval at once; without a configured flow nothing is saved (M-82).
+        Result submitted = farmer.Value.Submit();
+        if (submitted.IsFailure)
+        {
+            return Result.Failure<Guid>(submitted.Error);
+        }
+
+        Result<ApprovalRequest> request = await approvals.SubmitAsync(
+            ApprovalSubmissions.ForFarmer(farmer.Value), cancellationToken);
+        if (request.IsFailure)
+        {
+            return Result.Failure<Guid>(request.Error);
         }
 
         Result documents = await attachments.ApplyDocumentsAsync(

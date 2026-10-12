@@ -77,5 +77,26 @@ public abstract class MasterFormViewModel
 
     [BindNever]
     public IReadOnlyList<Application.Documents.AttachmentResponse> Attachments { get; set; } = [];
+
+    /// <summary>
+    /// Approval state of a farmer or farm (PLAN-MOBILE M-81): Draft, PendingApproval, Rejected or Approved.
+    /// </summary>
+    [BindNever]
+    public string? RegistrationStatus { get; set; }
+
+    /// <summary>
+    /// The approval requests of the record (timeline).
+    /// </summary>
+    [BindNever]
+    public IReadOnlyList<Application.Approvals.ApprovalDetailResponse> Approvals { get; set; } = [];
+
+    /// <summary>
+    /// A draft or rejected record can be submitted (again) by a user with the Edit right.
+    /// </summary>
+    [BindNever]
+    public bool CanSubmit { get; set; }
+
+    [BindNever]
+    public bool IsApproved => RegistrationStatus is null or "Approved";
 }
 

@@ -28,7 +28,7 @@ public sealed class MasterDataTests
     }
 
     [Fact]
-    public void Coop_Should_InheritBranchOfFarmer_AndRaiseCreatedEvent()
+    public void Coop_Should_InheritBranchOfFarmer_AndRaiseApprovedEvent()
     {
         Farmer farmer = TestData.PlasmaFarmer();
 
@@ -36,7 +36,7 @@ public sealed class MasterDataTests
 
         coop.BranchId.ShouldBe(farmer.BranchId);
         coop.FarmerId.ShouldBe(farmer.Id);
-        coop.DomainEvents.ShouldContain(e => e is CoopCreatedDomainEvent);
+        coop.DomainEvents.ShouldContain(e => e is CoopApprovedDomainEvent);
     }
 
     [Fact]

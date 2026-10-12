@@ -31,4 +31,16 @@ public static class CommonErrors
     public static Error Inactive(string entity, Guid id) => Error.Problem(
         $"{entity}.Inactive",
         $"The {entity} with the Id = '{id}' is inactive");
+
+    public static Error PendingApproval(string entity, Guid id) => Error.Problem(
+        $"{entity}.PendingApproval",
+        $"The {entity} with the Id = '{id}' is waiting for approval; cancel the request before changing it");
+
+    public static Error NotSubmittable(string entity, Guid id) => Error.Problem(
+        $"{entity}.NotSubmittable",
+        $"The {entity} with the Id = '{id}' can only be submitted as a draft or after it was rejected");
+
+    public static Error NotPendingApproval(string entity, Guid id) => Error.Problem(
+        $"{entity}.NotPendingApproval",
+        $"The {entity} with the Id = '{id}' is not waiting for approval");
 }

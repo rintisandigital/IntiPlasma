@@ -52,7 +52,7 @@ public sealed class AppFeaturesTests
     {
         string[] keys = Keys(AppFeatures.MoreMenu(User(Manager)));
 
-        keys.ShouldBe(["peternak", "kontrak", "grafik", "request-pakan", "profil", "pengaturan"]);
+        keys.ShouldBe(["peternak", "kontrak", "grafik", "request-pakan", "delegasi", "profil", "pengaturan"]);
     }
 
     [Fact]

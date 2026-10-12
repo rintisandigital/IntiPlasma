@@ -1,0 +1,61 @@
+@inject ApprovalsApi Approvals
+
+@* "Approval" tab of a farmer, coop or contract: every request of the document with its levels (M-92). *@
+@if (_error is not null)
+{
+    <ErrorState Error="_error" OnRetry="LoadAsync" />
+}
+else if (_requests is null)
+{
+    <Spinner />
+}
+else
+{
+    <CacheNote CachedAtUtc="_cachedAtUtc" />
+    <ApprovalTimeline Requests="_requests" OnChanged="ChangedAsync" />
+}
+
+@code {
+    private List<ApprovalDetail>? _requests;
+    private DateTime? _cachedAtUtc;
+    private ApiError? _error;
+
+    /// <summary>
+    /// <c>farmers</c>, <c>coops</c> or <c>contracts</c>.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public string Resource { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public Guid DocumentId { get; set; }
+
+    /// <summary>
+    /// After a request was cancelled: the document changed too.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+
+        CachedResult<List<ApprovalDetail>> result = await Approvals.GetTimelineAsync(Resource, DocumentId);
+        if (result.IsSuccess)
+        {
+            _requests = result.Value;
+            _cachedAtUtc = result.CachedAtUtc;
+        }
+        else
+        {
+            _error = result.Error;
+        }
+    }
+
+    private async Task ChangedAsync()
+    {
+        await LoadAsync();
+        await OnChanged.InvokeAsync();
+    }
+}

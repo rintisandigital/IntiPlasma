@@ -1,22 +1,26 @@
+using Application.Approvals;
+
 namespace Application.Contracts;
 
-public sealed record ContractResponse
+public sealed record ContractResponse : IHasLatestApproval
 {
     /// <summary>
     /// Lampiran: attachment ids; metadata via <c>GET /attachments?ids=</c>.
     /// </summary>
     public Guid[] Documents { get; init; } = [];
 
-    public const string Select =
-        """
+    public static readonly string Select =
+        $"""
         SELECT c.id AS Id, c.code AS Code, c.name AS Name, c.branch_id AS BranchId, b.code AS BranchCode,
                c.scheme AS Scheme, c.status AS Status, c.valid_from AS ValidFrom, c.valid_to AS ValidTo,
                c.plasma_profit_share_percent AS PlasmaProfitSharePercent, c.income_tax_code_id AS IncomeTaxCodeId,
                t.code AS IncomeTaxCode, c.notes AS Notes,
-               c.documents AS Documents
+               c.documents AS Documents,
+               {ApprovalSql.LatestColumns}
         FROM partnership.contracts c
         JOIN master.branches b ON b.id = c.branch_id
         LEFT JOIN master.tax_codes t ON t.id = c.income_tax_code_id
+        {ApprovalSql.LatestJoin("c", "Contract")}
         """;
 
     public Guid Id { get; init; }
@@ -44,6 +48,20 @@ public sealed record ContractResponse
     public string? IncomeTaxCode { get; init; }
 
     public string? Notes { get; init; }
+
+    public Guid? ApprovalRequestId { get; init; }
+
+    public string? ApprovalDocumentType { get; init; }
+
+    public string? ApprovalStatus { get; init; }
+
+    public int? ApprovalLevel { get; init; }
+
+    public int? ApprovalLevelCount { get; init; }
+
+    public string? ApprovalLevelName { get; init; }
+
+    public string? ApprovalRejectReason { get; init; }
 
     /// <summary>
     /// Only filled by the detail endpoint.

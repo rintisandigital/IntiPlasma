@@ -1,0 +1,34 @@
+@using Domain.Approvals
+@model ApprovalListViewModel
+@{
+    ViewData["Title"] = "My Submissions";
+    ViewData["ShowRequester"] = false;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">My Submissions</h4>
+            <h6>Approval requests you submitted; a pending request can be cancelled from its page</h6>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <form method="get" class="row g-2">
+            <div class="col-md-4"><input type="search" name="search" value="@Model.Search" class="form-control form-control-sm" placeholder="Search code or name" aria-label="Search"></div>
+            <div class="col-md-3">
+                <select name="status" class="form-select form-select-sm" aria-label="Status" data-autosubmit>
+                    <option value="">All statuses</option>
+                    @foreach (ApprovalStatus status in Enum.GetValues<ApprovalStatus>())
+                    {
+                        <option value="@status" selected="@(Model.Status == status.ToString())">@status</option>
+                    }
+                </select>
+            </div>
+        </form>
+    </div>
+    <div class="card-body p-0">
+        <partial name="_RequestTable" model="Model" />
+    </div>
+</div>

@@ -102,6 +102,8 @@ public static class Labels
         "Draft" => "Draf",
         "Active" => "Aktif",
         "Inactive" => "Nonaktif",
+        "PendingApproval" => "Menunggu approval",
+        "Rejected" => "Ditolak",
         _ => value
     };
 
@@ -109,6 +111,115 @@ public static class Labels
     {
         "Active" => Tone.Success,
         "Draft" => Tone.Info,
+        "PendingApproval" => Tone.Warning,
+        "Rejected" => Tone.Danger,
+        _ => Tone.Neutral
+    };
+
+    /// <summary>
+    /// Status of a farmer or coop (M-81): the approval state until approved, then Aktif/Nonaktif.
+    /// </summary>
+    public static string RecordStatus(string registrationStatus, bool isActive) => registrationStatus switch
+    {
+        "PendingApproval" => "Menunggu approval",
+        "Rejected" => "Ditolak",
+        "Draft" => "Draf",
+        _ => Active(isActive)
+    };
+
+    public static Tone RecordTone(string registrationStatus, bool isActive) => registrationStatus switch
+    {
+        "PendingApproval" => Tone.Warning,
+        "Rejected" => Tone.Danger,
+        "Draft" => Tone.Info,
+        _ => isActive ? Tone.Success : Tone.Neutral
+    };
+
+    /// <summary>
+    /// What a request is about (M-5).
+    /// </summary>
+    public static string ApprovalDocumentType(string value) => value switch
+    {
+        "Farmer" => "Peternak baru",
+        "FarmerChange" => "Perubahan NIK/rekening",
+        "Coop" => "Kandang baru",
+        "Contract" => "Aktivasi kontrak",
+        _ => value
+    };
+
+    public static string ApprovalStatus(string value) => value switch
+    {
+        "Pending" => "Menunggu",
+        "Approved" => "Disetujui",
+        "Rejected" => "Ditolak",
+        "Cancelled" => "Dibatalkan",
+        _ => value
+    };
+
+    public static Tone ApprovalTone(string value) => value switch
+    {
+        "Pending" => Tone.Warning,
+        "Approved" => Tone.Success,
+        "Rejected" => Tone.Danger,
+        _ => Tone.Neutral
+    };
+
+    /// <summary>
+    /// State of one level in the timeline.
+    /// </summary>
+    public static string LevelState(string value) => value switch
+    {
+        "Approved" => "Disetujui",
+        "Rejected" => "Ditolak",
+        "Pending" => "Menunggu keputusan",
+        "Waiting" => "Belum sampai",
+        "Skipped" => "Tidak diproses",
+        _ => value
+    };
+
+    /// <summary>
+    /// "Level 1 dari 2 · Manager Unit" while pending, otherwise the number of levels.
+    /// </summary>
+    public static string ApprovalLevel(string status, int currentLevel, int levelCount, string? levelName)
+    {
+        if (status != "Pending")
+        {
+            return $"{levelCount} level";
+        }
+
+        string level = $"Level {currentLevel} dari {levelCount}";
+
+        return string.IsNullOrWhiteSpace(levelName) ? level : $"{level} · {levelName}";
+    }
+
+    public static string ApprovalField(string field) => field switch
+    {
+        "Nik" => "NIK",
+        "BankAccount" => "Rekening bank",
+        _ => field
+    };
+
+    /// <summary>
+    /// The one-line summary of a request; the changed fields of a farmer change in Indonesian.
+    /// </summary>
+    public static string? ApprovalSummary(string documentType, string? summary) =>
+        documentType == "FarmerChange" && summary is not null
+            ? string.Join(", ", summary.Split(", ").Select(ApprovalField))
+            : summary;
+
+    public static string DelegationStatus(string value) => value switch
+    {
+        "Active" => "Berjalan",
+        "Scheduled" => "Terjadwal",
+        "Ended" => "Selesai",
+        "Revoked" => "Dicabut",
+        _ => value
+    };
+
+    public static Tone DelegationTone(string value) => value switch
+    {
+        "Active" => Tone.Success,
+        "Scheduled" => Tone.Info,
         _ => Tone.Neutral
     };
 

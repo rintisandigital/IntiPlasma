@@ -66,8 +66,11 @@ public abstract class FieldScenarioTest(IntegrationTestWebAppFactory factory) : 
             bankAccount = new { },
             fieldOfficerUserId = (Guid?)null
         });
+        await ApproveAsync(farmer);
         Guid coopA = await PostAsync<Guid>("coops", Coop(farmer, $"RA{suffix}", pplAId));
         Guid coopB = await PostAsync<Guid>("coops", Coop(farmer, $"RB{suffix}", pplBId));
+        await ApproveAsync(coopA);
+        await ApproveAsync(coopB);
 
         Guid warehouseA = await CoopWarehouseAsync(coopA);
         Guid warehouseB = await CoopWarehouseAsync(coopB);
@@ -111,7 +114,7 @@ public abstract class FieldScenarioTest(IntegrationTestWebAppFactory factory) : 
     }
 
     /// <summary>
-    /// The coop warehouse is created by the outbox after the coop is saved.
+    /// The coop warehouse is created by the outbox after the coop is approved.
     /// </summary>
     protected async Task<Guid> CoopWarehouseAsync(Guid coopId)
     {

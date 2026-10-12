@@ -1,0 +1,32 @@
+@* Approval state and timeline of a farmer or farm (PLAN-MOBILE M-81 s.d. M-84); outside the edit form. *@
+@using Web.App.Areas.Approvals.Models
+@model MasterFormViewModel
+@if (!Model.IsNew)
+{
+    <div class="card" id="approval">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <h5 class="card-title mb-0">Approval <partial name="Partials/_StatusBadge" model='Model.RegistrationStatus ?? "Approved"' /></h5>
+            @if (Model.CanSubmit)
+            {
+                <form asp-action="Submit" asp-route-id="@Model.Id" method="post" data-confirm="Submit for approval? A new request starts at level 1.">
+                    <button type="submit" class="btn btn-sm btn-success"><i class="ti ti-send me-1"></i>Submit for approval</button>
+                </form>
+            }
+        </div>
+        <div class="card-body">
+            @switch (Model.RegistrationStatus)
+            {
+                case "PendingApproval":
+                    <p class="text-muted">Waiting for approval: the data cannot be changed until the request is decided or cancelled by its requester.</p>
+                    break;
+                case "Rejected":
+                    <p class="text-muted">Rejected: correct the data, save and submit again.</p>
+                    break;
+                case "Draft":
+                    <p class="text-muted">Draft: not submitted (the request was cancelled). Submit it to make the record usable.</p>
+                    break;
+            }
+            <partial name="Partials/_ApprovalTimeline" model="new ApprovalTimelineModel(Model.Approvals)" />
+        </div>
+    </div>
+}

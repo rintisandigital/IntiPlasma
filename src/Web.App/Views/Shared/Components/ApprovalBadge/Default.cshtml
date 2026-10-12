@@ -1,0 +1,11 @@
+@* Header inbox icon with the number of requests waiting for the user. *@
+@model ApprovalBadgeModel
+<li class="nav-item nav-item-box me-2">
+    <a href="/Approvals/Inbox" target="content-frame" class="nav-link position-relative" title="Approval inbox" aria-label="Approval inbox: @Model.WaitingForMe waiting">
+        <i class="ti ti-checklist"></i>
+        @if (Model.WaitingForMe > 0)
+        {
+            <span class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle" data-approval-count>@Model.WaitingForMe</span>
+        }
+    </a>
+</li>

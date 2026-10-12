@@ -17,11 +17,14 @@ Master tidak dihapus; nonaktifkan lewat switch **Active** agar riwayat tetap utu
 ## Partnership
 | Menu | Catatan |
 |---|---|
-| **Farmers** | Peternak **Inti** atau **Plasma** (plasma wajib NIK), rekening untuk pembayaran. |
-| **Coops** | Kandang milik peternak, kapasitas, cabang. |
+| **Farmers** | Peternak **Inti** atau **Plasma** (plasma wajib NIK), rekening untuk pembayaran. Peternak baru langsung **diajukan approval**; perubahan **NIK atau rekening** peternak yang sudah disetujui juga diajukan (nilai lama tetap dipakai sampai disetujui). |
+| **Coops** | Kandang milik peternak, kapasitas, cabang. Kandang baru langsung diajukan approval (peternaknya harus sudah disetujui atau sedang diajukan); gudang kandang `GK-…` dibuat setelah kandang disetujui. |
 | **Contracts** | Kontrak kemitraan plasma: skema **PriceContract** (harga sapronak kontrak + harga jaminan ayam per rentang bobot) atau **ProfitSharing** (% bagi hasil), bonus/potongan, PPh. |
 
+### Status & approval peternak/kandang
+*Pending Approval* (terkunci, tidak bisa diedit) → disetujui semua level → *Active* (bisa dipakai siklus; bisa dinonaktifkan), atau → *Rejected* (alasan tampil di kartu **Approval**; perbaiki, **Save**, lalu **Submit for approval** — pengajuan baru mulai level 1). Pengaju bisa **Cancel request** selama menunggu → *Draft*. Halaman peternak/kandang (ikon mata di daftar) menampilkan kartu **Approval** berisi riwayat level & keputusan.
+
 ### Alur kontrak
-*Draft* (bisa diubah) → **Activate** → *Active* (dipakai siklus) → **Deactivate** → *Inactive*. Hanya kontrak *Draft* yang bisa diedit. **Print PDF** mencetak kontrak.
+*Draft* (bisa diubah) → **Submit for approval** → *Pending Approval* → semua level setuju → *Active* (dipakai siklus) → **Deactivate** → *Inactive*. Bila ditolak → *Rejected* (bisa diedit lalu diajukan lagi). Hanya kontrak *Draft*/*Rejected* yang bisa diedit. **Print PDF** mencetak kontrak.
 
 Siklus plasma wajib memakai kontrak aktif pada cabang yang sama; data kontrak disalin ke siklus saat direncanakan.

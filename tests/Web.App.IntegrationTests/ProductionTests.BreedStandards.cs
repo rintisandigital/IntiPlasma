@@ -75,6 +75,7 @@ public sealed partial class ProductionTests
         Guid branchId = await QueryAsync(db => db.Branches.Where(b => b.Code == $"B{s}").Select(b => b.Id).SingleAsync());
         await PostAsync(client, "/Partnership/Farmers/Create", new() { ["Code"] = $"F{s}", ["Name"] = "Inti farm", ["Type"] = "Inti", ["BranchId"] = branchId.ToString() });
         Guid farmerId = await QueryAsync(db => db.Farmers.Where(f => f.Code == $"F{s}").Select(f => f.Id).SingleAsync());
+        await factory.ApproveAsync(farmerId);
         Guid coopId = await CreateCoopAsync(client, s, "K", farmerId, branchId);
 
         Guid other = await QueryAsync(async db =>

@@ -1,0 +1,87 @@
+@using Application.Approvals
+@using Web.App.Areas.Approvals.Models
+@model ReplaceApproverViewModel
+@{
+    ViewData["Title"] = "Replace Approver";
+    ViewData["Menu"] = MenuCodes.AdminApprovalFlows;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Replace Approver</h4>
+            <h6>For an approver who resigned or moved: replace them in every flow and in the levels still to be decided of pending requests</h6>
+        </div>
+    </div>
+    <div class="page-btn">
+        <a asp-action="Index" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label" for="fromUserId">Approver to replace</label>
+                <select id="fromUserId" name="fromUserId" class="form-select" data-autosubmit>
+                    <option value="">— choose —</option>
+                    @foreach (Microsoft.AspNetCore.Mvc.Rendering.SelectListItem option in Model.FromOptions)
+                    {
+                        <option value="@option.Value" selected="@(option.Value == Model.FromUserId?.ToString())">@option.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="branchId">Only branch</label>
+                <select id="branchId" name="branchId" class="form-select" asp-items="Model.BranchOptions" data-autosubmit>
+                    <option value="">All (including default flows)</option>
+                </select>
+            </div>
+            <input type="hidden" name="toUserId" value="@Model.ToUserId" />
+        </form>
+    </div>
+</div>
+
+@if (Model.Usage is { } usage)
+{
+    <div class="card">
+        <div class="card-header"><h5 class="card-title mb-0">Where this user is an approver</h5></div>
+        <div class="card-body">
+            @if (!usage.IsUsed)
+            {
+                <p class="text-muted mb-0">Not an approver in any flow or pending request.</p>
+            }
+            else
+            {
+                <h6>Flows (@usage.Flows.Count)</h6>
+                <ul>
+                    @foreach (ApproverUsageFlow flow in usage.Flows)
+                    {
+                        <li>@ApprovalLabels.DocumentType(flow.DocumentType) · @(flow.BranchName ?? "Default") · @flow.Name — level @string.Join(", ", flow.Levels)</li>
+                    }
+                </ul>
+                <h6>Pending requests (@usage.PendingRequests.Count)</h6>
+                <ul>
+                    @foreach (ApproverUsageRequest request in usage.PendingRequests)
+                    {
+                        <li>@ApprovalLabels.DocumentType(request.DocumentType) @request.DocumentCode — @request.DocumentTitle (@request.BranchName), now at level @request.CurrentLevel, listed at level @string.Join(", ", request.Levels)</li>
+                    }
+                </ul>
+                <form asp-action="ReplaceApprover" method="post" class="row g-2 align-items-end" data-confirm="Replace this approver in every flow and pending request listed?">
+                    <input type="hidden" name="fromUserId" value="@Model.FromUserId" />
+                    <input type="hidden" name="branchId" value="@Model.BranchId" />
+                    <div class="col-md-4">
+                        <label class="form-label" for="toUserId">Replace with</label>
+                        <select id="toUserId" name="toUserId" class="form-select" required>
+                            <option value="">— choose —</option>
+                            @foreach (Microsoft.AspNetCore.Mvc.Rendering.SelectListItem option in Model.ToOptions.Where(o => o.Value != Model.FromUserId?.ToString()))
+                            {
+                                <option value="@option.Value" selected="@(option.Value == Model.ToUserId?.ToString())">@option.Text</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">Replace</button></div>
+                </form>
+            }
+        </div>
+    </div>
+}

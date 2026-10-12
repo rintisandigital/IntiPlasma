@@ -122,8 +122,8 @@ public sealed class InventoryHandlersTests : BaseHandlerTest
         feed.SetConversions([(sak.Id, 50m)]);
 
         Farmer farmer = Farmer.Create("INT-1", "Farm Inti", FarmerType.Inti, branch.Id, null,
-            TaxIdentity.None, null, null, BankAccount.None).Value;
-        Coop coop = Coop.Create(farmer, "KDG-1", "Kandang 1", 10_000, HouseType.ClosedHouse, null, null, null).Value;
+            TaxIdentity.None, null, null, BankAccount.None).Value.Approved();
+        Coop coop = Coop.Create(farmer, "KDG-1", "Kandang 1", 10_000, HouseType.ClosedHouse, null, null, null).Value.Approved(farmer);
         ProductionCycle cycle = ProductionCycle.Plan("SKL/1", coop, farmer, null, Date, 9_000, null).Value;
 
         var central = Warehouse.CreateCentral("GI-BDG", "Gudang Induk", branch.Id, null);

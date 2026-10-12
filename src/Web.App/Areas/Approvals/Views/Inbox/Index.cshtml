@@ -1,0 +1,42 @@
+@model ApprovalListViewModel
+@{
+    ViewData["Title"] = "Approval Inbox";
+    ViewData["Menu"] = MenuCodes.ApprovalsInbox;
+    ViewData["ShowStatus"] = false;
+    int total = Model.Counts.Values.Sum();
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Approval Inbox</h4>
+            <h6>Requests waiting for your decision, as an approver of the current level or as a delegate</h6>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/Approvals/MyDelegations" class="btn btn-outline-primary"><i class="ti ti-user-share me-1"></i>My delegations</a>
+        <a href="/Approvals/MySubmissions" class="btn btn-light"><i class="ti ti-send me-1"></i>My submissions</a>
+    </div>
+</div>
+
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <a class="nav-link @(Model.DocumentType is null ? "active" : null)" asp-action="Index">All <span class="badge bg-primary ms-1">@total</span></a>
+    </li>
+    @foreach (Microsoft.AspNetCore.Mvc.Rendering.SelectListItem type in ApprovalLabels.DocumentTypeOptions())
+    {
+        <li class="nav-item">
+            <a class="nav-link @(Model.DocumentType == type.Value ? "active" : null)" asp-action="Index" asp-route-type="@type.Value">
+                @type.Text <span class="badge bg-secondary ms-1">@Model.Counts.GetValueOrDefault(type.Value)</span>
+            </a>
+        </li>
+    }
+</ul>
+
+<div class="card">
+    <div class="card-header">
+        <partial name="Partials/_FilterBar" model='new FilterBarModel(Model.Search, "Search code or name")' />
+    </div>
+    <div class="card-body p-0">
+        <partial name="_RequestTable" model="Model" />
+    </div>
+</div>

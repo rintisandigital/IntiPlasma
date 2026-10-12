@@ -59,11 +59,13 @@ public sealed partial class SalesTests(WebAppFactory factory)
         Guid customerId = await QueryAsync(db => db.Customers.Where(c => c.Code == $"C{s}").Select(c => c.Id).SingleAsync());
         await PostAsync(client, "/Partnership/Farmers/Create", new() { ["Code"] = $"F{s}", ["Name"] = "Inti", ["Type"] = "Inti", ["BranchId"] = branchId.ToString() });
         Guid farmerId = await QueryAsync(db => db.Farmers.Where(f => f.Code == $"F{s}").Select(f => f.Id).SingleAsync());
+        await factory.ApproveAsync(farmerId);
         await PostAsync(client, "/Partnership/Coops/Create", new()
         {
             ["FarmerId"] = farmerId.ToString(), ["Code"] = $"K{s}", ["Name"] = "Coop", ["Capacity"] = "5000", ["HouseType"] = "ClosedHouse"
         });
         Guid coopId = await QueryAsync(db => db.Coops.Where(c => c.Code == $"K{s}").Select(c => c.Id).SingleAsync());
+        await factory.ApproveAsync(coopId);
         await AddAsync(Warehouse.CreateForCoop($"GK-K{s}", "Gudang Kandang", branchId, coopId, null));
         Guid coopWarehouseId = await QueryAsync(db => db.Warehouses.Where(w => w.CoopId == coopId).Select(w => w.Id).SingleAsync());
         await PostAsync(client, "/Finance/Accounts/Create", new() { ["Code"] = $"1-19{s}", ["Name"] = $"Bank {s}", ["Type"] = "Asset", ["IsPostable"] = "true" });

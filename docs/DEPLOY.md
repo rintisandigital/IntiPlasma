@@ -53,6 +53,7 @@ Variabel `Bagian__Kunci` menimpa `appsettings.json` (mis. `Outbox__MaxAttempts`,
    `Database__SeedOnStartup=true`, `Seed__Admin__Email=…`, `Seed__Admin__Password=…` (tambahkan sementara ke `.env`), lalu hapus lagi ketiganya. Seeding idempotent.
 5. **Jalankan**: `docker compose up -d`. Cek `http://<host>:5002/health/ready` dan `http://<host>:5000/health/ready` → `Healthy`.
 6. Login Web.App dengan admin awal, **ganti password**, buat Akses Menu/Cabang & user lain (Administration).
+7. **Alur approval (wajib sebelum input peternak/kandang/kontrak)**: user approver diberi role API berisi `approvals:decide` (mis. role **Manager**), lalu **Administration → Approval Flows** → buat alur **default (semua cabang)** untuk keempat jenis dokumen (peternak baru, perubahan NIK/rekening, kandang baru, aktivasi kontrak), 1–5 level, ≥ 2 approver per level dianjurkan. Tanpa alur, membuat peternak/kandang dan mengajukan kontrak ditolak dengan pesan *"Alur approval belum dikonfigurasi …"*. Cabang baru bisa langsung diberi alurnya sendiri di form **Branches → Add Branch**.
 
 ## 4. Upgrade versi
 

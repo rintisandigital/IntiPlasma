@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Application.Abstractions.Data;
 using Domain.Access;
+using Domain.Approvals;
 using Domain.Auditing;
 using Domain.Costing.PlasmaSettlements;
 using Domain.Documents.Attachments;
@@ -97,6 +98,12 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<Farmer> Farmers { get; set; }
 
     public DbSet<Coop> Coops { get; set; }
+
+    public DbSet<ApprovalFlow> ApprovalFlows { get; set; }
+
+    public DbSet<ApprovalRequest> ApprovalRequests { get; set; }
+
+    public DbSet<ApprovalDelegation> ApprovalDelegations { get; set; }
 
     public DbSet<PartnershipContract> Contracts { get; set; }
 

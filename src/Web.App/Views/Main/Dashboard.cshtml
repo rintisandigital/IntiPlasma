@@ -78,6 +78,7 @@
             <div class="card-header"><h5 class="card-title mb-0">Waiting for action</h5></div>
             <div class="card-body p-0">
                 <ul class="list-group list-group-flush dashboard-pending">
+                    @await Component.InvokeAsync("ApprovalBadge", new { view = "Dashboard" })
                     @{
                         (string Label, int Count, string Menu, string Url)[] pending =
                         [

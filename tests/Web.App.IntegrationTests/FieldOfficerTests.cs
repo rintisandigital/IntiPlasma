@@ -114,7 +114,11 @@ public sealed partial class FieldOfficerTests(WebAppFactory factory)
 
         Farmer farmer = Farmer.Create($"FI{s}", "Peternak Inti", FarmerType.Inti, branch.Id, null,
             TaxIdentity.None, null, null, BankAccount.None).Value;
+        farmer.Submit();
+        farmer.Approve();
         Coop coop = Coop.Create(farmer, $"KI{s}", "Kandang Inti", 5_000, HouseType.ClosedHouse, null, null, null).Value;
+        coop.Submit(farmer);
+        coop.Approve(farmer);
         db.Farmers.Add(farmer);
         db.Coops.Add(coop);
         await db.SaveChangesAsync();

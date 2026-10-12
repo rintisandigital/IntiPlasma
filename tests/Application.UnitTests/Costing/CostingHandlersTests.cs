@@ -146,8 +146,8 @@ public sealed class CostingHandlersTests : BaseHandlerTest
         var liveBird = Item.Create("AYM", "Ayam Hidup", ItemCategory.LiveBird, kg.Id, null);
         var customer = Customer.Create("RPA-01", "RPA", TaxIdentity.None, null, null, null, 14, new Money(1_000_000_000m));
 
-        Farmer farmer = Farmer.Create("INT", "Farm Inti", FarmerType.Inti, branch.Id, null, TaxIdentity.None, null, null, BankAccount.None).Value;
-        Coop coop = Coop.Create(farmer, "KDG-A", "Kandang A", 5_000, HouseType.ClosedHouse, null, null, null).Value;
+        Farmer farmer = Farmer.Create("INT", "Farm Inti", FarmerType.Inti, branch.Id, null, TaxIdentity.None, null, null, BankAccount.None).Value.Approved();
+        Coop coop = Coop.Create(farmer, "KDG-A", "Kandang A", 5_000, HouseType.ClosedHouse, null, null, null).Value.Approved(farmer);
         var warehouse = Warehouse.CreateForCoop("GK-A", "Gudang A", branch.Id, coop.Id, null);
         ProductionCycle cycle = ProductionCycle.Plan("SKL/A", coop, farmer, null, ChickIn, 1_000, null).Value;
 

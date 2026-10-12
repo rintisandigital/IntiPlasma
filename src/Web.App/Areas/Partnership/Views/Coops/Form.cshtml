@@ -37,7 +37,7 @@
                         <label asp-for="FarmerId" class="form-label"></label> <span class="text-danger">*</span>
                         @if (Model.IsNew)
                         {
-                            <select asp-for="FarmerId" class="form-select" data-lookup="@Url.Action("Farmers", "Lookup", new { area = "" })">
+                            <select asp-for="FarmerId" class="form-select" data-lookup="@Url.Action("Farmers", "Lookup", new { area = "", forCoop = true })">
                                 <option value="">Search farmer…</option>
                                 @if (Model.FarmerId is not null && Model.FarmerLabel is not null)
                                 {
@@ -118,7 +118,7 @@
                         <div class="form-text">The mobile app shows this record to this PPL only (and to managers of the branch).</div>
                         <span asp-validation-for="FieldOfficerUserId" class="text-danger fs-13"></span>
                     </div>
-                    @if (!Model.IsNew)
+                    @if (!Model.IsNew && Model.IsApproved)
                     {
                         <div class="col-12">
                             <div class="form-check form-switch">
@@ -367,6 +367,8 @@
 
     <partial name="Partials/_FormButtons" model='new FormButtonsModel(Model.CanSave, Url.Action("Index")!)' />
 </form>
+
+<partial name="Partials/_RegistrationCard" model="Model" />
 
 <template data-collection-template="Profile.Fans">
     <tr class="collection-row">

@@ -1,0 +1,14 @@
+@model DelegationsViewModel
+@{
+    ViewData["Title"] = "Delegations";
+    ViewData["Menu"] = MenuCodes.ApprovalsDelegations;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Approval Delegations</h4>
+            <h6>Delegate the approvals of an approver who is away (leave, business trip); every change is in the audit log</h6>
+        </div>
+    </div>
+</div>
+<partial name="_Delegations" model="Model" />

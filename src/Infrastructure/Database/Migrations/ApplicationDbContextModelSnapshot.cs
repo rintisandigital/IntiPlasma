@@ -300,6 +300,367 @@ namespace Infrastructure.Database.Migrations
                     b.ToTable("menu_access_profiles", "identity");
                 });
 
+            modelBuilder.Entity("Domain.Approvals.ApprovalDecision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("DecidedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at_utc");
+
+                    b.Property<Guid>("DecidedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("decided_by");
+
+                    b.Property<int>("LevelNo")
+                        .HasColumnType("integer")
+                        .HasColumnName("level_no");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<Guid?>("OnBehalfOf")
+                        .HasColumnType("uuid")
+                        .HasColumnName("on_behalf_of");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("outcome");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_approval_decisions");
+
+                    b.HasIndex("DecidedBy")
+                        .HasDatabaseName("ix_approval_decisions_decided_by");
+
+                    b.HasIndex("OnBehalfOf")
+                        .HasDatabaseName("ix_approval_decisions_on_behalf_of");
+
+                    b.HasIndex("RequestId")
+                        .HasDatabaseName("ix_approval_decisions_request_id");
+
+                    b.ToTable("approval_decisions", "approval");
+                });
+
+            modelBuilder.Entity("Domain.Approvals.ApprovalDelegation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("DelegateUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("delegate_user_id");
+
+                    b.Property<Guid>("DelegatorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("delegator_user_id");
+
+                    b.Property<DateOnly>("FromDate")
+                        .HasColumnType("date")
+                        .HasColumnName("from_date");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at_utc");
+
+                    b.Property<Guid?>("RevokedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revoked_by");
+
+                    b.Property<DateOnly>("ToDate")
+                        .HasColumnType("date")
+                        .HasColumnName("to_date");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_approval_delegations");
+
+                    b.HasIndex("DelegateUserId")
+                        .HasDatabaseName("ix_approval_delegations_delegate_user_id");
+
+                    b.HasIndex("DelegatorUserId")
+                        .HasDatabaseName("ix_approval_delegations_delegator_user_id");
+
+                    b.ToTable("approval_delegations", "approval");
+                });
+
+            modelBuilder.Entity("Domain.Approvals.ApprovalFlow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("DocumentType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("document_type");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("name");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_approval_flows");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_approval_flows_branch_id");
+
+                    b.HasIndex("DocumentType", "BranchId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_approval_flows_document_type_branch_id")
+                        .HasFilter("is_active");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("DocumentType", "BranchId"), false);
+
+                    b.ToTable("approval_flows", "approval");
+                });
+
+            modelBuilder.Entity("Domain.Approvals.ApprovalFlowLevel", b =>
+                {
+                    b.Property<Guid>("FlowId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("flow_id");
+
+                    b.Property<int>("LevelNo")
+                        .HasColumnType("integer")
+                        .HasColumnName("level_no");
+
+                    b.PrimitiveCollection<Guid[]>("ApproverUserIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("approver_user_ids");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.HasKey("FlowId", "LevelNo")
+                        .HasName("pk_approval_flow_levels");
+
+                    b.ToTable("approval_flow_levels", "approval");
+                });
+
+            modelBuilder.Entity("Domain.Approvals.ApprovalRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at_utc");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("CurrentLevel")
+                        .HasColumnType("integer")
+                        .HasColumnName("current_level");
+
+                    b.Property<string>("DocumentCode")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("document_code");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<string>("DocumentTitle")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("document_title");
+
+                    b.Property<string>("DocumentType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("document_type");
+
+                    b.Property<Guid?>("FlowId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("flow_id");
+
+                    b.Property<int>("LevelCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("level_count");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_at_utc");
+
+                    b.Property<Guid?>("ModifiedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("modified_by");
+
+                    b.Property<string>("Payload")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<DateTime>("RequestedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at_utc");
+
+                    b.Property<Guid>("RequestedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Summary")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("summary");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_approval_requests");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_approval_requests_branch_id");
+
+                    b.HasIndex("FlowId")
+                        .HasDatabaseName("ix_approval_requests_flow_id");
+
+                    b.HasIndex("RequestedBy")
+                        .HasDatabaseName("ix_approval_requests_requested_by");
+
+                    b.HasIndex("DocumentId", "DocumentType")
+                        .HasDatabaseName("ix_approval_requests_document_id_document_type");
+
+                    b.HasIndex("DocumentType", "DocumentId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_approval_requests_document_pending")
+                        .HasFilter("status = 'Pending'");
+
+                    b.HasIndex("Status", "BranchId")
+                        .HasDatabaseName("ix_approval_requests_status_branch_id");
+
+                    b.ToTable("approval_requests", "approval");
+                });
+
+            modelBuilder.Entity("Domain.Approvals.ApprovalRequestLevel", b =>
+                {
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<int>("LevelNo")
+                        .HasColumnType("integer")
+                        .HasColumnName("level_no");
+
+                    b.PrimitiveCollection<Guid[]>("ApproverUserIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("approver_user_ids");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.HasKey("RequestId", "LevelNo")
+                        .HasName("pk_approval_request_levels");
+
+                    b.ToTable("approval_request_levels", "approval");
+                });
+
             modelBuilder.Entity("Domain.Auditing.AuditLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3462,6 +3823,12 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnName("profile")
                         .HasDefaultValueSql("'{}'::jsonb");
 
+                    b.Property<string>("RegistrationStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("registration_status");
+
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -3661,10 +4028,20 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("character varying(16)")
                         .HasColumnName("nik");
 
+                    b.Property<string>("PendingChange")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("pending_change");
+
                     b.Property<string>("Phone")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("phone");
+
+                    b.Property<string>("RegistrationStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("registration_status");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -6317,6 +6694,98 @@ namespace Infrastructure.Database.Migrations
                         .HasConstraintName("fk_menu_access_profile_items_menu_access_profiles_profile_id");
                 });
 
+            modelBuilder.Entity("Domain.Approvals.ApprovalDecision", b =>
+                {
+                    b.HasOne("Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("DecidedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_approval_decisions_users_decided_by");
+
+                    b.HasOne("Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("OnBehalfOf")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_approval_decisions_users_on_behalf_of");
+
+                    b.HasOne("Domain.Approvals.ApprovalRequest", null)
+                        .WithMany("Decisions")
+                        .HasForeignKey("RequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_approval_decisions_approval_requests_request_id");
+                });
+
+            modelBuilder.Entity("Domain.Approvals.ApprovalDelegation", b =>
+                {
+                    b.HasOne("Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("DelegateUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_approval_delegations_users_delegate_user_id");
+
+                    b.HasOne("Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("DelegatorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_approval_delegations_users_delegator_user_id");
+                });
+
+            modelBuilder.Entity("Domain.Approvals.ApprovalFlow", b =>
+                {
+                    b.HasOne("Domain.MasterData.Branches.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_approval_flows_branches_branch_id");
+                });
+
+            modelBuilder.Entity("Domain.Approvals.ApprovalFlowLevel", b =>
+                {
+                    b.HasOne("Domain.Approvals.ApprovalFlow", null)
+                        .WithMany("Levels")
+                        .HasForeignKey("FlowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_approval_flow_levels_approval_flows_flow_id");
+                });
+
+            modelBuilder.Entity("Domain.Approvals.ApprovalRequest", b =>
+                {
+                    b.HasOne("Domain.MasterData.Branches.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_approval_requests_branches_branch_id");
+
+                    b.HasOne("Domain.Approvals.ApprovalFlow", null)
+                        .WithMany()
+                        .HasForeignKey("FlowId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_approval_requests_approval_flows_flow_id");
+
+                    b.HasOne("Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_approval_requests_users_requested_by");
+                });
+
+            modelBuilder.Entity("Domain.Approvals.ApprovalRequestLevel", b =>
+                {
+                    b.HasOne("Domain.Approvals.ApprovalRequest", null)
+                        .WithMany("Levels")
+                        .HasForeignKey("RequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_approval_request_levels_approval_requests_request_id");
+                });
+
             modelBuilder.Entity("Domain.Costing.PlasmaSettlements.PlasmaSettlement", b =>
                 {
                     b.HasOne("Domain.MasterData.Branches.Branch", null)
@@ -7621,6 +8090,18 @@ namespace Infrastructure.Database.Migrations
             modelBuilder.Entity("Domain.Access.MenuAccessProfile", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Domain.Approvals.ApprovalFlow", b =>
+                {
+                    b.Navigation("Levels");
+                });
+
+            modelBuilder.Entity("Domain.Approvals.ApprovalRequest", b =>
+                {
+                    b.Navigation("Decisions");
+
+                    b.Navigation("Levels");
                 });
 
             modelBuilder.Entity("Domain.Costing.PlasmaSettlements.PlasmaSettlement", b =>

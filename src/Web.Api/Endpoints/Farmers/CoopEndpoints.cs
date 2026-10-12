@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Paging;
+using Application.Approvals;
 using Application.Coops;
 using Application.Coops.Create;
 using Application.Coops.Get;
@@ -95,5 +96,29 @@ internal sealed class CoopEndpoints : IEndpoint
             return result.Match(Results.NoContent, CustomResults.Problem);
         })
         .HasPermission(Permissions.FarmersManage);
+
+        // Submits a draft or rejected coop again (PLAN-MOBILE M-83); returns the approval request id.
+        group.MapPost("{coopId:guid}/submit", async (
+            Guid coopId,
+            ICommandHandler<SubmitCoopCommand, Guid> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<Guid> result = await handler.Handle(new SubmitCoopCommand(coopId), cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.FarmersManage);
+
+        group.MapGet("{coopId:guid}/approvals", async (
+            Guid coopId,
+            IQueryHandler<GetCoopApprovalsQuery, IReadOnlyList<ApprovalDetailResponse>> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<IReadOnlyList<ApprovalDetailResponse>> result =
+                await handler.Handle(new GetCoopApprovalsQuery(coopId), cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.FarmersRead);
     }
 }

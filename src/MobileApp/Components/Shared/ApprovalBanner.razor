@@ -1,0 +1,21 @@
+@* Approval state of a farmer, coop or contract above its tabs (PLAN-MOBILE M-89, M-92). *@
+@if (Item.ApprovalStatus == "Pending")
+{
+    <div class="alert alert-warning py-2 mb-12">
+        <i class="icon icon-clock me-1"></i>@Labels.ApprovalDocumentType(Item.ApprovalDocumentType ?? string.Empty) menunggu approval ·
+        @Labels.ApprovalLevel("Pending", Item.ApprovalLevel ?? 1, Item.ApprovalLevelCount ?? 1, Item.ApprovalLevelName)
+    </div>
+}
+else if (Item.ApprovalStatus == "Rejected")
+{
+    <div class="alert alert-danger py-2 mb-12">
+        <i class="icon icon-xCircle me-1"></i>@Labels.ApprovalDocumentType(Item.ApprovalDocumentType ?? string.Empty) ditolak@(RejectSuffix)
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public ApprovalTracked Item { get; set; } = default!;
+
+    private string RejectSuffix => Item.ApprovalRejectReason is { } reason ? $": {reason}" : ".";
+}

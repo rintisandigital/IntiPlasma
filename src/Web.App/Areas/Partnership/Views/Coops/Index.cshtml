@@ -53,7 +53,7 @@
                             <td>@EnumOptions.Label(coop.HouseType)</td>
                             <td>@(coop.OpenCycleId is null ? "—" : "Running")</td>
                             <td>@(coop.FieldOfficerName ?? "—")</td>
-                            <td><partial name="Partials/_StatusBadge" model='coop.IsActive ? "Active" : "Inactive"' /></td>
+                            <td><partial name="Partials/_StatusBadge" model='Web.App.Areas.Approvals.Models.ApprovalLabels.RecordStatus(coop.RegistrationStatus, coop.IsActive)' /></td>
                             <td class="text-end text-nowrap">
                                 @if (canExport)
                                 {

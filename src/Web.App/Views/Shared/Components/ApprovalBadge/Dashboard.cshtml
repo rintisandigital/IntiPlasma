@@ -1,0 +1,13 @@
+@* Rows of the dashboard "Waiting for action" card. *@
+@model ApprovalBadgeModel
+<li class="list-group-item d-flex justify-content-between align-items-center">
+    <a href="/Approvals/Inbox">Approvals waiting for me</a>
+    <span class="badge rounded-pill @(Model.WaitingForMe > 0 ? "bg-warning text-dark" : "bg-light text-muted")">@Model.WaitingForMe</span>
+</li>
+@if (Model.Stuck is { } stuck)
+{
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+        <a href="/Approvals/Requests?stuck=true">Stuck approvals (no active approver)</a>
+        <span class="badge rounded-pill @(stuck > 0 ? "bg-danger" : "bg-light text-muted")">@stuck</span>
+    </li>
+}

@@ -19,7 +19,7 @@ public sealed record PagedList<T>
 /// <summary>
 /// <c>GET farmers</c>, <c>GET farmers/{id}</c>.
 /// </summary>
-public sealed record Farmer
+public sealed record Farmer : ApprovalTracked
 {
     public Guid Id { get; init; }
 
@@ -50,6 +50,16 @@ public sealed record Farmer
 
     public bool IsActive { get; init; }
 
+    /// <summary>
+    /// <c>Draft</c>, <c>PendingApproval</c>, <c>Rejected</c> or <c>Approved</c> (M-81).
+    /// </summary>
+    public string RegistrationStatus { get; init; } = "Approved";
+
+    /// <summary>
+    /// New NIK and bank account waiting for approval (M-84); the values above stay in use until approved.
+    /// </summary>
+    public FarmerPendingChange? PendingChange { get; init; }
+
     public IReadOnlyList<Guid> Documents { get; init; } = [];
 
     public Guid? FieldOfficerUserId { get; init; }
@@ -78,7 +88,7 @@ public sealed record BankAccount
 /// <summary>
 /// Kandang: <c>GET coops</c>, <c>GET coops/{id}</c>. The survey profile is not used by the app yet.
 /// </summary>
-public sealed record Coop
+public sealed record Coop : ApprovalTracked
 {
     public Guid Id { get; init; }
 
@@ -110,6 +120,11 @@ public sealed record Coop
 
     public bool IsActive { get; init; }
 
+    /// <summary>
+    /// <c>Draft</c>, <c>PendingApproval</c>, <c>Rejected</c> or <c>Approved</c> (M-81).
+    /// </summary>
+    public string RegistrationStatus { get; init; } = "Approved";
+
     public Guid? OpenCycleId { get; init; }
 
     public Guid? WarehouseId { get; init; }
@@ -126,7 +141,7 @@ public sealed record Coop
 /// <summary>
 /// Kontrak kemitraan: <c>GET contracts</c>; the price lists are only filled by <c>GET contracts/{id}</c>.
 /// </summary>
-public sealed record Contract
+public sealed record Contract : ApprovalTracked
 {
     public Guid Id { get; init; }
 

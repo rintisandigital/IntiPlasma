@@ -23,7 +23,7 @@ public sealed class AttachmentServiceTests : BaseHandlerTest
     private static async Task<Farmer> SeedFarmerAsync(TestDbContext context, Guid? branchId = null)
     {
         Farmer farmer = Farmer.Create(
-            $"P{Guid.NewGuid():N}"[..10], "Pak Budi", FarmerType.Inti, branchId ?? Guid.NewGuid(), null, TaxIdentity.None with { }, null, null, BankAccount.None with { }).Value;
+            $"P{Guid.NewGuid():N}"[..10], "Pak Budi", FarmerType.Inti, branchId ?? Guid.NewGuid(), null, TaxIdentity.None with { }, null, null, BankAccount.None with { }).Value.Approved();
         context.Farmers.Add(farmer);
         await context.SaveChangesAsync();
 

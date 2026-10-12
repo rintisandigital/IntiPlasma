@@ -13,7 +13,15 @@ public static class ContractErrors
 
     public static Error NotDraft(Guid contractId) => Error.Problem(
         "Contracts.NotDraft",
-        $"The contract with the Id = '{contractId}' is not a draft; its terms can no longer be changed");
+        $"The contract with the Id = '{contractId}' is not a draft or rejected; its terms can no longer be changed");
+
+    public static Error NotSubmittable(Guid contractId) => Error.Problem(
+        "Contracts.NotSubmittable",
+        $"The contract with the Id = '{contractId}' can only be submitted as a draft or after it was rejected");
+
+    public static Error NotPendingApproval(Guid contractId) => Error.Problem(
+        "Contracts.NotPendingApproval",
+        $"The contract with the Id = '{contractId}' is not waiting for approval");
 
     public static Error NotActive(Guid contractId) => Error.Problem(
         "Contracts.NotActive",

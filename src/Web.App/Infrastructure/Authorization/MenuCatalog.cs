@@ -13,6 +13,11 @@ public static class MenuCodes
     public const string AdminMenus = "admin.menus";
     public const string AdminApiRoles = "admin.api-roles";
     public const string AdminBranches = "admin.branches";
+    public const string AdminApprovalFlows = "admin.approval-flows";
+
+    public const string ApprovalsInbox = "approvals.inbox";
+    public const string ApprovalsRequests = "approvals.requests";
+    public const string ApprovalsDelegations = "approvals.delegations";
 
     public const string MasterUoms = "master.uoms";
     public const string MasterTaxCodes = "master.tax-codes";
@@ -96,6 +101,11 @@ public static class MenuCatalog
             menus.Add(new MenuDefinition(
                 code, group, name, null, route, menus.Count(m => m.ParentCode == group) * 10 + 10, supports, released));
 
+        Group("approvals", "Approvals", "ti ti-checklist", 15);
+        Page("approvals", MenuCodes.ApprovalsInbox, "Approval Inbox", "/Approvals/Inbox", MenuRights.None, true);
+        Page("approvals", MenuCodes.ApprovalsRequests, "Approval Requests", "/Approvals/Requests", MenuRights.Edit, true);
+        Page("approvals", MenuCodes.ApprovalsDelegations, "Delegations", "/Approvals/Delegations", MenuRights.Create | MenuRights.Edit, true);
+
         Group("master", "Master Data", "ti ti-database", 20);
         Page("master", "master.uoms", "Units of Measure", "/MasterData/Uoms", CreateEditExport, true);
         Page("master", "master.tax-codes", "Tax Codes", "/MasterData/TaxCodes", CreateEditExport, true);
@@ -171,6 +181,7 @@ public static class MenuCatalog
         Page("admin", MenuCodes.AdminMenus, "Menus", "/Admin/Menus", MenuRights.Edit, true);
         Page("admin", MenuCodes.AdminApiRoles, "API Roles", "/Admin/ApiRoles", CreateEditExport, true);
         Page("admin", MenuCodes.AdminBranches, "Branches", "/Admin/Branches", CreateEditExport, true);
+        Page("admin", MenuCodes.AdminApprovalFlows, "Approval Flows", "/Admin/ApprovalFlows", MenuRights.Create | MenuRights.Edit, true);
         Page("admin", MenuCodes.AdminFailedEvents, "Failed Events", "/Admin/FailedEvents", MenuRights.Edit, true);
         Page("admin", MenuCodes.AdminAuditLogs, "Audit Log", "/Admin/AuditLogs", MenuRights.Export, true);
 

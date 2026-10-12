@@ -17,7 +17,17 @@ public enum ContractStatus
 {
     Draft = 1,
     Active = 2,
-    Inactive = 3
+    Inactive = 3,
+
+    /// <summary>
+    /// Submitted for activation (M-85); the terms are locked until the request is decided or cancelled.
+    /// </summary>
+    PendingApproval = 4,
+
+    /// <summary>
+    /// The activation was rejected; the terms can be changed and the contract submitted again.
+    /// </summary>
+    Rejected = 5
 }
 
 public enum IncentiveKind

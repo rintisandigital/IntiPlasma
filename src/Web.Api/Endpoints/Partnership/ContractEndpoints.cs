@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Paging;
+using Application.Approvals;
 using Application.Contracts;
 using Application.Contracts.ChangeStatus;
 using Application.Contracts.Create;
@@ -71,16 +72,29 @@ internal sealed class ContractEndpoints : IEndpoint
         })
         .HasPermission(Permissions.ContractsManage);
 
-        group.MapPost("{contractId:guid}/activate", async (
+        // Activation goes through the approval module (PLAN-MOBILE M-85); returns the approval request id.
+        group.MapPost("{contractId:guid}/submit", async (
             Guid contractId,
-            ICommandHandler<ActivateContractCommand> handler,
+            ICommandHandler<SubmitContractCommand, Guid> handler,
             CancellationToken cancellationToken) =>
         {
-            Result result = await handler.Handle(new ActivateContractCommand(contractId), cancellationToken);
+            Result<Guid> result = await handler.Handle(new SubmitContractCommand(contractId), cancellationToken);
 
-            return result.Match(Results.NoContent, CustomResults.Problem);
+            return result.Match(Results.Ok, CustomResults.Problem);
         })
         .HasPermission(Permissions.ContractsManage);
+
+        group.MapGet("{contractId:guid}/approvals", async (
+            Guid contractId,
+            IQueryHandler<GetContractApprovalsQuery, IReadOnlyList<ApprovalDetailResponse>> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<IReadOnlyList<ApprovalDetailResponse>> result =
+                await handler.Handle(new GetContractApprovalsQuery(contractId), cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.ContractsRead);
 
         group.MapPost("{contractId:guid}/deactivate", async (
             Guid contractId,

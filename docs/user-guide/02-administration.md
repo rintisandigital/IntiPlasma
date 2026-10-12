@@ -26,6 +26,17 @@ Role & permission untuk Web.Api/aplikasi mobile (format `modul:aksi`). Tidak mem
 
 ## Branches
 Master cabang. Menonaktifkan cabang menghapusnya dari cabang efektif semua user.
+- **Add Branch** → bagian **Approval flow**: *Use the default approval flows* (cabang memakai alur default), atau *Set up this branch's own approval flow*: pilih jenis dokumen, isi level (nama bebas + approver, diisi awal dari alur default), dan centang **Add this branch to the branch access profile of approvers…** agar approver bisa melihat cabang baru.
+- **Edit** cabang menampilkan alur yang dipakai per jenis dokumen (alur cabang atau default). Daftar cabang memberi badge **No approval flow** bila ada jenis dokumen tanpa alur.
+
+## Approval Flows
+Alur approval berjenjang per jenis dokumen: **New farmer**, **Farmer NIK/bank change**, **New farm**, **Contract activation**.
+- Alur **Default (all branches)** berlaku untuk semua cabang; alur cabang menggantikannya untuk cabang itu. Satu alur aktif per jenis & cabang.
+- **Add Flow / Edit**: 1–5 level berurutan, setiap level punya nama bebas (mis. *Verifikasi*, *Kepala Produksi*, *Kepala Cabang*, *Pusat*) dan satu atau lebih approver — **salah satu** approver cukup untuk memutuskan level itu. **Add level** / ikon hapus untuk menambah/mengurangi level. Approver harus user aktif dengan role API berisi `approvals:decide`; user dari cabang lain boleh asal Akses Cabangnya mencakup cabang dokumen.
+- Perubahan alur hanya berlaku untuk pengajuan **baru**; pengajuan berjalan memakai salinan level saat diajukan.
+- Ikon salin (**Copy to a branch**) membuat alur cabang dari alur yang ada. Level berlabel **Stuck** tidak punya approver yang bisa memutuskan (nonaktif / tanpa hak).
+- **Replace approver** (approver resign/pindah): pilih user lama → lihat alur & pengajuan *Pending* tempat dia menjadi approver → pilih pengganti → diganti sekaligus di semua alur dan di level yang belum diputuskan. Bisa dibatasi satu cabang. Tercatat di Audit Log.
+- Detail user yang menjadi approver menampilkan peringatan + tautan **Replace approver** (lakukan sebelum **Deactivate**).
 
 ## Failed Events
 Event latar belakang (mis. jurnal otomatis, pembuatan gudang kandang) yang gagal setelah semua percobaan. Perbaiki penyebabnya dulu (biasanya mapping jurnal otomatis belum ada, atau tahun fiskal belum dibuka / periode sudah ditutup), lalu **Retry** atau **Retry All**. Event gagal memblokir tutup periode.

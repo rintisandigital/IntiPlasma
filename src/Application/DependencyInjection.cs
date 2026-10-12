@@ -1,5 +1,6 @@
 ﻿using Application.Abstractions.Behaviors;
 using Application.Abstractions.Messaging;
+using Application.Approvals;
 using Application.Documents;
 using Application.Finance.AutoJournal;
 using FluentValidation;
@@ -44,6 +45,14 @@ public static class DependencyInjection
         services.AddScoped<IAutoJournalService, AutoJournalService>();
         services.AddScoped<IAttachmentService, AttachmentService>();
         services.AddScoped<Users.CredentialVerifier>();
+
+        services.AddScoped<IApprovalService, ApprovalService>();
+        services.AddScoped<ApprovalDecider>();
+        services.AddScoped<ApprovalHandlerRegistry>();
+        services.AddScoped<IApprovalHandler, FarmerApprovalHandler>();
+        services.AddScoped<IApprovalHandler, FarmerChangeApprovalHandler>();
+        services.AddScoped<IApprovalHandler, CoopApprovalHandler>();
+        services.AddScoped<IApprovalHandler, ContractApprovalHandler>();
 
         return services;
     }

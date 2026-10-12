@@ -5,7 +5,7 @@ Panduan singkat aplikasi web **Admin Office** untuk usaha ayam broiler pola kemi
 | No | Bagian | Isi |
 |---|---|---|
 | 1 | [Login & navigasi](01-login-navigasi.md) | Masuk, mainboard, pencarian menu, cabang aktif, sesi, ganti password, lockout |
-| 2 | [Administration](02-administration.md) | Users, Menu Access, Branch Access, Menus, API Roles, Branches, Failed Events, Audit Log |
+| 2 | [Administration](02-administration.md) | Users, Menu Access, Branch Access, Menus, API Roles, Branches, Approval Flows, Failed Events, Audit Log |
 | 3 | [Master Data & Partnership](03-master-kemitraan.md) | Satuan, kode pajak, item, gudang, vendor, customer, peternak, kandang, kontrak |
 | 4 | [Procurement & Inventory](04-pengadaan-gudang.md) | PO, penerimaan barang (BPB), transfer, retur, mutasi pakan, stok |
 | 5 | [Production](05-produksi.md) | Siklus, chick-in, recording harian, panen, tutup siklus |
@@ -13,6 +13,7 @@ Panduan singkat aplikasi web **Admin Office** untuk usaha ayam broiler pola kemi
 | 7 | [AP, Kas & Bank](07-hutang-kas-bank.md) | Vendor invoice, payment voucher, kas masuk/keluar, transfer, rekonsiliasi |
 | 8 | [Costing & Settlement](08-hpp-settlement.md) | HPP siklus, settlement plasma, pembayaran plasma |
 | 9 | [Journals, Reports & Closing](09-jurnal-laporan-tutup-buku.md) | Jurnal manual/otomatis, laporan keuangan, pajak, tutup periode |
+| 10 | [Approval](10-approval.md) | Approval berjenjang peternak/kandang/kontrak, inbox, delegasi, ganti approver |
 
 ## Konsep umum
 

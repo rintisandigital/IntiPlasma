@@ -1,6 +1,7 @@
 using System.Globalization;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Paging;
+using Application.Approvals;
 using Application.Contracts;
 using Application.Contracts.Get;
 using Application.Coops;
@@ -66,15 +67,41 @@ public sealed class LookupController : AppController
         string? q,
         Guid? branchId,
         FarmerType? type,
+        bool? forCoop,
         [FromServices] IQueryHandler<GetFarmersQuery, PagedList<FarmerResponse>> query,
         CancellationToken cancellationToken)
     {
         Result<PagedList<FarmerResponse>> result = await query.Handle(
             new GetFarmersQuery(new PageRequest(1, MaxResults, q), branchId, type), cancellationToken);
 
+        // A new farm may be submitted for a farmer still waiting for approval (PLAN-MOBILE M-87).
         return Json(result.IsFailure
             ? []
-            : result.Value.Items.Where(f => f.IsActive).Select(f => new LookupItem(f.Id, $"{f.Code} — {f.Name} ({f.Type}, {f.BranchCode})")));
+            : result.Value.Items.Where(f => f.IsActive || forCoop == true && f.RegistrationStatus == "PendingApproval").Select(f => new LookupItem(f.Id, $"{f.Code} — {f.Name} ({f.Type}, {f.BranchCode})")));
+    }
+
+    /// <summary>
+    /// Users who can be approvers (M-86); those whose branch access does not cover <paramref name="branchId"/> are
+    /// marked.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> Approvers(
+        string? q,
+        Guid? branchId,
+        [FromServices] IQueryHandler<GetApproverCandidatesQuery, IReadOnlyList<ApproverCandidateResponse>> query,
+        CancellationToken cancellationToken)
+    {
+        Result<IReadOnlyList<ApproverCandidateResponse>> result =
+            await query.Handle(new GetApproverCandidatesQuery(branchId), cancellationToken);
+
+        return Json(result.IsFailure
+            ? []
+            : result.Value
+                .Where(u => string.IsNullOrWhiteSpace(q)
+                            || u.Name.Contains(q, StringComparison.OrdinalIgnoreCase)
+                            || u.Email.Contains(q, StringComparison.OrdinalIgnoreCase))
+                .Take(MaxResults)
+                .Select(u => new LookupItem(u.Id, u.CoversBranch ? $"{u.Name} ({u.Email})" : $"{u.Name} ({u.Email}) — no access to the branch")));
     }
 
     /// <summary>

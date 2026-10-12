@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Paging;
+using Application.Approvals;
 using Application.Common;
 using Application.Farmers;
 using Application.Farmers.Create;
@@ -94,5 +95,29 @@ internal sealed class FarmerEndpoints : IEndpoint
             return result.Match(Results.NoContent, CustomResults.Problem);
         })
         .HasPermission(Permissions.FarmersManage);
+
+        // Submits a draft or rejected farmer again (PLAN-MOBILE M-83); returns the approval request id.
+        group.MapPost("{farmerId:guid}/submit", async (
+            Guid farmerId,
+            ICommandHandler<SubmitFarmerCommand, Guid> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<Guid> result = await handler.Handle(new SubmitFarmerCommand(farmerId), cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.FarmersManage);
+
+        group.MapGet("{farmerId:guid}/approvals", async (
+            Guid farmerId,
+            IQueryHandler<GetFarmerApprovalsQuery, IReadOnlyList<ApprovalDetailResponse>> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<IReadOnlyList<ApprovalDetailResponse>> result =
+                await handler.Handle(new GetFarmerApprovalsQuery(farmerId), cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.FarmersRead);
     }
 }

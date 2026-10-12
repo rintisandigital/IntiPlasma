@@ -24,7 +24,8 @@ public sealed class SettlementTests
         Coop coop = TestData.Coop(farmer);
         PartnershipContract contract = PartnershipContract.Create("KTR-001", TestData.BranchId, scheme,
             TestData.Terms(profitShare: scheme == ContractScheme.ProfitSharing ? 40m : null)).Value;
-        contract.Activate();
+        contract.Submit();
+        contract.Approve();
 
         ProductionCycle cycle = ProductionCycle.Plan("SKL/1", coop, farmer, contract, ChickIn, 1_000, null).Value;
         cycle.Start(ChickIn, 1_000);

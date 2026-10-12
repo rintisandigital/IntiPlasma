@@ -6,13 +6,13 @@ namespace Domain.UnitTests.Partnership;
 public sealed class ContractTests
 {
     [Fact]
-    public void Activate_Should_Fail_WhenPriceContractHasNoLiveBirdPrices()
+    public void Submit_Should_Fail_WhenPriceContractHasNoLiveBirdPrices()
     {
         PartnershipContract contract = PartnershipContract
             .Create("KTR-1", TestData.BranchId, ContractScheme.PriceContract, TestData.Terms(liveBirdPrices: []))
             .Value;
 
-        contract.Activate().Error.ShouldBe(ContractErrors.PriceContractIncomplete);
+        contract.Submit().Error.ShouldBe(ContractErrors.PriceContractIncomplete);
     }
 
     [Fact]
@@ -46,6 +46,7 @@ public sealed class ContractTests
         PartnershipContract contract = TestData.ActivePriceContract();
 
         contract.UpdateTerms(TestData.Terms()).Error.ShouldBe(ContractErrors.NotDraft(contract.Id));
+        contract.Submit().Error.ShouldBe(ContractErrors.NotSubmittable(contract.Id));
         contract.DomainEvents.ShouldContain(e => e is ContractActivatedDomainEvent);
     }
 

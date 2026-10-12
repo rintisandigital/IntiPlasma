@@ -7,7 +7,7 @@
     string? error = TempData[AppController.ErrorKey] as string;
 }
 <!DOCTYPE html>
-<html lang="en" data-theme="light" data-color="primary" data-mainboard-url="@Url.Action("Index", "Main")">
+<html lang="en" data-theme="light" data-color="primary" data-mainboard-url="@Url.Action("Index", "Main", new { area = "" })">
 <head>
     <base href="~/">
     <meta charset="utf-8" />

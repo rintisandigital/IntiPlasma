@@ -31,7 +31,7 @@ public sealed class FieldOfficerScopeTests : BaseHandlerTest
         User otherPpl = await SeedFieldOfficerAsync(context, branch);
 
         var handler = new CreateFarmerCommandHandler(
-            context, AllBranches(), new TestFieldScope(context, ppl.Id), CreateAttachments(context));
+            context, AllBranches(), new TestFieldScope(context, ppl.Id), CreateAttachments(context), CreateApprovals(context));
 
         // Act
         Result<Guid> result = await handler.Handle(CreateFarmer(branch.Id, otherPpl.Id), CancellationToken.None);
@@ -49,7 +49,8 @@ public sealed class FieldOfficerScopeTests : BaseHandlerTest
         Branch branch = await SeedBranchAsync(context);
         User ppl = await SeedFieldOfficerAsync(context, branch);
 
-        var handler = new CreateFarmerCommandHandler(context, AllBranches(), NoFieldScope(), CreateAttachments(context));
+        var handler = new CreateFarmerCommandHandler(
+            context, AllBranches(), NoFieldScope(), CreateAttachments(context), CreateApprovals(context));
 
         // Act
         Result<Guid> result = await handler.Handle(CreateFarmer(branch.Id, ppl.Id), CancellationToken.None);
@@ -67,7 +68,8 @@ public sealed class FieldOfficerScopeTests : BaseHandlerTest
         Branch branch = await SeedBranchAsync(context);
         User staff = await SeedUserAsync(context, branch, Role.Create("Staff", null, [Permissions.FarmersRead]).Value);
 
-        var handler = new CreateFarmerCommandHandler(context, AllBranches(), NoFieldScope(), CreateAttachments(context));
+        var handler = new CreateFarmerCommandHandler(
+            context, AllBranches(), NoFieldScope(), CreateAttachments(context), CreateApprovals(context));
 
         // Act
         Result<Guid> result = await handler.Handle(CreateFarmer(branch.Id, staff.Id), CancellationToken.None);
@@ -84,7 +86,8 @@ public sealed class FieldOfficerScopeTests : BaseHandlerTest
         Branch branch = await SeedBranchAsync(context);
         User admin = await SeedUserAsync(context, branch, Role.CreateAdministrator());
 
-        var handler = new CreateFarmerCommandHandler(context, AllBranches(), NoFieldScope(), CreateAttachments(context));
+        var handler = new CreateFarmerCommandHandler(
+            context, AllBranches(), NoFieldScope(), CreateAttachments(context), CreateApprovals(context));
 
         // Act
         Result<Guid> result = await handler.Handle(CreateFarmer(branch.Id, admin.Id), CancellationToken.None);
@@ -102,7 +105,8 @@ public sealed class FieldOfficerScopeTests : BaseHandlerTest
         Branch otherBranch = await SeedBranchAsync(context, "JKT");
         User ppl = await SeedFieldOfficerAsync(context, otherBranch);
 
-        var handler = new CreateFarmerCommandHandler(context, AllBranches(), NoFieldScope(), CreateAttachments(context));
+        var handler = new CreateFarmerCommandHandler(
+            context, AllBranches(), NoFieldScope(), CreateAttachments(context), CreateApprovals(context));
 
         // Act
         Result<Guid> result = await handler.Handle(CreateFarmer(branch.Id, ppl.Id), CancellationToken.None);
@@ -122,7 +126,7 @@ public sealed class FieldOfficerScopeTests : BaseHandlerTest
         Farmer farmer = await SeedFarmerAsync(context, branch, otherPpl.Id);
 
         var handler = new CreateCoopCommandHandler(
-            context, AllBranches(), new TestFieldScope(context, ppl.Id), CreateAttachments(context));
+            context, AllBranches(), new TestFieldScope(context, ppl.Id), CreateAttachments(context), CreateApprovals(context));
 
         // Act
         Result<Guid> result = await handler.Handle(CreateCoop(farmer.Id), CancellationToken.None);
@@ -141,7 +145,7 @@ public sealed class FieldOfficerScopeTests : BaseHandlerTest
         Farmer farmer = await SeedFarmerAsync(context, branch, ppl.Id);
 
         var handler = new CreateCoopCommandHandler(
-            context, AllBranches(), new TestFieldScope(context, ppl.Id), CreateAttachments(context));
+            context, AllBranches(), new TestFieldScope(context, ppl.Id), CreateAttachments(context), CreateApprovals(context));
 
         // Act
         Result<Guid> result = await handler.Handle(CreateCoop(farmer.Id), CancellationToken.None);
@@ -244,6 +248,11 @@ public sealed class FieldOfficerScopeTests : BaseHandlerTest
         context.Branches.Add(branch);
         await context.SaveChangesAsync();
 
+        if (!await context.ApprovalFlows.AnyAsync())
+        {
+            await SeedDefaultApprovalFlowsAsync(context);
+        }
+
         return branch;
     }
 
@@ -268,7 +277,7 @@ public sealed class FieldOfficerScopeTests : BaseHandlerTest
     private static async Task<Farmer> SeedFarmerAsync(TestDbContext context, Branch branch, Guid? fieldOfficerUserId)
     {
         Farmer farmer = Farmer.Create($"INT-{Guid.NewGuid():N}"[..20], "Farm Inti", FarmerType.Inti, branch.Id, null,
-            TaxIdentity.None, null, null, BankAccount.None).Value;
+            TaxIdentity.None, null, null, BankAccount.None).Value.Approved();
         farmer.AssignFieldOfficer(fieldOfficerUserId);
 
         context.Farmers.Add(farmer);
@@ -280,7 +289,7 @@ public sealed class FieldOfficerScopeTests : BaseHandlerTest
     private static async Task<Coop> SeedCoopAsync(TestDbContext context, Branch branch, Guid? fieldOfficerUserId)
     {
         Farmer farmer = await SeedFarmerAsync(context, branch, null);
-        Coop coop = Coop.Create(farmer, "KDG-01", "Kandang 1", 10_000, HouseType.ClosedHouse, null, null, null).Value;
+        Coop coop = Coop.Create(farmer, "KDG-01", "Kandang 1", 10_000, HouseType.ClosedHouse, null, null, null).Value.Approved(farmer);
         coop.AssignFieldOfficer(fieldOfficerUserId);
 
         context.Coops.Add(coop);

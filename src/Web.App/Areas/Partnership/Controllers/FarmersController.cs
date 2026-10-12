@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Paging;
+using Application.Approvals;
 using Application.Documents;
 using Application.Farmers;
 using Application.Farmers.Create;
@@ -24,13 +25,17 @@ using Web.App.Models.Shared;
 namespace Web.App.Areas.Partnership.Controllers;
 
 /// <summary>
-/// Farmers (peternak): Inti or Plasma (plasma needs a NIK), per branch, with bank account for settlements.
+/// Farmers (peternak): Inti or Plasma (plasma needs a NIK), per branch, with bank account for settlements. New
+/// farmers and changes of the NIK or bank account of an approved farmer go through the approval module (M-81, M-84);
+/// the edit page doubles as the details page, with the approval timeline.
 /// </summary>
 [Area("Partnership")]
 [MenuAccess(MenuCodes.PartnershipFarmers)]
 public sealed class FarmersController(
     PageSupport support,
-    IQueryHandler<GetFarmersQuery, PagedList<FarmerResponse>> farmersQuery) : AppController
+    IQueryHandler<GetFarmersQuery, PagedList<FarmerResponse>> farmersQuery,
+    IQueryHandler<GetFarmerByIdQuery, FarmerResponse> farmerQuery,
+    IQueryHandler<GetFarmerApprovalsQuery, IReadOnlyList<ApprovalDetailResponse>> approvalsQuery) : AppController
 {
     private const string MenuCode = MenuCodes.PartnershipFarmers;
 
@@ -47,6 +52,7 @@ public sealed class FarmersController(
         new("Account", f => f.BankAccount.AccountNumber, Width: 1.5f),
         new("Farms", f => f.CoopCount, ExportFormat.WholeNumber, 0.7f),
         new("PPL", f => f.FieldOfficerName, Width: 1.5f),
+        new("Status", f => f.RegistrationStatus, Width: 1.1f),
         new("Active", f => f.IsActive, ExportFormat.Boolean, 0.6f)
     ];
 
@@ -128,8 +134,8 @@ public sealed class FarmersController(
 
             if (result.IsSuccess)
             {
-                NotifySuccess($"Farmer {model.Code} has been created.");
-                return RedirectToAction(nameof(Index));
+                NotifySuccess($"Farmer {model.Code} has been created and submitted for approval.");
+                return RedirectToAction(nameof(Edit), new { id = result.Value });
             }
 
             AddErrors(result.Error);
@@ -139,12 +145,12 @@ public sealed class FarmersController(
     }
 
     [HttpGet]
-    public async Task<IActionResult> Edit(
-        Guid id,
-        [FromServices] IQueryHandler<GetFarmerByIdQuery, FarmerResponse> query,
-        CancellationToken cancellationToken)
+    public Task<IActionResult> Details(Guid id, CancellationToken cancellationToken) => Edit(id, cancellationToken);
+
+    [HttpGet]
+    public async Task<IActionResult> Edit(Guid id, CancellationToken cancellationToken)
     {
-        Result<FarmerResponse> result = await query.Handle(new GetFarmerByIdQuery(id), cancellationToken);
+        Result<FarmerResponse> result = await farmerQuery.Handle(new GetFarmerByIdQuery(id), cancellationToken);
 
         if (result.IsFailure)
         {
@@ -168,8 +174,7 @@ public sealed class FarmersController(
             CoopCount = farmer.CoopCount,
             Documents = [.. farmer.Documents],
             FieldOfficerUserId = farmer.FieldOfficerUserId,
-            FieldOfficerLabel = farmer.FieldOfficerName,
-            CanSave = await support.CanAsync(MenuCode, MenuRights.Edit)
+            FieldOfficerLabel = farmer.FieldOfficerName
         };
 
         return View("Form", await WithOptionsAsync(model, cancellationToken));
@@ -192,14 +197,38 @@ public sealed class FarmersController(
 
             if (result.IsSuccess)
             {
-                NotifySuccess($"Farmer {model.Code} has been saved.");
-                return RedirectToAction(nameof(Index));
+                NotifySuccess($"Farmer {model.Code} has been saved. A new NIK or bank account takes effect once approved.");
+                return RedirectToAction(nameof(Edit), new { id });
             }
 
             AddErrors(result.Error);
         }
 
         return View("Form", await WithOptionsAsync(model, cancellationToken));
+    }
+
+    /// <summary>
+    /// Submits a draft or rejected farmer again (M-83).
+    /// </summary>
+    [HttpPost]
+    [MenuAccess(MenuCode, MenuRights.Edit)]
+    public async Task<IActionResult> Submit(
+        Guid id,
+        [FromServices] ICommandHandler<SubmitFarmerCommand, Guid> handler,
+        CancellationToken cancellationToken)
+    {
+        Result<Guid> result = await handler.Handle(new SubmitFarmerCommand(id), cancellationToken);
+
+        if (result.IsSuccess)
+        {
+            NotifySuccess("The farmer has been submitted for approval.");
+        }
+        else
+        {
+            NotifyError(result.Error.Description);
+        }
+
+        return RedirectToAction(nameof(Edit), new { id });
     }
 
     /// <summary>
@@ -236,6 +265,19 @@ public sealed class FarmersController(
     private async Task<FarmerFormViewModel> WithOptionsAsync(FarmerFormViewModel model, CancellationToken cancellationToken)
     {
         model.Branches = await support.BranchOptionsAsync(model.BranchId);
+
+        if (model.Id is Guid id)
+        {
+            bool canEdit = await support.CanAsync(MenuCode, MenuRights.Edit);
+            Result<FarmerResponse> farmer = await farmerQuery.Handle(new GetFarmerByIdQuery(id), cancellationToken);
+            Result<IReadOnlyList<ApprovalDetailResponse>> approvals =
+                await approvalsQuery.Handle(new GetFarmerApprovalsQuery(id), cancellationToken);
+
+            model.RegistrationStatus = farmer.IsSuccess ? farmer.Value.RegistrationStatus : null;
+            model.Approvals = approvals.IsSuccess ? approvals.Value : [];
+            model.CanSave = canEdit && model.RegistrationStatus != "PendingApproval";
+            model.CanSubmit = canEdit && model.RegistrationStatus is "Draft" or "Rejected";
+        }
         model.Attachments = await support.AttachmentsAsync(model.Documents, cancellationToken);
         model.FieldOfficerLabel ??= await support.FieldOfficerLabelAsync(model.BranchId, model.FieldOfficerUserId, cancellationToken);
         return model;

@@ -50,7 +50,7 @@
                                 <a asp-controller="Coops" asp-action="Index" asp-route-farmerId="@farmer.Id" asp-route-branch="all">@Fmt.Number(farmer.CoopCount)</a>
                             </td>
                             <td>@(farmer.FieldOfficerName ?? "—")</td>
-                            <td><partial name="Partials/_StatusBadge" model='farmer.IsActive ? "Active" : "Inactive"' /></td>
+                            <td><partial name="Partials/_StatusBadge" model='Web.App.Areas.Approvals.Models.ApprovalLabels.RecordStatus(farmer.RegistrationStatus, farmer.IsActive)' /></td>
                             <td class="text-end text-nowrap">
                                 @if (canExport)
                                 {

@@ -1,7 +1,9 @@
 using System.Data.Common;
+using Application.Abstractions.Authentication;
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Approvals;
 using Application.BreedStandards;
 using Application.Production;
 using Dapper;
@@ -27,7 +29,30 @@ public sealed record MobileDashboardResponse(
     DateTime GeneratedAtUtc,
     DashboardThresholds Thresholds,
     DashboardKpi Kpi,
-    IReadOnlyList<DashboardCycleResponse> Cycles);
+    IReadOnlyList<DashboardCycleResponse> Cycles,
+    DashboardApprovals Approvals);
+
+/// <summary>
+/// Approval summary of the signed-in user (PLAN-MOBILE M-93).
+/// </summary>
+/// <param name="WaitingForMe">Pending requests the user may decide now, as an approver or a delegate.</param>
+/// <param name="WaitingByDocumentType">The same per document type (Farmer, FarmerChange, Coop, Contract).</param>
+/// <param name="MyPending">The user's own requests still pending.</param>
+/// <param name="MyRejected">The user's requests rejected in the last 7 days, newest first.</param>
+public sealed record DashboardApprovals(
+    int WaitingForMe,
+    IReadOnlyDictionary<string, int> WaitingByDocumentType,
+    int MyPending,
+    IReadOnlyList<DashboardRejectedRequest> MyRejected);
+
+public sealed record DashboardRejectedRequest(
+    Guid RequestId,
+    string DocumentType,
+    Guid DocumentId,
+    string DocumentCode,
+    string DocumentTitle,
+    string? RejectReason,
+    DateTime RejectedAtUtc);
 
 public sealed record DashboardThresholds(
     int FeedWarningDays,
@@ -132,6 +157,7 @@ internal sealed class GetMobileDashboardQueryHandler(
     IBranchAccess branchAccess,
     IFieldScope fieldScope,
     IDateTimeProvider dateTimeProvider,
+    IUserContext userContext,
     MobileDashboardOptions options,
     BreedStandardOptions standardOptions)
     : IQueryHandler<GetMobileDashboardQuery, MobileDashboardResponse>
@@ -259,12 +285,61 @@ internal sealed class GetMobileDashboardQueryHandler(
                 standardOptions.Thresholds))
         ];
 
+        DashboardApprovals approvals = await ApprovalsAsync(connection, scope, utcNow, cancellationToken);
+
         return new MobileDashboardResponse(
             date,
             utcNow,
             new DashboardThresholds(options.FeedWarningDays, options.RecordingLateDays, options.DepletionWarningPercent, options.StockReportFromAgeDays),
             MobileDashboardCalculator.BuildKpi(results, options),
-            results);
+            results,
+            approvals);
+    }
+
+    private async Task<DashboardApprovals> ApprovalsAsync(
+        DbConnection connection,
+        BranchScope scope,
+        DateTime utcNow,
+        CancellationToken cancellationToken)
+    {
+        string sql =
+            $"""
+             SELECT r.document_type, COUNT(*)::int
+             FROM approval.approval_requests r
+             LEFT JOIN approval.approval_request_levels l ON l.request_id = r.id AND l.level_no = r.current_level
+             WHERE {ApprovalSql.WaitingFor} AND {ApprovalSql.BranchFilter}
+             GROUP BY r.document_type;
+
+             SELECT COUNT(*)::int FROM approval.approval_requests r WHERE r.requested_by = @UserId AND r.status = 'Pending';
+
+             SELECT r.id AS RequestId, r.document_type AS DocumentType, r.document_id AS DocumentId, r.document_code AS DocumentCode,
+                    r.document_title AS DocumentTitle,
+                    (SELECT d.note FROM approval.approval_decisions d WHERE d.request_id = r.id AND d.outcome = 'Rejected' LIMIT 1) AS RejectReason,
+                    r.completed_at_utc AS RejectedAtUtc
+             FROM approval.approval_requests r
+             WHERE r.requested_by = @UserId AND r.status = 'Rejected' AND r.completed_at_utc >= @Since
+             ORDER BY r.completed_at_utc DESC
+             LIMIT 20;
+             """;
+
+        await using SqlMapper.GridReader multi = await connection.QueryMultipleAsync(new CommandDefinition(
+            sql,
+            new
+            {
+                scope.AllBranches,
+                scope.BranchIds,
+                userContext.UserId,
+                Today = ApproverRules.Today(utcNow),
+                ApproverRules.DecidePermission,
+                Since = utcNow.AddDays(-7)
+            },
+            cancellationToken: cancellationToken));
+
+        var waiting = (await multi.ReadAsync<(string DocumentType, int Count)>()).ToDictionary(r => r.DocumentType, r => r.Count);
+        int myPending = await multi.ReadSingleAsync<int>();
+        List<DashboardRejectedRequest> rejected = [.. await multi.ReadAsync<DashboardRejectedRequest>()];
+
+        return new DashboardApprovals(waiting.Values.Sum(), waiting, myPending, rejected);
     }
 
     internal sealed record CycleRow

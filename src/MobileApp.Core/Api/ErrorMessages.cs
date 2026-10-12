@@ -12,6 +12,8 @@ public static partial class ErrorMessages
     /// <summary>
     /// Error codes with a fixed Indonesian message. Kept in sync with the Domain error catalog by a unit test.
     /// </summary>
+    public const string FlowNotConfiguredCode = "Approvals.FlowNotConfigured";
+
     internal static readonly IReadOnlyDictionary<string, string> Known = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         ["Users.NotFoundByEmail"] = "Email atau password salah.",
@@ -53,6 +55,25 @@ public static partial class ErrorMessages
         ["Attachments.TooLarge"] = "Foto terlalu besar (maksimal 10 MB).",
         ["Attachments.UnsupportedType"] = "Jenis file tidak didukung (hanya JPEG, PNG, WEBP, PDF).",
         ["Attachments.IdConflict"] = "Foto bentrok dengan lampiran lain di server. Hapus foto lalu tambahkan lagi.",
+        // Approval (M6).
+        ["Approvals.NotApprover"] = "Anda bukan approver pada level yang sedang berjalan.",
+        ["Approvals.RequesterCannotDecide"] = "Pengaju tidak dapat menyetujui atau menolak pengajuannya sendiri.",
+        ["Approvals.AlreadyDecidedOtherLevel"] = "Anda sudah memutuskan level lain pada pengajuan ini; satu orang hanya boleh memutuskan satu level.",
+        ["Approvals.NotPending"] = "Pengajuan sudah diputuskan atau dibatalkan. Muat ulang untuk melihat statusnya.",
+        ["Approvals.ReasonRequired"] = "Alasan penolakan wajib diisi.",
+        ["Approvals.NotFound"] = "Pengajuan tidak ditemukan.",
+        ["Approvals.DocumentPending"] = "Dokumen ini masih punya pengajuan yang menunggu keputusan.",
+        ["Approvals.OnlyRequesterCanCancel"] = "Hanya pengaju yang dapat membatalkan pengajuan.",
+        ["Farmer.PendingApproval"] = "Peternak sedang menunggu approval; batalkan pengajuan dulu untuk mengubah data.",
+        ["Coop.PendingApproval"] = "Kandang sedang menunggu approval; batalkan pengajuan dulu untuk mengubah data.",
+        ["Farmers.ChangePending"] = "Masih ada perubahan NIK/rekening yang menunggu approval.",
+        ["Coops.FarmerNotSubmitted"] = "Peternak kandang ini belum diajukan atau ditolak; ajukan peternaknya dulu.",
+        ["Coops.FarmerNotApproved"] = "Kandang baru bisa disetujui setelah peternaknya disetujui.",
+        ["ApprovalDelegations.DelegateToSelf"] = "Tidak bisa mendelegasikan ke diri sendiri.",
+        ["ApprovalDelegations.InvalidPeriod"] = "Periode delegasi tidak valid (maksimal 90 hari dan belum berakhir).",
+        ["ApprovalDelegations.Overlaps"] = "Periode ini bertumpuk dengan delegasi Anda yang lain.",
+        ["ApprovalDelegations.Ended"] = "Delegasi sudah berakhir atau dicabut.",
+        ["ApprovalDelegations.InvalidDelegate"] = "Penerima delegasi harus approver yang aktif.",
         [ApiError.NetworkCode] = "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.",
         [ApiError.SessionExpiredCode] = "Sesi Anda sudah berakhir. Silakan masuk kembali.",
         [ApiError.UnexpectedCode] = "Terjadi kesalahan yang tidak terduga."
@@ -66,6 +87,12 @@ public static partial class ErrorMessages
         if (code == "Users.LockedOut")
         {
             return LockedOut(detail);
+        }
+
+        // Written in Indonesian by the server, with the document type and branch (M-82).
+        if (code == FlowNotConfiguredCode && !string.IsNullOrWhiteSpace(detail))
+        {
+            return detail;
         }
 
         if (Known.TryGetValue(code, out string? message))

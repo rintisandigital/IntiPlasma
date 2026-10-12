@@ -1,0 +1,145 @@
+@* Pengajuan approval sebuah dokumen dengan level dan keputusannya (PLAN-MOBILE M-92). Batal hanya untuk pengaju. *@
+@inject ApprovalsApi Approvals
+@inject NavigationManager Navigation
+
+@if (Requests.Count == 0)
+{
+    <div class="text-caption-1 text-dark-4">Belum ada pengajuan approval.</div>
+}
+@foreach (ApprovalDetail detail in Requests)
+{
+    ApprovalRequest request = detail.Request;
+    <div class="list-card mb-12">
+        <div class="d-flex justify-content-between align-items-start gap-8">
+            <div>
+                <div class="text-button-small text-OnSurface">@Labels.ApprovalDocumentType(request.DocumentType)</div>
+                <div class="text-caption-2 text-dark-4">
+                    @request.RequestedByName · @IdFormat.DateTime(request.RequestedAtUtc.ToLocalTime())
+                </div>
+            </div>
+            <StatusBadge Text="@Labels.ApprovalStatus(request.Status)" Tone="@Labels.ApprovalTone(request.Status)" />
+        </div>
+        <div class="text-caption-2 text-Primary mt-4">
+            @Labels.ApprovalLevel(request.Status, request.CurrentLevel, request.LevelCount, request.CurrentLevelName)
+        </div>
+
+        @if (detail.Changes.Count > 0)
+        {
+            <div class="info-list mt-8">
+                @foreach (ApprovalChange change in detail.Changes)
+                {
+                    <div class="row-item">
+                        <span class="label">@Labels.ApprovalField(change.Field)</span>
+                        <span class="text-end">@(change.OldValue ?? "—") → <strong>@(change.NewValue ?? "—")</strong></span>
+                    </div>
+                }
+            </div>
+        }
+
+        <ul class="approval-steps mt-8">
+            @foreach (ApprovalLevel level in detail.Levels)
+            {
+                ApprovalDecision? decision = detail.Decisions.FirstOrDefault(d => d.LevelNo == level.LevelNo);
+                <li class="approval-step @StepCss(level.State)">
+                    <i class="icon @StepIcon(level.State)"></i>
+                    <div>
+                        <div class="text-caption-1">Level @level.LevelNo · @level.Name — @Labels.LevelState(level.State)</div>
+                        @if (decision is not null)
+                        {
+                            <div class="text-caption-2 text-dark-4">
+                                @decision.DecidedByName@(decision.OnBehalfOfName is { } onBehalf ? $" a.n. {onBehalf}" : string.Empty)
+                                · @IdFormat.DateTime(decision.DecidedAtUtc.ToLocalTime())
+                            </div>
+                            @if (decision.Note is not null)
+                            {
+                                <div class="text-caption-2 @(decision.Outcome == "Rejected" ? "text-Red" : "text-dark-4")">“@decision.Note”</div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="text-caption-2 text-dark-4">@string.Join(", ", level.Approvers.Select(a => a.Name))</div>
+                        }
+                    </div>
+                </li>
+            }
+        </ul>
+
+        @if (ShowActions && (detail.CanDecide || detail.CanCancel))
+        {
+            <div class="d-flex gap-8 mt-8">
+                @if (detail.CanDecide)
+                {
+                    <a class="tf-btn round-full" href="/approval/@request.Id">Putuskan</a>
+                }
+                @if (detail.CanCancel)
+                {
+                    <button type="button" class="tf-btn style-1 round-full" @onclick="() => _cancelling = request">Batalkan pengajuan</button>
+                }
+            </div>
+        }
+    </div>
+}
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger mt-8">@_error</div>
+}
+
+<ConfirmSheet Visible="_cancelling is not null" Title="Batalkan pengajuan?"
+              Message="Dokumen kembali menjadi draf dan bisa diubah lalu diajukan ulang."
+              ConfirmText="Batalkan" CancelText="Kembali" OnClose="CancelAsync" />
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ApprovalDetail> Requests { get; set; } = [];
+
+    /// <summary>
+    /// Shows "Putuskan" and "Batalkan pengajuan" (not on the decision page itself).
+    /// </summary>
+    [Parameter]
+    public bool ShowActions { get; set; } = true;
+
+    /// <summary>
+    /// After a request was cancelled: the page reloads.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    private ApprovalRequest? _cancelling;
+    private string? _error;
+
+    private async Task CancelAsync(bool confirmed)
+    {
+        ApprovalRequest? request = _cancelling;
+        _cancelling = null;
+
+        if (!confirmed || request is null)
+        {
+            return;
+        }
+
+        ApiResult result = await Approvals.CancelAsync(request.Id);
+        _error = result.Error?.Message;
+
+        if (result.IsSuccess)
+        {
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private static string StepCss(string state) => state switch
+    {
+        "Approved" => "done",
+        "Rejected" => "rejected",
+        "Pending" => "current",
+        _ => "waiting"
+    };
+
+    private static string StepIcon(string state) => state switch
+    {
+        "Approved" => "icon-CheckCircle",
+        "Rejected" => "icon-xCircle",
+        "Pending" => "icon-clock",
+        _ => "icon-circle-fill"
+    };
+}

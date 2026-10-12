@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Application.Coops;
 using Domain.MasterData.Branches;
 using Domain.MasterData.BreedStandards;
@@ -199,6 +200,8 @@ internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
 
 internal sealed class FarmerConfiguration : IEntityTypeConfiguration<Farmer>
 {
+    private static readonly JsonSerializerOptions PendingChangeJson = new(JsonSerializerDefaults.Web);
+
     public void Configure(EntityTypeBuilder<Farmer> builder)
     {
         builder.ToTable("farmers", Schemas.MasterData);
@@ -213,6 +216,11 @@ internal sealed class FarmerConfiguration : IEntityTypeConfiguration<Farmer>
         builder.HasIndex(f => f.FieldOfficerUserId);
         builder.ComplexTaxIdentity(f => f.TaxIdentity);
         builder.ComplexBankAccount(f => f.BankAccount);
+        builder.Property(f => f.PendingChange)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                change => JsonSerializer.Serialize(change, PendingChangeJson),
+                json => JsonSerializer.Deserialize<FarmerPendingChange>(json, PendingChangeJson));
 
         builder.HasOne<Branch>().WithMany().HasForeignKey(f => f.BranchId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<User>().WithMany().HasForeignKey(f => f.FieldOfficerUserId).OnDelete(DeleteBehavior.SetNull);

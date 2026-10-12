@@ -1,4 +1,5 @@
 using Domain.Access;
+using Domain.Approvals;
 using Domain.Auditing;
 using Domain.Costing.PlasmaSettlements;
 using Domain.Documents.Attachments;
@@ -67,6 +68,9 @@ public interface IApplicationDbContext
     DbSet<Customer> Customers { get; }
     DbSet<Farmer> Farmers { get; }
     DbSet<Coop> Coops { get; }
+    DbSet<ApprovalFlow> ApprovalFlows { get; }
+    DbSet<ApprovalRequest> ApprovalRequests { get; }
+    DbSet<ApprovalDelegation> ApprovalDelegations { get; }
 
     DbSet<PartnershipContract> Contracts { get; }
     DbSet<ProductionCycle> ProductionCycles { get; }

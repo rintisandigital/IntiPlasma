@@ -11,7 +11,7 @@
         }
         else if (!Coop.IsActive)
         {
-            <StatusBadge Text="Nonaktif" />
+            <StatusBadge Text="@Labels.RecordStatus(Coop.RegistrationStatus, Coop.IsActive)" Tone="@Labels.RecordTone(Coop.RegistrationStatus, Coop.IsActive)" />
         }
     </div>
     <div class="meta">

@@ -14,6 +14,7 @@ public static class Tags
     public const string Farmers = "Farmers";
     public const string Coops = "Coops";
     public const string Contracts = "Partnership Contracts";
+    public const string Approvals = "Approvals";
     public const string Cycles = "Production Cycles";
     public const string Accounts = "Finance - Chart of Accounts";
     public const string CostCenters = "Finance - Cost Centers";

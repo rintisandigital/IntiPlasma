@@ -1,0 +1,143 @@
+@page "/delegasi"
+@inject ApprovalsApi Approvals
+@inject SessionService Session
+@inject IClock Clock
+
+@* Delegasi approval saat cuti (PLAN-MOBILE M-98): selama periode, pengajuan yang menunggu saya juga masuk ke inbox
+   penerima, yang memutuskan atas nama saya. Wajib online. *@
+<AppPage Title="Delegasi Approval" BackTo="/lainnya">
+    <div class="form-section">
+        <h6 class="mb-8">Delegasi baru</h6>
+        <label class="text-caption-1 mb-4" for="delegate">Delegasikan ke</label>
+        <select id="delegate" class="form-select mb-12" @bind="_delegateId">
+            <option value="">— pilih approver —</option>
+            @foreach (ApproverCandidate candidate in _candidates.Where(c => c.Id != Session.User?.Id))
+            {
+                <option value="@candidate.Id">@candidate.Name</option>
+            }
+        </select>
+        <div class="d-flex gap-12">
+            <div class="flex-grow-1">
+                <label class="text-caption-1 mb-4" for="from">Dari</label>
+                <input id="from" type="date" class="form-control mb-12" @bind="_from" />
+            </div>
+            <div class="flex-grow-1">
+                <label class="text-caption-1 mb-4" for="to">Sampai</label>
+                <input id="to" type="date" class="form-control mb-12" @bind="_to" />
+            </div>
+        </div>
+        <label class="text-caption-1 mb-4" for="reason">Alasan</label>
+        <input id="reason" class="form-control mb-12" maxlength="300" placeholder="mis. cuti tahunan" @bind="_reason" />
+        @if (_message is not null)
+        {
+            <div class="alert @(_saved ? "alert-success" : "alert-danger") py-2">@_message</div>
+        }
+        <button type="button" class="tf-btn round-full w-100" disabled="@_busy" @onclick="SaveAsync">Simpan delegasi</button>
+        <div class="text-caption-2 text-dark-4 mt-8">Maksimal 90 hari. Delegasi berakhir otomatis dan bisa dicabut kapan saja.</div>
+    </div>
+
+    <h6 class="mt-16 mb-8">Delegasi saya</h6>
+    <CacheNote CachedAtUtc="_cachedAtUtc" />
+    @if (_delegations.Count == 0)
+    {
+        <div class="text-caption-1 text-dark-4">Belum ada delegasi.</div>
+    }
+    @foreach (ApprovalDelegation delegation in _delegations)
+    {
+        bool mine = delegation.DelegatorUserId == Session.User?.Id;
+        <div class="list-card mb-12">
+            <div class="d-flex justify-content-between align-items-start gap-8">
+                <div>
+                    <div class="text-button-small text-OnSurface">
+                        @(mine ? $"Ke {delegation.DelegateName}" : $"Dari {delegation.DelegatorName}")
+                    </div>
+                    <div class="text-caption-2 text-dark-4">@IdFormat.Date(delegation.FromDate) – @IdFormat.Date(delegation.ToDate)@(delegation.Reason is { } r ? $" · {r}" : string.Empty)</div>
+                </div>
+                <StatusBadge Text="@Labels.DelegationStatus(delegation.Status)" Tone="@Labels.DelegationTone(delegation.Status)" />
+            </div>
+            @if (mine && delegation.Status is "Active" or "Scheduled")
+            {
+                <button type="button" class="tf-btn style-1 round-full mt-8" @onclick="() => _revoking = delegation">Cabut</button>
+            }
+        </div>
+    }
+</AppPage>
+
+<ConfirmSheet Visible="_revoking is not null" Title="Cabut delegasi?"
+              Message="Pengajuan yang menunggu Anda tidak lagi masuk ke inbox penerima."
+              ConfirmText="Cabut" CancelText="Kembali" OnClose="RevokeAsync" />
+
+@code {
+    private List<ApproverCandidate> _candidates = [];
+    private List<ApprovalDelegation> _delegations = [];
+    private DateTime? _cachedAtUtc;
+    private Guid? _delegateId;
+    private DateOnly _from;
+    private DateOnly _to;
+    private string? _reason;
+    private string? _message;
+    private bool _saved;
+    private bool _busy;
+    private ApprovalDelegation? _revoking;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _from = Clock.Today;
+        _to = Clock.Today.AddDays(6);
+
+        CachedResult<List<ApproverCandidate>> candidates = await Approvals.GetDelegatesAsync();
+        _candidates = candidates.IsSuccess ? candidates.Value : [];
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        CachedResult<List<ApprovalDelegation>> result = await Approvals.GetDelegationsAsync(includeEnded: true);
+        if (result.IsSuccess)
+        {
+            _delegations = result.Value;
+            _cachedAtUtc = result.CachedAtUtc;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_delegateId is not { } delegateId)
+        {
+            _saved = false;
+            _message = "Pilih penerima delegasi.";
+            return;
+        }
+
+        _busy = true;
+        ApiResult<Guid> result = await Approvals.DelegateAsync(delegateId, _from, _to, _reason);
+        _busy = false;
+
+        _saved = result.IsSuccess;
+        _message = result.IsSuccess ? "Delegasi tersimpan." : result.Error!.Message;
+
+        if (result.IsSuccess)
+        {
+            _reason = null;
+            await LoadAsync();
+        }
+    }
+
+    private async Task RevokeAsync(bool confirmed)
+    {
+        ApprovalDelegation? delegation = _revoking;
+        _revoking = null;
+
+        if (!confirmed || delegation is null)
+        {
+            return;
+        }
+
+        ApiResult result = await Approvals.RevokeDelegationAsync(delegation.Id);
+        _saved = result.IsSuccess;
+        _message = result.IsSuccess ? "Delegasi dicabut." : result.Error!.Message;
+
+        await LoadAsync();
+    }
+}

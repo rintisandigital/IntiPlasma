@@ -295,7 +295,8 @@ public sealed record ContractDetailsViewModel(
     IReadOnlyList<AttachmentResponse> Attachments,
     bool CanEditDraft,
     bool CanChangeStatus,
-    bool CanManageAttachments);
+    bool CanManageAttachments,
+    IReadOnlyList<Application.Approvals.ApprovalDetailResponse> Approvals);
 
 // ---- Field officer assignment ------------------------------------------------------------------------------
 

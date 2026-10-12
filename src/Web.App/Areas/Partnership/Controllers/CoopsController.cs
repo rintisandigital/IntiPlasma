@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Paging;
+using Application.Approvals;
 using Application.Coops;
 using Application.Coops.Create;
 using Application.Coops.Get;
@@ -124,8 +125,8 @@ public sealed class CoopsController(
 
             if (result.IsSuccess)
             {
-                NotifySuccess($"Farm {model.Code} has been created; its farm warehouse is being set up.");
-                return RedirectToAction(nameof(Index));
+                NotifySuccess($"Farm {model.Code} has been created and submitted for approval; its farm warehouse is set up once approved.");
+                return RedirectToAction(nameof(Edit), new { id = result.Value });
             }
 
             AddErrors(result.Error);
@@ -136,9 +137,18 @@ public sealed class CoopsController(
     }
 
     [HttpGet]
+    public Task<IActionResult> Details(
+        Guid id,
+        [FromServices] IQueryHandler<GetCoopByIdQuery, CoopResponse> query,
+        [FromServices] IQueryHandler<GetCoopApprovalsQuery, IReadOnlyList<ApprovalDetailResponse>> approvalsQuery,
+        CancellationToken cancellationToken) =>
+        Edit(id, query, approvalsQuery, cancellationToken);
+
+    [HttpGet]
     public async Task<IActionResult> Edit(
         Guid id,
         [FromServices] IQueryHandler<GetCoopByIdQuery, CoopResponse> query,
+        [FromServices] IQueryHandler<GetCoopApprovalsQuery, IReadOnlyList<ApprovalDetailResponse>> approvalsQuery,
         CancellationToken cancellationToken)
     {
         Result<CoopResponse> result = await query.Handle(new GetCoopByIdQuery(id), cancellationToken);
@@ -149,6 +159,9 @@ public sealed class CoopsController(
         }
 
         CoopResponse coop = result.Value;
+        bool canEdit = await support.CanAsync(MenuCode, MenuRights.Edit);
+        Result<IReadOnlyList<ApprovalDetailResponse>> approvals =
+            await approvalsQuery.Handle(new GetCoopApprovalsQuery(id), cancellationToken);
 
         return View("Form", new CoopFormViewModel
         {
@@ -171,7 +184,10 @@ public sealed class CoopsController(
             Profile = coop.Profile,
             Documents = [.. coop.Documents],
             Attachments = await support.AttachmentsAsync(coop.Documents, cancellationToken),
-            CanSave = await support.CanAsync(MenuCode, MenuRights.Edit)
+            RegistrationStatus = coop.RegistrationStatus,
+            Approvals = approvals.IsSuccess ? approvals.Value : [],
+            CanSave = canEdit && coop.RegistrationStatus != "PendingApproval",
+            CanSubmit = canEdit && coop.RegistrationStatus is "Draft" or "Rejected"
         });
     }
 
@@ -193,7 +209,7 @@ public sealed class CoopsController(
             if (result.IsSuccess)
             {
                 NotifySuccess($"Farm {model.Code} has been saved.");
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Edit), new { id });
             }
 
             AddErrors(result.Error);
@@ -202,6 +218,30 @@ public sealed class CoopsController(
         model.Attachments = await support.AttachmentsAsync(model.Documents, cancellationToken);
         model.FieldOfficerLabel = await support.FieldOfficerLabelAsync(model.BranchId, model.FieldOfficerUserId, cancellationToken);
         return View("Form", model);
+    }
+
+    /// <summary>
+    /// Submits a draft or rejected farm again; its farmer must be approved or waiting for approval (M-87).
+    /// </summary>
+    [HttpPost]
+    [MenuAccess(MenuCode, MenuRights.Edit)]
+    public async Task<IActionResult> Submit(
+        Guid id,
+        [FromServices] ICommandHandler<SubmitCoopCommand, Guid> handler,
+        CancellationToken cancellationToken)
+    {
+        Result<Guid> result = await handler.Handle(new SubmitCoopCommand(id), cancellationToken);
+
+        if (result.IsSuccess)
+        {
+            NotifySuccess("The farm has been submitted for approval.");
+        }
+        else
+        {
+            NotifyError(result.Error.Description);
+        }
+
+        return RedirectToAction(nameof(Edit), new { id });
     }
 
     /// <summary>

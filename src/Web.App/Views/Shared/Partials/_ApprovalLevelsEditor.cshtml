@@ -1,0 +1,42 @@
+@* Editable approval levels (M-96): 1-5 rows, each a name and one or more approvers (any one decides the level). *@
+@using Web.App.Areas.Approvals.Models
+@model ApprovalLevelsEditorModel
+@{
+    string lookup = "/Lookup/Approvers";
+    string? depends = Model.BranchField is null ? null : $"branchId:{Model.BranchField}";
+}
+<table class="table table-sm align-middle" data-collection="@Model.Name">
+    <thead>
+        <tr><th style="width: 4rem">Level</th><th style="width: 30%">Name</th><th>Approvers (any one decides)</th><th style="width: 3rem"></th></tr>
+    </thead>
+    <tbody>
+        @for (int i = 0; i < Model.Levels.Count; i++)
+        {
+            ApprovalLevelRow level = Model.Levels[i];
+            <tr class="collection-row">
+                <td class="text-muted level-no">@(i + 1)</td>
+                <td><input name="@(Model.Name)[@i].Name" value="@level.Name" maxlength="100" class="form-control form-control-sm" placeholder="e.g. Kepala Cabang" required /></td>
+                <td>
+                    <select name="@(Model.Name)[@i].ApproverUserIds" multiple class="form-select form-select-sm" data-lookup="@lookup" data-lookup-depends="@depends" required>
+                        @foreach (Guid id in level.ApproverUserIds)
+                        {
+                            <option value="@id" selected>@(Model.ApproverNames.GetValueOrDefault(id) ?? id.ToString())</option>
+                        }
+                    </select>
+                </td>
+                <td><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove level"><i class="ti ti-trash"></i></button></td>
+            </tr>
+        }
+        <tr class="collection-empty"><td colspan="4" class="text-muted">Add at least one level.</td></tr>
+    </tbody>
+</table>
+<template data-collection-template="@Model.Name">
+    <tr class="collection-row">
+        <td class="text-muted level-no"></td>
+        <td><input name="@(Model.Name)[__i__].Name" maxlength="100" class="form-control form-control-sm" placeholder="e.g. Kepala Cabang" required /></td>
+        <td><select name="@(Model.Name)[__i__].ApproverUserIds" multiple class="form-select form-select-sm" data-lookup="@lookup" data-lookup-depends="@depends" required></select></td>
+        <td><button type="button" class="btn btn-sm btn-light collection-remove" title="Remove level"><i class="ti ti-trash"></i></button></td>
+    </tr>
+</template>
+<button type="button" class="btn btn-sm btn-outline-primary" data-collection-add="@Model.Name"><i class="ti ti-plus me-1"></i>Add level</button>
+<span class="text-muted fs-13 ms-2">Up to @Domain.Approvals.ApprovalFlow.MaxLevels levels, decided in order. Approvers must be active users with an API role holding <code>approvals:decide</code>; two or more per level avoid waiting when one is away.</span>

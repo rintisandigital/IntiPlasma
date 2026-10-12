@@ -2,6 +2,13 @@
 @{
     ViewData["Title"] = "Branches";
     ViewData["Menu"] = MenuCodes.AdminBranches;
+    var flows = ViewData["ApprovalFlows"] as IReadOnlyList<Application.Approvals.ApprovalFlowResponse> ?? [];
+    string[] documentTypes = Enum.GetNames<Domain.Approvals.ApprovalDocumentType>();
+
+    // Document types a branch cannot submit: neither its own nor a default active flow (PLAN-MOBILE M-97).
+    string[] Missing(Guid branchId) =>
+        [.. documentTypes.Where(t => !flows.Any(f => f.IsActive && f.DocumentType == t && (f.BranchId == branchId || f.BranchId == null)))
+            .Select(Web.App.Areas.Approvals.Models.ApprovalLabels.DocumentType)];
 }
 <div class="page-header">
     <div class="add-item d-flex">
@@ -42,7 +49,13 @@
                             <td>@branch.Name</td>
                             <td class="text-muted">@branch.Address</td>
                             <td class="text-muted">@branch.Phone</td>
-                            <td><partial name="Partials/_StatusBadge" model='branch.IsActive ? "Active" : "Inactive"' /></td>
+                            <td>
+                                <partial name="Partials/_StatusBadge" model='branch.IsActive ? "Active" : "Inactive"' />
+                                @if (Missing(branch.Id) is { Length: > 0 } missing)
+                                {
+                                    <span class="badge bg-warning text-dark" title="No approval flow for: @string.Join(", ", missing)"><i class="ti ti-alert-triangle me-1"></i>No approval flow</span>
+                                }
+                            </td>
                             <td class="text-end">
                                 <a asp-action="Edit" asp-route-id="@branch.Id" asp-menu="@MenuCodes.AdminBranches" asp-right="Edit"
                                    class="btn btn-sm btn-light" title="Edit"><i class="ti ti-edit"></i></a>

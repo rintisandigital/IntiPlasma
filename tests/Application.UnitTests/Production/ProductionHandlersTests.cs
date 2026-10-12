@@ -204,9 +204,9 @@ public sealed class ProductionHandlersTests : BaseHandlerTest
         feed.SetConversions([(sak.Id, 50m)]);
         var doc = Item.Create("DOC", "DOC", ItemCategory.Doc, ekor.Id, null);
 
-        Farmer farmer = Farmer.Create("INT", "Farm Inti", FarmerType.Inti, branch.Id, null, TaxIdentity.None, null, null, BankAccount.None).Value;
-        Coop coopA = Coop.Create(farmer, "KDG-A", "Kandang A", 5_000, HouseType.ClosedHouse, null, null, null).Value;
-        Coop coopB = Coop.Create(farmer, "KDG-B", "Kandang B", 5_000, HouseType.ClosedHouse, null, null, null).Value;
+        Farmer farmer = Farmer.Create("INT", "Farm Inti", FarmerType.Inti, branch.Id, null, TaxIdentity.None, null, null, BankAccount.None).Value.Approved();
+        Coop coopA = Coop.Create(farmer, "KDG-A", "Kandang A", 5_000, HouseType.ClosedHouse, null, null, null).Value.Approved(farmer);
+        Coop coopB = Coop.Create(farmer, "KDG-B", "Kandang B", 5_000, HouseType.ClosedHouse, null, null, null).Value.Approved(farmer);
         ProductionCycle cycleA = ProductionCycle.Plan("SKL/A", coopA, farmer, null, ChickIn, 1_000, null).Value;
         ProductionCycle cycleB = ProductionCycle.Plan("SKL/B", coopB, farmer, null, ChickIn, 1_000, null).Value;
 

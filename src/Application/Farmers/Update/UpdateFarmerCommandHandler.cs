@@ -1,8 +1,10 @@
 using Application.Abstractions.Authorization;
 using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
+using Application.Approvals;
 using Application.Documents;
 using Application.Users.FieldOfficers;
+using Domain.Approvals;
 using Domain.Common;
 using Domain.Documents.Attachments;
 using Domain.MasterData.Farmers;
@@ -15,7 +17,8 @@ internal sealed class UpdateFarmerCommandHandler(
     IApplicationDbContext context,
     IBranchAccess branchAccess,
     IFieldScope fieldScope,
-    IAttachmentService attachments)
+    IAttachmentService attachments,
+    IApprovalService approvals)
     : ICommandHandler<UpdateFarmerCommand>
 {
     public async Task<Result> Handle(UpdateFarmerCommand command, CancellationToken cancellationToken)
@@ -58,7 +61,7 @@ internal sealed class UpdateFarmerCommandHandler(
             return bankAccount;
         }
 
-        Result result = farmer.Update(
+        Result<bool> result = farmer.Update(
             command.Name,
             command.Nik,
             taxIdentity.Value,
@@ -70,6 +73,17 @@ internal sealed class UpdateFarmerCommandHandler(
         if (result.IsFailure)
         {
             return result;
+        }
+
+        // A new NIK or bank account of an approved farmer waits for a FarmerChange approval (M-84).
+        if (result.Value)
+        {
+            Result<ApprovalRequest> request = await approvals.SubmitAsync(
+                ApprovalSubmissions.ForFarmerChange(farmer), cancellationToken);
+            if (request.IsFailure)
+            {
+                return request;
+            }
         }
 
         Result documents = await attachments.ApplyDocumentsAsync(

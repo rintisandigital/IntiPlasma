@@ -17,6 +17,15 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: approval; Type: SCHEMA; Schema: -; Owner: postgres
+--
+
+CREATE SCHEMA approval;
+
+
+ALTER SCHEMA approval OWNER TO postgres;
+
+--
 -- Name: costing; Type: SCHEMA; Schema: -; Owner: postgres
 --
 
@@ -118,6 +127,122 @@ ALTER SCHEMA sales OWNER TO postgres;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: approval_decisions; Type: TABLE; Schema: approval; Owner: postgres
+--
+
+CREATE TABLE approval.approval_decisions (
+    id uuid NOT NULL,
+    request_id uuid NOT NULL,
+    level_no integer NOT NULL,
+    outcome character varying(30) NOT NULL,
+    decided_by uuid NOT NULL,
+    on_behalf_of uuid,
+    note character varying(500),
+    decided_at_utc timestamp with time zone NOT NULL
+);
+
+
+ALTER TABLE approval.approval_decisions OWNER TO postgres;
+
+--
+-- Name: approval_delegations; Type: TABLE; Schema: approval; Owner: postgres
+--
+
+CREATE TABLE approval.approval_delegations (
+    id uuid NOT NULL,
+    delegator_user_id uuid NOT NULL,
+    delegate_user_id uuid NOT NULL,
+    from_date date NOT NULL,
+    to_date date NOT NULL,
+    reason character varying(300),
+    revoked_at_utc timestamp with time zone,
+    revoked_by uuid,
+    created_at_utc timestamp with time zone NOT NULL,
+    created_by uuid,
+    modified_at_utc timestamp with time zone,
+    modified_by uuid
+);
+
+
+ALTER TABLE approval.approval_delegations OWNER TO postgres;
+
+--
+-- Name: approval_flow_levels; Type: TABLE; Schema: approval; Owner: postgres
+--
+
+CREATE TABLE approval.approval_flow_levels (
+    flow_id uuid NOT NULL,
+    level_no integer NOT NULL,
+    name character varying(100) NOT NULL,
+    approver_user_ids uuid[] NOT NULL
+);
+
+
+ALTER TABLE approval.approval_flow_levels OWNER TO postgres;
+
+--
+-- Name: approval_flows; Type: TABLE; Schema: approval; Owner: postgres
+--
+
+CREATE TABLE approval.approval_flows (
+    id uuid NOT NULL,
+    document_type character varying(30) NOT NULL,
+    branch_id uuid,
+    name character varying(150) NOT NULL,
+    is_active boolean NOT NULL,
+    created_at_utc timestamp with time zone NOT NULL,
+    created_by uuid,
+    modified_at_utc timestamp with time zone,
+    modified_by uuid
+);
+
+
+ALTER TABLE approval.approval_flows OWNER TO postgres;
+
+--
+-- Name: approval_request_levels; Type: TABLE; Schema: approval; Owner: postgres
+--
+
+CREATE TABLE approval.approval_request_levels (
+    request_id uuid NOT NULL,
+    level_no integer NOT NULL,
+    name character varying(100) NOT NULL,
+    approver_user_ids uuid[] NOT NULL
+);
+
+
+ALTER TABLE approval.approval_request_levels OWNER TO postgres;
+
+--
+-- Name: approval_requests; Type: TABLE; Schema: approval; Owner: postgres
+--
+
+CREATE TABLE approval.approval_requests (
+    id uuid NOT NULL,
+    document_type character varying(30) NOT NULL,
+    document_id uuid NOT NULL,
+    branch_id uuid NOT NULL,
+    document_code character varying(40) NOT NULL,
+    document_title character varying(200) NOT NULL,
+    summary character varying(500),
+    payload jsonb,
+    flow_id uuid,
+    requested_by uuid NOT NULL,
+    requested_at_utc timestamp with time zone NOT NULL,
+    status character varying(30) NOT NULL,
+    current_level integer NOT NULL,
+    level_count integer NOT NULL,
+    completed_at_utc timestamp with time zone,
+    created_at_utc timestamp with time zone NOT NULL,
+    created_by uuid,
+    modified_at_utc timestamp with time zone,
+    modified_by uuid
+);
+
+
+ALTER TABLE approval.approval_requests OWNER TO postgres;
 
 --
 -- Name: plasma_settlement_lines; Type: TABLE; Schema: costing; Owner: postgres
@@ -1185,6 +1310,44 @@ CREATE TABLE master.branches (
 ALTER TABLE master.branches OWNER TO postgres;
 
 --
+-- Name: breed_standard_rows; Type: TABLE; Schema: master; Owner: postgres
+--
+
+CREATE TABLE master.breed_standard_rows (
+    breed_standard_id uuid NOT NULL,
+    age_days integer NOT NULL,
+    body_weight_gram numeric(8,2) NOT NULL,
+    fcr numeric(6,3),
+    depletion_percent numeric(6,3),
+    daily_feed_gram numeric(8,2),
+    cumulative_feed_gram numeric(10,2)
+);
+
+
+ALTER TABLE master.breed_standard_rows OWNER TO postgres;
+
+--
+-- Name: breed_standards; Type: TABLE; Schema: master; Owner: postgres
+--
+
+CREATE TABLE master.breed_standards (
+    id uuid NOT NULL,
+    code character varying(20) NOT NULL,
+    name character varying(100) NOT NULL,
+    strain character varying(100),
+    notes character varying(1000),
+    is_active boolean NOT NULL,
+    is_default boolean NOT NULL,
+    created_at_utc timestamp with time zone NOT NULL,
+    created_by uuid,
+    modified_at_utc timestamp with time zone,
+    modified_by uuid
+);
+
+
+ALTER TABLE master.breed_standards OWNER TO postgres;
+
+--
 -- Name: coops; Type: TABLE; Schema: master; Owner: postgres
 --
 
@@ -1204,7 +1367,10 @@ CREATE TABLE master.coops (
     created_by uuid,
     modified_at_utc timestamp with time zone,
     modified_by uuid,
-    documents uuid[] DEFAULT '{}'::uuid[] NOT NULL
+    documents uuid[] DEFAULT '{}'::uuid[] NOT NULL,
+    profile jsonb DEFAULT '{}'::jsonb NOT NULL,
+    field_officer_user_id uuid,
+    registration_status character varying(30) DEFAULT 'Approved'::character varying NOT NULL
 );
 
 
@@ -1261,7 +1427,10 @@ CREATE TABLE master.farmers (
     created_by uuid,
     modified_at_utc timestamp with time zone,
     modified_by uuid,
-    documents uuid[] DEFAULT '{}'::uuid[] NOT NULL
+    documents uuid[] DEFAULT '{}'::uuid[] NOT NULL,
+    field_officer_user_id uuid,
+    pending_change jsonb,
+    registration_status character varying(30) DEFAULT 'Approved'::character varying NOT NULL
 );
 
 
@@ -1406,6 +1575,27 @@ CREATE TABLE master.warehouses (
 ALTER TABLE master.warehouses OWNER TO postgres;
 
 --
+-- Name: weight_ranges; Type: TABLE; Schema: master; Owner: postgres
+--
+
+CREATE TABLE master.weight_ranges (
+    id uuid NOT NULL,
+    code character varying(20) NOT NULL,
+    name character varying(100) NOT NULL,
+    min_weight_kg numeric(8,3),
+    max_weight_kg numeric(8,3),
+    sort_order integer NOT NULL,
+    is_active boolean NOT NULL,
+    created_at_utc timestamp with time zone NOT NULL,
+    created_by uuid,
+    modified_at_utc timestamp with time zone,
+    modified_by uuid
+);
+
+
+ALTER TABLE master.weight_ranges OWNER TO postgres;
+
+--
 -- Name: contract_incentives; Type: TABLE; Schema: partnership; Owner: postgres
 --
 
@@ -1525,7 +1715,9 @@ CREATE TABLE partnership.production_cycles (
     total_culling integer DEFAULT 0 NOT NULL,
     total_mortality integer DEFAULT 0 NOT NULL,
     closing_cost jsonb,
-    documents uuid[] DEFAULT '{}'::uuid[] NOT NULL
+    documents uuid[] DEFAULT '{}'::uuid[] NOT NULL,
+    breed_standard_id uuid,
+    closing_standard jsonb
 );
 
 
@@ -1633,6 +1825,30 @@ CREATE TABLE production.daily_recordings (
 
 
 ALTER TABLE production.daily_recordings OWNER TO postgres;
+
+--
+-- Name: live_bird_stock_entries; Type: TABLE; Schema: production; Owner: postgres
+--
+
+CREATE TABLE production.live_bird_stock_entries (
+    id uuid NOT NULL,
+    cycle_id uuid NOT NULL,
+    branch_id uuid NOT NULL,
+    coop_id uuid NOT NULL,
+    date date NOT NULL,
+    age_days integer NOT NULL,
+    weight_range_id uuid NOT NULL,
+    birds integer NOT NULL,
+    weight_kg numeric(14,3) NOT NULL,
+    notes character varying(500),
+    created_at_utc timestamp with time zone NOT NULL,
+    created_by uuid,
+    modified_at_utc timestamp with time zone,
+    modified_by uuid
+);
+
+
+ALTER TABLE production.live_bird_stock_entries OWNER TO postgres;
 
 --
 -- Name: __EFMigrationsHistory; Type: TABLE; Schema: public; Owner: postgres
@@ -1837,6 +2053,54 @@ CREATE TABLE sales.sales_orders (
 ALTER TABLE sales.sales_orders OWNER TO postgres;
 
 --
+-- Data for Name: approval_decisions; Type: TABLE DATA; Schema: approval; Owner: postgres
+--
+
+COPY approval.approval_decisions (id, request_id, level_no, outcome, decided_by, on_behalf_of, note, decided_at_utc) FROM stdin;
+\.
+
+
+--
+-- Data for Name: approval_delegations; Type: TABLE DATA; Schema: approval; Owner: postgres
+--
+
+COPY approval.approval_delegations (id, delegator_user_id, delegate_user_id, from_date, to_date, reason, revoked_at_utc, revoked_by, created_at_utc, created_by, modified_at_utc, modified_by) FROM stdin;
+\.
+
+
+--
+-- Data for Name: approval_flow_levels; Type: TABLE DATA; Schema: approval; Owner: postgres
+--
+
+COPY approval.approval_flow_levels (flow_id, level_no, name, approver_user_ids) FROM stdin;
+\.
+
+
+--
+-- Data for Name: approval_flows; Type: TABLE DATA; Schema: approval; Owner: postgres
+--
+
+COPY approval.approval_flows (id, document_type, branch_id, name, is_active, created_at_utc, created_by, modified_at_utc, modified_by) FROM stdin;
+\.
+
+
+--
+-- Data for Name: approval_request_levels; Type: TABLE DATA; Schema: approval; Owner: postgres
+--
+
+COPY approval.approval_request_levels (request_id, level_no, name, approver_user_ids) FROM stdin;
+\.
+
+
+--
+-- Data for Name: approval_requests; Type: TABLE DATA; Schema: approval; Owner: postgres
+--
+
+COPY approval.approval_requests (id, document_type, document_id, branch_id, document_code, document_title, summary, payload, flow_id, requested_by, requested_at_utc, status, current_level, level_count, completed_at_utc, created_at_utc, created_by, modified_at_utc, modified_by) FROM stdin;
+\.
+
+
+--
 -- Data for Name: plasma_settlement_lines; Type: TABLE DATA; Schema: costing; Owner: postgres
 --
 
@@ -1881,6 +2145,7 @@ COPY costing.plasma_settlements (id, number, branch_id, cycle_id, farmer_id, con
 --
 
 COPY documents.attachment_links (attachment_id, owner_type, owner_id, owner_key) FROM stdin;
+01a11a6f-2f19-72e2-988b-7222b691a94c	Farmer	01a106ad-bf87-7c98-8271-811bb311416f	
 \.
 
 
@@ -1889,6 +2154,7 @@ COPY documents.attachment_links (attachment_id, owner_type, owner_id, owner_key)
 --
 
 COPY documents.attachments (id, file_name, stored_file_name, extension, content_type, size_bytes, storage_path, checksum, kind, branch_id, description, status, unlinked_at_utc, is_deleted, deleted_at_utc, deleted_by, created_at_utc, created_by, modified_at_utc, modified_by) FROM stdin;
+01a11a6f-2f19-72e2-988b-7222b691a94c	WEB-MEMBER2.jpg(1).jpeg	01a11a6f2f1972e2988b7222b691a94c.jpg	.jpg	image/jpeg	256427	2026/10/01a11a6f2f1972e2988b7222b691a94c.jpg	4bd6aba68478618786d23b3b36fe81e05872d692b9f7a6a14d5ad28f7a29d9d3	Photo	01a106ad-b536-7f76-bf02-1115db4d6aff	\N	Linked	\N	f	\N	\N	2026-10-08 14:34:16.636669+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-10-08 14:34:20.341194+07	01a0f240-f921-75b0-972d-0f74522a6333
 \.
 
 
@@ -3195,10 +3461,10 @@ COPY identity.menus (id, code, parent_code, name, default_name, icon, route, sor
 01a10068-f934-7672-9e98-ac986e030054	sales.invoices	sales	Sales Invoices	Sales Invoices	\N	/Sales/SalesInvoices	30	t	t	t	t	t	f	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-04 03:18:13.02848+07	\N
 01a10068-f934-783f-93df-4f08c8fb0919	finance.journals	finance	Journals	Journals	\N	/Finance/Journals	130	t	t	t	t	t	t	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-04 03:18:13.02848+07	\N
 01a10068-f934-7955-b1c9-d9c7b9bd6032	finance.payables	finance	Payable Ledger & Aging	Payable Ledger & Aging	\N	/Finance/Payables	120	t	t	t	f	f	f	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-04 03:18:13.02848+07	\N
-01a10068-f934-79d3-8fe1-b0d63653501e	admin.failed-events	admin	Failed Events	Failed Events	\N	/Admin/FailedEvents	70	t	t	t	f	t	f	f	f	2026-10-03 13:17:21.979+07	\N	2026-10-04 03:18:13.02848+07	\N
 01a10068-f934-79f9-b77a-f1fed506413d	sales.credit-notes	sales	Credit Notes	Credit Notes	\N	/Sales/CreditNotes	40	t	t	t	t	f	f	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-04 03:18:13.02848+07	\N
 01a10068-f934-7a57-ad08-a0f8532ff00c	reports.balance-sheet	reports	Balance Sheet	Balance Sheet	\N	/Reports/BalanceSheet	40	t	t	t	f	f	f	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-04 03:18:13.02848+07	\N
 01a10068-f934-7ab2-b694-97f58dd9f948	reports.profitability	reports	Profitability	Profitability	\N	/Reports/Profitability	60	t	t	t	f	f	f	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-04 03:18:13.02848+07	\N
+01a10068-f934-79d3-8fe1-b0d63653501e	admin.failed-events	admin	Failed Events	Failed Events	\N	/Admin/FailedEvents	80	t	t	t	f	t	f	f	f	2026-10-03 13:17:21.979+07	\N	2026-10-12 11:51:37.709405+07	\N
 01a10068-f934-7e1b-9e50-7cc001eafbd6	admin.branch-access	admin	Branch Access	Branch Access	\N	/Admin/BranchAccess	30	t	t	t	t	t	t	t	f	2026-10-03 13:17:21.979+07	\N	\N	\N
 01a10068-f932-7307-92e7-97fc1fa3f602	master.uoms	master	Units of Measure	Units of Measure	\N	/MasterData/Uoms	10	t	t	t	t	t	f	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-03 14:11:49.837661+07	\N
 01a10068-f933-7205-975b-0d2bfde54b1d	master.vendors	master	Vendors	Vendors	\N	/MasterData/Vendors	50	t	t	t	t	t	f	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-03 14:11:49.837661+07	\N
@@ -3206,7 +3472,6 @@ COPY identity.menus (id, code, parent_code, name, default_name, icon, route, sor
 01a10068-f933-743a-b822-a5280e7f9cd4	master.tax-codes	master	Tax Codes	Tax Codes	\N	/MasterData/TaxCodes	20	t	t	t	t	t	f	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-03 14:11:49.837661+07	\N
 01a10068-f933-7821-916d-539aadc853d3	partnership.contracts	partnership	Contracts	Contracts	\N	/Partnership/Contracts	30	t	t	t	t	t	f	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-03 14:11:49.837661+07	\N
 01a10068-f933-78d8-acbd-14b42f747708	master.customers	master	Customers	Customers	\N	/MasterData/Customers	60	t	t	t	t	t	f	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-03 14:11:49.837661+07	\N
-01a10068-f933-7962-b99a-31c857828dea	partnership.coops	partnership	Coops	Coops	\N	/Partnership/Coops	20	t	t	t	t	t	f	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-03 14:11:49.837661+07	\N
 01a10068-f933-7a68-b616-94be9949b0ec	master.items	master	Items	Items	\N	/MasterData/Items	30	t	t	t	t	t	f	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-03 14:11:49.837661+07	\N
 01a10068-f933-7c8c-8004-a69d7c651630	master.warehouses	master	Warehouses	Warehouses	\N	/MasterData/Warehouses	40	t	t	t	t	t	f	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-03 14:11:49.837661+07	\N
 01a10068-f934-7683-a555-1a94d51183ba	finance.fiscal-periods	finance	Fiscal Periods	Fiscal Periods	\N	/Finance/FiscalPeriods	30	t	t	t	t	t	f	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-03 19:20:32.913107+07	\N
@@ -3227,7 +3492,17 @@ COPY identity.menus (id, code, parent_code, name, default_name, icon, route, sor
 01a10068-f934-7f23-a19a-50bed03dd64e	finance.bank-transfers	finance	Bank Transfers	Bank Transfers	\N	/Finance/BankTransfers	100	t	t	t	t	f	f	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-04 03:18:13.02848+07	\N
 01a10068-f934-7fa3-8b14-32cbc4e19fb3	reports.tax	reports	Tax Recap	Tax Recap	\N	/Reports/Tax	70	t	t	t	f	f	f	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-04 03:18:13.02848+07	\N
 01a10068-f934-7ff3-b7eb-5567c9416480	finance.bank-reconciliations	finance	Bank Reconciliations	Bank Reconciliations	\N	/Finance/BankReconciliations	110	t	t	t	t	t	f	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-04 03:18:13.02848+07	\N
-01a1036a-cb9e-7d2e-b3f4-62780f4f9921	admin.audit-logs	admin	Audit Log	Audit Log	\N	/Admin/AuditLogs	80	t	t	t	f	f	f	t	f	2026-10-04 03:18:13.02848+07	\N	\N	\N
+01a10068-f933-7962-b99a-31c857828dea	partnership.coops	partnership	Farms	Farms	\N	/Partnership/Coops	20	t	t	t	t	t	f	t	f	2026-10-03 13:17:21.979+07	\N	2026-10-08 14:09:24.753654+07	\N
+01a11eb9-25b1-7ed2-aaeb-bb35880809f9	partnership.field-officers	partnership	Field Officer Assignment	Field Officer Assignment	\N	/Partnership/FieldOfficers	40	t	t	t	f	t	f	f	f	2026-10-09 10:33:32.820616+07	\N	\N	\N
+01a11fb1-1153-7c69-8586-e9cf9546ac0f	master.weight-ranges	master	Weight Ranges	Weight Ranges	\N	/MasterData/WeightRanges	70	t	t	t	t	t	f	t	f	2026-10-09 15:04:20.530347+07	\N	\N	\N
+01a11fb1-119e-7e26-ad2f-4640d097ab85	production.live-bird-stock	production	Live Bird Stock	Live Bird Stock	\N	/Production/LiveBirdStock	40	t	t	t	f	f	f	t	f	2026-10-09 15:04:20.530347+07	\N	\N	\N
+01a12aeb-e4d4-70f2-a7fe-9abcd74eca7a	master.breed-standards	master	Breed Standards	Breed Standards	\N	/MasterData/BreedStandards	80	t	t	t	t	t	f	t	f	2026-10-11 19:24:25.071043+07	\N	\N	\N
+01a1036a-cb9e-7d2e-b3f4-62780f4f9921	admin.audit-logs	admin	Audit Log	Audit Log	\N	/Admin/AuditLogs	90	t	t	t	f	f	f	t	f	2026-10-04 03:18:13.02848+07	\N	2026-10-12 11:51:37.709405+07	\N
+01a12e73-b65a-77d9-849b-c77113443a6c	approvals	\N	Approvals	Approvals	ti ti-checklist	\N	15	t	t	t	f	f	f	f	f	2026-10-12 11:51:37.709405+07	\N	\N	\N
+01a12e73-b669-739d-820f-0f891e175366	approvals.requests	approvals	Approval Requests	Approval Requests	\N	/Approvals/Requests	20	t	t	t	f	t	f	f	f	2026-10-12 11:51:37.709405+07	\N	\N	\N
+01a12e73-b669-7b14-b6d4-3a48a02769cf	approvals.delegations	approvals	Delegations	Delegations	\N	/Approvals/Delegations	30	t	t	t	t	t	f	f	f	2026-10-12 11:51:37.709405+07	\N	\N	\N
+01a12e73-b669-7e10-a26a-90586f61eb2b	approvals.inbox	approvals	Approval Inbox	Approval Inbox	\N	/Approvals/Inbox	10	t	t	t	f	f	f	f	f	2026-10-12 11:51:37.709405+07	\N	\N	\N
+01a12e73-b66a-79f7-9591-cdac0779d484	admin.approval-flows	admin	Approval Flows	Approval Flows	\N	/Admin/ApprovalFlows	70	t	t	t	t	t	f	f	f	2026-10-12 11:51:37.709405+07	\N	\N	\N
 \.
 
 
@@ -3305,6 +3580,21 @@ COPY identity.role_permissions (role_id, permission) FROM stdin;
 01a0f240-f7a6-7484-868c-9da0bc7ed0c8	attachments:upload
 01a0f240-f7a6-7484-868c-9da0bc7ed0c8	system:outbox
 01a0f240-f7a6-7484-868c-9da0bc7ed0c8	tax-reports:read
+01a11ec4-59e9-7f1b-a38f-04ab4dbc6c38	partnership:assigned-only
+01a0f240-f7a6-7484-868c-9da0bc7ed0c8	approvals:decide
+01a0f240-f7a6-7484-868c-9da0bc7ed0c8	inventory:request-feed
+01a0f240-f7a6-7484-868c-9da0bc7ed0c8	inventory:request-feed-mutation
+01a0f240-f7a6-7484-868c-9da0bc7ed0c8	partnership:assigned-only
+01a0f240-f7a6-7484-868c-9da0bc7ed0c8	production:stock-report
+01a12aeb-77c2-74aa-8503-ddc0ced5bcb1	approvals:decide
+01a12aeb-77c2-74aa-8503-ddc0ced5bcb1	attachments:read
+01a12aeb-77c2-74aa-8503-ddc0ced5bcb1	contracts:read
+01a12aeb-77c2-74aa-8503-ddc0ced5bcb1	cycles:read
+01a12aeb-77c2-74aa-8503-ddc0ced5bcb1	farmers:read
+01a12aeb-77c2-74aa-8503-ddc0ced5bcb1	inventory:read
+01a12aeb-77c2-74aa-8503-ddc0ced5bcb1	master-data:read
+01a12aeb-77c2-74aa-8503-ddc0ced5bcb1	production:read
+01a12aeb-77c2-74aa-8503-ddc0ced5bcb1	warehouses:read
 \.
 
 
@@ -3314,6 +3604,8 @@ COPY identity.role_permissions (role_id, permission) FROM stdin;
 
 COPY identity.roles (id, name, description, is_system, created_at_utc, created_by, modified_at_utc, modified_by) FROM stdin;
 01a0f240-f7a6-7484-868c-9da0bc7ed0c8	Administrator	Full access to every module.	t	2026-09-30 19:18:59.516345+07	\N	\N	\N
+01a11ec4-59e9-7f1b-a38f-04ab4dbc6c38	PPL	AKSES UNTUK PPL	f	2026-10-09 10:45:47.065304+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N
+01a12aeb-77c2-74aa-8503-ddc0ced5bcb1	Manager	Manager (mobile): reads the data of their branches and decides approvals	f	2026-10-11 19:23:57.33882+07	\N	\N	\N
 \.
 
 
@@ -3332,6 +3624,7 @@ COPY identity.user_old (id, user_id, email, first_name, last_name, password_hash
 COPY identity.user_roles (user_id, role_id) FROM stdin;
 01a0f240-f921-75b0-972d-0f74522a6333	01a0f240-f7a6-7484-868c-9da0bc7ed0c8
 01a106ad-b782-7dd8-9680-2dd57b9573c4	01a0f240-f7a6-7484-868c-9da0bc7ed0c8
+01a11ec1-2d0f-76af-b3c5-fa35d36eb0cc	01a11ec4-59e9-7f1b-a38f-04ab4dbc6c38
 \.
 
 
@@ -3343,6 +3636,7 @@ COPY identity.users (id, email, first_name, last_name, password_hash, created_at
 01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	System	Administrator	E63DFE63299FCC7CC60948AC384176D457B8D9C8D8DDDB793D1F11A2A564B2FF-5804283739C279721E0D7C17B8B746D1	2026-09-30 19:18:59.516345+07	\N	\N	\N	t	7462e2882eb44e6e98da1b5fd5f757fe	0199a3c0-0000-7000-8000-000000000002	\N	0199a3c0-0000-7000-8000-000000000001	0	\N
 01a106ad-b782-7dd8-9680-2dd57b9573c4	checker@intiplasma.local	Siti	Rahmawati	0FCCBFBF546901C241E06A3FD5E9B730A7456DABFB64EB895DE4B2F5D01F3AD7-2DD0E28BEB733080E2F536F81E72D206	2026-10-04 18:30:10.4437+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	t	37fc25eecd2d4390af2bb735b3db691d	0199a3c0-0000-7000-8000-000000000002	01a106ad-b536-7f76-bf02-1115db4d6aff	0199a3c0-0000-7000-8000-000000000001	0	\N
 01a106ad-b93f-7644-8f8a-4d7bfe6cf1e3	staff.bdg@intiplasma.local	Budi	Santoso	72C60C8A4ECAE9F78E50407B648C5C7EBADBA46D8328662F5F4BBB413F17BBCF-1FB8559C6948043A657C2D8DB17C12D1	2026-10-04 18:30:10.880347+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	t	94dda4bd448645bcb372c7efc613f762	01a106ad-b803-7abc-a19a-20a53d1f9bf4	01a106ad-b536-7f76-bf02-1115db4d6aff	0199a3c0-0000-7000-8000-000000000001	0	\N
+01a11ec1-2d0f-76af-b3c5-fa35d36eb0cc	ppl@intiplasma.local	Andika	Penyuluh	ABD643C88B1FFA4DA27D2842367031F61E6C5F905A16EDEF92066EDDAFF7D912-FE52DD228E8FCE3F5A62A0E6A8257DA6	2026-10-09 10:42:18.953538+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-10-09 10:46:27.31502+07	01a0f240-f921-75b0-972d-0f74522a6333	t	51b6465cb04d477995013221fa4c11cb	01a106ad-b803-7abc-a19a-20a53d1f9bf4	01a106ad-b536-7f76-bf02-1115db4d6aff	0199a3c0-0000-7000-8000-000000000001	0	\N
 \.
 
 
@@ -3363,6 +3657,24 @@ COPY infrastructure.audit_logs (id, occurred_at_utc, category, action, user_id, 
 01a106b5-9c58-76e1-a38f-dc360462e808	2026-10-04 18:38:47.767941+07	Export	PDF	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	production.cycles	01a106ad-d05a-759c-a6ff-c3e67df7f41b	PDF print of Cycle Closing Summary	{"menu": "production.cycles", "rows": 1, "title": "Cycle Closing Summary", "branch": "Cabang Bandung", "filters": ["No. SKL/BDG/2026/VII/0002", "Status: Closed"]}	127.0.0.1	Web.App
 01a106e5-96b0-7e3e-8bdd-1e41bc792737	2026-10-04 19:31:12.047555+07	SignIn	SignedIn	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	User	01a0f240-f921-75b0-972d-0f74522a6333	Signed in	\N	127.0.0.1	Web.App
 01a106eb-3c3b-70b3-947a-db500398ca2d	2026-10-04 19:37:22.107097+07	SignIn	SignedIn	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	User	01a0f240-f921-75b0-972d-0f74522a6333	Signed in	\N	127.0.0.1	Web.App
+01a1077a-dd36-70a8-9cdc-1af602e747be	2026-10-04 22:14:14.965986+07	SignIn	SignedIn	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	User	01a0f240-f921-75b0-972d-0f74522a6333	Signed in	\N	127.0.0.1	Web.App
+01a11a38-4e39-7bf9-bc4d-2fdd7362727b	2026-10-08 13:34:20.087621+07	SignIn	SignedIn	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	User	01a0f240-f921-75b0-972d-0f74522a6333	Signed in	\N	::1	Web.App
+01a11a39-2721-716b-a80c-5767f9b3cf81	2026-10-08 13:35:15.601225+07	Export	PDF	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	partnership.farmers	\N	PDF export of Farmers (4 rows)	{"menu": "partnership.farmers", "rows": 4, "title": "Farmers", "branch": "Cabang Bandung", "filters": ["Branch: Cabang Bandung"]}	::1	Web.App
+01a11a4c-d91d-7de2-9174-2da48678a81a	2026-10-08 13:56:46.331521+07	Export	PDF	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	partnership.farmers	01a106ad-bf87-7c98-8271-811bb311416f	PDF print of Data Peternak	{"menu": "partnership.farmers", "rows": 1, "title": "Data Peternak", "branch": "Cabang Bandung", "filters": ["Kode PTN-BDG-001", "H. Ahmad Suryadi"]}	::1	Web.App
+01a11a6d-d073-75ed-897b-5af74f97e9ea	2026-10-08 14:32:46.787966+07	Export	PDF	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	partnership.coops	01a106ad-c093-725b-9c5f-bb53c87c1551	PDF print of Data Kandang Peternak	{"menu": "partnership.coops", "rows": 1, "title": "Data Kandang Peternak", "branch": "Cabang Bandung", "filters": ["Kode KDG-BDG-01", "Kandang Ahmad 1"]}	::1	Web.App
+01a11a6f-5ae5-74a4-90fe-c76448ef4d8b	2026-10-08 14:34:27.813556+07	Export	PDF	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	partnership.farmers	01a106ad-bf87-7c98-8271-811bb311416f	PDF print of Data Peternak	{"menu": "partnership.farmers", "rows": 1, "title": "Data Peternak", "branch": "Cabang Bandung", "filters": ["Kode PTN-BDG-001", "H. Ahmad Suryadi"]}	::1	Web.App
+01a11a6f-a844-70e6-8327-c938079cd74b	2026-10-08 14:34:47.619837+07	Export	PDF	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	partnership.farmers	01a106ad-bf87-7c98-8271-811bb311416f	PDF print of Data Peternak	{"menu": "partnership.farmers", "rows": 1, "title": "Data Peternak", "branch": "Cabang Bandung", "filters": ["Kode PTN-BDG-001", "H. Ahmad Suryadi"]}	::1	Web.App
+01a11a6f-c9b4-7390-aec6-b229187ffbd8	2026-10-08 14:34:56.179386+07	Export	PDF	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	partnership.farmers	01a106ad-bf87-7c98-8271-811bb311416f	PDF print of Data Peternak	{"menu": "partnership.farmers", "rows": 1, "title": "Data Peternak", "branch": "Cabang Bandung", "filters": ["Kode PTN-BDG-001", "H. Ahmad Suryadi"]}	::1	Web.App
+01a11eb9-79a3-7799-9fc6-18fe151af323	2026-10-09 10:33:54.209207+07	SignIn	SignedIn	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	User	01a0f240-f921-75b0-972d-0f74522a6333	Signed in	\N	127.0.0.1	Web.App
+01a11ec1-2e71-7afe-be2b-cc126d6d6940	2026-10-09 10:42:19.21636+07	Access	CreateUser	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	User	01a11ec1-2d0f-76af-b3c5-fa35d36eb0cc	Create user (User)	{"email": "ppl@intiplasma.local", "roleIds": ["01a0f240-f7a6-7484-868c-9da0bc7ed0c8"], "lastName": "Penyuluh", "password": "***", "firstName": "Andika", "defaultBranchId": "01a106ad-b536-7f76-bf02-1115db4d6aff", "menuAccessProfileId": null, "branchAccessProfileId": "01a106ad-b803-7abc-a19a-20a53d1f9bf4"}	127.0.0.1	Web.App
+01a11ec4-5a8e-76fd-b944-060d07caad2a	2026-10-09 10:45:47.144977+07	Access	CreateRole	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	Role	01a11ec4-59e9-7f1b-a38f-04ab4dbc6c38	Create role (Role)	{"name": "PPL", "description": "AKSES UNTUK PPL", "permissions": ["partnership:assigned-only"]}	127.0.0.1	Web.App
+01a11ec4-f7db-7a33-a63c-5cd0d001f85a	2026-10-09 10:46:27.387117+07	Access	SetUserAccess	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	User	01a11ec1-2d0f-76af-b3c5-fa35d36eb0cc	Set user access (User)	{"userId": "01a11ec1-2d0f-76af-b3c5-fa35d36eb0cc", "defaultBranchId": "01a106ad-b536-7f76-bf02-1115db4d6aff", "menuAccessProfileId": "0199a3c0-0000-7000-8000-000000000001", "branchAccessProfileId": "01a106ad-b803-7abc-a19a-20a53d1f9bf4"}	127.0.0.1	Web.App
+01a11ec4-f8f8-7ee5-8ea7-854e33f2161f	2026-10-09 10:46:27.702308+07	Access	AssignUserRoles	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	User	01a11ec1-2d0f-76af-b3c5-fa35d36eb0cc	Assign user roles (User)	{"userId": "01a11ec1-2d0f-76af-b3c5-fa35d36eb0cc", "roleIds": ["01a11ec4-59e9-7f1b-a38f-04ab4dbc6c38"]}	127.0.0.1	Web.App
+01a11fb2-0a92-7c17-8410-d998ab9bfd59	2026-10-09 15:05:24.239627+07	SignIn	SignedIn	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	User	01a0f240-f921-75b0-972d-0f74522a6333	Signed in	\N	127.0.0.1	Web.App
+01a11fb3-b9d8-7219-8b15-780e66ece48a	2026-10-09 15:07:14.616441+07	Export	PDF	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	production.recordings	\N	PDF export of Daily Recordings (20 rows)	{"menu": "production.recordings", "rows": 20, "title": "Daily Recordings", "branch": "Cabang Bandung", "filters": ["Cycle: SKL/BDG/2026/IX/0001 — KDG-BDG-INTI Kandang Inti Lembang"]}	127.0.0.1	Web.App
+01a12aec-262c-71d1-ab9d-0fdb55db5f96	2026-10-11 19:24:41.771254+07	SignIn	SignedIn	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	User	01a0f240-f921-75b0-972d-0f74522a6333	Signed in	\N	127.0.0.1	Web.App
+01a12af7-de83-7c50-b27a-94380d06c4e5	2026-10-11 19:37:29.858058+07	SignIn	SignedIn	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	User	01a0f240-f921-75b0-972d-0f74522a6333	Signed in	\N	127.0.0.1	Web.App
+01a12e74-84ea-73ab-b2de-6f601dec8e7b	2026-10-12 11:52:30.569539+07	SignIn	SignedIn	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	User	01a0f240-f921-75b0-972d-0f74522a6333	Signed in	\N	127.0.0.1	Web.App
 \.
 
 
@@ -3528,6 +3840,7 @@ COPY infrastructure.outbox_messages (id, type, content, occurred_on_utc, process
 01a106ad-d05a-7ef3-aef7-d792fed099ab	Domain.Partnership.Cycles.CyclePlannedDomainEvent	{"id": "01a106ad-d05a-7ef3-aef7-d792fed099ab", "cycleId": "01a106ad-d05a-759c-a6ff-c3e67df7f41b", "occurredOnUtc": "2026-10-04T11:30:16.794632Z"}	2026-10-04 18:30:16.794632+07	2026-10-04 18:30:16.800946+07	1	\N
 01a106ad-d0d7-74c7-9549-1ea867472222	Domain.Production.DailyRecordings.DailyRecordingSavedDomainEvent	{"id": "01a106ad-d0d7-74c7-9549-1ea867472222", "occurredOnUtc": "2026-10-04T11:30:16.9195675Z", "dailyRecordingId": "01a106ad-d0cb-72a0-9381-697ced243e40"}	2026-10-04 18:30:16.919567+07	2026-10-04 18:30:16.929934+07	1	\N
 01a106ad-c5a4-7af4-a16c-e0185e72b422	Domain.Finance.CashBank.CashTransactionPostedDomainEvent	{"id": "01a106ad-c5a4-7af4-a16c-e0185e72b422", "occurredOnUtc": "2026-10-04T11:30:14.0528922Z", "cashTransactionId": "01a106ad-c584-7c38-b34d-8c5434d2cf4d"}	2026-10-04 18:30:14.052892+07	2026-10-04 18:30:14.082528+07	1	\N
+01a11ec1-2d11-7cbc-a02c-cfe7d65e377e	Domain.Users.UserRegisteredDomainEvent	{"id": "01a11ec1-2d11-7cbc-a02c-cfe7d65e377e", "userId": "01a11ec1-2d0f-76af-b3c5-fa35d36eb0cc", "occurredOnUtc": "2026-10-09T03:42:18.8971977Z"}	2026-10-09 10:42:18.897197+07	2026-10-09 10:42:23.53933+07	1	\N
 01a106ad-c921-7c28-b4da-52ca6ef8f3c7	Domain.Inventory.GoodsReceipts.GoodsReceiptPostedDomainEvent	{"id": "01a106ad-c921-7c28-b4da-52ca6ef8f3c7", "occurredOnUtc": "2026-10-04T11:30:14.9459706Z", "goodsReceiptId": "01a106ad-c921-7abc-9538-f9aefa07df64"}	2026-10-04 18:30:14.94597+07	2026-10-04 18:30:15.191035+07	1	\N
 01a106ad-ca12-79b1-8f5a-4176d95d1cfd	Domain.Finance.Journals.JournalPostedDomainEvent	{"id": "01a106ad-ca12-79b1-8f5a-4176d95d1cfd", "journalId": "01a106ad-ca0b-7631-aaa1-6b0f7a4ec843", "occurredOnUtc": "2026-10-04T11:30:15.1864885Z"}	2026-10-04 18:30:15.186488+07	2026-10-04 18:30:15.191927+07	1	\N
 01a106ad-ca2d-74d1-b384-dc92ea132357	Domain.Inventory.GoodsReceipts.GoodsReceiptPostedDomainEvent	{"id": "01a106ad-ca2d-74d1-b384-dc92ea132357", "occurredOnUtc": "2026-10-04T11:30:15.213576Z", "goodsReceiptId": "01a106ad-ca2d-7c57-8ba4-d49b50adc0b1"}	2026-10-04 18:30:15.213576+07	2026-10-04 18:30:15.263376+07	1	\N
@@ -3608,6 +3921,7 @@ COPY infrastructure.outbox_messages (id, type, content, occurred_on_utc, process
 01a106ad-dbe0-7e8a-8def-23aaf1cc8da7	Domain.Finance.Journals.JournalPostedDomainEvent	{"id": "01a106ad-dbe0-7e8a-8def-23aaf1cc8da7", "journalId": "01a106ad-dbda-766d-8b9a-322bb4ad4f94", "occurredOnUtc": "2026-10-04T11:30:19.7444483Z"}	2026-10-04 18:30:19.744448+07	2026-10-04 18:30:19.750507+07	1	\N
 01a106ad-dbf3-71e2-992c-2b6506f56e88	Domain.Production.DailyRecordings.DailyRecordingSavedDomainEvent	{"id": "01a106ad-dbf3-71e2-992c-2b6506f56e88", "occurredOnUtc": "2026-10-04T11:30:19.7638686Z", "dailyRecordingId": "01a106ad-dbe7-7177-aac8-6decd4265310"}	2026-10-04 18:30:19.763868+07	2026-10-04 18:30:19.7767+07	1	\N
 01a106ad-de55-74c6-8f81-08f15c597e59	Domain.Production.DailyRecordings.DailyRecordingSavedDomainEvent	{"id": "01a106ad-de55-74c6-8f81-08f15c597e59", "occurredOnUtc": "2026-10-04T11:30:20.3739003Z", "dailyRecordingId": "01a106ad-de49-7b55-9483-061ba2ed0676"}	2026-10-04 18:30:20.3739+07	2026-10-04 18:30:20.38489+07	1	\N
+01a11ec1-2d1a-724e-b3b9-734ed3c93381	Domain.Users.UserRolesChangedDomainEvent	{"id": "01a11ec1-2d1a-724e-b3b9-734ed3c93381", "userId": "01a11ec1-2d0f-76af-b3c5-fa35d36eb0cc", "occurredOnUtc": "2026-10-09T03:42:18.906284Z"}	2026-10-09 10:42:18.906284+07	2026-10-09 10:42:23.594522+07	1	\N
 01a106ad-d842-7f06-b9b0-a0b0b55a89f1	Domain.Finance.Journals.JournalPostedDomainEvent	{"id": "01a106ad-d842-7f06-b9b0-a0b0b55a89f1", "journalId": "01a106ad-d83b-76d3-b51b-7acf5de4f84c", "occurredOnUtc": "2026-10-04T11:30:18.8186473Z"}	2026-10-04 18:30:18.818647+07	2026-10-04 18:30:18.824795+07	1	\N
 01a106ad-d876-779c-b174-7ac50ec73777	Domain.Finance.Payables.VendorInvoicePostedDomainEvent	{"id": "01a106ad-d876-779c-b174-7ac50ec73777", "occurredOnUtc": "2026-10-04T11:30:18.8706526Z", "vendorInvoiceId": "01a106ad-d85e-7c5f-af62-abde8aa20340"}	2026-10-04 18:30:18.870652+07	2026-10-04 18:30:18.905143+07	1	\N
 01a106ad-d894-74c6-abfd-b7dc51d99892	Domain.Finance.Journals.JournalPostedDomainEvent	{"id": "01a106ad-d894-74c6-abfd-b7dc51d99892", "journalId": "01a106ad-d88d-7f93-9c71-8e78e7d21810", "occurredOnUtc": "2026-10-04T11:30:18.9002587Z"}	2026-10-04 18:30:18.900258+07	2026-10-04 18:30:18.906182+07	1	\N
@@ -3661,6 +3975,7 @@ COPY infrastructure.outbox_messages (id, type, content, occurred_on_utc, process
 01a106ad-e577-7fe5-97cc-0502cf7c5322	Domain.Production.DailyRecordings.DailyRecordingSavedDomainEvent	{"id": "01a106ad-e577-7fe5-97cc-0502cf7c5322", "occurredOnUtc": "2026-10-04T11:30:22.199868Z", "dailyRecordingId": "01a106ad-e56d-7a82-87bc-a60b421b2dcc"}	2026-10-04 18:30:22.199868+07	2026-10-04 18:30:22.209546+07	1	\N
 01a106ad-e5a5-7d13-aba5-9f1752656dab	Domain.Finance.CashBank.CashTransactionPostedDomainEvent	{"id": "01a106ad-e5a5-7d13-aba5-9f1752656dab", "occurredOnUtc": "2026-10-04T11:30:22.2451274Z", "cashTransactionId": "01a106ad-e58a-77b6-ad07-77c957398613"}	2026-10-04 18:30:22.245127+07	2026-10-04 18:30:22.27357+07	1	\N
 01a106ad-de6e-76b1-8236-64fae0f17608	Domain.Inventory.StockTransfers.StockTransferPostedDomainEvent	{"id": "01a106ad-de6e-76b1-8236-64fae0f17608", "occurredOnUtc": "2026-10-04T11:30:20.3986038Z", "stockTransferId": "01a106ad-de6e-7454-87f3-422062f82097"}	2026-10-04 18:30:20.398603+07	2026-10-04 18:30:20.444235+07	1	\N
+01a11ec4-59f1-7240-bcd3-8bf465f834e6	Domain.Roles.RolePermissionsChangedDomainEvent	{"id": "01a11ec4-59f1-7240-bcd3-8bf465f834e6", "roleId": "01a11ec4-59e9-7f1b-a38f-04ab4dbc6c38", "occurredOnUtc": "2026-10-09T03:45:46.9934608Z"}	2026-10-09 10:45:46.99346+07	2026-10-09 10:45:48.537999+07	1	\N
 01a106ad-dea9-74c4-89f5-c6b7d7063cfe	Domain.Production.DailyRecordings.DailyRecordingSavedDomainEvent	{"id": "01a106ad-dea9-74c4-89f5-c6b7d7063cfe", "occurredOnUtc": "2026-10-04T11:30:20.4574708Z", "dailyRecordingId": "01a106ad-de9d-7045-bae7-5ff5c4901e79"}	2026-10-04 18:30:20.45747+07	2026-10-04 18:30:20.470964+07	1	\N
 01a106ad-dec3-72b1-8202-cd7bfc47b852	Domain.Production.DailyRecordings.DailyRecordingSavedDomainEvent	{"id": "01a106ad-dec3-72b1-8202-cd7bfc47b852", "occurredOnUtc": "2026-10-04T11:30:20.4834009Z", "dailyRecordingId": "01a106ad-deb7-7b1b-84dd-c55f9a2e5486"}	2026-10-04 18:30:20.4834+07	2026-10-04 18:30:20.498456+07	1	\N
 01a106ad-def8-7471-9006-03b6d2e56fb4	Domain.Production.DailyRecordings.DailyRecordingSavedDomainEvent	{"id": "01a106ad-def8-7471-9006-03b6d2e56fb4", "occurredOnUtc": "2026-10-04T11:30:20.5365873Z", "dailyRecordingId": "01a106ad-deec-7768-8789-357dffb98706"}	2026-10-04 18:30:20.536587+07	2026-10-04 18:30:20.546167+07	1	\N
@@ -3687,6 +4002,7 @@ COPY infrastructure.outbox_messages (id, type, content, occurred_on_utc, process
 01a106ad-e2ff-7ebd-b653-4fd4929ef2d6	Domain.Production.DailyRecordings.DailyRecordingSavedDomainEvent	{"id": "01a106ad-e2ff-7ebd-b653-4fd4929ef2d6", "occurredOnUtc": "2026-10-04T11:30:21.5673855Z", "dailyRecordingId": "01a106ad-e2f2-7cc5-9ec1-12b227be53fc"}	2026-10-04 18:30:21.567385+07	2026-10-04 18:30:21.579312+07	1	\N
 01a106ad-e432-706d-9dfa-eb1518b7dfbe	Domain.Production.DailyRecordings.DailyRecordingSavedDomainEvent	{"id": "01a106ad-e432-706d-9dfa-eb1518b7dfbe", "occurredOnUtc": "2026-10-04T11:30:21.8742764Z", "dailyRecordingId": "01a106ad-e425-79d1-8235-5ab8ed4b57a6"}	2026-10-04 18:30:21.874276+07	2026-10-04 18:30:21.884928+07	1	\N
 01a106ad-e5bc-73fd-9287-2ebdad72dd22	Domain.Finance.Journals.JournalPostedDomainEvent	{"id": "01a106ad-e5bc-73fd-9287-2ebdad72dd22", "journalId": "01a106ad-e5b5-71b0-8d19-cc5f390ba878", "occurredOnUtc": "2026-10-04T11:30:22.268089Z"}	2026-10-04 18:30:22.268089+07	2026-10-04 18:30:22.274864+07	1	\N
+01a11ec4-f8be-73f3-b9f1-bf55a7d40cc3	Domain.Users.UserRolesChangedDomainEvent	{"id": "01a11ec4-f8be-73f3-b9f1-bf55a7d40cc3", "userId": "01a11ec1-2d0f-76af-b3c5-fa35d36eb0cc", "occurredOnUtc": "2026-10-09T03:46:27.6468609Z"}	2026-10-09 10:46:27.64686+07	2026-10-09 10:46:28.523393+07	1	\N
 01a106ad-e600-738d-a4f4-e793c6e69feb	Domain.Finance.CashBank.CashTransactionPostedDomainEvent	{"id": "01a106ad-e600-738d-a4f4-e793c6e69feb", "occurredOnUtc": "2026-10-04T11:30:22.3366207Z", "cashTransactionId": "01a106ad-e5cb-7c39-bbcc-05161ef91f86"}	2026-10-04 18:30:22.33662+07	2026-10-04 18:30:22.378198+07	1	\N
 01a106ad-e624-7fe0-a034-7393f5e3be73	Domain.Finance.Journals.JournalPostedDomainEvent	{"id": "01a106ad-e624-7fe0-a034-7393f5e3be73", "journalId": "01a106ad-e61c-7f90-bd0b-ca8a888fbf7a", "occurredOnUtc": "2026-10-04T11:30:22.3720859Z"}	2026-10-04 18:30:22.372085+07	2026-10-04 18:30:22.379199+07	1	\N
 01a106ad-e639-7bdd-a765-519802dcef95	Domain.Production.DailyRecordings.DailyRecordingSavedDomainEvent	{"id": "01a106ad-e639-7bdd-a765-519802dcef95", "occurredOnUtc": "2026-10-04T11:30:22.3937221Z", "dailyRecordingId": "01a106ad-e62b-7087-b227-8793ecf528fb"}	2026-10-04 18:30:22.393722+07	2026-10-04 18:30:22.404925+07	1	\N
@@ -3765,7 +4081,9 @@ COPY infrastructure.outbox_messages (id, type, content, occurred_on_utc, process
 01a106ad-f5e8-7231-baf6-95e0e19b8e6c	Domain.Inventory.GoodsReceipts.GoodsReceiptPostedDomainEvent	{"id": "01a106ad-f5e8-7231-baf6-95e0e19b8e6c", "occurredOnUtc": "2026-10-04T11:30:26.4080833Z", "goodsReceiptId": "01a106ad-f5e8-7414-89fa-95e6aee15d5c"}	2026-10-04 18:30:26.408083+07	2026-10-04 18:30:26.448052+07	1	\N
 01a106ad-f60c-7ca1-9be1-d10788a2f847	Domain.Finance.Journals.JournalPostedDomainEvent	{"id": "01a106ad-f60c-7ca1-9be1-d10788a2f847", "journalId": "01a106ad-f605-7fae-aabe-a1f6f12a4b11", "occurredOnUtc": "2026-10-04T11:30:26.4442856Z"}	2026-10-04 18:30:26.444285+07	2026-10-04 18:30:26.449179+07	1	\N
 01a106ad-f64a-7d10-b2fd-79c71a37d390	Domain.Finance.Journals.JournalPostedDomainEvent	{"id": "01a106ad-f64a-7d10-b2fd-79c71a37d390", "journalId": "01a106ad-f644-78c7-b744-61f2b6a1fbef", "occurredOnUtc": "2026-10-04T11:30:26.5063856Z"}	2026-10-04 18:30:26.506385+07	2026-10-04 18:30:26.512111+07	1	\N
+01a12aeb-7791-743c-988c-1577a888959c	Domain.Roles.RolePermissionsChangedDomainEvent	{"id": "01a12aeb-7791-743c-988c-1577a888959c", "roleId": "01a0f240-f7a6-7484-868c-9da0bc7ed0c8", "occurredOnUtc": "2026-10-11T12:23:57.0734519Z"}	2026-10-11 19:23:57.073451+07	2026-10-11 19:24:23.2554+07	1	\N
 01a106ad-f3ee-78ac-aba2-c3eb9be25f74	Domain.Production.DailyRecordings.DailyRecordingSavedDomainEvent	{"id": "01a106ad-f3ee-78ac-aba2-c3eb9be25f74", "occurredOnUtc": "2026-10-04T11:30:25.9020567Z", "dailyRecordingId": "01a106ad-f3e2-7d84-8967-62c819b50a45"}	2026-10-04 18:30:25.902056+07	2026-10-04 18:30:25.912474+07	1	\N
+01a12aeb-77c2-7dc8-8cfc-c722d20b9363	Domain.Roles.RolePermissionsChangedDomainEvent	{"id": "01a12aeb-77c2-7dc8-8cfc-c722d20b9363", "roleId": "01a12aeb-77c2-74aa-8503-ddc0ced5bcb1", "occurredOnUtc": "2026-10-11T12:23:57.1229815Z"}	2026-10-11 19:23:57.122981+07	2026-10-11 19:24:23.291209+07	1	\N
 01a106ad-f4a4-7040-af91-df2625b68985	Domain.Finance.Payables.VendorInvoicePostedDomainEvent	{"id": "01a106ad-f4a4-7040-af91-df2625b68985", "occurredOnUtc": "2026-10-04T11:30:26.0844009Z", "vendorInvoiceId": "01a106ad-f492-7328-b925-8c257fbccde7"}	2026-10-04 18:30:26.0844+07	2026-10-04 18:30:26.128481+07	1	\N
 01a106ad-f4cb-7891-80a8-a0d098fde64e	Domain.Finance.Journals.JournalPostedDomainEvent	{"id": "01a106ad-f4cb-7891-80a8-a0d098fde64e", "journalId": "01a106ad-f4bf-7afc-a903-e9caa72d7e2e", "occurredOnUtc": "2026-10-04T11:30:26.1236597Z"}	2026-10-04 18:30:26.123659+07	2026-10-04 18:30:26.130435+07	1	\N
 01a106ad-f4e5-789a-ac45-29ddeb7a9513	Domain.Production.DailyRecordings.DailyRecordingSavedDomainEvent	{"id": "01a106ad-f4e5-789a-ac45-29ddeb7a9513", "occurredOnUtc": "2026-10-04T11:30:26.1490648Z", "dailyRecordingId": "01a106ad-f4d4-7ace-a351-6b1924b17cbd"}	2026-10-04 18:30:26.149064+07	2026-10-04 18:30:26.164846+07	1	\N
@@ -4733,18 +5051,34 @@ COPY master.branches (id, code, name, address, phone, is_active, created_at_utc,
 
 
 --
+-- Data for Name: breed_standard_rows; Type: TABLE DATA; Schema: master; Owner: postgres
+--
+
+COPY master.breed_standard_rows (breed_standard_id, age_days, body_weight_gram, fcr, depletion_percent, daily_feed_gram, cumulative_feed_gram) FROM stdin;
+\.
+
+
+--
+-- Data for Name: breed_standards; Type: TABLE DATA; Schema: master; Owner: postgres
+--
+
+COPY master.breed_standards (id, code, name, strain, notes, is_active, is_default, created_at_utc, created_by, modified_at_utc, modified_by) FROM stdin;
+\.
+
+
+--
 -- Data for Name: coops; Type: TABLE DATA; Schema: master; Owner: postgres
 --
 
-COPY master.coops (id, code, name, farmer_id, branch_id, capacity, house_type, address, latitude, longitude, is_active, created_at_utc, created_by, modified_at_utc, modified_by, documents) FROM stdin;
-01a106ad-bfec-7b37-a51a-18c521c8bce6	KDG-BDG-INTI	Kandang Inti Lembang	01a106ad-bf47-77b6-b40b-b3c7d7c5d703	01a106ad-b536-7f76-bf02-1115db4d6aff	10000	ClosedHouse	\N	-6.813200	107.617500	t	2026-10-04 18:30:12.62377+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}
-01a106ad-c093-725b-9c5f-bb53c87c1551	KDG-BDG-01	Kandang Ahmad 1	01a106ad-bf87-7c98-8271-811bb311416f	01a106ad-b536-7f76-bf02-1115db4d6aff	6000	ClosedHouse	\N	-6.976500	107.640200	t	2026-10-04 18:30:12.758343+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}
-01a106ad-c0b0-728b-bb71-3e70df15f86d	KDG-BDG-02	Kandang Ahmad 2	01a106ad-bf87-7c98-8271-811bb311416f	01a106ad-b536-7f76-bf02-1115db4d6aff	7000	ClosedHouse	\N	-6.977100	107.641800	t	2026-10-04 18:30:12.786503+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}
-01a106ad-c0cc-775f-96fa-cd8dda0154d7	KDG-BDG-03	Kandang Dedi	01a106ad-bf95-77e6-aff7-4d707e0c4d91	01a106ad-b536-7f76-bf02-1115db4d6aff	5000	OpenHouse	\N	-6.882000	107.519400	t	2026-10-04 18:30:12.815293+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}
-01a106ad-c0e5-768d-a018-7fac5d24b72d	KDG-BDG-04	Kandang Asep	01a106ad-bf9f-7c11-a999-b0777c39c3e4	01a106ad-b536-7f76-bf02-1115db4d6aff	4000	OpenHouse	\N	-7.176300	107.571300	t	2026-10-04 18:30:12.839832+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}
-01a106ad-c0fe-7ef7-883a-6874a1e63d54	KDG-CJR-INTI	Kandang Inti Cipanas	01a106ad-bfaa-73de-a52f-85ac9a8f56c9	01a106ad-b5da-7c16-8a1e-37a0998b9705	8000	ClosedHouse	\N	-6.735000	107.041200	t	2026-10-04 18:30:12.864667+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}
-01a106ad-c120-72e3-bae4-d2248cc584d3	KDG-CJR-01	Kandang Ujang	01a106ad-bfb4-7c14-9f15-02079aeddd09	01a106ad-b5da-7c16-8a1e-37a0998b9705	5000	ClosedHouse	\N	-6.805100	107.100300	t	2026-10-04 18:30:12.898549+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}
-01a106ad-c139-7a07-b8e4-9ea7321c38b7	KDG-CJR-02	Kandang Nining	01a106ad-bfbe-7056-8fed-880c859337b3	01a106ad-b5da-7c16-8a1e-37a0998b9705	4000	OpenHouse	\N	-6.701200	107.049800	t	2026-10-04 18:30:12.923407+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}
+COPY master.coops (id, code, name, farmer_id, branch_id, capacity, house_type, address, latitude, longitude, is_active, created_at_utc, created_by, modified_at_utc, modified_by, documents, profile, field_officer_user_id, registration_status) FROM stdin;
+01a106ad-bfec-7b37-a51a-18c521c8bce6	KDG-BDG-INTI	Kandang Inti Lembang	01a106ad-bf47-77b6-b40b-b3c7d7c5d703	01a106ad-b536-7f76-bf02-1115db4d6aff	10000	ClosedHouse	\N	-6.813200	107.617500	t	2026-10-04 18:30:12.62377+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}	{}	\N	Approved
+01a106ad-c093-725b-9c5f-bb53c87c1551	KDG-BDG-01	Kandang Ahmad 1	01a106ad-bf87-7c98-8271-811bb311416f	01a106ad-b536-7f76-bf02-1115db4d6aff	6000	ClosedHouse	\N	-6.976500	107.640200	t	2026-10-04 18:30:12.758343+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}	{}	\N	Approved
+01a106ad-c0b0-728b-bb71-3e70df15f86d	KDG-BDG-02	Kandang Ahmad 2	01a106ad-bf87-7c98-8271-811bb311416f	01a106ad-b536-7f76-bf02-1115db4d6aff	7000	ClosedHouse	\N	-6.977100	107.641800	t	2026-10-04 18:30:12.786503+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}	{}	\N	Approved
+01a106ad-c0cc-775f-96fa-cd8dda0154d7	KDG-BDG-03	Kandang Dedi	01a106ad-bf95-77e6-aff7-4d707e0c4d91	01a106ad-b536-7f76-bf02-1115db4d6aff	5000	OpenHouse	\N	-6.882000	107.519400	t	2026-10-04 18:30:12.815293+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}	{}	\N	Approved
+01a106ad-c0e5-768d-a018-7fac5d24b72d	KDG-BDG-04	Kandang Asep	01a106ad-bf9f-7c11-a999-b0777c39c3e4	01a106ad-b536-7f76-bf02-1115db4d6aff	4000	OpenHouse	\N	-7.176300	107.571300	t	2026-10-04 18:30:12.839832+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}	{}	\N	Approved
+01a106ad-c0fe-7ef7-883a-6874a1e63d54	KDG-CJR-INTI	Kandang Inti Cipanas	01a106ad-bfaa-73de-a52f-85ac9a8f56c9	01a106ad-b5da-7c16-8a1e-37a0998b9705	8000	ClosedHouse	\N	-6.735000	107.041200	t	2026-10-04 18:30:12.864667+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}	{}	\N	Approved
+01a106ad-c120-72e3-bae4-d2248cc584d3	KDG-CJR-01	Kandang Ujang	01a106ad-bfb4-7c14-9f15-02079aeddd09	01a106ad-b5da-7c16-8a1e-37a0998b9705	5000	ClosedHouse	\N	-6.805100	107.100300	t	2026-10-04 18:30:12.898549+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}	{}	\N	Approved
+01a106ad-c139-7a07-b8e4-9ea7321c38b7	KDG-CJR-02	Kandang Nining	01a106ad-bfbe-7056-8fed-880c859337b3	01a106ad-b5da-7c16-8a1e-37a0998b9705	4000	OpenHouse	\N	-6.701200	107.049800	t	2026-10-04 18:30:12.923407+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}	{}	\N	Approved
 \.
 
 
@@ -4764,14 +5098,14 @@ COPY master.customers (id, code, name, address, phone, email, payment_term_days,
 -- Data for Name: farmers; Type: TABLE DATA; Schema: master; Owner: postgres
 --
 
-COPY master.farmers (id, code, name, type, branch_id, nik, address, phone, is_active, bank_account_account_holder_name, bank_account_account_number, bank_account_bank_name, tax_identity_is_pkp, tax_identity_nitku, tax_identity_npwp, created_at_utc, created_by, modified_at_utc, modified_by, documents) FROM stdin;
-01a106ad-bf47-77b6-b40b-b3c7d7c5d703	PTN-BDG-INTI	Farm Inti Lembang	Inti	01a106ad-b536-7f76-bf02-1115db4d6aff	\N	Jl. Raya Lembang KM 9, Bandung Barat	0812-NTI0-1234	t	Farm Inti Lembang	3301-01-NTI123-50-7	BRI	f	\N	\N	2026-10-04 18:30:12.461552+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}
-01a106ad-bf87-7c98-8271-811bb311416f	PTN-BDG-001	H. Ahmad Suryadi	Plasma	01a106ad-b536-7f76-bf02-1115db4d6aff	3204011203750001	Kp. Cikoneng RT 02/05, Bojongsoang	0812-0010-1234	t	H. Ahmad Suryadi	330101001123507	BRI	f	\N	\N	2026-10-04 18:30:12.490446+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}
-01a106ad-bf95-77e6-aff7-4d707e0c4d91	PTN-BDG-002	Dedi Kurniawan	Plasma	01a106ad-b536-7f76-bf02-1115db4d6aff	3204022508820003	Ds. Cilame RT 01/03, Ngamprah	0812-0020-1234	t	Dedi Kurniawan	330101002123507	BRI	f	\N	\N	2026-10-04 18:30:12.504353+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}
-01a106ad-bf9f-7c11-a999-b0777c39c3e4	PTN-BDG-003	Asep Saepudin	Plasma	01a106ad-b536-7f76-bf02-1115db4d6aff	3204031707880002	Ds. Pangalengan RT 04/01, Pangalengan	0812-0030-1234	t	Asep Saepudin	330101003123507	BRI	f	\N	\N	2026-10-04 18:30:12.513778+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}
-01a106ad-bfaa-73de-a52f-85ac9a8f56c9	PTN-CJR-INTI	Farm Inti Cipanas	Inti	01a106ad-b5da-7c16-8a1e-37a0998b9705	\N	Jl. Raya Cipanas No. 77, Cianjur	0812-NTI0-1234	t	Farm Inti Cipanas	3301-01-NTI123-50-7	BRI	f	\N	\N	2026-10-04 18:30:12.524606+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}
-01a106ad-bfb4-7c14-9f15-02079aeddd09	PTN-CJR-001	Ujang Hermawan	Plasma	01a106ad-b5da-7c16-8a1e-37a0998b9705	3203010505800004	Kp. Sukamaju RT 03/02, Cugenang	0812-0010-1234	t	Ujang Hermawan	330101001123507	BRI	f	\N	\N	2026-10-04 18:30:12.534614+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}
-01a106ad-bfbe-7056-8fed-880c859337b3	PTN-CJR-002	Nining Sumarni	Plasma	01a106ad-b5da-7c16-8a1e-37a0998b9705	3203024411850001	Ds. Sukaresmi RT 01/04, Sukaresmi	0812-0020-1234	t	Nining Sumarni	330101002123507	BRI	f	\N	\N	2026-10-04 18:30:12.545123+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}
+COPY master.farmers (id, code, name, type, branch_id, nik, address, phone, is_active, bank_account_account_holder_name, bank_account_account_number, bank_account_bank_name, tax_identity_is_pkp, tax_identity_nitku, tax_identity_npwp, created_at_utc, created_by, modified_at_utc, modified_by, documents, field_officer_user_id, pending_change, registration_status) FROM stdin;
+01a106ad-bf47-77b6-b40b-b3c7d7c5d703	PTN-BDG-INTI	Farm Inti Lembang	Inti	01a106ad-b536-7f76-bf02-1115db4d6aff	\N	Jl. Raya Lembang KM 9, Bandung Barat	0812-NTI0-1234	t	Farm Inti Lembang	3301-01-NTI123-50-7	BRI	f	\N	\N	2026-10-04 18:30:12.461552+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}	\N	\N	Approved
+01a106ad-bf95-77e6-aff7-4d707e0c4d91	PTN-BDG-002	Dedi Kurniawan	Plasma	01a106ad-b536-7f76-bf02-1115db4d6aff	3204022508820003	Ds. Cilame RT 01/03, Ngamprah	0812-0020-1234	t	Dedi Kurniawan	330101002123507	BRI	f	\N	\N	2026-10-04 18:30:12.504353+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}	\N	\N	Approved
+01a106ad-bf9f-7c11-a999-b0777c39c3e4	PTN-BDG-003	Asep Saepudin	Plasma	01a106ad-b536-7f76-bf02-1115db4d6aff	3204031707880002	Ds. Pangalengan RT 04/01, Pangalengan	0812-0030-1234	t	Asep Saepudin	330101003123507	BRI	f	\N	\N	2026-10-04 18:30:12.513778+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}	\N	\N	Approved
+01a106ad-bfaa-73de-a52f-85ac9a8f56c9	PTN-CJR-INTI	Farm Inti Cipanas	Inti	01a106ad-b5da-7c16-8a1e-37a0998b9705	\N	Jl. Raya Cipanas No. 77, Cianjur	0812-NTI0-1234	t	Farm Inti Cipanas	3301-01-NTI123-50-7	BRI	f	\N	\N	2026-10-04 18:30:12.524606+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}	\N	\N	Approved
+01a106ad-bfb4-7c14-9f15-02079aeddd09	PTN-CJR-001	Ujang Hermawan	Plasma	01a106ad-b5da-7c16-8a1e-37a0998b9705	3203010505800004	Kp. Sukamaju RT 03/02, Cugenang	0812-0010-1234	t	Ujang Hermawan	330101001123507	BRI	f	\N	\N	2026-10-04 18:30:12.534614+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}	\N	\N	Approved
+01a106ad-bfbe-7056-8fed-880c859337b3	PTN-CJR-002	Nining Sumarni	Plasma	01a106ad-b5da-7c16-8a1e-37a0998b9705	3203024411850001	Ds. Sukaresmi RT 01/04, Sukaresmi	0812-0020-1234	t	Nining Sumarni	330101002123507	BRI	f	\N	\N	2026-10-04 18:30:12.545123+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	{}	\N	\N	Approved
+01a106ad-bf87-7c98-8271-811bb311416f	PTN-BDG-001	H. Ahmad Suryadi	Plasma	01a106ad-b536-7f76-bf02-1115db4d6aff	3204011203750001	Kp. Cikoneng RT 02/05, Bojongsoang	0812-0010-1234	t	H. Ahmad Suryadi	330101001123507	BRI	f	\N	\N	2026-10-04 18:30:12.490446+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-10-08 14:34:20.341194+07	01a0f240-f921-75b0-972d-0f74522a6333	{01a11a6f-2f19-72e2-988b-7222b691a94c}	\N	\N	Approved
 \.
 
 
@@ -4871,6 +5205,14 @@ COPY master.warehouses (id, code, name, branch_id, type, coop_id, address, is_ac
 
 
 --
+-- Data for Name: weight_ranges; Type: TABLE DATA; Schema: master; Owner: postgres
+--
+
+COPY master.weight_ranges (id, code, name, min_weight_kg, max_weight_kg, sort_order, is_active, created_at_utc, created_by, modified_at_utc, modified_by) FROM stdin;
+\.
+
+
+--
 -- Data for Name: contract_incentives; Type: TABLE DATA; Schema: partnership; Owner: postgres
 --
 
@@ -4961,15 +5303,15 @@ COPY partnership.cycle_harvests (id, cycle_id, date, age_days, birds, weight_kg,
 -- Data for Name: production_cycles; Type: TABLE DATA; Schema: partnership; Owner: postgres
 --
 
-COPY partnership.production_cycles (id, number, branch_id, farmer_id, coop_id, contract_id, contract_snapshot, status, planned_chick_in_date, planned_population, chick_in_date, initial_population, notes, cancellation_reason, created_at_utc, created_by, modified_at_utc, modified_by, closed_date, closing_performance, harvested_birds, harvested_weight_kg, total_culling, total_mortality, closing_cost, documents) FROM stdin;
-01a106ad-d05a-759c-a6ff-c3e67df7f41b	SKL/BDG/2026/VII/0002	01a106ad-b536-7f76-bf02-1115db4d6aff	01a106ad-bf95-77e6-aff7-4d707e0c4d91	01a106ad-c0cc-775f-96fa-cd8dda0154d7	01a106ad-c27b-708d-99cc-89e0647e1680	{"scheme": "ProfitSharing", "contractId": "01a106ad-c27b-708d-99cc-89e0647e1680", "incentives": [{"kind": "Bonus", "name": "Bonus FCR ≤ 1,50", "basis": "PerKg", "amount": {"amount": 150.00}, "metric": "Fcr", "rangeTo": 1.5000, "rangeFrom": 0.0000}, {"kind": "Bonus", "name": "Bonus IP ≥ 380", "basis": "PerKg", "amount": {"amount": 100.00}, "metric": "Ip", "rangeTo": 999.0000, "rangeFrom": 380.0000}, {"kind": "Deduction", "name": "Potongan deplesi > 6%", "basis": "PerBird", "amount": {"amount": 150.00}, "metric": "Depletion", "rangeTo": 100.0000, "rangeFrom": 6.0100}], "inputPrices": [], "contractCode": "KTR-BDG-BH26", "liveBirdPrices": [], "incomeTaxCodeId": "01a106ad-bd06-72df-8a06-c944cfed04a6", "plasmaProfitSharePercent": 40.0000}	Closed	2026-07-26	4500	2026-07-26	4500	Rencana chick-in DOC CP 707	\N	2026-10-04 18:30:16.794854+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-10-04 18:30:27.59834+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-08-29	{"ip": 303.905, "fcr": 1.679, "feedKg": 12727.7000, "adgGram": 53.686, "ageDays": 32.998, "culling": 6, "mortality": 216, "population": 0, "liveWeightKg": 7578.700, "harvestedBirds": 4278, "averageWeightKg": 1.772, "depletionPercent": 4.933, "harvestedWeightKg": 7578.700, "initialPopulation": 4500}	4278	7578.700	6	216	{"docCost": 33300000.00, "ovkCost": 2140000.00, "feedCost": 100886212.40, "costPerKg": 17988.07, "totalCost": 136326212.40, "adjustment": -1082569.19, "costPerBird": 31866.81, "harvestedBirds": 4278, "recognizedCost": 137408781.59, "harvestedWeightKg": 7578.700}	{}
-01a106ad-ea62-7df6-aaaa-1359b7c73fa1	SKL/CJR/2026/VIII/0001	01a106ad-b5da-7c16-8a1e-37a0998b9705	01a106ad-bfaa-73de-a52f-85ac9a8f56c9	01a106ad-c0fe-7ef7-883a-6874a1e63d54	\N	\N	Closed	2026-08-23	7000	2026-08-23	7000	Rencana chick-in DOC CP 707	\N	2026-10-04 18:30:23.458773+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-10-04 18:30:34.396699+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-09-29	{"ip": 358.403, "fcr": 1.581, "feedKg": 22575.4000, "adgGram": 59.441, "ageDays": 36.000, "culling": 23, "mortality": 304, "population": 0, "liveWeightKg": 14279.100, "harvestedBirds": 6673, "averageWeightKg": 2.140, "depletionPercent": 4.671, "harvestedWeightKg": 14279.100, "initialPopulation": 7000}	6673	14279.100	23	304	{"docCost": 51800000.00, "ovkCost": 2954000.00, "feedCost": 178305990.00, "costPerKg": 16321.76, "totalCost": 233059990.00, "adjustment": -157056.96, "costPerBird": 34925.82, "harvestedBirds": 6673, "recognizedCost": 233217046.96, "harvestedWeightKg": 14279.100}	{}
-01a106ad-c6f1-7f5f-8d11-f2ccfb191671	SKL/BDG/2026/VII/0001	01a106ad-b536-7f76-bf02-1115db4d6aff	01a106ad-bf87-7c98-8271-811bb311416f	01a106ad-c093-725b-9c5f-bb53c87c1551	01a106ad-c18d-7237-a0e3-d935699c85c6	{"scheme": "PriceContract", "contractId": "01a106ad-c18d-7237-a0e3-d935699c85c6", "incentives": [{"kind": "Bonus", "name": "Bonus FCR ≤ 1,50", "basis": "PerKg", "amount": {"amount": 150.00}, "metric": "Fcr", "rangeTo": 1.5000, "rangeFrom": 0.0000}, {"kind": "Bonus", "name": "Bonus IP ≥ 380", "basis": "PerKg", "amount": {"amount": 100.00}, "metric": "Ip", "rangeTo": 999.0000, "rangeFrom": 380.0000}, {"kind": "Deduction", "name": "Potongan deplesi > 6%", "basis": "PerBird", "amount": {"amount": 150.00}, "metric": "Depletion", "rangeTo": 100.0000, "rangeFrom": 6.0100}], "inputPrices": [{"price": {"amount": 7900.00}, "itemId": "01a106ad-bd1e-7c26-a889-94b43fae1c60"}, {"price": {"amount": 8600.00}, "itemId": "01a106ad-bd76-76e3-9971-2ce1aae02eb4"}, {"price": {"amount": 8300.00}, "itemId": "01a106ad-bd91-75b9-8797-63a66fb4ba5d"}, {"price": {"amount": 100000.00}, "itemId": "01a106ad-bd9f-7179-9506-e6071b528b74"}, {"price": {"amount": 118000.00}, "itemId": "01a106ad-bdab-762c-ad3a-cd0613d5d1df"}, {"price": {"amount": 47500.00}, "itemId": "01a106ad-bdb8-7c78-af20-a4a6f3355778"}], "contractCode": "KTR-BDG-HK26", "liveBirdPrices": [{"pricePerKg": {"amount": 21000.00}, "maxWeightKg": 1.600, "minWeightKg": 0.500}, {"pricePerKg": {"amount": 20600.00}, "maxWeightKg": 1.800, "minWeightKg": 1.600}, {"pricePerKg": {"amount": 20300.00}, "maxWeightKg": 2.000, "minWeightKg": 1.800}, {"pricePerKg": {"amount": 20000.00}, "maxWeightKg": 2.200, "minWeightKg": 2.000}, {"pricePerKg": {"amount": 19600.00}, "maxWeightKg": 5.000, "minWeightKg": 2.200}], "incomeTaxCodeId": "01a106ad-bd06-72df-8a06-c944cfed04a6", "plasmaProfitSharePercent": null}	Settled	2026-07-16	5000	2026-07-16	5000	Rencana chick-in DOC CP 707	\N	2026-10-04 18:30:14.446672+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-10-04 18:30:25.379055+07	01a106ad-b782-7dd8-9680-2dd57b9573c4	2026-08-20	{"ip": 372.130, "fcr": 1.463, "feedKg": 13541.5000, "adgGram": 57.083, "ageDays": 33.999, "culling": 21, "mortality": 210, "population": 0, "liveWeightKg": 9255.500, "harvestedBirds": 4769, "averageWeightKg": 1.941, "depletionPercent": 4.62, "harvestedWeightKg": 9255.500, "initialPopulation": 5000}	4769	9255.500	21	210	{"docCost": 37000000.00, "ovkCost": 2140000.00, "feedCost": 107446181.81, "costPerKg": 15837.74, "totalCost": 146586181.81, "adjustment": -637091.58, "costPerBird": 30737.30, "harvestedBirds": 4769, "recognizedCost": 147223273.39, "harvestedWeightKg": 9255.500}	{}
-01a106ad-d332-7f38-9c34-260051b68ef3	SKL/CJR/2026/VII/0001	01a106ad-b5da-7c16-8a1e-37a0998b9705	01a106ad-bfb4-7c14-9f15-02079aeddd09	01a106ad-c120-72e3-bae4-d2248cc584d3	01a106ad-c29f-73ee-9803-d9755e1eef7f	{"scheme": "PriceContract", "contractId": "01a106ad-c29f-73ee-9803-d9755e1eef7f", "incentives": [{"kind": "Bonus", "name": "Bonus FCR ≤ 1,50", "basis": "PerKg", "amount": {"amount": 150.00}, "metric": "Fcr", "rangeTo": 1.5000, "rangeFrom": 0.0000}, {"kind": "Bonus", "name": "Bonus IP ≥ 380", "basis": "PerKg", "amount": {"amount": 100.00}, "metric": "Ip", "rangeTo": 999.0000, "rangeFrom": 380.0000}, {"kind": "Deduction", "name": "Potongan deplesi > 6%", "basis": "PerBird", "amount": {"amount": 150.00}, "metric": "Depletion", "rangeTo": 100.0000, "rangeFrom": 6.0100}], "inputPrices": [{"price": {"amount": 7900.00}, "itemId": "01a106ad-bd1e-7c26-a889-94b43fae1c60"}, {"price": {"amount": 8600.00}, "itemId": "01a106ad-bd76-76e3-9971-2ce1aae02eb4"}, {"price": {"amount": 8300.00}, "itemId": "01a106ad-bd91-75b9-8797-63a66fb4ba5d"}, {"price": {"amount": 100000.00}, "itemId": "01a106ad-bd9f-7179-9506-e6071b528b74"}, {"price": {"amount": 118000.00}, "itemId": "01a106ad-bdab-762c-ad3a-cd0613d5d1df"}, {"price": {"amount": 47500.00}, "itemId": "01a106ad-bdb8-7c78-af20-a4a6f3355778"}], "contractCode": "KTR-CJR-HK26", "liveBirdPrices": [{"pricePerKg": {"amount": 21000.00}, "maxWeightKg": 1.600, "minWeightKg": 0.500}, {"pricePerKg": {"amount": 20600.00}, "maxWeightKg": 1.800, "minWeightKg": 1.600}, {"pricePerKg": {"amount": 20300.00}, "maxWeightKg": 2.000, "minWeightKg": 1.800}, {"pricePerKg": {"amount": 20000.00}, "maxWeightKg": 2.200, "minWeightKg": 2.000}, {"pricePerKg": {"amount": 19600.00}, "maxWeightKg": 5.000, "minWeightKg": 2.200}], "incomeTaxCodeId": "01a106ad-bd06-72df-8a06-c944cfed04a6", "plasmaProfitSharePercent": null}	Settled	2026-07-30	5000	2026-07-30	5000	Rencana chick-in DOC CP 707	\N	2026-10-04 18:30:17.522867+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-10-04 18:30:29.475769+07	01a106ad-b782-7dd8-9680-2dd57b9573c4	2026-09-04	{"ip": 293.722, "fcr": 1.768, "feedKg": 16075.3000, "adgGram": 56.023, "ageDays": 34.999, "culling": 9, "mortality": 355, "population": 0, "liveWeightKg": 9089.900, "harvestedBirds": 4636, "averageWeightKg": 1.961, "depletionPercent": 7.28, "harvestedWeightKg": 9089.900, "initialPopulation": 5000}	4636	9089.900	9	355	{"docCost": 37000000.00, "ovkCost": 2140000.00, "feedCost": 127817245.00, "costPerKg": 18367.34, "totalCost": 166957245.00, "adjustment": -29537.08, "costPerBird": 36013.21, "harvestedBirds": 4636, "recognizedCost": 166986782.08, "harvestedWeightKg": 9089.900}	{}
-01a106ae-023f-704e-8a47-6e438951d196	SKL/BDG/2026/IX/0001	01a106ad-b536-7f76-bf02-1115db4d6aff	01a106ad-bf47-77b6-b40b-b3c7d7c5d703	01a106ad-bfec-7b37-a51a-18c521c8bce6	\N	\N	Active	2026-09-13	8000	2026-09-13	8000	Rencana chick-in DOC CP 707	\N	2026-10-04 18:30:29.567901+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-10-04 18:30:35.011309+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	0	0.000	3	235	\N	{}
-01a106ad-f40d-7a20-b733-56168fcec265	SKL/BDG/2026/VIII/0001	01a106ad-b536-7f76-bf02-1115db4d6aff	01a106ad-bf87-7c98-8271-811bb311416f	01a106ad-c0b0-728b-bb71-3e70df15f86d	01a106ad-c18d-7237-a0e3-d935699c85c6	{"scheme": "PriceContract", "contractId": "01a106ad-c18d-7237-a0e3-d935699c85c6", "incentives": [{"kind": "Bonus", "name": "Bonus FCR ≤ 1,50", "basis": "PerKg", "amount": {"amount": 150.00}, "metric": "Fcr", "rangeTo": 1.5000, "rangeFrom": 0.0000}, {"kind": "Bonus", "name": "Bonus IP ≥ 380", "basis": "PerKg", "amount": {"amount": 100.00}, "metric": "Ip", "rangeTo": 999.0000, "rangeFrom": 380.0000}, {"kind": "Deduction", "name": "Potongan deplesi > 6%", "basis": "PerBird", "amount": {"amount": 150.00}, "metric": "Depletion", "rangeTo": 100.0000, "rangeFrom": 6.0100}], "inputPrices": [{"price": {"amount": 7900.00}, "itemId": "01a106ad-bd1e-7c26-a889-94b43fae1c60"}, {"price": {"amount": 8600.00}, "itemId": "01a106ad-bd76-76e3-9971-2ce1aae02eb4"}, {"price": {"amount": 8300.00}, "itemId": "01a106ad-bd91-75b9-8797-63a66fb4ba5d"}, {"price": {"amount": 100000.00}, "itemId": "01a106ad-bd9f-7179-9506-e6071b528b74"}, {"price": {"amount": 118000.00}, "itemId": "01a106ad-bdab-762c-ad3a-cd0613d5d1df"}, {"price": {"amount": 47500.00}, "itemId": "01a106ad-bdb8-7c78-af20-a4a6f3355778"}], "contractCode": "KTR-BDG-HK26", "liveBirdPrices": [{"pricePerKg": {"amount": 21000.00}, "maxWeightKg": 1.600, "minWeightKg": 0.500}, {"pricePerKg": {"amount": 20600.00}, "maxWeightKg": 1.800, "minWeightKg": 1.600}, {"pricePerKg": {"amount": 20300.00}, "maxWeightKg": 2.000, "minWeightKg": 1.800}, {"pricePerKg": {"amount": 20000.00}, "maxWeightKg": 2.200, "minWeightKg": 2.000}, {"pricePerKg": {"amount": 19600.00}, "maxWeightKg": 5.000, "minWeightKg": 2.200}], "incomeTaxCodeId": "01a106ad-bd06-72df-8a06-c944cfed04a6", "plasmaProfitSharePercent": null}	Harvesting	2026-08-30	6000	2026-08-30	6000	Rencana chick-in DOC CP 707	\N	2026-10-04 18:30:25.933795+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-10-04 18:30:34.665632+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	2870	5425.700	20	241	\N	{}
-01a106ae-179c-7392-bd9f-1274d80f58e8	SKL/BDG/2026/X/0001	01a106ad-b536-7f76-bf02-1115db4d6aff	01a106ad-bf9f-7c11-a999-b0777c39c3e4	01a106ad-c0e5-768d-a018-7fac5d24b72d	01a106ad-c18d-7237-a0e3-d935699c85c6	{"scheme": "PriceContract", "contractId": "01a106ad-c18d-7237-a0e3-d935699c85c6", "incentives": [{"kind": "Bonus", "name": "Bonus FCR ≤ 1,50", "basis": "PerKg", "amount": {"amount": 150.00}, "metric": "Fcr", "rangeTo": 1.5000, "rangeFrom": 0.0000}, {"kind": "Bonus", "name": "Bonus IP ≥ 380", "basis": "PerKg", "amount": {"amount": 100.00}, "metric": "Ip", "rangeTo": 999.0000, "rangeFrom": 380.0000}, {"kind": "Deduction", "name": "Potongan deplesi > 6%", "basis": "PerBird", "amount": {"amount": 150.00}, "metric": "Depletion", "rangeTo": 100.0000, "rangeFrom": 6.0100}], "inputPrices": [{"price": {"amount": 7900.00}, "itemId": "01a106ad-bd1e-7c26-a889-94b43fae1c60"}, {"price": {"amount": 8600.00}, "itemId": "01a106ad-bd76-76e3-9971-2ce1aae02eb4"}, {"price": {"amount": 8300.00}, "itemId": "01a106ad-bd91-75b9-8797-63a66fb4ba5d"}, {"price": {"amount": 100000.00}, "itemId": "01a106ad-bd9f-7179-9506-e6071b528b74"}, {"price": {"amount": 118000.00}, "itemId": "01a106ad-bdab-762c-ad3a-cd0613d5d1df"}, {"price": {"amount": 47500.00}, "itemId": "01a106ad-bdb8-7c78-af20-a4a6f3355778"}], "contractCode": "KTR-BDG-HK26", "liveBirdPrices": [{"pricePerKg": {"amount": 21000.00}, "maxWeightKg": 1.600, "minWeightKg": 0.500}, {"pricePerKg": {"amount": 20600.00}, "maxWeightKg": 1.800, "minWeightKg": 1.600}, {"pricePerKg": {"amount": 20300.00}, "maxWeightKg": 2.000, "minWeightKg": 1.800}, {"pricePerKg": {"amount": 20000.00}, "maxWeightKg": 2.200, "minWeightKg": 2.000}, {"pricePerKg": {"amount": 19600.00}, "maxWeightKg": 5.000, "minWeightKg": 2.200}], "incomeTaxCodeId": "01a106ad-bd06-72df-8a06-c944cfed04a6", "plasmaProfitSharePercent": null}	Planned	2026-10-07	4000	\N	\N	Rencana chick-in DOC CP 707	\N	2026-10-04 18:30:35.036698+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	\N	\N	0	0.000	0	0	\N	{}
-01a106ae-0935-71d7-8a79-528d2a90b371	SKL/CJR/2026/IX/0001	01a106ad-b5da-7c16-8a1e-37a0998b9705	01a106ad-bfbe-7056-8fed-880c859337b3	01a106ad-c139-7a07-b8e4-9ea7321c38b7	01a106ad-c29f-73ee-9803-d9755e1eef7f	{"scheme": "PriceContract", "contractId": "01a106ad-c29f-73ee-9803-d9755e1eef7f", "incentives": [{"kind": "Bonus", "name": "Bonus FCR ≤ 1,50", "basis": "PerKg", "amount": {"amount": 150.00}, "metric": "Fcr", "rangeTo": 1.5000, "rangeFrom": 0.0000}, {"kind": "Bonus", "name": "Bonus IP ≥ 380", "basis": "PerKg", "amount": {"amount": 100.00}, "metric": "Ip", "rangeTo": 999.0000, "rangeFrom": 380.0000}, {"kind": "Deduction", "name": "Potongan deplesi > 6%", "basis": "PerBird", "amount": {"amount": 150.00}, "metric": "Depletion", "rangeTo": 100.0000, "rangeFrom": 6.0100}], "inputPrices": [{"price": {"amount": 7900.00}, "itemId": "01a106ad-bd1e-7c26-a889-94b43fae1c60"}, {"price": {"amount": 8600.00}, "itemId": "01a106ad-bd76-76e3-9971-2ce1aae02eb4"}, {"price": {"amount": 8300.00}, "itemId": "01a106ad-bd91-75b9-8797-63a66fb4ba5d"}, {"price": {"amount": 100000.00}, "itemId": "01a106ad-bd9f-7179-9506-e6071b528b74"}, {"price": {"amount": 118000.00}, "itemId": "01a106ad-bdab-762c-ad3a-cd0613d5d1df"}, {"price": {"amount": 47500.00}, "itemId": "01a106ad-bdb8-7c78-af20-a4a6f3355778"}], "contractCode": "KTR-CJR-HK26", "liveBirdPrices": [{"pricePerKg": {"amount": 21000.00}, "maxWeightKg": 1.600, "minWeightKg": 0.500}, {"pricePerKg": {"amount": 20600.00}, "maxWeightKg": 1.800, "minWeightKg": 1.600}, {"pricePerKg": {"amount": 20300.00}, "maxWeightKg": 2.000, "minWeightKg": 1.800}, {"pricePerKg": {"amount": 20000.00}, "maxWeightKg": 2.200, "minWeightKg": 2.000}, {"pricePerKg": {"amount": 19600.00}, "maxWeightKg": 5.000, "minWeightKg": 2.200}], "incomeTaxCodeId": "01a106ad-bd06-72df-8a06-c944cfed04a6", "plasmaProfitSharePercent": null}	Active	2026-09-22	3500	2026-09-22	3500	Rencana chick-in DOC CP 707	\N	2026-10-04 18:30:31.349312+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-10-04 18:30:35.16973+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	0	0.000	0	91	\N	{}
+COPY partnership.production_cycles (id, number, branch_id, farmer_id, coop_id, contract_id, contract_snapshot, status, planned_chick_in_date, planned_population, chick_in_date, initial_population, notes, cancellation_reason, created_at_utc, created_by, modified_at_utc, modified_by, closed_date, closing_performance, harvested_birds, harvested_weight_kg, total_culling, total_mortality, closing_cost, documents, breed_standard_id, closing_standard) FROM stdin;
+01a106ad-d05a-759c-a6ff-c3e67df7f41b	SKL/BDG/2026/VII/0002	01a106ad-b536-7f76-bf02-1115db4d6aff	01a106ad-bf95-77e6-aff7-4d707e0c4d91	01a106ad-c0cc-775f-96fa-cd8dda0154d7	01a106ad-c27b-708d-99cc-89e0647e1680	{"scheme": "ProfitSharing", "contractId": "01a106ad-c27b-708d-99cc-89e0647e1680", "incentives": [{"kind": "Bonus", "name": "Bonus FCR ≤ 1,50", "basis": "PerKg", "amount": {"amount": 150.00}, "metric": "Fcr", "rangeTo": 1.5000, "rangeFrom": 0.0000}, {"kind": "Bonus", "name": "Bonus IP ≥ 380", "basis": "PerKg", "amount": {"amount": 100.00}, "metric": "Ip", "rangeTo": 999.0000, "rangeFrom": 380.0000}, {"kind": "Deduction", "name": "Potongan deplesi > 6%", "basis": "PerBird", "amount": {"amount": 150.00}, "metric": "Depletion", "rangeTo": 100.0000, "rangeFrom": 6.0100}], "inputPrices": [], "contractCode": "KTR-BDG-BH26", "liveBirdPrices": [], "incomeTaxCodeId": "01a106ad-bd06-72df-8a06-c944cfed04a6", "plasmaProfitSharePercent": 40.0000}	Closed	2026-07-26	4500	2026-07-26	4500	Rencana chick-in DOC CP 707	\N	2026-10-04 18:30:16.794854+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-10-04 18:30:27.59834+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-08-29	{"ip": 303.905, "fcr": 1.679, "feedKg": 12727.7000, "adgGram": 53.686, "ageDays": 32.998, "culling": 6, "mortality": 216, "population": 0, "liveWeightKg": 7578.700, "harvestedBirds": 4278, "averageWeightKg": 1.772, "depletionPercent": 4.933, "harvestedWeightKg": 7578.700, "initialPopulation": 4500}	4278	7578.700	6	216	{"docCost": 33300000.00, "ovkCost": 2140000.00, "feedCost": 100886212.40, "costPerKg": 17988.07, "totalCost": 136326212.40, "adjustment": -1082569.19, "costPerBird": 31866.81, "harvestedBirds": 4278, "recognizedCost": 137408781.59, "harvestedWeightKg": 7578.700}	{}	\N	\N
+01a106ad-ea62-7df6-aaaa-1359b7c73fa1	SKL/CJR/2026/VIII/0001	01a106ad-b5da-7c16-8a1e-37a0998b9705	01a106ad-bfaa-73de-a52f-85ac9a8f56c9	01a106ad-c0fe-7ef7-883a-6874a1e63d54	\N	\N	Closed	2026-08-23	7000	2026-08-23	7000	Rencana chick-in DOC CP 707	\N	2026-10-04 18:30:23.458773+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-10-04 18:30:34.396699+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-09-29	{"ip": 358.403, "fcr": 1.581, "feedKg": 22575.4000, "adgGram": 59.441, "ageDays": 36.000, "culling": 23, "mortality": 304, "population": 0, "liveWeightKg": 14279.100, "harvestedBirds": 6673, "averageWeightKg": 2.140, "depletionPercent": 4.671, "harvestedWeightKg": 14279.100, "initialPopulation": 7000}	6673	14279.100	23	304	{"docCost": 51800000.00, "ovkCost": 2954000.00, "feedCost": 178305990.00, "costPerKg": 16321.76, "totalCost": 233059990.00, "adjustment": -157056.96, "costPerBird": 34925.82, "harvestedBirds": 6673, "recognizedCost": 233217046.96, "harvestedWeightKg": 14279.100}	{}	\N	\N
+01a106ad-c6f1-7f5f-8d11-f2ccfb191671	SKL/BDG/2026/VII/0001	01a106ad-b536-7f76-bf02-1115db4d6aff	01a106ad-bf87-7c98-8271-811bb311416f	01a106ad-c093-725b-9c5f-bb53c87c1551	01a106ad-c18d-7237-a0e3-d935699c85c6	{"scheme": "PriceContract", "contractId": "01a106ad-c18d-7237-a0e3-d935699c85c6", "incentives": [{"kind": "Bonus", "name": "Bonus FCR ≤ 1,50", "basis": "PerKg", "amount": {"amount": 150.00}, "metric": "Fcr", "rangeTo": 1.5000, "rangeFrom": 0.0000}, {"kind": "Bonus", "name": "Bonus IP ≥ 380", "basis": "PerKg", "amount": {"amount": 100.00}, "metric": "Ip", "rangeTo": 999.0000, "rangeFrom": 380.0000}, {"kind": "Deduction", "name": "Potongan deplesi > 6%", "basis": "PerBird", "amount": {"amount": 150.00}, "metric": "Depletion", "rangeTo": 100.0000, "rangeFrom": 6.0100}], "inputPrices": [{"price": {"amount": 7900.00}, "itemId": "01a106ad-bd1e-7c26-a889-94b43fae1c60"}, {"price": {"amount": 8600.00}, "itemId": "01a106ad-bd76-76e3-9971-2ce1aae02eb4"}, {"price": {"amount": 8300.00}, "itemId": "01a106ad-bd91-75b9-8797-63a66fb4ba5d"}, {"price": {"amount": 100000.00}, "itemId": "01a106ad-bd9f-7179-9506-e6071b528b74"}, {"price": {"amount": 118000.00}, "itemId": "01a106ad-bdab-762c-ad3a-cd0613d5d1df"}, {"price": {"amount": 47500.00}, "itemId": "01a106ad-bdb8-7c78-af20-a4a6f3355778"}], "contractCode": "KTR-BDG-HK26", "liveBirdPrices": [{"pricePerKg": {"amount": 21000.00}, "maxWeightKg": 1.600, "minWeightKg": 0.500}, {"pricePerKg": {"amount": 20600.00}, "maxWeightKg": 1.800, "minWeightKg": 1.600}, {"pricePerKg": {"amount": 20300.00}, "maxWeightKg": 2.000, "minWeightKg": 1.800}, {"pricePerKg": {"amount": 20000.00}, "maxWeightKg": 2.200, "minWeightKg": 2.000}, {"pricePerKg": {"amount": 19600.00}, "maxWeightKg": 5.000, "minWeightKg": 2.200}], "incomeTaxCodeId": "01a106ad-bd06-72df-8a06-c944cfed04a6", "plasmaProfitSharePercent": null}	Settled	2026-07-16	5000	2026-07-16	5000	Rencana chick-in DOC CP 707	\N	2026-10-04 18:30:14.446672+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-10-04 18:30:25.379055+07	01a106ad-b782-7dd8-9680-2dd57b9573c4	2026-08-20	{"ip": 372.130, "fcr": 1.463, "feedKg": 13541.5000, "adgGram": 57.083, "ageDays": 33.999, "culling": 21, "mortality": 210, "population": 0, "liveWeightKg": 9255.500, "harvestedBirds": 4769, "averageWeightKg": 1.941, "depletionPercent": 4.62, "harvestedWeightKg": 9255.500, "initialPopulation": 5000}	4769	9255.500	21	210	{"docCost": 37000000.00, "ovkCost": 2140000.00, "feedCost": 107446181.81, "costPerKg": 15837.74, "totalCost": 146586181.81, "adjustment": -637091.58, "costPerBird": 30737.30, "harvestedBirds": 4769, "recognizedCost": 147223273.39, "harvestedWeightKg": 9255.500}	{}	\N	\N
+01a106ad-d332-7f38-9c34-260051b68ef3	SKL/CJR/2026/VII/0001	01a106ad-b5da-7c16-8a1e-37a0998b9705	01a106ad-bfb4-7c14-9f15-02079aeddd09	01a106ad-c120-72e3-bae4-d2248cc584d3	01a106ad-c29f-73ee-9803-d9755e1eef7f	{"scheme": "PriceContract", "contractId": "01a106ad-c29f-73ee-9803-d9755e1eef7f", "incentives": [{"kind": "Bonus", "name": "Bonus FCR ≤ 1,50", "basis": "PerKg", "amount": {"amount": 150.00}, "metric": "Fcr", "rangeTo": 1.5000, "rangeFrom": 0.0000}, {"kind": "Bonus", "name": "Bonus IP ≥ 380", "basis": "PerKg", "amount": {"amount": 100.00}, "metric": "Ip", "rangeTo": 999.0000, "rangeFrom": 380.0000}, {"kind": "Deduction", "name": "Potongan deplesi > 6%", "basis": "PerBird", "amount": {"amount": 150.00}, "metric": "Depletion", "rangeTo": 100.0000, "rangeFrom": 6.0100}], "inputPrices": [{"price": {"amount": 7900.00}, "itemId": "01a106ad-bd1e-7c26-a889-94b43fae1c60"}, {"price": {"amount": 8600.00}, "itemId": "01a106ad-bd76-76e3-9971-2ce1aae02eb4"}, {"price": {"amount": 8300.00}, "itemId": "01a106ad-bd91-75b9-8797-63a66fb4ba5d"}, {"price": {"amount": 100000.00}, "itemId": "01a106ad-bd9f-7179-9506-e6071b528b74"}, {"price": {"amount": 118000.00}, "itemId": "01a106ad-bdab-762c-ad3a-cd0613d5d1df"}, {"price": {"amount": 47500.00}, "itemId": "01a106ad-bdb8-7c78-af20-a4a6f3355778"}], "contractCode": "KTR-CJR-HK26", "liveBirdPrices": [{"pricePerKg": {"amount": 21000.00}, "maxWeightKg": 1.600, "minWeightKg": 0.500}, {"pricePerKg": {"amount": 20600.00}, "maxWeightKg": 1.800, "minWeightKg": 1.600}, {"pricePerKg": {"amount": 20300.00}, "maxWeightKg": 2.000, "minWeightKg": 1.800}, {"pricePerKg": {"amount": 20000.00}, "maxWeightKg": 2.200, "minWeightKg": 2.000}, {"pricePerKg": {"amount": 19600.00}, "maxWeightKg": 5.000, "minWeightKg": 2.200}], "incomeTaxCodeId": "01a106ad-bd06-72df-8a06-c944cfed04a6", "plasmaProfitSharePercent": null}	Settled	2026-07-30	5000	2026-07-30	5000	Rencana chick-in DOC CP 707	\N	2026-10-04 18:30:17.522867+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-10-04 18:30:29.475769+07	01a106ad-b782-7dd8-9680-2dd57b9573c4	2026-09-04	{"ip": 293.722, "fcr": 1.768, "feedKg": 16075.3000, "adgGram": 56.023, "ageDays": 34.999, "culling": 9, "mortality": 355, "population": 0, "liveWeightKg": 9089.900, "harvestedBirds": 4636, "averageWeightKg": 1.961, "depletionPercent": 7.28, "harvestedWeightKg": 9089.900, "initialPopulation": 5000}	4636	9089.900	9	355	{"docCost": 37000000.00, "ovkCost": 2140000.00, "feedCost": 127817245.00, "costPerKg": 18367.34, "totalCost": 166957245.00, "adjustment": -29537.08, "costPerBird": 36013.21, "harvestedBirds": 4636, "recognizedCost": 166986782.08, "harvestedWeightKg": 9089.900}	{}	\N	\N
+01a106ae-023f-704e-8a47-6e438951d196	SKL/BDG/2026/IX/0001	01a106ad-b536-7f76-bf02-1115db4d6aff	01a106ad-bf47-77b6-b40b-b3c7d7c5d703	01a106ad-bfec-7b37-a51a-18c521c8bce6	\N	\N	Active	2026-09-13	8000	2026-09-13	8000	Rencana chick-in DOC CP 707	\N	2026-10-04 18:30:29.567901+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-10-04 18:30:35.011309+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	0	0.000	3	235	\N	{}	\N	\N
+01a106ad-f40d-7a20-b733-56168fcec265	SKL/BDG/2026/VIII/0001	01a106ad-b536-7f76-bf02-1115db4d6aff	01a106ad-bf87-7c98-8271-811bb311416f	01a106ad-c0b0-728b-bb71-3e70df15f86d	01a106ad-c18d-7237-a0e3-d935699c85c6	{"scheme": "PriceContract", "contractId": "01a106ad-c18d-7237-a0e3-d935699c85c6", "incentives": [{"kind": "Bonus", "name": "Bonus FCR ≤ 1,50", "basis": "PerKg", "amount": {"amount": 150.00}, "metric": "Fcr", "rangeTo": 1.5000, "rangeFrom": 0.0000}, {"kind": "Bonus", "name": "Bonus IP ≥ 380", "basis": "PerKg", "amount": {"amount": 100.00}, "metric": "Ip", "rangeTo": 999.0000, "rangeFrom": 380.0000}, {"kind": "Deduction", "name": "Potongan deplesi > 6%", "basis": "PerBird", "amount": {"amount": 150.00}, "metric": "Depletion", "rangeTo": 100.0000, "rangeFrom": 6.0100}], "inputPrices": [{"price": {"amount": 7900.00}, "itemId": "01a106ad-bd1e-7c26-a889-94b43fae1c60"}, {"price": {"amount": 8600.00}, "itemId": "01a106ad-bd76-76e3-9971-2ce1aae02eb4"}, {"price": {"amount": 8300.00}, "itemId": "01a106ad-bd91-75b9-8797-63a66fb4ba5d"}, {"price": {"amount": 100000.00}, "itemId": "01a106ad-bd9f-7179-9506-e6071b528b74"}, {"price": {"amount": 118000.00}, "itemId": "01a106ad-bdab-762c-ad3a-cd0613d5d1df"}, {"price": {"amount": 47500.00}, "itemId": "01a106ad-bdb8-7c78-af20-a4a6f3355778"}], "contractCode": "KTR-BDG-HK26", "liveBirdPrices": [{"pricePerKg": {"amount": 21000.00}, "maxWeightKg": 1.600, "minWeightKg": 0.500}, {"pricePerKg": {"amount": 20600.00}, "maxWeightKg": 1.800, "minWeightKg": 1.600}, {"pricePerKg": {"amount": 20300.00}, "maxWeightKg": 2.000, "minWeightKg": 1.800}, {"pricePerKg": {"amount": 20000.00}, "maxWeightKg": 2.200, "minWeightKg": 2.000}, {"pricePerKg": {"amount": 19600.00}, "maxWeightKg": 5.000, "minWeightKg": 2.200}], "incomeTaxCodeId": "01a106ad-bd06-72df-8a06-c944cfed04a6", "plasmaProfitSharePercent": null}	Harvesting	2026-08-30	6000	2026-08-30	6000	Rencana chick-in DOC CP 707	\N	2026-10-04 18:30:25.933795+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-10-04 18:30:34.665632+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	2870	5425.700	20	241	\N	{}	\N	\N
+01a106ae-179c-7392-bd9f-1274d80f58e8	SKL/BDG/2026/X/0001	01a106ad-b536-7f76-bf02-1115db4d6aff	01a106ad-bf9f-7c11-a999-b0777c39c3e4	01a106ad-c0e5-768d-a018-7fac5d24b72d	01a106ad-c18d-7237-a0e3-d935699c85c6	{"scheme": "PriceContract", "contractId": "01a106ad-c18d-7237-a0e3-d935699c85c6", "incentives": [{"kind": "Bonus", "name": "Bonus FCR ≤ 1,50", "basis": "PerKg", "amount": {"amount": 150.00}, "metric": "Fcr", "rangeTo": 1.5000, "rangeFrom": 0.0000}, {"kind": "Bonus", "name": "Bonus IP ≥ 380", "basis": "PerKg", "amount": {"amount": 100.00}, "metric": "Ip", "rangeTo": 999.0000, "rangeFrom": 380.0000}, {"kind": "Deduction", "name": "Potongan deplesi > 6%", "basis": "PerBird", "amount": {"amount": 150.00}, "metric": "Depletion", "rangeTo": 100.0000, "rangeFrom": 6.0100}], "inputPrices": [{"price": {"amount": 7900.00}, "itemId": "01a106ad-bd1e-7c26-a889-94b43fae1c60"}, {"price": {"amount": 8600.00}, "itemId": "01a106ad-bd76-76e3-9971-2ce1aae02eb4"}, {"price": {"amount": 8300.00}, "itemId": "01a106ad-bd91-75b9-8797-63a66fb4ba5d"}, {"price": {"amount": 100000.00}, "itemId": "01a106ad-bd9f-7179-9506-e6071b528b74"}, {"price": {"amount": 118000.00}, "itemId": "01a106ad-bdab-762c-ad3a-cd0613d5d1df"}, {"price": {"amount": 47500.00}, "itemId": "01a106ad-bdb8-7c78-af20-a4a6f3355778"}], "contractCode": "KTR-BDG-HK26", "liveBirdPrices": [{"pricePerKg": {"amount": 21000.00}, "maxWeightKg": 1.600, "minWeightKg": 0.500}, {"pricePerKg": {"amount": 20600.00}, "maxWeightKg": 1.800, "minWeightKg": 1.600}, {"pricePerKg": {"amount": 20300.00}, "maxWeightKg": 2.000, "minWeightKg": 1.800}, {"pricePerKg": {"amount": 20000.00}, "maxWeightKg": 2.200, "minWeightKg": 2.000}, {"pricePerKg": {"amount": 19600.00}, "maxWeightKg": 5.000, "minWeightKg": 2.200}], "incomeTaxCodeId": "01a106ad-bd06-72df-8a06-c944cfed04a6", "plasmaProfitSharePercent": null}	Planned	2026-10-07	4000	\N	\N	Rencana chick-in DOC CP 707	\N	2026-10-04 18:30:35.036698+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	\N	\N	0	0.000	0	0	\N	{}	\N	\N
+01a106ae-0935-71d7-8a79-528d2a90b371	SKL/CJR/2026/IX/0001	01a106ad-b5da-7c16-8a1e-37a0998b9705	01a106ad-bfbe-7056-8fed-880c859337b3	01a106ad-c139-7a07-b8e4-9ea7321c38b7	01a106ad-c29f-73ee-9803-d9755e1eef7f	{"scheme": "PriceContract", "contractId": "01a106ad-c29f-73ee-9803-d9755e1eef7f", "incentives": [{"kind": "Bonus", "name": "Bonus FCR ≤ 1,50", "basis": "PerKg", "amount": {"amount": 150.00}, "metric": "Fcr", "rangeTo": 1.5000, "rangeFrom": 0.0000}, {"kind": "Bonus", "name": "Bonus IP ≥ 380", "basis": "PerKg", "amount": {"amount": 100.00}, "metric": "Ip", "rangeTo": 999.0000, "rangeFrom": 380.0000}, {"kind": "Deduction", "name": "Potongan deplesi > 6%", "basis": "PerBird", "amount": {"amount": 150.00}, "metric": "Depletion", "rangeTo": 100.0000, "rangeFrom": 6.0100}], "inputPrices": [{"price": {"amount": 7900.00}, "itemId": "01a106ad-bd1e-7c26-a889-94b43fae1c60"}, {"price": {"amount": 8600.00}, "itemId": "01a106ad-bd76-76e3-9971-2ce1aae02eb4"}, {"price": {"amount": 8300.00}, "itemId": "01a106ad-bd91-75b9-8797-63a66fb4ba5d"}, {"price": {"amount": 100000.00}, "itemId": "01a106ad-bd9f-7179-9506-e6071b528b74"}, {"price": {"amount": 118000.00}, "itemId": "01a106ad-bdab-762c-ad3a-cd0613d5d1df"}, {"price": {"amount": 47500.00}, "itemId": "01a106ad-bdb8-7c78-af20-a4a6f3355778"}], "contractCode": "KTR-CJR-HK26", "liveBirdPrices": [{"pricePerKg": {"amount": 21000.00}, "maxWeightKg": 1.600, "minWeightKg": 0.500}, {"pricePerKg": {"amount": 20600.00}, "maxWeightKg": 1.800, "minWeightKg": 1.600}, {"pricePerKg": {"amount": 20300.00}, "maxWeightKg": 2.000, "minWeightKg": 1.800}, {"pricePerKg": {"amount": 20000.00}, "maxWeightKg": 2.200, "minWeightKg": 2.000}, {"pricePerKg": {"amount": 19600.00}, "maxWeightKg": 5.000, "minWeightKg": 2.200}], "incomeTaxCodeId": "01a106ad-bd06-72df-8a06-c944cfed04a6", "plasmaProfitSharePercent": null}	Active	2026-09-22	3500	2026-09-22	3500	Rencana chick-in DOC CP 707	\N	2026-10-04 18:30:31.349312+07	01a0f240-f921-75b0-972d-0f74522a6333	2026-10-04 18:30:35.16973+07	01a0f240-f921-75b0-972d-0f74522a6333	\N	\N	0	0.000	0	91	\N	{}	\N	\N
 \.
 
 
@@ -5558,6 +5900,14 @@ COPY production.daily_recordings (id, cycle_id, branch_id, coop_id, date, age_da
 
 
 --
+-- Data for Name: live_bird_stock_entries; Type: TABLE DATA; Schema: production; Owner: postgres
+--
+
+COPY production.live_bird_stock_entries (id, cycle_id, branch_id, coop_id, date, age_days, weight_range_id, birds, weight_kg, notes, created_at_utc, created_by, modified_at_utc, modified_by) FROM stdin;
+\.
+
+
+--
 -- Data for Name: __EFMigrationsHistory; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -5575,6 +5925,11 @@ COPY public."__EFMigrationsHistory" (migration_id, product_version) FROM stdin;
 20261002085239_PhaseW0_UserStatus	10.0.9
 20261003054111_PhaseW1_AccessControl	10.0.9
 20261003181926_PhaseW10_Hardening	10.0.9
+20261008072147_Coop_Profile	10.0.9
+20261009022824_PhaseM1_FieldOfficerScope	10.0.9
+20261009065049_PhaseM3_LiveBirdStock	10.0.9
+20261011114726_PhaseM5_BreedStandard	10.0.9
+20261012031939_PhaseM6_ApprovalWorkflow	10.0.9
 \.
 
 
@@ -5709,6 +6064,54 @@ COPY sales.sales_orders (id, number, branch_id, customer_id, order_date, deliver
 --
 
 SELECT pg_catalog.setval('infrastructure.data_protection_keys_id_seq', 1, true);
+
+
+--
+-- Name: approval_decisions pk_approval_decisions; Type: CONSTRAINT; Schema: approval; Owner: postgres
+--
+
+ALTER TABLE ONLY approval.approval_decisions
+    ADD CONSTRAINT pk_approval_decisions PRIMARY KEY (id);
+
+
+--
+-- Name: approval_delegations pk_approval_delegations; Type: CONSTRAINT; Schema: approval; Owner: postgres
+--
+
+ALTER TABLE ONLY approval.approval_delegations
+    ADD CONSTRAINT pk_approval_delegations PRIMARY KEY (id);
+
+
+--
+-- Name: approval_flow_levels pk_approval_flow_levels; Type: CONSTRAINT; Schema: approval; Owner: postgres
+--
+
+ALTER TABLE ONLY approval.approval_flow_levels
+    ADD CONSTRAINT pk_approval_flow_levels PRIMARY KEY (flow_id, level_no);
+
+
+--
+-- Name: approval_flows pk_approval_flows; Type: CONSTRAINT; Schema: approval; Owner: postgres
+--
+
+ALTER TABLE ONLY approval.approval_flows
+    ADD CONSTRAINT pk_approval_flows PRIMARY KEY (id);
+
+
+--
+-- Name: approval_request_levels pk_approval_request_levels; Type: CONSTRAINT; Schema: approval; Owner: postgres
+--
+
+ALTER TABLE ONLY approval.approval_request_levels
+    ADD CONSTRAINT pk_approval_request_levels PRIMARY KEY (request_id, level_no);
+
+
+--
+-- Name: approval_requests pk_approval_requests; Type: CONSTRAINT; Schema: approval; Owner: postgres
+--
+
+ALTER TABLE ONLY approval.approval_requests
+    ADD CONSTRAINT pk_approval_requests PRIMARY KEY (id);
 
 
 --
@@ -6120,6 +6523,22 @@ ALTER TABLE ONLY master.branches
 
 
 --
+-- Name: breed_standard_rows pk_breed_standard_rows; Type: CONSTRAINT; Schema: master; Owner: postgres
+--
+
+ALTER TABLE ONLY master.breed_standard_rows
+    ADD CONSTRAINT pk_breed_standard_rows PRIMARY KEY (breed_standard_id, age_days);
+
+
+--
+-- Name: breed_standards pk_breed_standards; Type: CONSTRAINT; Schema: master; Owner: postgres
+--
+
+ALTER TABLE ONLY master.breed_standards
+    ADD CONSTRAINT pk_breed_standards PRIMARY KEY (id);
+
+
+--
 -- Name: coops pk_coops; Type: CONSTRAINT; Schema: master; Owner: postgres
 --
 
@@ -6197,6 +6616,14 @@ ALTER TABLE ONLY master.vendors
 
 ALTER TABLE ONLY master.warehouses
     ADD CONSTRAINT pk_warehouses PRIMARY KEY (id);
+
+
+--
+-- Name: weight_ranges pk_weight_ranges; Type: CONSTRAINT; Schema: master; Owner: postgres
+--
+
+ALTER TABLE ONLY master.weight_ranges
+    ADD CONSTRAINT pk_weight_ranges PRIMARY KEY (id);
 
 
 --
@@ -6288,6 +6715,14 @@ ALTER TABLE ONLY production.daily_recordings
 
 
 --
+-- Name: live_bird_stock_entries pk_live_bird_stock_entries; Type: CONSTRAINT; Schema: production; Owner: postgres
+--
+
+ALTER TABLE ONLY production.live_bird_stock_entries
+    ADD CONSTRAINT pk_live_bird_stock_entries PRIMARY KEY (id);
+
+
+--
 -- Name: __EFMigrationsHistory pk___ef_migrations_history; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -6357,6 +6792,97 @@ ALTER TABLE ONLY sales.sales_order_lines
 
 ALTER TABLE ONLY sales.sales_orders
     ADD CONSTRAINT pk_sales_orders PRIMARY KEY (id);
+
+
+--
+-- Name: ix_approval_decisions_decided_by; Type: INDEX; Schema: approval; Owner: postgres
+--
+
+CREATE INDEX ix_approval_decisions_decided_by ON approval.approval_decisions USING btree (decided_by);
+
+
+--
+-- Name: ix_approval_decisions_on_behalf_of; Type: INDEX; Schema: approval; Owner: postgres
+--
+
+CREATE INDEX ix_approval_decisions_on_behalf_of ON approval.approval_decisions USING btree (on_behalf_of);
+
+
+--
+-- Name: ix_approval_decisions_request_id; Type: INDEX; Schema: approval; Owner: postgres
+--
+
+CREATE INDEX ix_approval_decisions_request_id ON approval.approval_decisions USING btree (request_id);
+
+
+--
+-- Name: ix_approval_delegations_delegate_user_id; Type: INDEX; Schema: approval; Owner: postgres
+--
+
+CREATE INDEX ix_approval_delegations_delegate_user_id ON approval.approval_delegations USING btree (delegate_user_id);
+
+
+--
+-- Name: ix_approval_delegations_delegator_user_id; Type: INDEX; Schema: approval; Owner: postgres
+--
+
+CREATE INDEX ix_approval_delegations_delegator_user_id ON approval.approval_delegations USING btree (delegator_user_id);
+
+
+--
+-- Name: ix_approval_flows_branch_id; Type: INDEX; Schema: approval; Owner: postgres
+--
+
+CREATE INDEX ix_approval_flows_branch_id ON approval.approval_flows USING btree (branch_id);
+
+
+--
+-- Name: ix_approval_flows_document_type_branch_id; Type: INDEX; Schema: approval; Owner: postgres
+--
+
+CREATE UNIQUE INDEX ix_approval_flows_document_type_branch_id ON approval.approval_flows USING btree (document_type, branch_id) NULLS NOT DISTINCT WHERE is_active;
+
+
+--
+-- Name: ix_approval_requests_branch_id; Type: INDEX; Schema: approval; Owner: postgres
+--
+
+CREATE INDEX ix_approval_requests_branch_id ON approval.approval_requests USING btree (branch_id);
+
+
+--
+-- Name: ix_approval_requests_document_id_document_type; Type: INDEX; Schema: approval; Owner: postgres
+--
+
+CREATE INDEX ix_approval_requests_document_id_document_type ON approval.approval_requests USING btree (document_id, document_type);
+
+
+--
+-- Name: ix_approval_requests_document_pending; Type: INDEX; Schema: approval; Owner: postgres
+--
+
+CREATE UNIQUE INDEX ix_approval_requests_document_pending ON approval.approval_requests USING btree (document_type, document_id) WHERE ((status)::text = 'Pending'::text);
+
+
+--
+-- Name: ix_approval_requests_flow_id; Type: INDEX; Schema: approval; Owner: postgres
+--
+
+CREATE INDEX ix_approval_requests_flow_id ON approval.approval_requests USING btree (flow_id);
+
+
+--
+-- Name: ix_approval_requests_requested_by; Type: INDEX; Schema: approval; Owner: postgres
+--
+
+CREATE INDEX ix_approval_requests_requested_by ON approval.approval_requests USING btree (requested_by);
+
+
+--
+-- Name: ix_approval_requests_status_branch_id; Type: INDEX; Schema: approval; Owner: postgres
+--
+
+CREATE INDEX ix_approval_requests_status_branch_id ON approval.approval_requests USING btree (status, branch_id);
 
 
 --
@@ -7193,6 +7719,13 @@ CREATE UNIQUE INDEX ix_branches_code ON master.branches USING btree (code);
 
 
 --
+-- Name: ix_breed_standards_code; Type: INDEX; Schema: master; Owner: postgres
+--
+
+CREATE UNIQUE INDEX ix_breed_standards_code ON master.breed_standards USING btree (code);
+
+
+--
 -- Name: ix_coops_branch_id; Type: INDEX; Schema: master; Owner: postgres
 --
 
@@ -7214,6 +7747,13 @@ CREATE INDEX ix_coops_farmer_id ON master.coops USING btree (farmer_id);
 
 
 --
+-- Name: ix_coops_field_officer_user_id; Type: INDEX; Schema: master; Owner: postgres
+--
+
+CREATE INDEX ix_coops_field_officer_user_id ON master.coops USING btree (field_officer_user_id);
+
+
+--
 -- Name: ix_customers_code; Type: INDEX; Schema: master; Owner: postgres
 --
 
@@ -7232,6 +7772,13 @@ CREATE INDEX ix_farmers_branch_id ON master.farmers USING btree (branch_id);
 --
 
 CREATE UNIQUE INDEX ix_farmers_code ON master.farmers USING btree (code);
+
+
+--
+-- Name: ix_farmers_field_officer_user_id; Type: INDEX; Schema: master; Owner: postgres
+--
+
+CREATE INDEX ix_farmers_field_officer_user_id ON master.farmers USING btree (field_officer_user_id);
 
 
 --
@@ -7305,6 +7852,13 @@ CREATE UNIQUE INDEX ix_warehouses_coop_id ON master.warehouses USING btree (coop
 
 
 --
+-- Name: ix_weight_ranges_code; Type: INDEX; Schema: master; Owner: postgres
+--
+
+CREATE UNIQUE INDEX ix_weight_ranges_code ON master.weight_ranges USING btree (code);
+
+
+--
 -- Name: ix_contract_input_prices_item_id; Type: INDEX; Schema: partnership; Owner: postgres
 --
 
@@ -7344,6 +7898,13 @@ CREATE INDEX ix_cycle_harvests_cycle_id_date ON partnership.cycle_harvests USING
 --
 
 CREATE INDEX ix_production_cycles_branch_id ON partnership.production_cycles USING btree (branch_id);
+
+
+--
+-- Name: ix_production_cycles_breed_standard_id; Type: INDEX; Schema: partnership; Owner: postgres
+--
+
+CREATE INDEX ix_production_cycles_breed_standard_id ON partnership.production_cycles USING btree (breed_standard_id);
 
 
 --
@@ -7449,6 +8010,34 @@ CREATE INDEX ix_daily_recordings_coop_id ON production.daily_recordings USING bt
 --
 
 CREATE UNIQUE INDEX ix_daily_recordings_cycle_id_date ON production.daily_recordings USING btree (cycle_id, date);
+
+
+--
+-- Name: ix_live_bird_stock_entries_branch_id_date; Type: INDEX; Schema: production; Owner: postgres
+--
+
+CREATE INDEX ix_live_bird_stock_entries_branch_id_date ON production.live_bird_stock_entries USING btree (branch_id, date);
+
+
+--
+-- Name: ix_live_bird_stock_entries_coop_id; Type: INDEX; Schema: production; Owner: postgres
+--
+
+CREATE INDEX ix_live_bird_stock_entries_coop_id ON production.live_bird_stock_entries USING btree (coop_id);
+
+
+--
+-- Name: ix_live_bird_stock_entries_cycle_id_date_weight_range_id; Type: INDEX; Schema: production; Owner: postgres
+--
+
+CREATE UNIQUE INDEX ix_live_bird_stock_entries_cycle_id_date_weight_range_id ON production.live_bird_stock_entries USING btree (cycle_id, date, weight_range_id);
+
+
+--
+-- Name: ix_live_bird_stock_entries_weight_range_id; Type: INDEX; Schema: production; Owner: postgres
+--
+
+CREATE INDEX ix_live_bird_stock_entries_weight_range_id ON production.live_bird_stock_entries USING btree (weight_range_id);
 
 
 --
@@ -7631,6 +8220,94 @@ CREATE INDEX ix_sales_orders_customer_id_status ON sales.sales_orders USING btre
 --
 
 CREATE UNIQUE INDEX ix_sales_orders_number ON sales.sales_orders USING btree (number);
+
+
+--
+-- Name: approval_decisions fk_approval_decisions_approval_requests_request_id; Type: FK CONSTRAINT; Schema: approval; Owner: postgres
+--
+
+ALTER TABLE ONLY approval.approval_decisions
+    ADD CONSTRAINT fk_approval_decisions_approval_requests_request_id FOREIGN KEY (request_id) REFERENCES approval.approval_requests(id) ON DELETE CASCADE;
+
+
+--
+-- Name: approval_decisions fk_approval_decisions_users_decided_by; Type: FK CONSTRAINT; Schema: approval; Owner: postgres
+--
+
+ALTER TABLE ONLY approval.approval_decisions
+    ADD CONSTRAINT fk_approval_decisions_users_decided_by FOREIGN KEY (decided_by) REFERENCES identity.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: approval_decisions fk_approval_decisions_users_on_behalf_of; Type: FK CONSTRAINT; Schema: approval; Owner: postgres
+--
+
+ALTER TABLE ONLY approval.approval_decisions
+    ADD CONSTRAINT fk_approval_decisions_users_on_behalf_of FOREIGN KEY (on_behalf_of) REFERENCES identity.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: approval_delegations fk_approval_delegations_users_delegate_user_id; Type: FK CONSTRAINT; Schema: approval; Owner: postgres
+--
+
+ALTER TABLE ONLY approval.approval_delegations
+    ADD CONSTRAINT fk_approval_delegations_users_delegate_user_id FOREIGN KEY (delegate_user_id) REFERENCES identity.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: approval_delegations fk_approval_delegations_users_delegator_user_id; Type: FK CONSTRAINT; Schema: approval; Owner: postgres
+--
+
+ALTER TABLE ONLY approval.approval_delegations
+    ADD CONSTRAINT fk_approval_delegations_users_delegator_user_id FOREIGN KEY (delegator_user_id) REFERENCES identity.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: approval_flow_levels fk_approval_flow_levels_approval_flows_flow_id; Type: FK CONSTRAINT; Schema: approval; Owner: postgres
+--
+
+ALTER TABLE ONLY approval.approval_flow_levels
+    ADD CONSTRAINT fk_approval_flow_levels_approval_flows_flow_id FOREIGN KEY (flow_id) REFERENCES approval.approval_flows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: approval_flows fk_approval_flows_branches_branch_id; Type: FK CONSTRAINT; Schema: approval; Owner: postgres
+--
+
+ALTER TABLE ONLY approval.approval_flows
+    ADD CONSTRAINT fk_approval_flows_branches_branch_id FOREIGN KEY (branch_id) REFERENCES master.branches(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: approval_request_levels fk_approval_request_levels_approval_requests_request_id; Type: FK CONSTRAINT; Schema: approval; Owner: postgres
+--
+
+ALTER TABLE ONLY approval.approval_request_levels
+    ADD CONSTRAINT fk_approval_request_levels_approval_requests_request_id FOREIGN KEY (request_id) REFERENCES approval.approval_requests(id) ON DELETE CASCADE;
+
+
+--
+-- Name: approval_requests fk_approval_requests_approval_flows_flow_id; Type: FK CONSTRAINT; Schema: approval; Owner: postgres
+--
+
+ALTER TABLE ONLY approval.approval_requests
+    ADD CONSTRAINT fk_approval_requests_approval_flows_flow_id FOREIGN KEY (flow_id) REFERENCES approval.approval_flows(id) ON DELETE SET NULL;
+
+
+--
+-- Name: approval_requests fk_approval_requests_branches_branch_id; Type: FK CONSTRAINT; Schema: approval; Owner: postgres
+--
+
+ALTER TABLE ONLY approval.approval_requests
+    ADD CONSTRAINT fk_approval_requests_branches_branch_id FOREIGN KEY (branch_id) REFERENCES master.branches(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: approval_requests fk_approval_requests_users_requested_by; Type: FK CONSTRAINT; Schema: approval; Owner: postgres
+--
+
+ALTER TABLE ONLY approval.approval_requests
+    ADD CONSTRAINT fk_approval_requests_users_requested_by FOREIGN KEY (requested_by) REFERENCES identity.users(id) ON DELETE RESTRICT;
 
 
 --
@@ -8426,6 +9103,14 @@ ALTER TABLE ONLY inventory.stock_transfers
 
 
 --
+-- Name: breed_standard_rows fk_breed_standard_rows_breed_standards_breed_standard_id; Type: FK CONSTRAINT; Schema: master; Owner: postgres
+--
+
+ALTER TABLE ONLY master.breed_standard_rows
+    ADD CONSTRAINT fk_breed_standard_rows_breed_standards_breed_standard_id FOREIGN KEY (breed_standard_id) REFERENCES master.breed_standards(id) ON DELETE CASCADE;
+
+
+--
 -- Name: coops fk_coops_branches_branch_id; Type: FK CONSTRAINT; Schema: master; Owner: postgres
 --
 
@@ -8442,11 +9127,27 @@ ALTER TABLE ONLY master.coops
 
 
 --
+-- Name: coops fk_coops_users_field_officer_user_id; Type: FK CONSTRAINT; Schema: master; Owner: postgres
+--
+
+ALTER TABLE ONLY master.coops
+    ADD CONSTRAINT fk_coops_users_field_officer_user_id FOREIGN KEY (field_officer_user_id) REFERENCES identity.users(id) ON DELETE SET NULL;
+
+
+--
 -- Name: farmers fk_farmers_branches_branch_id; Type: FK CONSTRAINT; Schema: master; Owner: postgres
 --
 
 ALTER TABLE ONLY master.farmers
     ADD CONSTRAINT fk_farmers_branches_branch_id FOREIGN KEY (branch_id) REFERENCES master.branches(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: farmers fk_farmers_users_field_officer_user_id; Type: FK CONSTRAINT; Schema: master; Owner: postgres
+--
+
+ALTER TABLE ONLY master.farmers
+    ADD CONSTRAINT fk_farmers_users_field_officer_user_id FOREIGN KEY (field_officer_user_id) REFERENCES identity.users(id) ON DELETE SET NULL;
 
 
 --
@@ -8567,6 +9268,14 @@ ALTER TABLE ONLY partnership.cycle_harvests
 
 ALTER TABLE ONLY partnership.production_cycles
     ADD CONSTRAINT fk_production_cycles_branches_branch_id FOREIGN KEY (branch_id) REFERENCES master.branches(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: production_cycles fk_production_cycles_breed_standards_breed_standard_id; Type: FK CONSTRAINT; Schema: partnership; Owner: postgres
+--
+
+ALTER TABLE ONLY partnership.production_cycles
+    ADD CONSTRAINT fk_production_cycles_breed_standards_breed_standard_id FOREIGN KEY (breed_standard_id) REFERENCES master.breed_standards(id) ON DELETE RESTRICT;
 
 
 --
@@ -8695,6 +9404,38 @@ ALTER TABLE ONLY production.daily_recordings
 
 ALTER TABLE ONLY production.daily_recordings
     ADD CONSTRAINT fk_daily_recordings_production_cycles_cycle_id FOREIGN KEY (cycle_id) REFERENCES partnership.production_cycles(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: live_bird_stock_entries fk_live_bird_stock_entries_branches_branch_id; Type: FK CONSTRAINT; Schema: production; Owner: postgres
+--
+
+ALTER TABLE ONLY production.live_bird_stock_entries
+    ADD CONSTRAINT fk_live_bird_stock_entries_branches_branch_id FOREIGN KEY (branch_id) REFERENCES master.branches(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: live_bird_stock_entries fk_live_bird_stock_entries_coops_coop_id; Type: FK CONSTRAINT; Schema: production; Owner: postgres
+--
+
+ALTER TABLE ONLY production.live_bird_stock_entries
+    ADD CONSTRAINT fk_live_bird_stock_entries_coops_coop_id FOREIGN KEY (coop_id) REFERENCES master.coops(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: live_bird_stock_entries fk_live_bird_stock_entries_production_cycles_cycle_id; Type: FK CONSTRAINT; Schema: production; Owner: postgres
+--
+
+ALTER TABLE ONLY production.live_bird_stock_entries
+    ADD CONSTRAINT fk_live_bird_stock_entries_production_cycles_cycle_id FOREIGN KEY (cycle_id) REFERENCES partnership.production_cycles(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: live_bird_stock_entries fk_live_bird_stock_entries_weight_ranges_weight_range_id; Type: FK CONSTRAINT; Schema: production; Owner: postgres
+--
+
+ALTER TABLE ONLY production.live_bird_stock_entries
+    ADD CONSTRAINT fk_live_bird_stock_entries_weight_ranges_weight_range_id FOREIGN KEY (weight_range_id) REFERENCES master.weight_ranges(id) ON DELETE RESTRICT;
 
 
 --

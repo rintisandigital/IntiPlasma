@@ -1,0 +1,90 @@
+@* Delegation form and list, for the user's own delegations and the administration page (M-98). *@
+@model DelegationsViewModel
+<div class="row">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">New delegation</h5></div>
+            <div class="card-body">
+                @if (!Model.CanDelegate && !Model.AllUsers)
+                {
+                    <p class="text-muted mb-0">Only approvers (users with an API role holding <code>approvals:decide</code>) can delegate.</p>
+                }
+                else
+                {
+                    <form asp-action="Create" method="post">
+                        @if (Model.AllUsers)
+                        {
+                            <div class="mb-3">
+                                <label class="form-label" for="Form_DelegatorUserId">Approver <span class="text-danger">*</span></label>
+                                <select asp-for="Form.DelegatorUserId" asp-items="Model.Candidates" class="form-select" required>
+                                    <option value="">— choose —</option>
+                                </select>
+                            </div>
+                        }
+                        <div class="mb-3">
+                            <label class="form-label" for="Form_DelegateUserId">Delegate to <span class="text-danger">*</span></label>
+                            <select asp-for="Form.DelegateUserId" asp-items="Model.Candidates" class="form-select" required>
+                                <option value="">— choose —</option>
+                            </select>
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label" for="Form_FromDate">From <span class="text-danger">*</span></label>
+                                <input asp-for="Form.FromDate" type="date" class="form-control" required />
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label" for="Form_ToDate">To <span class="text-danger">*</span></label>
+                                <input asp-for="Form.ToDate" type="date" class="form-control" required />
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="Form_Reason">Reason</label>
+                            <input asp-for="Form.Reason" class="form-control" placeholder="e.g. annual leave" />
+                        </div>
+                        <p class="text-muted fs-13">At most @Domain.Approvals.ApprovalDelegation.MaxDays days. During the period, requests waiting for the approver also reach the delegate, who decides on their behalf.</p>
+                        <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Save</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Delegations</h5>
+                <a asp-action="Index" asp-route-ended="@(!Model.IncludeEnded)" class="btn btn-sm btn-light">@(Model.IncludeEnded ? "Hide ended" : "Show ended")</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="thead-light"><tr><th>Approver</th><th>Delegate</th><th>Period</th><th>Reason</th><th>Status</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (ApprovalDelegationResponse delegation in Model.Delegations)
+                            {
+                                <tr>
+                                    <td>@delegation.DelegatorName</td>
+                                    <td>@delegation.DelegateName</td>
+                                    <td>@Fmt.Date(delegation.FromDate) – @Fmt.Date(delegation.ToDate)</td>
+                                    <td>@delegation.Reason</td>
+                                    <td><partial name="Partials/_StatusBadge" model="delegation.Status" /></td>
+                                    <td class="text-end">
+                                        @if (delegation.Status is "Active" or "Scheduled" && (Model.AllUsers || delegation.DelegatorUserId == Model.CurrentUserId))
+                                        {
+                                            <form asp-action="Revoke" asp-route-id="@delegation.Id" method="post" data-confirm="Revoke this delegation?">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">Revoke</button>
+                                            </form>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                            @if (Model.Delegations.Count == 0)
+                            {
+                                <tr><td colspan="6" class="text-center text-muted py-4">No delegations.</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

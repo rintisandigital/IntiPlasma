@@ -1,0 +1,67 @@
+@* Table of approval requests; rows open the Details action of the current controller. *@
+@model ApprovalListViewModel
+@{
+    bool showStatus = ViewData["ShowStatus"] as bool? ?? true;
+    bool showRequester = ViewData["ShowRequester"] as bool? ?? true;
+}
+<div class="table-responsive">
+    <table class="table table-hover mb-0">
+        <thead class="thead-light">
+            <tr>
+                <th>Type</th><th>Document</th><th>Branch</th>
+                @if (showRequester)
+                {
+                    <th>Requested by</th>
+                }
+                <th>Requested</th><th>Level</th>
+                @if (showStatus)
+                {
+                    <th>Status</th>
+                }
+                <th class="text-end"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (ApprovalRequestResponse request in Model.Rows.Items)
+            {
+                <tr>
+                    <td>@ApprovalLabels.DocumentType(request.DocumentType)</td>
+                    <td>
+                        <div class="fw-semibold">@request.DocumentCode — @request.DocumentTitle</div>
+                        @if (request.Summary is not null)
+                        {
+                            <div class="text-muted fs-13">@request.Summary</div>
+                        }
+                    </td>
+                    <td>@request.BranchCode</td>
+                    @if (showRequester)
+                    {
+                        <td>@request.RequestedByName</td>
+                    }
+                    <td>@Fmt.DateTime(request.RequestedAtUtc)</td>
+                    <td>@ApprovalLabels.Level(request)</td>
+                    @if (showStatus)
+                    {
+                        <td>
+                            <partial name="Partials/_StatusBadge" model="request.Status" />
+                            @if (request.IsStuck)
+                            {
+                                <span class="badge bg-danger">Stuck</span>
+                            }
+                            @if (request.RejectReason is not null)
+                            {
+                                <div class="text-danger fs-13">@request.RejectReason</div>
+                            }
+                        </td>
+                    }
+                    <td class="text-end"><a asp-action="Details" asp-route-id="@request.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
+                </tr>
+            }
+            @if (Model.Rows.Items.Count == 0)
+            {
+                <tr><td colspan="8" class="text-center text-muted py-4">No approval requests.</td></tr>
+            }
+        </tbody>
+    </table>
+</div>
+<partial name="Partials/_Pagination" model="PaginationModel.From(Model.Rows)" />

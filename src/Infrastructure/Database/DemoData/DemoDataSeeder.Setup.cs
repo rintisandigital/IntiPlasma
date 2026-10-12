@@ -1,4 +1,5 @@
 using Application.Access.BranchAccessProfiles;
+using Application.Approvals;
 using Application.Branches.Create;
 using Application.BreedStandards;
 using Application.Common;
@@ -23,6 +24,7 @@ using Application.Warehouses.Create;
 using Application.WeightRanges;
 using Domain.MasterData.BreedStandards;
 using Domain.Access;
+using Domain.Approvals;
 using Domain.Finance.Accounts;
 using Domain.Finance.CashBank;
 using Domain.Finance.FiscalPeriods;
@@ -40,6 +42,7 @@ public sealed partial class DemoDataSeeder
 {
     public const string CheckerEmail = "checker@intiplasma.local";
     public const string BranchStaffEmail = "staff.bdg@intiplasma.local";
+    public const string BranchHeadEmail = "kacab@intiplasma.local";
 
     private readonly List<CycleRun> _cycles = [];
     private readonly Dictionary<Guid, Guid> _baseUoms = [];
@@ -107,6 +110,29 @@ public sealed partial class DemoDataSeeder
         await SendAsync(new CreateUserCommand(
             BranchStaffEmail, "Budi", "Santoso", DemoPassword,
             MenuAccessProfile.FullAccessId, bandungOnly, bandung, []));
+
+        // Kepala Cabang: the second level of every approval flow (PLAN-MOBILE M-94); the mobile Manager role holds
+        // approvals:decide.
+        Guid managerRoleId = await QueryDbAsync(db => db.Roles
+            .Where(r => r.Name == MobileRoles.Manager)
+            .Select(r => r.Id)
+            .SingleAsync(_ct));
+
+        _branchHeadId = await SendAsync(new CreateUserCommand(
+            BranchHeadEmail, "Tommy", "Wijaya", DemoPassword,
+            MenuAccessProfile.FullAccessId, BranchAccessProfile.AllBranchesId, bandung, [managerRoleId]));
+
+        // Default two-level flow of every document type: Manager Unit (Siti), then Kepala Cabang (Tommy).
+        ApprovalLevelDefinition[] levels =
+        [
+            new("Manager Unit", [_checkerId]),
+            new("Kepala Cabang", [_branchHeadId])
+        ];
+
+        foreach (ApprovalDocumentType documentType in Enum.GetValues<ApprovalDocumentType>())
+        {
+            await SendAsync(new CreateApprovalFlowCommand(documentType, null, $"{documentType} (default)", levels));
+        }
 
         _bandung = new BranchData { Id = bandung, Code = "BDG", Plate = "D", Payroll = 86_500_000m, Electricity = 7_450_000m };
         _cianjur = new BranchData { Id = cianjur, Code = "CJR", Plate = "F", Payroll = 61_200_000m, Electricity = 5_180_000m };
@@ -259,6 +285,8 @@ public sealed partial class DemoDataSeeder
         await CreateCoopAsync(ujang, _cianjur, "KDG-CJR-01", "Kandang Ujang", 5_000, HouseType.ClosedHouse, -6.8051m, 107.1003m);
         await CreateCoopAsync(nining, _cianjur, "KDG-CJR-02", "Kandang Nining", 4_000, HouseType.OpenHouse, -6.7012m, 107.0498m);
 
+        await SetUpApprovalExamplesAsync(ahmad);
+
         DateOnly validFrom = new(_start.Year, _start.Month, 1);
         Guid bandungPrice = await CreateContractAsync("KTR-BDG-HK26", _bandung, ContractScheme.PriceContract, "Harga Kontrak Bandung 2026", validFrom);
         Guid bandungShare = await CreateContractAsync("KTR-BDG-BH26", _bandung, ContractScheme.ProfitSharing, "Bagi Hasil Bandung 2026", validFrom);
@@ -352,17 +380,60 @@ public sealed partial class DemoDataSeeder
         return id;
     }
 
-    private Task<Guid> CreateFarmerAsync(string code, string name, FarmerType type, BranchData branch, string? nik, string address) =>
+    /// <summary>
+    /// Farmers, coops and contracts are submitted by the admin and approved at both levels (M-94).
+    /// </summary>
+    private async Task<Guid> CreateFarmerAsync(string code, string name, FarmerType type, BranchData branch, string? nik, string address)
+    {
+        Guid farmerId = await SubmitFarmerAsync(code, name, type, branch, nik, address);
+
+        await ApproveAllLevelsAsync(farmerId);
+
+        return farmerId;
+    }
+
+    private Task<Guid> SubmitFarmerAsync(string code, string name, FarmerType type, BranchData branch, string? nik, string address) =>
         SendAsync(new CreateFarmerCommand(
             code, name, type, branch.Id, nik, NonPkp(), address, "0812-" + code[^3..] + "0-1234",
             new BankAccountRequest("BRI", "3301-01-" + code[^3..] + "123-50-7", name)));
+
+    private async Task ApproveAllLevelsAsync(Guid documentId)
+    {
+        Guid requestId = await PendingRequestOfAsync(documentId);
+
+        await SendAsAsync(_checkerId, new ApproveRequestCommand(requestId));
+        await SendAsAsync(_branchHeadId, new ApproveRequestCommand(requestId, "Sesuai hasil survei."));
+    }
+
+    private Task<Guid> PendingRequestOfAsync(Guid documentId) =>
+        QueryDbAsync(db => db.ApprovalRequests
+            .Where(r => r.DocumentId == documentId && r.Status == ApprovalStatus.Pending)
+            .Select(r => r.Id)
+            .SingleAsync(_ct));
+
+    /// <summary>
+    /// Requests left open for the approval inbox: a new farmer waiting at level 2 and a coop rejected at level 1.
+    /// </summary>
+    private async Task SetUpApprovalExamplesAsync(Guid ahmad)
+    {
+        Guid cecep = await SubmitFarmerAsync(
+            "PTN-BDG-004", "Cecep Rustandi", FarmerType.Plasma, _bandung, "3204041011900005", "Ds. Banjaran RT 05/02, Banjaran");
+        await SendAsAsync(_checkerId, new ApproveRequestCommand(await PendingRequestOfAsync(cecep), "Dokumen lengkap."));
+
+        Guid coopId = await SendAsync(new CreateCoopCommand(
+            ahmad, "KDG-BDG-05", "Kandang Ahmad 3", 3_000, HouseType.OpenHouse, null, -6.9790m, 107.6431m));
+        await SendAsAsync(_checkerId, new RejectRequestCommand(
+            await PendingRequestOfAsync(coopId), "Lokasi terlalu dekat permukiman; lengkapi izin lingkungan."));
+    }
 
     private async Task CreateCoopAsync(
         Guid farmerId, BranchData branch, string code, string name, int capacity, HouseType houseType, decimal latitude, decimal longitude)
     {
         Guid coopId = await SendAsync(new CreateCoopCommand(farmerId, code, name, capacity, houseType, null, latitude, longitude));
 
-        // The coop warehouse (GK-{code}) is created by the outbox handler of CoopCreated, already processed.
+        await ApproveAllLevelsAsync(coopId);
+
+        // The coop warehouse (GK-{code}) is created by the outbox handler of CoopApproved, already processed.
         Guid warehouseId = await QueryDbAsync(db => db.Warehouses.Where(w => w.CoopId == coopId).Select(w => w.Id).SingleAsync(_ct));
 
         _coops[code] = new CoopData(coopId, warehouseId, farmerId, branch);
@@ -401,7 +472,9 @@ public sealed partial class DemoDataSeeder
                 priceContract ? "Harga sapronak & jaminan harga ayam per rentang BW" : "Bagi hasil 40% laba siklus untuk plasma; rugi ditanggung inti",
                 inputPrices, liveBirdPrices, incentives)));
 
-        await SendAsync(new ActivateContractCommand(contractId));
+        Guid requestId = await SendAsync(new SubmitContractCommand(contractId));
+        await SendAsAsync(_checkerId, new ApproveRequestCommand(requestId));
+        await SendAsAsync(_branchHeadId, new ApproveRequestCommand(requestId));
 
         return contractId;
     }

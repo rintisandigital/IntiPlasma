@@ -144,7 +144,12 @@ public sealed class FieldOfficerScopeTests(IntegrationTestWebAppFactory factory)
         Guid farmerC = await PostAsync<Guid>("farmers", Farmer($"FC{suffix}", branch, null));
         Guid coopA = await PostAsync<Guid>("coops", Coop(farmerA, $"CA{suffix}", pplAId));
         Guid coopB = await PostAsync<Guid>("coops", Coop(farmerB, $"CB{suffix}", pplBId));
-        await PostAsync<Guid>("coops", Coop(farmerC, $"CC{suffix}", pplAId));
+        Guid coopC = await PostAsync<Guid>("coops", Coop(farmerC, $"CC{suffix}", pplAId));
+
+        foreach (Guid documentId in new[] { farmerA, farmerB, farmerC, coopA, coopB, coopC })
+        {
+            await ApproveAsync(documentId);
+        }
 
         return new Setup(suffix, branch, pplAId, pplA, pplBId, pplB, managerId, manager, farmerA, farmerB, coopA, coopB);
     }

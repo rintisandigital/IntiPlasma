@@ -1,3 +1,8 @@
+using Application.Abstractions.Authentication;
+using Domain.Access;
+using Domain.Approvals;
+using Domain.Roles;
+using Domain.Users;
 using Infrastructure.Database;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -12,6 +17,12 @@ public sealed class IntegrationTestWebAppFactory : WebApplicationFactory<Program
 {
     public const string AdminEmail = "admin@intiplasma.test";
     public const string AdminPassword = "Admin123!";
+
+    /// <summary>
+    /// The approver of the default one-level flows seeded for every document type (PLAN-MOBILE M6).
+    /// </summary>
+    public const string ApproverEmail = "approver@intiplasma.test";
+    public const string ApproverPassword = "Approver123!";
 
     private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder("postgres:17")
         .WithDatabase("clean-architecture")
@@ -52,6 +63,31 @@ public sealed class IntegrationTestWebAppFactory : WebApplicationFactory<Program
         await dbContext.Database.MigrateAsync();
 
         await DatabaseSeeder.SeedAsync(Services);
+        await SeedApprovalFlowsAsync();
+    }
+
+    /// <summary>
+    /// Farmers, coops and contracts need an approval flow (M-31): a default one-level flow decided by a Manager.
+    /// </summary>
+    private async Task SeedApprovalFlowsAsync()
+    {
+        using IServiceScope scope = Services.CreateScope();
+        ApplicationDbContext dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        IPasswordHasher hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+
+        Guid managerRole = await dbContext.Roles.Where(r => r.Name == MobileRoles.Manager).Select(r => r.Id).SingleAsync();
+        var approver = User.Create(ApproverEmail, "Approver", "Default", hasher.Hash(ApproverPassword));
+        approver.SetAccess(MenuAccessProfile.FullAccessId, BranchAccessProfile.AllBranchesId, null);
+        approver.SetRoles([managerRole]);
+        dbContext.Users.Add(approver);
+
+        foreach (ApprovalDocumentType documentType in Enum.GetValues<ApprovalDocumentType>())
+        {
+            dbContext.ApprovalFlows.Add(ApprovalFlow.Create(
+                documentType, null, $"{documentType} (default)", [new ApprovalLevelDefinition("Manager", [approver.Id])]).Value);
+        }
+
+        await dbContext.SaveChangesAsync();
     }
 
     public new async Task DisposeAsync()

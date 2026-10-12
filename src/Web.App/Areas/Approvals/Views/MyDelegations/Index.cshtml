@@ -1,0 +1,13 @@
+@model DelegationsViewModel
+@{
+    ViewData["Title"] = "My Delegations";
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">My Approval Delegations</h4>
+            <h6>While you are away, the delegate decides the requests waiting for you on your behalf</h6>
+        </div>
+    </div>
+</div>
+<partial name="_Delegations" model="Model" />

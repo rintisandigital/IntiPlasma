@@ -63,6 +63,7 @@ public static class MauiProgram
         services.AddSingleton<UsersApi>();
         services.AddSingleton<ApiCache>();
         services.AddSingleton<PartnershipApi>();
+        services.AddSingleton<ApprovalsApi>();
         services.AddSingleton<SessionService>();
 
         // Daily recording offline (M2): the queue only sends for the user who is signed in.

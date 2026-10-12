@@ -728,3 +728,42 @@ h1:focus, h2:focus, h4:focus {
   font-style: italic;
   color: #A3620A;
 }
+
+/* Approval timeline (M6) */
+.approval-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.approval-step {
+    display: flex;
+    gap: 8px;
+    padding: 6px 0;
+    border-top: 1px dashed var(--Outline, #e5e5e5);
+}
+
+.approval-step .icon {
+    font-size: 18px;
+    line-height: 1.2;
+}
+
+.approval-step.done .icon {
+    color: var(--Success, #2bb673);
+}
+
+.approval-step.rejected .icon {
+    color: var(--Red, #e53935);
+}
+
+.approval-step.current .icon {
+    color: var(--Warning, #f5a623);
+}
+
+.approval-step.waiting .icon {
+    color: #c4c4c4;
+}
+
+.decision-box textarea {
+    min-height: 72px;
+}

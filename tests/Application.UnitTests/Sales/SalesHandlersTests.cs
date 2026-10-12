@@ -267,8 +267,8 @@ public sealed class SalesHandlersTests : BaseHandlerTest
         CashBankAccount bank = CashBankAccount.Create(
             "BCA", "BCA Operasional", CashBankAccountType.Bank, branch.Id, bankAccount.Id, true, "BCA", "1234567890").Value;
 
-        Farmer farmer = Farmer.Create("INT", "Farm Inti", FarmerType.Inti, branch.Id, null, TaxIdentity.None, null, null, BankAccount.None).Value;
-        Coop coop = Coop.Create(farmer, "KDG-A", "Kandang A", 5_000, HouseType.ClosedHouse, null, null, null).Value;
+        Farmer farmer = Farmer.Create("INT", "Farm Inti", FarmerType.Inti, branch.Id, null, TaxIdentity.None, null, null, BankAccount.None).Value.Approved();
+        Coop coop = Coop.Create(farmer, "KDG-A", "Kandang A", 5_000, HouseType.ClosedHouse, null, null, null).Value.Approved(farmer);
         var warehouse = Warehouse.CreateForCoop("GK-A", "Gudang A", branch.Id, coop.Id, null);
         ProductionCycle cycle = ProductionCycle.Plan("SKL/A", coop, farmer, null, ChickIn, 1_000, null).Value;
         cycle.Start(ChickIn, 1_000);

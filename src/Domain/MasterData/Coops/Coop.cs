@@ -15,7 +15,7 @@ public sealed class Coop : AggregateRoot, IHasDocuments
         Code = code;
         FarmerId = farmerId;
         BranchId = branchId;
-        IsActive = true;
+        RegistrationStatus = RegistrationStatus.Draft;
     }
 
     private Coop()
@@ -40,7 +40,13 @@ public sealed class Coop : AggregateRoot, IHasDocuments
     public string? Address { get; private set; }
     public decimal? Latitude { get; private set; }
     public decimal? Longitude { get; private set; }
+
+    /// <summary>
+    /// Only true once the coop is approved (M-81).
+    /// </summary>
     public bool IsActive { get; private set; }
+
+    public RegistrationStatus RegistrationStatus { get; private set; }
 
     /// <summary>
     /// PPL (petugas penyuluh lapangan) responsible for this coop. Users limited to their assigned data
@@ -76,22 +82,88 @@ public sealed class Coop : AggregateRoot, IHasDocuments
         decimal? latitude,
         decimal? longitude)
     {
-        if (!farmer.IsActive)
+        Result farmerUsable = EnsureFarmerSubmitted(farmer);
+        if (farmerUsable.IsFailure)
         {
-            return Result.Failure<Coop>(FarmerErrors.Inactive(farmer.Id));
+            return Result.Failure<Coop>(farmerUsable.Error);
         }
 
         var coop = new Coop(Guid.CreateVersion7(), Codes.Normalize(code), farmer.Id, farmer.BranchId);
 
-        Result result = coop.Update(name, capacity, houseType, address, latitude, longitude, isActive: true);
+        Result result = coop.Update(name, capacity, houseType, address, latitude, longitude, isActive: false);
+
+        return result.IsSuccess ? coop : Result.Failure<Coop>(result.Error);
+    }
+
+    /// <summary>
+    /// Submits the coop for approval; its farmer must be approved or waiting for approval itself (M-87).
+    /// </summary>
+    public Result Submit(Farmer farmer)
+    {
+        Result result = Registration.Submit(RegistrationStatus, nameof(Coop), Id);
         if (result.IsFailure)
         {
-            return Result.Failure<Coop>(result.Error);
+            return result;
         }
 
-        coop.Raise(new CoopCreatedDomainEvent(coop.Id));
+        Result farmerUsable = EnsureFarmerSubmitted(farmer);
+        if (farmerUsable.IsFailure)
+        {
+            return farmerUsable;
+        }
 
-        return coop;
+        RegistrationStatus = RegistrationStatus.PendingApproval;
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Approves the coop once its farmer is approved (M-87); the coop warehouse is then created from the outbox.
+    /// </summary>
+    public Result Approve(Farmer farmer)
+    {
+        Result result = Registration.Decide(RegistrationStatus, nameof(Coop), Id);
+        if (result.IsFailure)
+        {
+            return result;
+        }
+
+        if (farmer.RegistrationStatus != RegistrationStatus.Approved)
+        {
+            return Result.Failure(CoopErrors.FarmerNotApproved);
+        }
+
+        RegistrationStatus = RegistrationStatus.Approved;
+        IsActive = true;
+
+        Raise(new CoopApprovedDomainEvent(Id));
+
+        return Result.Success();
+    }
+
+    public Result Reject()
+    {
+        Result result = Registration.Decide(RegistrationStatus, nameof(Coop), Id);
+        if (result.IsSuccess)
+        {
+            RegistrationStatus = RegistrationStatus.Rejected;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// The requester cancelled the request: the coop can be edited and submitted again.
+    /// </summary>
+    public Result ReturnToDraft()
+    {
+        Result result = Registration.Decide(RegistrationStatus, nameof(Coop), Id);
+        if (result.IsSuccess)
+        {
+            RegistrationStatus = RegistrationStatus.Draft;
+        }
+
+        return result;
     }
 
     public Result Update(
@@ -103,6 +175,12 @@ public sealed class Coop : AggregateRoot, IHasDocuments
         decimal? longitude,
         bool isActive)
     {
+        Result editable = Registration.Edit(RegistrationStatus, nameof(Coop), Id);
+        if (editable.IsFailure)
+        {
+            return editable;
+        }
+
         if (capacity <= 0)
         {
             return Result.Failure(CoopErrors.InvalidCapacity);
@@ -119,8 +197,15 @@ public sealed class Coop : AggregateRoot, IHasDocuments
         Address = address;
         Latitude = latitude;
         Longitude = longitude;
-        IsActive = isActive;
+        IsActive = isActive && RegistrationStatus == RegistrationStatus.Approved;
 
         return Result.Success();
     }
+
+    private static Result EnsureFarmerSubmitted(Farmer farmer) => farmer.RegistrationStatus switch
+    {
+        RegistrationStatus.Approved when !farmer.IsActive => Result.Failure(FarmerErrors.Inactive(farmer.Id)),
+        RegistrationStatus.Approved or RegistrationStatus.PendingApproval => Result.Success(),
+        _ => Result.Failure(CoopErrors.FarmerNotSubmitted)
+    };
 }

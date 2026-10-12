@@ -1,0 +1,109 @@
+@* Approval requests of a document with their levels and decisions (PLAN-MOBILE §5.4). *@
+@using Application.Approvals
+@using Web.App.Areas.Approvals.Models
+@model ApprovalTimelineModel
+@{
+    string returnUrl = $"{Context.Request.PathBase}{Context.Request.Path}{Context.Request.QueryString}";
+
+    static string StateCss(string state) => state switch
+    {
+        "Approved" => "text-success",
+        "Rejected" => "text-danger",
+        "Pending" => "text-warning",
+        _ => "text-muted"
+    };
+
+    static string StateIcon(string state) => state switch
+    {
+        "Approved" => "ti ti-circle-check",
+        "Rejected" => "ti ti-circle-x",
+        "Pending" => "ti ti-hourglass",
+        _ => "ti ti-circle-dashed"
+    };
+}
+@if (Model.Requests.Count == 0)
+{
+    <p class="text-muted mb-0">No approval requests yet.</p>
+}
+@foreach (ApprovalDetailResponse detail in Model.Requests)
+{
+    ApprovalRequestResponse request = detail.Request;
+    <div class="border rounded p-3 mb-3" data-approval-request="@request.Id">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+            <div>
+                <span class="fw-semibold">@ApprovalLabels.DocumentType(request.DocumentType)</span>
+                <partial name="Partials/_StatusBadge" model="request.Status" />
+                @if (request.IsStuck)
+                {
+                    <span class="badge bg-danger" title="No active approver can decide the current level">Stuck</span>
+                }
+                <div class="text-muted fs-13">
+                    Requested by @request.RequestedByName · @Fmt.DateTime(request.RequestedAtUtc) · @ApprovalLabels.Level(request)
+                </div>
+            </div>
+            @if (Model.ShowActions)
+            {
+                <div class="d-flex gap-2">
+                    @if (detail.CanDecide)
+                    {
+                        <a href="/Approvals/Inbox/Details/@request.Id" class="btn btn-sm btn-primary"><i class="ti ti-gavel me-1"></i>Decide</a>
+                    }
+                    @if (detail.CanCancel)
+                    {
+                        <form action="/Approvals/MySubmissions/Cancel/@request.Id" method="post" data-confirm="Cancel this approval request? The document returns to draft.">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="returnUrl" value="@returnUrl" />
+                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="ti ti-x me-1"></i>Cancel request</button>
+                        </form>
+                    }
+                </div>
+            }
+        </div>
+
+        @if (detail.Changes.Count > 0)
+        {
+            <table class="table table-sm mb-2">
+                <thead><tr><th>Field</th><th>Current</th><th>Proposed</th></tr></thead>
+                <tbody>
+                    @foreach (ApprovalChange change in detail.Changes)
+                    {
+                        <tr><td>@ApprovalLabels.Field(change.Field)</td><td>@(change.OldValue ?? "—")</td><td class="fw-semibold">@(change.NewValue ?? "—")</td></tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        <ol class="list-unstyled mb-0">
+            @foreach (ApprovalLevelResponse level in detail.Levels)
+            {
+                ApprovalDecisionResponse? decision = detail.Decisions.FirstOrDefault(d => d.LevelNo == level.LevelNo);
+                <li class="d-flex gap-2 py-1" data-level="@level.LevelNo">
+                    <i class="@StateIcon(level.State) @StateCss(level.State) fs-18"></i>
+                    <div>
+                        <div><span class="fw-semibold">Level @level.LevelNo · @level.Name</span> <span class="@StateCss(level.State) fs-13">@level.State</span></div>
+                        @if (decision is not null)
+                        {
+                            <div class="fs-13">
+                                @decision.DecidedByName@(decision.OnBehalfOfName is { } onBehalf ? $" a.n. {onBehalf}" : string.Empty)
+                                · @Fmt.DateTime(decision.DecidedAtUtc)
+                                @if (decision.Note is not null)
+                                {
+                                    <span class="text-muted">— “@decision.Note”</span>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="fs-13 text-muted">
+                                @foreach (ApproverResponse approver in level.Approvers)
+                                {
+                                    <span class="me-2 @(approver.CanDecide ? string.Empty : "text-decoration-line-through")" title="@(approver.CanDecide ? null : "Inactive or without approvals:decide")">@approver.Name</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                </li>
+            }
+        </ol>
+    </div>
+}

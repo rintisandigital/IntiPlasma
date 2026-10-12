@@ -12,15 +12,32 @@ internal static class TestData
     public static readonly Guid FeedItemId = Guid.NewGuid();
     public static readonly DateOnly Today = new(2026, 10, 1);
 
-    public static Farmer PlasmaFarmer(Guid? branchId = null) =>
+    /// <summary>
+    /// An approved (active) plasma farmer.
+    /// </summary>
+    public static Farmer PlasmaFarmer(Guid? branchId = null) => Approved(DraftPlasmaFarmer(branchId));
+
+    public static Farmer DraftPlasmaFarmer(Guid? branchId = null) =>
         Farmer.Create("PLM-001", "Budi Santoso", FarmerType.Plasma, branchId ?? BranchId, "3201010101010001",
             TaxIdentity.None, null, null, BankAccount.None).Value;
 
     public static Farmer IntiFarmer() =>
-        Farmer.Create("INT-001", "Farm Inti Cianjur", FarmerType.Inti, BranchId, null,
-            TaxIdentity.None, null, null, BankAccount.None).Value;
+        Approved(Farmer.Create("INT-001", "Farm Inti Cianjur", FarmerType.Inti, BranchId, null,
+            TaxIdentity.None, null, null, BankAccount.None).Value);
 
-    public static Coop Coop(Farmer farmer, int capacity = 10_000) =>
+    /// <summary>
+    /// An approved (active) coop of an approved farmer.
+    /// </summary>
+    public static Coop Coop(Farmer farmer, int capacity = 10_000)
+    {
+        Coop coop = DraftCoop(farmer, capacity);
+        coop.Submit(farmer);
+        coop.Approve(farmer);
+
+        return coop;
+    }
+
+    public static Coop DraftCoop(Farmer farmer, int capacity = 10_000) =>
         Domain.MasterData.Coops.Coop.Create(farmer, "KDG-001", "Kandang 1", capacity, HouseType.ClosedHouse, null, null, null).Value;
 
     public static ContractTerms Terms(
@@ -49,8 +66,17 @@ internal static class TestData
         PartnershipContract contract = PartnershipContract
             .Create("KTR-001", branchId ?? BranchId, ContractScheme.PriceContract, Terms()).Value;
 
-        contract.Activate();
+        contract.Submit();
+        contract.Approve();
 
         return contract;
+    }
+
+    private static Farmer Approved(Farmer farmer)
+    {
+        farmer.Submit();
+        farmer.Approve();
+
+        return farmer;
     }
 }

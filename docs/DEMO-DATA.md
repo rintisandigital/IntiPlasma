@@ -36,6 +36,7 @@ Untuk **mengulang dari awal**, hapus database lalu buat lagi (`DROP DATABASE int
 | `admin@intiplasma.local` | `Admin123!` (dari `Seed:Admin`) | Maker semua dokumen; akses penuh |
 | `checker@intiplasma.local` | `Demo123!` | Checker (approve jurnal, kas keluar, PV, settlement, PO, SO); akses penuh + role API Administrator |
 | `staff.bdg@intiplasma.local` | `Demo123!` | Akses menu penuh, **hanya Cabang Bandung** (contoh Akses Cabang) |
+| `kacab@intiplasma.local` | `Demo123!` | Tommy Wijaya, **Kepala Cabang**: approver level 2 semua alur approval; akses penuh + role API **Manager** (`approvals:decide`) |
 
 ## Isi data
 
@@ -57,8 +58,13 @@ Untuk **mengulang dari awal**, hapus database lalu buat lagi (`DROP DATABASE int
 - Rentang bobot (stok ayam harian, M3): `BB-14` < 1,4 kg, `BB-16` 1,4–1,6, `BB-18` 1,6–1,8, `BB-20` 1,8–2,0, `BB-20UP` ≥ 2,0 kg.
 - Breed standard (M5): `CP707-CONTOH` "CP 707 (contoh)", default dan dipilih semua siklus demo; baris mingguan umur 0–42 diturunkan dari kurva data dummy (BW 42 + 1,62 × umur² g, pakan 13 + 4,3 × umur g/ekor/hari). **Bukan angka resmi breeder** — impor standar resmi lewat CSV.
 
+**Approval berjenjang** (M6)
+- Alur **default** (semua cabang) untuk keempat jenis dokumen (peternak baru, perubahan NIK/rekening, kandang baru, aktivasi kontrak): level 1 **Manager Unit** = Siti (`checker`), level 2 **Kepala Cabang** = Tommy (`kacab`).
+- Semua peternak, kandang & kontrak demo diajukan admin lalu disetujui kedua level (timeline lengkap di detail dokumen); gudang kandang `GK-…` dibuat saat kandang disetujui.
+- Contoh terbuka: peternak **PTN-BDG-004 Cecep Rustandi** menunggu di **level 2** (inbox Tommy) dan kandang **KDG-BDG-05 Kandang Ahmad 3** **ditolak** di level 1 dengan alasan (bisa diperbaiki lalu **Submit** ulang).
+
 **Kemitraan**
-- 7 peternak (2 inti, 5 plasma), 8 kandang.
+- 8 peternak (2 inti, 6 plasma; satu menunggu approval), 9 kandang (satu ditolak).
 - 3 kontrak aktif:
   - harga kontrak Bandung,
   - **bagi hasil 40%** Bandung,

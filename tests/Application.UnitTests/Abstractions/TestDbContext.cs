@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Application.Abstractions.Data;
 using Domain.Access;
+using Domain.Approvals;
 using Domain.Auditing;
 using Domain.Costing.PlasmaSettlements;
 using Domain.Documents.Attachments;
@@ -88,6 +89,9 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
     public DbSet<Farmer> Farmers { get; set; }
 
     public DbSet<Coop> Coops { get; set; }
+    public DbSet<ApprovalFlow> ApprovalFlows { get; set; }
+    public DbSet<ApprovalRequest> ApprovalRequests { get; set; }
+    public DbSet<ApprovalDelegation> ApprovalDelegations { get; set; }
 
     public DbSet<PartnershipContract> Contracts { get; set; }
 
@@ -175,6 +179,25 @@ public sealed class TestDbContext(DbContextOptions<TestDbContext> options)
         modelBuilder.Entity<Customer>().OwnsOne(c => c.CreditLimit);
         modelBuilder.Entity<Farmer>().OwnsOne(f => f.TaxIdentity);
         modelBuilder.Entity<Farmer>().OwnsOne(f => f.BankAccount);
+        modelBuilder.Entity<Farmer>().Property(f => f.PendingChange).HasConversion(
+            change => JsonSerializer.Serialize(change, JsonSerializerOptions.Web),
+            json => JsonSerializer.Deserialize<FarmerPendingChange>(json, JsonSerializerOptions.Web));
+
+        modelBuilder.Entity<ApprovalFlow>(b =>
+        {
+            b.HasMany(f => f.Levels).WithOne().HasForeignKey(l => l.FlowId);
+            b.Navigation(f => f.Levels).HasField("_levels");
+        });
+        modelBuilder.Entity<ApprovalFlowLevel>().HasKey(l => new { l.FlowId, l.LevelNo });
+        modelBuilder.Entity<ApprovalRequest>(b =>
+        {
+            b.HasMany(r => r.Levels).WithOne().HasForeignKey(l => l.RequestId);
+            b.Navigation(r => r.Levels).HasField("_levels");
+            b.HasMany(r => r.Decisions).WithOne().HasForeignKey(d => d.RequestId);
+            b.Navigation(r => r.Decisions).HasField("_decisions");
+        });
+        modelBuilder.Entity<ApprovalRequestLevel>().HasKey(l => new { l.RequestId, l.LevelNo });
+        modelBuilder.Entity<ApprovalDecision>().Property(d => d.Id).ValueGeneratedNever();
 
         modelBuilder.Entity<PartnershipContract>().Navigation(c => c.InputPrices).HasField("_inputPrices");
         modelBuilder.Entity<PartnershipContract>().Navigation(c => c.LiveBirdPrices).HasField("_liveBirdPrices");

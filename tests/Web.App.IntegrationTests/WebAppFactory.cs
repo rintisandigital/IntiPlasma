@@ -1,11 +1,18 @@
+using System.Security.Claims;
 using Application.Abstractions.Authentication;
+using Application.Abstractions.Messaging;
+using Application.Approvals;
 using Domain.Access;
+using Domain.Approvals;
+using Domain.Roles;
 using Domain.Users;
 using Infrastructure.Database;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using SharedKernel;
 using Testcontainers.PostgreSql;
 using Web.App.Infrastructure.Authorization;
 
@@ -19,6 +26,14 @@ public sealed class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifeti
 {
     public const string AdminEmail = "admin@intiplasma.test";
     public const string AdminPassword = "Admin123!";
+
+    /// <summary>
+    /// Approver of the default one-level flows seeded for every document type (PLAN-MOBILE M6).
+    /// </summary>
+    public const string ApproverEmail = "approver@intiplasma.test";
+    public const string ApproverPassword = "Approver123!";
+
+    public Guid ApproverId { get; private set; }
 
     private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder("postgres:17")
         .WithDatabase("intiplasma-webapp")
@@ -51,6 +66,61 @@ public sealed class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifeti
 
         // The hosted sync may have run before the migration; make the catalog available to every test.
         await MenuCatalogSyncService.SyncAsync(Services.GetRequiredService<IServiceScopeFactory>(), CancellationToken.None);
+
+        await SeedApprovalFlowsAsync(dbContext, scope.ServiceProvider.GetRequiredService<IPasswordHasher>());
+    }
+
+    /// <summary>
+    /// Approves every level of the document's pending request as the default approver, through the real handler (as
+    /// the approver, without a browser session).
+    /// </summary>
+    public async Task ApproveAsync(Guid documentId)
+    {
+        while (true)
+        {
+            using IServiceScope scope = Services.CreateScope();
+            ApplicationDbContext dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            Guid? requestId = await dbContext.ApprovalRequests
+                .Where(r => r.DocumentId == documentId && r.Status == ApprovalStatus.Pending)
+                .Select(r => (Guid?)r.Id)
+                .SingleOrDefaultAsync();
+            if (requestId is null)
+            {
+                return;
+            }
+
+            scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext = new DefaultHttpContext
+            {
+                RequestServices = scope.ServiceProvider,
+                User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, ApproverId.ToString())], "Test"))
+            };
+
+            Result result = await scope.ServiceProvider.GetRequiredService<ICommandHandler<ApproveRequestCommand>>()
+                .Handle(new ApproveRequestCommand(requestId.Value), CancellationToken.None);
+            if (result.IsFailure)
+            {
+                throw new InvalidOperationException($"Approval of {documentId} failed: {result.Error.Description}");
+            }
+        }
+    }
+
+    private async Task SeedApprovalFlowsAsync(ApplicationDbContext dbContext, IPasswordHasher hasher)
+    {
+        Guid managerRole = await dbContext.Roles.Where(r => r.Name == MobileRoles.Manager).Select(r => r.Id).SingleAsync();
+        var approver = User.Create(ApproverEmail, "Approver", "Default", hasher.Hash(ApproverPassword));
+        approver.SetAccess(MenuAccessProfile.FullAccessId, BranchAccessProfile.AllBranchesId, null);
+        approver.SetRoles([managerRole]);
+        dbContext.Users.Add(approver);
+
+        foreach (ApprovalDocumentType documentType in Enum.GetValues<ApprovalDocumentType>())
+        {
+            dbContext.ApprovalFlows.Add(ApprovalFlow.Create(
+                documentType, null, $"{documentType} (default)", [new ApprovalLevelDefinition("Manager", [approver.Id])]).Value);
+        }
+
+        await dbContext.SaveChangesAsync();
+        ApproverId = approver.Id;
     }
 
     /// <summary>
