@@ -216,7 +216,7 @@ internal static class ReceivableSql
     /// <summary>
     /// Every movement of a customer's receivable (@CustomerId): posted invoices (debit), the invoice part of receipts
     /// (credit; an advance is not a receivable movement), voided receipts (debit on the void date), advances applied
-    /// to invoices (credit) and credit notes (credit).
+    /// to invoices (credit), credit notes (credit) and voided credit notes (debit on the void date).
     /// </summary>
     public static readonly string Movements =
         $"""
@@ -247,6 +247,11 @@ internal static class ReceivableSql
         FROM sales.sales_credit_notes n
         JOIN master.branches b ON b.id = n.branch_id
         WHERE n.customer_id = @CustomerId AND {Branch("n")}
+        UNION ALL
+        SELECT 'CreditNoteVoid', n.id, n.number, n.void_date, b.code, n.void_reason, n.total, 0::numeric
+        FROM sales.sales_credit_notes n
+        JOIN master.branches b ON b.id = n.branch_id
+        WHERE n.customer_id = @CustomerId AND n.status = 'Voided' AND {Branch("n")}
         """;
 }
 
@@ -424,7 +429,8 @@ internal sealed class GetReceivableAgingQueryHandler(IDbConnectionFactory dbConn
                        - COALESCE((SELECT SUM(p.amount) FROM finance.customer_advance_applications p
                                    WHERE p.sales_invoice_id = i.id AND p.date <= @AsOf), 0)
                        - COALESCE((SELECT SUM(n.total) FROM sales.sales_credit_notes n
-                                   WHERE n.sales_invoice_id = i.id AND n.date <= @AsOf), 0) AS Outstanding
+                                   WHERE n.sales_invoice_id = i.id AND n.date <= @AsOf
+                                     AND (n.status <> 'Voided' OR n.void_date > @AsOf)), 0) AS Outstanding
                 FROM sales.sales_invoices i
                 JOIN master.branches b ON b.id = i.branch_id
                 JOIN master.customers c ON c.id = i.customer_id

@@ -647,7 +647,7 @@ Disusun 2026-10-09 dari pemetaan kode. Prasyarat: hasil M0 sudah di-commit.
 
 ### 14.1 Backend
 - **Domain**: `Farmer.FieldOfficerUserId`, `Coop.FieldOfficerUserId` + `AssignFieldOfficer(Guid?)`; error baru `Users.NotFieldOfficer`.
-- **Migration `PhaseM1_FieldOfficerScope`**: kolom `field_officer_user_id` (nullable, ber-index) di `master.farmers` & `master.coops`, FK ke `identity.users` **ON DELETE SET NULL** (user bisa dihapus permanen, W-22; penugasannya menjadi kosong). Data lama tetap kosong. **Belum di-migrate.**
+- **Migration `PhaseM1_FieldOfficerScope`**: kolom `field_officer_user_id` (nullable, ber-index) di `master.farmers` & `master.coops`, FK ke `identity.users` **ON DELETE SET NULL** (user bisa dihapus permanen, W-22; penugasannya menjadi kosong). Data lama tetap kosong. Sudah di-migrate.
 - **`IFieldScope`** (`Application/Abstractions/Authorization`): `GetScopeAsync`, `CanAccessFarmer/Coop/CycleAsync`, `FieldScopeSql` (potongan SQL Dapper), `FieldScopeExtensions` (di luar lingkup → `*.NotFound`). Implementasi `FieldScopeProvider` (Infrastructure): restricted = punya `partnership:assigned-only` **dan bukan** role sistem Administrator; flag di-cache (`PermissionCacheKeys.FieldScopeForUser`, ikut di-*invalidate* bersama akses user). **Web.App** memakai `UnrestrictedFieldScope`.
 - **Lingkup diterapkan di**:
   - peternak: list, detail & update (ditugaskan langsung atau lewat kandang);
@@ -933,7 +933,7 @@ Disusun 2026-10-09 dari pemetaan kode. Prasyarat: hasil M2 sudah di-commit. Migr
 - **Domain**:
   - `WeightRange` (`Domain/MasterData/WeightRanges`): batas `[MinWeightKg, MaxWeightKg)` 3 desimal, sisi terbuka = null (minimal satu batas), `Contains`, `Overlaps`, `SetBounds`, `Update(name, sortOrder, isActive)`.
   - `LiveBirdStockEntry` (`Domain/Production/LiveBirdStock`): `Create`/`Update` memvalidasi siklus recordable & ≥ chick-in, rentang aktif, ekor & kg > 0, rata-rata di dalam rentang; rentang & siklus entri tidak bisa diganti (`KeyMismatch`). Tanpa lampiran (M-48).
-- **Migration `PhaseM3_LiveBirdStock`**: `master.weight_ranges` (unik `code`), `production.live_bird_stock_entries` (unik `cycle_id, date, weight_range_id`; index `branch_id, date`; FK siklus, cabang, kandang, rentang). **Belum di-migrate.**
+- **Migration `PhaseM3_LiveBirdStock`**: `master.weight_ranges` (unik `code`), `production.live_bird_stock_entries` (unik `cycle_id, date, weight_range_id`; index `branch_id, date`; FK siklus, cabang, kandang, rentang). Sudah di-migrate.
 - **Application**:
   - `WeightRanges/WeightRangeUseCases.cs`: create/update dengan cek tumpang tindih antar rentang aktif; batas terkunci bila sudah dipakai entri (`WeightRanges.InUse`); `GetWeightRangesQuery(activeOnly)`.
   - `UpsertLiveBirdStockEntryCommand` (M-47: kombinasi sama → entri lama diubah & id lama dikembalikan; `id` dipakai kombinasi lain → 409; tanggal ≤ server + 1; total ekor semua rentang ≤ populasi berjalan, M-50) dan `DeleteLiveBirdStockEntryCommand` (lingkup PPL, hanya tanggal hari ini/kemarin, M-49).

@@ -62,6 +62,7 @@ Auto Journal Engine harus **pasti** terbentuk bila transaksi operasional tersimp
 - `Entity<TId>`, `AggregateRoot<TId>` (domain event hanya di aggregate root), `ValueObject`.
 - Strongly-typed IDs (`FarmerId`, `CoopId`, `CycleId`, …) sebagai `record struct`.
 - Value objects: `Money` (decimal, IDR), `Quantity` (+ `Uom`: ekor, kg, sak, botol), `DocumentNumber`, `Period` (tahun-bulan).
+  *Realisasi:* hanya `Money` yang dibuat; `Quantity`/`Uom`, `DocumentNumber` dan `Period` **sengaja tidak dibuat** (keputusan 2026-10-13, lihat §17).
 - `IAuditable` (CreatedAt/By, UpdatedAt/By) diisi otomatis lewat EF interceptor; `ISoftDeletable`; concurrency token (`xmin` PostgreSQL).
 - Service `IDocumentNumberGenerator` (mis. `PO/BR01/2026/IX/0001`).
 
@@ -190,7 +191,7 @@ Per fase, definisi selesai: domain + unit test invariant → command/query + val
 | 1 | Skema kemitraan | **Diatur per kontrak** | `PartnershipContract.Scheme` = `PriceContract` (harga kontrak sapronak + harga jaminan ayam) atau `ProfitSharing` (persentase bagi hasil laba). Perhitungan settlement memakai *strategy* di domain (`ISettlementPolicy` per skema); bonus/insentif & potongan dikonfigurasi sebagai daftar komponen di kontrak. Kontrak di-*snapshot* ke siklus saat siklus dibuka agar perubahan kontrak tidak mengubah siklus berjalan. |
 | 2 | Valuasi persediaan | **Moving Average** | `StockBalance` per (gudang, item) menyimpan qty & `AverageCost`; penerimaan menghitung ulang rata-rata, pengeluaran/transfer memakai rata-rata saat itu. Transfer ke siklus membawa nilai → WIP siklus. Update saldo memakai concurrency token/row lock. |
 | 3 | Struktur usaha | **Satu perusahaan, banyak cabang** | COA satu untuk perusahaan; `BranchId` wajib di semua transaksi & baris jurnal (dimensi), bersama `CostCenterId`. Laporan keuangan bisa per cabang/konsolidasi. User punya daftar cabang yang boleh diakses (branch-scoped authorization). Penomoran dokumen per cabang per periode. |
-| 4 | Tampilan | **API saja dulu** (menyusul: mobile app untuk PPL, MVC WebApp untuk Admin Office) | API didesain *client-agnostic*: ID boleh dibuat klien (untuk recording offline PPL), header `Idempotency-Key` pada command penting, endpoint sinkronisasi (`?modifiedSince=`), paging standar, API versioning (`/api/v1`). Permission dipisah per peran (PPL vs Admin Office). |
+| 4 | Tampilan | **API saja dulu** (menyusul: mobile app untuk PPL, MVC WebApp untuk Admin Office) | API didesain *client-agnostic*: ID boleh dibuat klien (untuk recording offline PPL), header `Idempotency-Key` pada command penting, endpoint sinkronisasi (`?modifiedSince=`) — *ditutup 2026-10-13, lihat §17*, paging standar, API versioning (`/api/v1`). Permission dipisah per peran (PPL vs Admin Office). |
 | 5 | Pajak | **Perlu PPN & PPh** | Master `TaxCode` (PPN Keluaran/Masukan, PPh 21/22/23/4(2), status *Dibebaskan/Tidak dipungut*) dengan tarif ber-tanggal-efektif; baris invoice pembelian/penjualan membawa `TaxCode`; NPWP/NIK/NITKU di Vendor, Customer, Peternak. Mapping jurnal pajak (PPN Masukan, PPN Keluaran, Hutang PPh). PPh atas pembayaran settlement plasma dikonfigurasi per kontrak/peternak. Ekspor e-Faktur/Coretax menyusul (Fase 8). ⚠️ Beberapa komoditas (DOC, pakan, ayam hidup) punya fasilitas PPN dibebaskan — tarif final wajib dikonfirmasi dengan konsultan pajak, karena itu semua tarif dibuat konfigurasi, bukan hardcode. |
 | 6 | Sample `Todos` | **Dihapus** di Fase 0 | — |
 
@@ -224,7 +225,7 @@ Per fase, definisi selesai: domain + unit test invariant → command/query + val
 | `IUnitOfWork` + repository per aggregate | `IApplicationDbContext` (DbSet = repository) | Konsisten dengan template, lebih sedikit abstraksi. Repository khusus ditambah bila query agregat jadi kompleks. |
 | Tabel `outbox_message_consumers` | Idempotensi pakai `DomainEvent.Id` | Handler menyimpan `SourceEventId` unik (mis. di jurnal otomatis) — lebih kuat dari tabel consumer karena satu transaksi dengan data handler. |
 | Branch-scoped authorization di Fase 0 | Dipindah ke **Fase 1** | Membutuhkan aggregate `Branch` yang baru dibuat di Fase 1. |
-| `Quantity`/`Uom` value object | Dipindah ke **Fase 1/3** | Bergantung pada master UoM. |
+| `Quantity`/`Uom` value object | Dipindah ke **Fase 1/3** → **tidak dibuat** (2026-10-13, §17) | Bergantung pada master UoM. |
 
 **Catatan**
 - Integration test butuh Docker (Testcontainers); belum dijalankan di mesin dev tanpa Docker. Alur yang sama sudah diverifikasi manual ke PostgreSQL lokal.
@@ -797,3 +798,89 @@ Migration: `Phase9_Attachments`. Isinya schema baru `documents` (tabel `attachme
   - Job pembersih: 9 lampiran Temporary kedaluwarsa terhapus (DB + file); 30 lampiran Linked utuh.
   - Belum diuji end-to-end: `PUT …/documents` pada PV yang sudah *paid* dan PV plasma (jalur kode sama dengan PV vendor draft yang sudah diuji).
 - Test: 120 domain (+16), 41 application (+7), 8 arsitektur, 13 integration (+3, termasuk upload → link → hapus via HTTP).
+
+---
+
+## 17. Perbaikan Temuan Audit 2026-10-04 (2026-10-13)
+
+Semua butir "Temuan audit 2026-10-04" di RANGKUMAN §8 diselesaikan. Keputusan yang disepakati 2026-10-13:
+- Nota kredit: **detail + void** (bukan hanya detail).
+- `?modifiedSince=` **ditutup tanpa dibuat**.
+- `Quantity` **tidak dibuat**; diganti pembulatan kuantitas.
+- Dashboard & audit log memakai **permission baru**.
+
+**Periode fiskal dicek sebelum dokumen disimpan**
+- Helper baru `JournalSupport.EnsurePeriodOpenAsync` dipanggil sebelum nomor dokumen diambil. Periode yang tidak ada atau sudah ditutup langsung ditolak, sehingga jurnal outbox tidak lagi menjadi *dead letter* yang memblokir tutup periode.
+- Dokumen yang kini dicek:
+  - BPB.
+  - Transfer sapronak ke siklus (transfer antar gudang pusat tidak dijurnal).
+  - Retur dari kandang dan mutasi pakan (lewat `PrepareAsync`).
+  - Penerimaan customer dan penerapan uang muka.
+  - Transfer bank.
+  - Tutup siklus, hanya bila penyesuaian HPP ≠ 0. Tanggal yang dicek adalah tanggal panen terakhir, karena `ClosedDate` = panen terakhir.
+- Dokumen yang sudah dicek sebelumnya: VI, PV, invoice, nota kredit, settlement, kas, void penerimaan, jurnal manual.
+
+**Tutup tahun per cabang**
+- `YearEndClosing` kini memakai mapping `YearEndClosing.NetIncome` milik cabang bila ada, dan jatuh ke default perusahaan bila tidak ada.
+- Akun laba ditahan setiap cabang di-resolve sebelum nomor jurnal diambil. Bila cabang tidak punya mapping dan tidak ada default, muncul `JournalMappings.NotConfigured` dengan id cabangnya.
+- Tahun tanpa saldo laba/rugi tidak lagi gagal hanya karena mapping tidak ada.
+
+**Nota kredit: detail & void** (migration **`CreditNote_Void`**, belum di-migrate)
+- Kolom baru di `sales.sales_credit_notes`: `status` (default `Posted` untuk data lama), `void_date`, `void_reason`.
+- `SalesCreditNote.Void(date, reason, invoice)`:
+  - Hanya untuk nota berstatus Posted, dengan tanggal void ≥ tanggal nota.
+  - `SalesInvoice.ReverseCreditNote` mengembalikan kredit per baris dan outstanding invoice. Status invoice dihitung ulang, misalnya Paid → Posted.
+  - Event `SalesCreditNoteVoidedDomainEvent` membalik jurnal pada tanggal void lewat `ReverseAsync`.
+- Laporan yang memperhitungkan void:
+  - Kartu piutang: baris `CreditNoteVoid` (debit pada tanggal void).
+  - Aging as-of: nota yang di-void setelah tanggal as-of masih dihitung.
+  - Profitabilitas: kredit dikurangi kembali pada periode tanggal void, sama seperti jurnalnya.
+  - Rekap PPN: nota yang di-void dikeluarkan dari daftar retur. Konsekuensinya, rekap periode lama ikut berubah bila nota di-void di periode berikutnya.
+  - Pendapatan settlement plasma: nota yang di-void diabaikan.
+- Query `GetSalesCreditNoteByIdQuery` (dengan baris). Daftar nota kini memuat `status`, `voidDate` dan `voidReason`.
+- Web.App:
+  - Halaman **Credit Notes → Details** berisi baris, pratinjau jurnal, tombol PDF, dan tombol **Void** (modal tanggal + alasan, hak Edit).
+  - Daftar dan halaman invoice menampilkan status dan tautan ke detail. Setelah create, pengguna diarahkan ke detail nota.
+  - `Print` memakai query by-id.
+  - Menu `sales.credit-notes` kini C E X.
+- API:
+  - `GET sales/credit-notes/{id}` (`sales:read`).
+  - `POST sales/credit-notes/{id}/void` dengan body `{date, reason}` (`sales:invoice`).
+
+**Transfer bank: detail**
+- Query baru `GetBankTransferByIdQuery`, halaman **Bank Transfers → Details** dengan jurnal, dan `GET finance/bank-transfers/{id}` (`cash-bank:read`).
+- Setelah create, pengguna diarahkan ke detail.
+- `JournalSources.Route` kini mengenal `BankTransfer` dan `SalesCreditNote`, sehingga tombol "Open source document" di jurnal berfungsi.
+- `CustomerAdvanceApplied` belum bertaut: `SourceId`-nya id aplikasi uang muka, bukan id penerimaan.
+
+**Endpoint API baru** (yang sebelumnya hanya ada di Web.App)
+- `GET customers/{id}/credit?excludeSalesOrderId=` (`sales:read`).
+- `GET costing/settleable-cycles?search&branchId` (`costing:read`).
+- `GET finance/journals/by-source?sourceIds=…` (`journals:read`).
+- `GET dashboard?asOf=` (**`dashboard:read`**, baru). `asOf` wajib karena klien menentukan tanggal lokalnya.
+- `GET audit-logs` (paged, filter `fromUtc`/`toUtc`/`category`/`userId`) dan `GET audit-logs/{id}` (**`audit-logs:read`**, baru).
+- Administrator otomatis mendapat kedua permission baru. Role lain diberi lewat API Roles.
+- Ganti password sendiri ternyata sudah ada (`POST users/me/change-password`). Butir audit ini keliru.
+- Perbaikan tambahan: parameter wajib yang hilang atau salah format (mis. `?asOf=` pada aging) sebelumnya menghasilkan **500**. Kini `GlobalExceptionHandler` memetakan `BadHttpRequestException` ke **400** `Request.Invalid` dengan pesan parameter.
+
+**Hak menu**
+- Export dicabut dari Users, Menu Access, Branch Access (kini C E D), API Roles, Branches (C E) dan Feed Mutations (C). Hak Export lama yang tersimpan sudah otomatis tidak berlaku (`granted & SupportedRights`).
+- `MenuAccessProfile.Duplicate` kini membuang hak yang tidak lagi didukung menu, alih-alih gagal `RightNotSupported`.
+- Test arsitektur baru `MenuCatalog_Rights_Should_MatchTheGuardedActions` menjaga dua arah:
+  - Setiap hak (selain View) di katalog dipakai oleh minimal satu `[MenuAccess(code, right)]`.
+  - Setiap hak yang dijaga atribut tersedia di katalog.
+
+**Lain-lain**
+- Kode mati `Application/Users/GetByEmail` dihapus. `UserErrors.NotFoundByEmail` tetap dipakai login.
+- `Quantity` (§2.4) **tidak dibuat**: semantik kuantitas memang berbeda per modul (ekor `int`, kg 3 desimal, stok 4 desimal dengan UoM per baris), dan retrofit akan menyentuh semua modul serta read model Dapper. Sebagai gantinya:
+  - `Domain.Common.Quantities` (`Decimals = 4`, `Round`).
+  - `Item.ConvertToBase` kini membulatkan ke 4 desimal, sehingga cek stok di memori sama dengan yang disimpan PostgreSQL.
+  - Presisi EF (`InventoryPrecision`, baris settlement) merujuk konstanta itu.
+- `?modifiedSince=` (keputusan #4) **ditutup**: desain sinkronisasi resmi mobile adalah `mobile/field-context` + cache per URL (PLAN-MOBILE §3.5). Filter timestamp tanpa *tombstone* tidak bisa mendeteksi data yang dihapus atau dipindah PPL, sehingga hasilnya menyesatkan.
+
+**Pengujian**
+- Test: 197 domain (+3), 116 application (+2), 15 arsitektur (+1), 140 MobileApp, 53 integration Web.Api (+3), 188 integration Web.App (skenario credit note & transfer diperluas). Total **709**.
+- Beberapa test application kini menyiapkan tahun fiskal 2026, karena BPB/transfer/tutup siklus memerlukannya.
+- Verifikasi end-to-end pada `intiplasma_verify` + data demo (788 command lewat handler asli, 0 *dead letter*):
+  - **26 skenario API**: endpoint baru; void nota (tanggal salah, alasan kosong, dua kali); outstanding & kredit baris kembali; jurnal dibalik; kartu piutang/aging/daftar; transfer & penerimaan tanpa periode ditolak tanpa membuat dokumen; 400 untuk `asOf` hilang/salah.
+  - **19 skenario Playwright Web.App**: detail transfer & jurnalnya, tautan "Open source document", create → detail → void nota kredit, PDF, status di daftar & invoice, hak menu.

@@ -82,7 +82,8 @@ public static class MenuCodes
 /// </summary>
 public static class MenuCatalog
 {
-    private const MenuRights Crud = MenuRights.Create | MenuRights.Edit | MenuRights.Delete | MenuRights.Export;
+    private const MenuRights CreateEditDelete = MenuRights.Create | MenuRights.Edit | MenuRights.Delete;
+    private const MenuRights Crud = CreateEditDelete | MenuRights.Export;
     private const MenuRights CreateExport = MenuRights.Create | MenuRights.Export;
     private const MenuRights CreateEditExport = MenuRights.Create | MenuRights.Edit | MenuRights.Export;
 
@@ -129,7 +130,7 @@ public static class MenuCatalog
         Page("inventory", "inventory.goods-receipts", "Goods Receipts", "/Inventory/GoodsReceipts", CreateExport, true);
         Page("inventory", "inventory.stock-transfers", "Stock Transfers", "/Inventory/StockTransfers", CreateExport, true);
         Page("inventory", "inventory.stock-returns", "Stock Returns", "/Inventory/StockReturns", CreateExport, true);
-        Page("inventory", "inventory.feed-mutations", "Feed Mutations", "/Inventory/FeedMutations", CreateExport, true);
+        Page("inventory", "inventory.feed-mutations", "Feed Mutations", "/Inventory/FeedMutations", MenuRights.Create, true);
         Page("inventory", "inventory.stock", "Stock Balance & Card", "/Inventory/Stock", MenuRights.Export, true);
 
         Group("production", "Production", "ti ti-egg", 60);
@@ -142,7 +143,7 @@ public static class MenuCatalog
         Page("sales", "sales.orders", "Sales Orders", "/Sales/SalesOrders", CreateEditExport, true);
         Page("sales", "sales.deliveries", "Delivery Orders", "/Sales/DeliveryOrders", CreateEditExport, true);
         Page("sales", "sales.invoices", "Sales Invoices", "/Sales/SalesInvoices", CreateEditExport, true);
-        Page("sales", "sales.credit-notes", "Credit Notes", "/Sales/CreditNotes", CreateExport, true);
+        Page("sales", "sales.credit-notes", "Credit Notes", "/Sales/CreditNotes", CreateEditExport, true);
         Page("sales", "sales.receipts", "Customer Receipts", "/Sales/Receipts", CreateEditExport, true);
         Page("sales", "sales.receivables", "Receivable Ledger & Aging", "/Sales/Receivables", MenuRights.Export, true);
 
@@ -175,12 +176,12 @@ public static class MenuCatalog
         Page("reports", "reports.tax", "Tax Recap", "/Reports/Tax", MenuRights.Export, true);
 
         Group("admin", "Administration", "ti ti-settings", 110);
-        Page("admin", MenuCodes.AdminUsers, "Users", "/Admin/Users", Crud, true);
-        Page("admin", MenuCodes.AdminMenuAccess, "Menu Access", "/Admin/MenuAccess", Crud, true);
-        Page("admin", MenuCodes.AdminBranchAccess, "Branch Access", "/Admin/BranchAccess", Crud, true);
+        Page("admin", MenuCodes.AdminUsers, "Users", "/Admin/Users", CreateEditDelete, true);
+        Page("admin", MenuCodes.AdminMenuAccess, "Menu Access", "/Admin/MenuAccess", CreateEditDelete, true);
+        Page("admin", MenuCodes.AdminBranchAccess, "Branch Access", "/Admin/BranchAccess", CreateEditDelete, true);
         Page("admin", MenuCodes.AdminMenus, "Menus", "/Admin/Menus", MenuRights.Edit, true);
-        Page("admin", MenuCodes.AdminApiRoles, "API Roles", "/Admin/ApiRoles", CreateEditExport, true);
-        Page("admin", MenuCodes.AdminBranches, "Branches", "/Admin/Branches", CreateEditExport, true);
+        Page("admin", MenuCodes.AdminApiRoles, "API Roles", "/Admin/ApiRoles", MenuRights.Create | MenuRights.Edit, true);
+        Page("admin", MenuCodes.AdminBranches, "Branches", "/Admin/Branches", MenuRights.Create | MenuRights.Edit, true);
         Page("admin", MenuCodes.AdminApprovalFlows, "Approval Flows", "/Admin/ApprovalFlows", MenuRights.Create | MenuRights.Edit, true);
         Page("admin", MenuCodes.AdminFailedEvents, "Failed Events", "/Admin/FailedEvents", MenuRights.Edit, true);
         Page("admin", MenuCodes.AdminAuditLogs, "Audit Log", "/Admin/AuditLogs", MenuRights.Export, true);

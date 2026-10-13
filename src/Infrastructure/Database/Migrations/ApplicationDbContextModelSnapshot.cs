@@ -5607,11 +5607,28 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("sales_invoice_id");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Posted")
+                        .HasColumnName("status");
+
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
+
+                    b.Property<DateOnly?>("VoidDate")
+                        .HasColumnType("date")
+                        .HasColumnName("void_date");
+
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("void_reason");
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "Subtotal", "Domain.Sales.CreditNotes.SalesCreditNote.Subtotal#Money", b1 =>
                         {

@@ -54,7 +54,7 @@ internal sealed class PlasmaSettlementLineConfiguration : IEntityTypeConfigurati
         builder.ToTable("plasma_settlement_lines", Schemas.Costing);
         builder.HasKey(l => new { l.PlasmaSettlementId, l.LineNumber });
         builder.Property(l => l.Description).HasMaxLength(250);
-        builder.Property(l => l.Quantity).HasPrecision(18, 4);
+        builder.Property(l => l.Quantity).HasPrecision(18, Domain.Common.Quantities.Decimals);
         builder.Property(l => l.UnitPrice).HasPrecision(ConfigurationExtensions.MoneyPrecision, SharedKernel.Money.Decimals);
         builder.ComplexMoney(l => l.Amount, "amount");
     }

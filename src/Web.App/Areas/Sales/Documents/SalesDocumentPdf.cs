@@ -143,7 +143,8 @@ public static class SalesDocumentPdf
                 ("Date", fmt.Date(note.Date)),
                 ("Invoice", note.InvoiceNumber),
                 ("Branch", note.BranchCode),
-                ("Reason", note.Reason)
+                ("Reason", note.Reason),
+                ("Status", note.VoidDate is { } voided ? $"Voided {fmt.Date(voided)} — {note.VoidReason}" : note.Status.ToString())
             ]));
             DocumentPdf.Totals(column,
             [

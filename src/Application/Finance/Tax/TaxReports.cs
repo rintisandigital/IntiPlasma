@@ -144,7 +144,7 @@ internal sealed class GetVatRecapQueryHandler(IDbConnectionFactory dbConnectionF
             FROM sales.sales_credit_notes n
             JOIN sales.sales_invoices i ON i.id = n.sales_invoice_id
             JOIN master.customers c ON c.id = n.customer_id
-            WHERE n.date BETWEEN @Start AND @End AND n.vat_amount <> 0 AND {TaxSql.Branch("n")}
+            WHERE n.date BETWEEN @Start AND @End AND n.vat_amount <> 0 AND n.status <> 'Voided' AND {TaxSql.Branch("n")}
             ORDER BY n.date, n.number;
 
             SELECT v.number AS InvoiceNumber, v.vendor_invoice_number AS VendorInvoiceNumber, v.tax_invoice_number AS TaxInvoiceNumber,

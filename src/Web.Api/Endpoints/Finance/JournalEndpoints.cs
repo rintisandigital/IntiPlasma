@@ -3,6 +3,7 @@ using Application.Abstractions.Paging;
 using Application.Finance.Journals;
 using Domain.Finance.Journals;
 using Domain.Roles;
+using Microsoft.AspNetCore.Mvc;
 using SharedKernel;
 using Web.Api.Extensions;
 using Web.Api.Infrastructure;
@@ -38,6 +39,18 @@ internal sealed class JournalEndpoints : IEndpoint
             var query = new GetJournalsQuery(new PageRequest(page, pageSize, search), branchId, status, source, from, to);
 
             Result<PagedList<JournalResponse>> result = await handler.Handle(query, cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.JournalsRead);
+
+        // The journals (incl. reversals) of business documents, e.g. ?sourceIds=a&sourceIds=b.
+        group.MapGet("by-source", async (
+            [FromQuery] Guid[] sourceIds,
+            IQueryHandler<GetDocumentJournalsQuery, IReadOnlyList<JournalResponse>> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<IReadOnlyList<JournalResponse>> result = await handler.Handle(new GetDocumentJournalsQuery(sourceIds), cancellationToken);
 
             return result.Match(Results.Ok, CustomResults.Problem);
         })

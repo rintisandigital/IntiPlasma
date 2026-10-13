@@ -24,17 +24,18 @@
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-hover mb-0">
-                <thead class="thead-light"><tr><th>Number</th><th>Date</th><th>Customer</th><th>Invoice</th><th>Reason</th><th class="text-end">Total</th><th></th></tr></thead>
+                <thead class="thead-light"><tr><th>Number</th><th>Date</th><th>Customer</th><th>Invoice</th><th>Reason</th><th class="text-end">Total</th><th>Status</th><th></th></tr></thead>
                 <tbody>
                     @foreach (Application.Sales.SalesCreditNoteResponse note in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@note.Number</td>
+                            <td class="fw-semibold"><a asp-action="Details" asp-route-id="@note.Id">@note.Number</a></td>
                             <td>@Fmt.Date(note.Date)</td>
                             <td>@note.CustomerName</td>
                             <td><a asp-controller="SalesInvoices" asp-action="Details" asp-route-id="@note.SalesInvoiceId">@note.InvoiceNumber</a></td>
                             <td>@note.Reason</td>
                             <td class="text-end text-nowrap">@Fmt.Money(note.Total)</td>
+                            <td><partial name="Partials/_StatusBadge" model="note.Status.ToString()" /></td>
                             <td class="text-end">
                                 @if (canExport)
                                 {
@@ -45,7 +46,7 @@
                     }
                     @if (Model.Rows.Items.Count == 0)
                     {
-                        <tr><td colspan="7" class="text-center text-muted py-4">No credit notes found.</td></tr>
+                        <tr><td colspan="8" class="text-center text-muted py-4">No credit notes found.</td></tr>
                     }
                 </tbody>
             </table>

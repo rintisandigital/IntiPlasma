@@ -1,0 +1,34 @@
+@model Application.Finance.CashBank.BankTransferResponse
+@{
+    ViewData["Title"] = $"Bank Transfer {Model.Number}";
+    ViewData["Menu"] = MenuCodes.FinanceBankTransfers;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Bank Transfer @Model.Number <partial name="Partials/_StatusBadge" model='"Posted"' /></h4>
+            <h6>@Model.BranchCode</h6>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="Index" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3 mb-2"><div class="text-muted fs-13">Date</div><div class="fw-semibold">@Fmt.Date(Model.Date)</div></div>
+            <div class="col-md-3 mb-2"><div class="text-muted fs-13">From</div><div class="fw-semibold">@Model.FromCode — @Model.FromName</div></div>
+            <div class="col-md-3 mb-2"><div class="text-muted fs-13">To</div><div class="fw-semibold">@Model.ToCode — @Model.ToName</div></div>
+            <div class="col-md-3 mb-2"><div class="text-muted fs-13">Amount</div><div class="fw-bold">@Fmt.Money(Model.Amount)</div></div>
+            <div class="col-md-3 mb-2"><div class="text-muted fs-13">Reference</div><div class="fw-semibold">@(Model.Reference ?? "—")</div></div>
+            @if (!string.IsNullOrWhiteSpace(Model.Notes))
+            {
+                <div class="col-md-9"><div class="text-muted fs-13">Notes</div><div>@Model.Notes</div></div>
+            }
+        </div>
+    </div>
+</div>
+
+@await Component.InvokeAsync("JournalPreview", new { sourceIds = new[] { Model.Id } })

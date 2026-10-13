@@ -23,6 +23,7 @@ public sealed class BankTransfersController(
     PageSupport support,
     DisplayFormatter formatter,
     IQueryHandler<GetBankTransfersQuery, PagedList<BankTransferResponse>> transfersQuery,
+    IQueryHandler<GetBankTransferByIdQuery, BankTransferResponse> transferQuery,
     IQueryHandler<GetCashBankAccountsQuery, IReadOnlyList<CashBankAccountResponse>> cashBankQuery) : AppController
 {
     private const string MenuCode = MenuCodes.FinanceBankTransfers;
@@ -71,6 +72,19 @@ public sealed class BankTransfersController(
     }
 
     [HttpGet]
+    public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
+    {
+        Result<BankTransferResponse> result = await transferQuery.Handle(new GetBankTransferByIdQuery(id), cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return result.Error.Type == ErrorType.Forbidden ? Forbid() : NotFound();
+        }
+
+        return View(result.Value);
+    }
+
+    [HttpGet]
     [MenuAccess(MenuCode, MenuRights.Create)]
     public async Task<IActionResult> Create(Guid? fromId, CancellationToken cancellationToken)
     {
@@ -102,7 +116,7 @@ public sealed class BankTransfersController(
             if (result.IsSuccess)
             {
                 NotifySuccess($"Transfer {result.Value.Number} of {formatter.Money(model.Amount!.Value)} has been posted.");
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Details), new { id = result.Value.Id });
             }
 
             AddErrors(result.Error);

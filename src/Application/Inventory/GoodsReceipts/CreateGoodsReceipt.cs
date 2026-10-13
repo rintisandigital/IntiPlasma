@@ -3,6 +3,7 @@ using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Numbering;
 using Application.Documents;
+using Application.Finance.Journals;
 using Application.Procurement;
 using Domain.Documents.Attachments;
 using Domain.Inventory.GoodsReceipts;
@@ -95,6 +96,13 @@ internal sealed class CreateGoodsReceiptCommandHandler(
         if (validation.IsFailure)
         {
             return Result.Failure<CreateGoodsReceiptResponse>(validation.Error);
+        }
+
+        // The journal is posted from the outbox; reject a closed period now rather than dead-letter it later.
+        Result period = await JournalSupport.EnsurePeriodOpenAsync(context, command.ReceiptDate, cancellationToken);
+        if (period.IsFailure)
+        {
+            return Result.Failure<CreateGoodsReceiptResponse>(period.Error);
         }
 
         Result attachable = await attachments.EnsureAttachableAsync(order.Value.BranchId, command.Documents, cancellationToken);

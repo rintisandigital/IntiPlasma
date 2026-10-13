@@ -86,6 +86,20 @@ internal static class JournalSupport
         return period.IsOpen ? period : Result.Failure<FiscalPeriod>(FiscalPeriodErrors.Closed(date));
     }
 
+    /// <summary>
+    /// For documents whose journal is posted later from the outbox: rejects a missing or closed period up front
+    /// rather than leaving the journal as a dead letter. Call it before a document number is taken.
+    /// </summary>
+    public static async Task<Result> EnsurePeriodOpenAsync(
+        IApplicationDbContext context,
+        DateOnly date,
+        CancellationToken cancellationToken)
+    {
+        Result<FiscalPeriod> period = await FindPeriodAsync(context, date, cancellationToken);
+
+        return period.IsFailure ? Result.Failure(period.Error) : Result.Success();
+    }
+
     public static async Task<string> NextNumberAsync(
         IApplicationDbContext context,
         IDocumentNumberGenerator numberGenerator,

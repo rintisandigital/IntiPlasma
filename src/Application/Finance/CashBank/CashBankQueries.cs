@@ -27,6 +27,8 @@ public sealed record GetCashTransactionByIdQuery(Guid CashTransactionId) : IQuer
 public sealed record GetBankTransfersQuery(PageRequest Paging, Guid? BranchId, Guid? CashBankAccountId, DateOnly? From, DateOnly? To)
     : IQuery<PagedList<BankTransferResponse>>;
 
+public sealed record GetBankTransferByIdQuery(Guid BankTransferId) : IQuery<BankTransferResponse>;
+
 /// <summary>
 /// Buku kas/bank: opening balance, every posted movement of the cash/bank account's ledger account with a running
 /// balance, closing balance.
@@ -141,7 +143,20 @@ public sealed record BankTransferResponse(
     string ToName,
     decimal Amount,
     string? Reference,
-    string? Notes);
+    string? Notes)
+{
+    public const string Select =
+        """
+        SELECT t.id AS Id, t.number AS Number, t.branch_id AS BranchId, b.code AS BranchCode, t.date AS Date,
+               t.from_cash_bank_account_id AS FromCashBankAccountId, f.code AS FromCode, f.name AS FromName,
+               t.to_cash_bank_account_id AS ToCashBankAccountId, d.code AS ToCode, d.name AS ToName,
+               t.amount AS Amount, t.reference AS Reference, t.notes AS Notes
+        FROM finance.bank_transfers t
+        JOIN master.branches b ON b.id = t.branch_id
+        JOIN finance.cash_bank_accounts f ON f.id = t.from_cash_bank_account_id
+        JOIN finance.cash_bank_accounts d ON d.id = t.to_cash_bank_account_id
+        """;
+}
 
 public sealed record CashBankLedgerResponse(
     Guid CashBankAccountId,
@@ -343,20 +358,36 @@ internal sealed class GetBankTransfersQueryHandler(IDbConnectionFactory dbConnec
         return await connection.QueryPagedAsync<BankTransferResponse>(
             $"SELECT COUNT(*) FROM finance.bank_transfers t {filter}",
             $"""
-             SELECT t.id AS Id, t.number AS Number, t.branch_id AS BranchId, b.code AS BranchCode, t.date AS Date,
-                    t.from_cash_bank_account_id AS FromCashBankAccountId, f.code AS FromCode, f.name AS FromName,
-                    t.to_cash_bank_account_id AS ToCashBankAccountId, d.code AS ToCode, d.name AS ToName,
-                    t.amount AS Amount, t.reference AS Reference, t.notes AS Notes
-             FROM finance.bank_transfers t
-             JOIN master.branches b ON b.id = t.branch_id
-             JOIN finance.cash_bank_accounts f ON f.id = t.from_cash_bank_account_id
-             JOIN finance.cash_bank_accounts d ON d.id = t.to_cash_bank_account_id
+             {BankTransferResponse.Select}
              {filter}
              ORDER BY t.date DESC, t.number DESC LIMIT @PageSize OFFSET @Offset
              """,
             query.Paging,
             new { scope.AllBranches, scope.BranchIds, query.BranchId, query.CashBankAccountId, query.From, query.To },
             cancellationToken);
+    }
+}
+
+internal sealed class GetBankTransferByIdQueryHandler(IDbConnectionFactory dbConnectionFactory, IBranchAccess branchAccess)
+    : IQueryHandler<GetBankTransferByIdQuery, BankTransferResponse>
+{
+    public async Task<Result<BankTransferResponse>> Handle(GetBankTransferByIdQuery query, CancellationToken cancellationToken)
+    {
+        await using DbConnection connection = await dbConnectionFactory.OpenConnectionAsync(cancellationToken);
+
+        BankTransferResponse? transfer = await connection.QuerySingleOrDefaultAsync<BankTransferResponse>(new CommandDefinition(
+            $"{BankTransferResponse.Select} WHERE t.id = @BankTransferId",
+            new { query.BankTransferId },
+            cancellationToken: cancellationToken));
+
+        if (transfer is null)
+        {
+            return Result.Failure<BankTransferResponse>(BankTransferErrors.NotFound(query.BankTransferId));
+        }
+
+        Result access = await branchAccess.EnsureAccessAsync(transfer.BranchId, cancellationToken);
+
+        return access.IsSuccess ? transfer : Result.Failure<BankTransferResponse>(access.Error);
     }
 }
 

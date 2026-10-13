@@ -109,6 +109,17 @@ public sealed class MasterDataTests
     }
 
     [Fact]
+    public void Item_Should_RoundBaseQuantities_ToTheStoredScale()
+    {
+        var kg = Guid.NewGuid();
+        var sak = Guid.NewGuid();
+        var feed = Item.Create("PKN-BR1", "Pakan BR-1", ItemCategory.Feed, kg, null);
+        feed.SetConversions([(sak, 0.333333m)]);
+
+        feed.ConvertToBase(sak, 1.5555m).Value.ShouldBe(0.5185m);
+    }
+
+    [Fact]
     public void Item_Should_RejectConversionToBaseUnit()
     {
         var kg = Guid.NewGuid();

@@ -229,6 +229,16 @@ public static class Permissions
     public const string SystemOutbox = "system:outbox";
 
     /// <summary>
+    /// The Admin Office dashboard: pending work per module, the month's figures and the failed event count.
+    /// </summary>
+    public const string DashboardRead = "dashboard:read";
+
+    /// <summary>
+    /// Read the audit log (sign-ins, data changes, exports).
+    /// </summary>
+    public const string AuditLogsRead = "audit-logs:read";
+
+    /// <summary>
     /// Upload attachments (lampiran: foto/dokumen) to be attached to masters and transactions.
     /// </summary>
     public const string AttachmentsUpload = "attachments:upload";
@@ -331,6 +341,8 @@ public static class Permissions
         SettlementsApprove,
         TaxReportsRead,
         SystemOutbox,
+        DashboardRead,
+        AuditLogsRead,
         AttachmentsUpload,
         AttachmentsRead,
         AttachmentsDelete,

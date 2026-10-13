@@ -92,6 +92,6 @@ public sealed class Item : AggregateRoot
 
         return conversion is null
             ? Result.Failure<decimal>(ItemErrors.UnknownUom(Id, uomId))
-            : quantity * conversion.Factor;
+            : Quantities.Round(quantity * conversion.Factor);
     }
 }

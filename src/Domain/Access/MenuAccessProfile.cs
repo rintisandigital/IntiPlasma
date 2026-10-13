@@ -77,9 +77,13 @@ public sealed class MenuAccessProfile : AggregateRoot
     {
         ArgumentNullException.ThrowIfNull(menus);
 
+        var supported = menus.ToDictionary(m => m.Id, m => m.SupportedRights);
+
+        // Rights a menu no longer supports (its catalog entry changed) are dropped instead of failing the copy.
         IEnumerable<MenuAccessGrant> grants = IsSystem
             ? menus.Where(m => !m.IsGroup).Select(m => new MenuAccessGrant(m.Id, m.SupportedRights))
-            : _items.Select(i => new MenuAccessGrant(i.MenuId, i.Rights));
+            : _items.Select(i => new MenuAccessGrant(
+                i.MenuId, supported.TryGetValue(i.MenuId, out MenuRights rights) ? i.Rights & rights : i.Rights));
 
         return Create(name, Description, grants, menus);
     }

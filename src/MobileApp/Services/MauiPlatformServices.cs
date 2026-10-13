@@ -99,11 +99,15 @@ internal sealed class MauiAppSettings : IAppSettings
 internal static class ServerDefaults
 {
 #if DEBUG
-    public static string ServerUrl =>
+    public static string ServerUrl => 
+        //"https://apifarm.rintisandigital.id/";
         DeviceInfo.Current.Platform == DevicePlatform.Android ? "http://10.0.2.2:5000/" : "http://localhost:5000/";
+        // DeviceInfo.Current.Platform == DevicePlatform.Android ? "https://apifarm.rintisandigital.id/" : "http://localhost:5000/";
 #else
     // TODO (M10): production address of Web.Api (HTTPS).
-    public static string ServerUrl => "https://api.intiplasma.example/";
+    // public static string ServerUrl => "https://api.intiplasma.example/";
+    public static string ServerUrl => "https://apifarm.rintisandigital.id/";
+    
 #endif
 }
 

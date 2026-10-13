@@ -186,6 +186,17 @@ internal sealed class CashBankEndpoints : IEndpoint
         })
         .HasPermission(Permissions.CashBankRead);
 
+        group.MapGet("bank-transfers/{bankTransferId:guid}", async (
+            Guid bankTransferId,
+            IQueryHandler<GetBankTransferByIdQuery, BankTransferResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<BankTransferResponse> result = await handler.Handle(new GetBankTransferByIdQuery(bankTransferId), cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.CashBankRead);
+
         group.MapPost("bank-transfers", async (
             CreateBankTransferCommand command,
             ICommandHandler<CreateBankTransferCommand, CreateBankTransferResponse> handler,

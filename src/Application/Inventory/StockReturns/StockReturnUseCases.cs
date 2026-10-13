@@ -3,6 +3,7 @@ using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Numbering;
 using Application.Documents;
+using Application.Finance.Journals;
 using Application.Inventory.StockTransfers;
 using Domain.Common;
 using Domain.Documents.Attachments;
@@ -194,6 +195,13 @@ internal sealed class CreateStockReturnCommandHandler(
         if (validation.IsFailure)
         {
             return Result.Failure<StockReturnDraft>(validation.Error);
+        }
+
+        // The journal is posted from the outbox; reject a closed period now rather than dead-letter it later.
+        Result period = await JournalSupport.EnsurePeriodOpenAsync(context, returnDate, cancellationToken);
+        if (period.IsFailure)
+        {
+            return Result.Failure<StockReturnDraft>(period.Error);
         }
 
         return new StockReturnDraft(from, to, cycleId.Value.Value, returnDate, reason, notes, lines);

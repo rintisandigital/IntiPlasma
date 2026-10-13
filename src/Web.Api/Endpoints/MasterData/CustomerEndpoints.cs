@@ -6,6 +6,7 @@ using Application.Customers.Create;
 using Application.Customers.Get;
 using Application.Customers.GetById;
 using Application.Customers.Update;
+using Application.Sales;
 using Domain.Roles;
 using SharedKernel;
 using Web.Api.Extensions;
@@ -54,6 +55,20 @@ internal sealed class CustomerEndpoints : IEndpoint
             return result.Match(Results.Ok, CustomResults.Problem);
         })
         .HasPermission(Permissions.MasterDataRead);
+
+        // Credit limit, exposure (open invoices, uninvoiced deliveries, open orders) and what is still available.
+        group.MapGet("{customerId:guid}/credit", async (
+            Guid customerId,
+            Guid? excludeSalesOrderId,
+            IQueryHandler<GetCustomerCreditQuery, CustomerCreditResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<CustomerCreditResponse> result = await handler.Handle(
+                new GetCustomerCreditQuery(customerId, excludeSalesOrderId), cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.SalesRead);
 
         group.MapPost("", async (
             CreateCustomerCommand command,

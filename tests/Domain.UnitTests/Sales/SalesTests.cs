@@ -355,6 +355,27 @@ public sealed class SalesTests
         invoice.Lines.Single().CreditableAmount.ShouldBe(new Money(39_000_000m));
     }
 
+    [Fact]
+    public void CreditNoteVoid_Should_GiveTheCreditBackToTheInvoice_Once()
+    {
+        SalesInvoice invoice = PostedInvoice();
+        SalesCreditNote creditNote = SalesCreditNote.Create("CN/1", invoice, OrderDate, "susut", [(1, new Money(40_000_000m))]).Value;
+        invoice.ApplyCreditNote([(1, creditNote.Lines.Single().Amount)], creditNote.Total);
+        invoice.Status.ShouldBe(SalesInvoiceStatus.Paid);
+
+        creditNote.Void(OrderDate.AddDays(-1), "salah input", invoice).Error.ShouldBe(SalesCreditNoteErrors.VoidBeforeDate);
+
+        creditNote.Void(OrderDate.AddDays(2), "salah input", invoice).IsSuccess.ShouldBeTrue();
+
+        creditNote.Status.ShouldBe(SalesCreditNoteStatus.Voided);
+        creditNote.VoidDate.ShouldBe(OrderDate.AddDays(2));
+        invoice.Status.ShouldBe(SalesInvoiceStatus.Posted);
+        invoice.Outstanding.ShouldBe(new Money(40_000_000m));
+        invoice.Lines.Single().CreditableAmount.ShouldBe(new Money(40_000_000m));
+        creditNote.DomainEvents.OfType<SalesCreditNoteVoidedDomainEvent>().ShouldHaveSingleItem();
+        creditNote.Void(OrderDate.AddDays(2), "lagi", invoice).Error.ShouldBe(SalesCreditNoteErrors.Voided(creditNote.Id));
+    }
+
     private static SalesInvoice PostedInvoice()
     {
         DeliveryOrder delivery = Deliver(ApprovedOrder(), Harvest(1_000, 2_000m));

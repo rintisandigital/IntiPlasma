@@ -22,6 +22,8 @@ internal sealed class SalesEndpoints : IEndpoint
 
     public sealed record ReasonRequest(string Reason);
 
+    public sealed record VoidRequest(DateOnly Date, string Reason);
+
     public void MapEndpoint(IEndpointRouteBuilder app)
     {
         MapSalesOrders(app.MapGroup("sales/orders").WithTags(Tags.SalesOrders));
@@ -57,6 +59,30 @@ internal sealed class SalesEndpoints : IEndpoint
         })
         .HasPermission(Permissions.SalesInvoice)
         .WithIdempotency();
+
+        group.MapGet("{salesCreditNoteId:guid}", async (
+            Guid salesCreditNoteId,
+            IQueryHandler<GetSalesCreditNoteByIdQuery, SalesCreditNoteResponse> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<SalesCreditNoteResponse> result = await handler.Handle(new GetSalesCreditNoteByIdQuery(salesCreditNoteId), cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.SalesRead);
+
+        group.MapPost("{salesCreditNoteId:guid}/void", async (
+            Guid salesCreditNoteId,
+            VoidRequest request,
+            ICommandHandler<VoidSalesCreditNoteCommand> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result result = await handler.Handle(
+                new VoidSalesCreditNoteCommand(salesCreditNoteId, request.Date, request.Reason), cancellationToken);
+
+            return result.Match(Results.NoContent, CustomResults.Problem);
+        })
+        .HasPermission(Permissions.SalesInvoice);
     }
 
     private static void MapSalesOrders(RouteGroupBuilder group)

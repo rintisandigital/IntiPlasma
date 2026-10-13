@@ -8,7 +8,7 @@ namespace Domain.Sales.CreditNotes;
 /// Nota kredit / retur penjualan on a posted sales invoice: reduces invoice lines (excluding VAT) for a price or weight
 /// correction, with the VAT reduced proportionally at the line's rate. It lowers the invoice's outstanding (never
 /// below zero) and journals Dr potongan &amp; retur penjualan and Dr PPN keluaran / Cr piutang usaha.
-/// Posted on creation.
+/// Posted on creation; a void gives the credit back to the invoice and reverses the journal on the void date.
 /// </summary>
 public sealed class SalesCreditNote : AggregateRoot
 {
@@ -32,6 +32,9 @@ public sealed class SalesCreditNote : AggregateRoot
     public Money Subtotal { get; private set; } = new(0m);
     public Money VatAmount { get; private set; } = new(0m);
     public Money Total { get; private set; } = new(0m);
+    public SalesCreditNoteStatus Status { get; private set; }
+    public DateOnly? VoidDate { get; private set; }
+    public string? VoidReason { get; private set; }
     public IReadOnlyCollection<SalesCreditNoteLine> Lines => [.. _lines];
 
     /// <summary>
@@ -67,7 +70,8 @@ public sealed class SalesCreditNote : AggregateRoot
             CustomerId = invoice.CustomerId,
             SalesInvoiceId = invoice.Id,
             Date = date,
-            Reason = reason.Trim()
+            Reason = reason.Trim(),
+            Status = SalesCreditNoteStatus.Posted
         };
 
         foreach ((int lineNumber, Money amount) in lines)
@@ -101,6 +105,46 @@ public sealed class SalesCreditNote : AggregateRoot
 
         return creditNote;
     }
+
+    /// <summary>
+    /// Voids the credit note: the credited amounts go back to the invoice (its outstanding grows again) and the
+    /// journal is reversed on the void date.
+    /// </summary>
+    /// <param name="invoice">The credited invoice (tracked).</param>
+    public Result Void(DateOnly date, string reason, SalesInvoice invoice)
+    {
+        ArgumentNullException.ThrowIfNull(invoice);
+
+        if (Status != SalesCreditNoteStatus.Posted)
+        {
+            return Result.Failure(SalesCreditNoteErrors.Voided(Id));
+        }
+
+        if (date < Date)
+        {
+            return Result.Failure(SalesCreditNoteErrors.VoidBeforeDate);
+        }
+
+        Result reversed = invoice.ReverseCreditNote([.. _lines.Select(l => (l.InvoiceLineNumber, l.Amount))], Total);
+        if (reversed.IsFailure)
+        {
+            return reversed;
+        }
+
+        Status = SalesCreditNoteStatus.Voided;
+        VoidDate = date;
+        VoidReason = reason.Trim();
+
+        Raise(new SalesCreditNoteVoidedDomainEvent(Id));
+
+        return Result.Success();
+    }
+}
+
+public enum SalesCreditNoteStatus
+{
+    Posted = 1,
+    Voided = 9
 }
 
 public sealed class SalesCreditNoteLine
@@ -136,6 +180,8 @@ public sealed class SalesCreditNoteLine
 
 public sealed record SalesCreditNotePostedDomainEvent(Guid SalesCreditNoteId) : DomainEvent;
 
+public sealed record SalesCreditNoteVoidedDomainEvent(Guid SalesCreditNoteId) : DomainEvent;
+
 public static class SalesCreditNoteErrors
 {
     public static Error NotFound(Guid salesCreditNoteId) => Error.NotFound(
@@ -161,6 +207,14 @@ public static class SalesCreditNoteErrors
     public static readonly Error BeforeInvoiceDate = Error.Problem(
         "SalesCreditNotes.BeforeInvoiceDate",
         "The credit note date cannot be before the invoice date");
+
+    public static Error Voided(Guid salesCreditNoteId) => Error.Problem(
+        "SalesCreditNotes.Voided",
+        $"The credit note with the Id = '{salesCreditNoteId}' is voided");
+
+    public static readonly Error VoidBeforeDate = Error.Problem(
+        "SalesCreditNotes.VoidBeforeDate",
+        "A credit note cannot be voided before its date");
 
     public static readonly Error InvalidLines = Error.Problem(
         "SalesCreditNotes.InvalidLines",

@@ -3,6 +3,7 @@ using Application.Abstractions.Data;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Numbering;
 using Application.Documents;
+using Application.Finance.Journals;
 using Domain.Documents.Attachments;
 using Domain.Inventory.StockTransfers;
 using Domain.MasterData.Items;
@@ -163,6 +164,17 @@ internal sealed class CreateStockTransferCommandHandler(
         if (validation.IsFailure)
         {
             return Result.Failure<StockTransferDraft>(validation.Error);
+        }
+
+        // Only a transfer to a cycle is journaled (from the outbox); reject a closed period now rather than
+        // dead-letter it later.
+        if (cycleId.Value is not null)
+        {
+            Result period = await JournalSupport.EnsurePeriodOpenAsync(context, transferDate, cancellationToken);
+            if (period.IsFailure)
+            {
+                return Result.Failure<StockTransferDraft>(period.Error);
+            }
         }
 
         return new StockTransferDraft(from, to, cycleId.Value, transferDate, notes, lines);

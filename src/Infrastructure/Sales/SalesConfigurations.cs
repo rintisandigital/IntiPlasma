@@ -165,6 +165,11 @@ internal sealed class SalesCreditNoteConfiguration : IEntityTypeConfiguration<Sa
         builder.HasKey(n => n.Id);
         builder.Property(n => n.Number).HasMaxLength(50);
         builder.Property(n => n.Reason).HasMaxLength(500);
+        builder.Property(n => n.VoidReason).HasMaxLength(500);
+
+        // Credit notes recorded before voiding existed are posted.
+        builder.Property(n => n.Status).HasDefaultValue(SalesCreditNoteStatus.Posted).HasSentinel((SalesCreditNoteStatus)0);
+
         builder.ComplexMoney(n => n.Subtotal, "subtotal");
         builder.ComplexMoney(n => n.VatAmount, "vat_amount");
         builder.ComplexMoney(n => n.Total, "total");

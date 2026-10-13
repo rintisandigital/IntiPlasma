@@ -12,7 +12,8 @@ namespace Application.Finance.FiscalPeriods;
 
 /// <summary>
 /// Penutupan tahun buku. When December is closed, one closing journal per branch brings every revenue and expense
-/// account of the year to zero against retained earnings (the credit account of the <c>YearEndClosing</c> mapping).
+/// account of the year to zero against retained earnings (the credit account of the <c>YearEndClosing</c> mapping of
+/// the branch, else the company default).
 /// Reopening December reverses those journals.
 /// </summary>
 internal static class YearEndClosing
@@ -29,18 +30,14 @@ internal static class YearEndClosing
         DateTime utcNow,
         CancellationToken cancellationToken)
     {
-        Guid? retainedEarnings = await context.JournalMappings.AsNoTracking()
-            .Where(m => m.EventType == AccountingEvents.YearEndClosing && m.BranchId == null && m.IsActive)
-            .SelectMany(m => m.Lines)
+        // A branch-specific mapping wins over the company default, as for every other automatic journal.
+        var retainedEarningsAccounts = await context.JournalMappings.AsNoTracking()
+            .Where(m => m.EventType == AccountingEvents.YearEndClosing && m.IsActive)
+            .SelectMany(m => m.Lines, (m, l) => new { m.BranchId, l.Component, l.CreditAccountId })
             .Where(l => l.Component == "NetIncome")
-            .Select(l => (Guid?)l.CreditAccountId)
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
 
-        if (retainedEarnings is null)
-        {
-            return Result.Failure<IReadOnlyList<JournalEntry>>(
-                JournalMappingErrors.NotConfigured(AccountingEvents.YearEndClosing, Guid.Empty));
-        }
+        Guid? companyRetainedEarnings = retainedEarningsAccounts.Find(a => a.BranchId == null)?.CreditAccountId;
 
         var yearStart = new DateOnly(december.Year, 1, 1);
         DateOnly yearEnd = december.EndDate;
@@ -56,13 +53,34 @@ internal static class YearEndClosing
                 (l, _) => l)
             .ToListAsync(cancellationToken);
 
+        List<IGrouping<Guid, (Guid BranchId, Guid AccountId, decimal Balance)>> branches =
+        [
+            .. balances
+                .GroupBy(b => (b.BranchId, b.AccountId))
+                .Select(g => (g.Key.BranchId, g.Key.AccountId, Balance: g.Sum(b => b.Debit - b.Credit)))
+                .Where(b => b.Balance != 0m)
+                .GroupBy(b => b.BranchId)
+        ];
+
+        // Resolved for every branch before any journal number is taken.
+        var retainedEarnings = new Dictionary<Guid, Guid>();
+        foreach (Guid branchId in branches.Select(b => b.Key))
+        {
+            Guid? account = retainedEarningsAccounts.Find(a => a.BranchId == branchId)?.CreditAccountId
+                            ?? companyRetainedEarnings;
+
+            if (account is null)
+            {
+                return Result.Failure<IReadOnlyList<JournalEntry>>(
+                    JournalMappingErrors.NotConfigured(AccountingEvents.YearEndClosing, branchId));
+            }
+
+            retainedEarnings[branchId] = account.Value;
+        }
+
         var journals = new List<JournalEntry>();
 
-        foreach (IGrouping<Guid, (Guid BranchId, Guid AccountId, decimal Balance)> branch in balances
-                     .GroupBy(b => (b.BranchId, b.AccountId))
-                     .Select(g => (g.Key.BranchId, g.Key.AccountId, Balance: g.Sum(b => b.Debit - b.Credit)))
-                     .Where(b => b.Balance != 0m)
-                     .GroupBy(b => b.BranchId))
+        foreach (IGrouping<Guid, (Guid BranchId, Guid AccountId, decimal Balance)> branch in branches)
         {
             // Close each account by posting its balance on the opposite side.
             List<JournalLineInput> lines =
@@ -77,8 +95,8 @@ internal static class YearEndClosing
             if (netIncome != 0m)
             {
                 lines.Add(netIncome > 0
-                    ? JournalLineInput.CreditLine(retainedEarnings.Value, new Money(netIncome))
-                    : JournalLineInput.DebitLine(retainedEarnings.Value, new Money(-netIncome)));
+                    ? JournalLineInput.CreditLine(retainedEarnings[branch.Key], new Money(netIncome))
+                    : JournalLineInput.DebitLine(retainedEarnings[branch.Key], new Money(-netIncome)));
             }
 
             Result<JournalEntry> journal = JournalEntry.CreateAutomatic(

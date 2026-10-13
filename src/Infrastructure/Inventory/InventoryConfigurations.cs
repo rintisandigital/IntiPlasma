@@ -18,7 +18,7 @@ namespace Infrastructure.Inventory;
 internal static class InventoryPrecision
 {
     public const int Quantity = 18;
-    public const int QuantityScale = 4;
+    public const int QuantityScale = Domain.Common.Quantities.Decimals;
     public const int UnitCost = 18;
 }
 

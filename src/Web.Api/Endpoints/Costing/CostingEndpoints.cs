@@ -49,6 +49,20 @@ internal sealed class CostingEndpoints : IEndpoint
         .WithTags(Tags.CycleCost)
         .HasPermission(Permissions.CostingRead);
 
+        app.MapGet("costing/settleable-cycles", async (
+            string? search,
+            Guid? branchId,
+            IQueryHandler<GetSettleableCyclesQuery, IReadOnlyList<SettleableCycleResponse>> handler,
+            CancellationToken cancellationToken) =>
+        {
+            Result<IReadOnlyList<SettleableCycleResponse>> result = await handler.Handle(
+                new GetSettleableCyclesQuery(search, branchId), cancellationToken);
+
+            return result.Match(Results.Ok, CustomResults.Problem);
+        })
+        .WithTags(Tags.PlasmaSettlements)
+        .HasPermission(Permissions.CostingRead);
+
         app.MapGet("costing/farmers/{farmerId:guid}/plasma-debt", async (
             Guid farmerId,
             IQueryHandler<GetFarmerPlasmaDebtQuery, FarmerPlasmaDebtResponse> handler,

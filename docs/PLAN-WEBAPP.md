@@ -566,7 +566,7 @@ Seluruh keputusan W-1 s.d. W-20 sudah disepakati (lihat §1). Keputusan baru yan
 | Master Data (`ti-database`) | `master.uoms`, `master.tax-codes`, `master.items`, `master.warehouses`, `master.vendors`, `master.customers` | UoM, Tax Codes, Items, Warehouses, Vendors, Customers | C E D X | W2 |
 | Partnership (`ti-users-group`) | `partnership.farmers`, `partnership.coops`, `partnership.contracts` | Farmers, Coops, Contracts | C E D X | W2 |
 | Procurement (`ti-shopping-cart`) | `procurement.purchase-orders` | Purchase Orders | C E D X | W4 |
-| Inventory (`ti-building-warehouse`) | `inventory.goods-receipts`, `inventory.stock-transfers`, `inventory.stock-returns`, `inventory.feed-mutations` | Goods Receipts, Transfers, Returns, Feed Mutations | C X | W4 |
+| Inventory (`ti-building-warehouse`) | `inventory.goods-receipts`, `inventory.stock-transfers`, `inventory.stock-returns`, `inventory.feed-mutations` | Goods Receipts, Transfers, Returns, Feed Mutations | C X (Feed Mutations: C — audit 2026-10-13) | W4 |
 | | `inventory.stock` | Stock Balance & Card | X | W4 |
 | Production (`ti-egg`) | `production.cycles`, `production.recordings`, `production.harvests` | Cycles & Chick-in, Daily Recordings, Harvests | C E X | W5 |
 | Sales (`ti-receipt`) | `sales.orders`, `sales.invoices` | Sales Orders, Sales Invoices | C E D X | W6 |
@@ -581,10 +581,10 @@ Seluruh keputusan W-1 s.d. W-20 sudah disepakati (lihat §1). Keputusan baru yan
 | Costing (`ti-calculator`) | `costing.cycle-costs` | Cycle Cost | X | W8 |
 | | `costing.settlements` | Plasma Settlements | C E X | W8 |
 | Reports (`ti-report-analytics`) | `reports.general-ledger`, `reports.trial-balance`, `reports.income-statement`, `reports.balance-sheet`, `reports.cash-flow`, `reports.profitability`, `reports.tax` | GL, Trial Balance, Income Statement, Balance Sheet, Cash Flow, Profitability, Tax Recap | X | W9 |
-| Administration (`ti-settings`) | `admin.users` | Users | C E D X | W1 |
-| | `admin.menu-access`, `admin.branch-access` | Menu Access, Branch Access | C E D X | W1 |
+| Administration (`ti-settings`) | `admin.users` | Users | C E D (X dihapus, audit 2026-10-13) | W1 |
+| | `admin.menu-access`, `admin.branch-access` | Menu Access, Branch Access | C E D (X dihapus, audit 2026-10-13) | W1 |
 | | `admin.menus` | Menus | E | W1 |
-| | `admin.api-roles`, `admin.branches` | API Roles, Branches | C E X | W1 |
+| | `admin.api-roles`, `admin.branches` | API Roles, Branches | C E (X dihapus, audit 2026-10-13) | W1 |
 | | `admin.failed-events` | Failed Events | E | W9 |
 
 Halaman "Change Password" tetap di menu user (`[AuthenticatedOnly]`), bukan bagian katalog.

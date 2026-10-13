@@ -1,7 +1,7 @@
 # Rangkuman Proyek — Aplikasi Peternakan Ayam Broiler Inti-Plasma
 
 > Rangkuman poin penting dari sesi pengembangan 2026-09-30 (Fase 0 s.d. Fase 4), 2026-10-01 (Fase 5–8), 2026-10-02 (Fase 9 — lampiran dokumen; Fase W0 — fondasi WebApp), 2026-10-03 (Fase W1–W8) dan 2026-10-04 (Fase W9–W10).
-> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§16 (API) dan [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (WebApp, realisasi W0 di §10, W1 di §12, W2 di §13, W3 di §14, W4 di §15, W5 di §16, W6 di §17, W7 di §18, W8 di §20, W9 di §22, W10 di §24). Fase API 0–9 dan **W0–W10 selesai** (rencana awal WebApp tuntas); berikutnya dipilih dari backlog §9.
+> Detail lengkap per fase ada di [PLAN.md](PLAN.md) §6–§17 (API; §17 = perbaikan temuan audit) dan [PLAN-WEBAPP.md](PLAN-WEBAPP.md) (WebApp, realisasi W0 di §10, W1 di §12, W2 di §13, W3 di §14, W4 di §15, W5 di §16, W6 di §17, W7 di §18, W8 di §20, W9 di §22, W10 di §24). Fase API 0–9 dan **W0–W10 selesai** (rencana awal WebApp tuntas); berikutnya dipilih dari backlog §9.
 
 ---
 
@@ -246,7 +246,7 @@
 
 
 ### Fase M3 — Stok Ayam Harian (offline) ✅ (2026-10-09; detail: PLAN-MOBILE §17–§18)
-- Migration **`PhaseM3_LiveBirdStock`**: `master.weight_ranges` (global, batas [min, maks) kg, tidak tumpang tindih antar rentang aktif) dan `production.live_bird_stock_entries` (unik siklus + tanggal + rentang). **Belum di-migrate.**
+- Migration **`PhaseM3_LiveBirdStock`**: `master.weight_ranges` (global, batas [min, maks) kg, tidak tumpang tindih antar rentang aktif) dan `production.live_bird_stock_entries` (unik siklus + tanggal + rentang). Sudah di-migrate.
 - API: `GET weight-ranges`, `POST production/live-bird-stocks` (upsert per rentang, idempotent), `DELETE …/{id}` (hari ini/kemarin), `GET …?cycleId|branchId&date|from&to`, `GET …/summary?date&branchId` (entri tanggal lapor terakhir ≤ tanggal pilih, data > 1 hari = basi). Field-context + rentang aktif & laporan terakhir per siklus.
 - Web.App: **Master Data → Weight Ranges**, **Production → Live Bird Stock** (rekap rentang & kandang, ekspor Excel/PDF). Demo data: 5 rentang + stok 3 hari terakhir.
 - Mobile: PPL input stok per kandang & tanggal (offline, validasi rata-rata & populasi, salin dari laporan terakhir, hapus online), riwayat per siklus, item stok di Antrean; Manager tab **Stok Ayam** = rekap cabang + drill-down kandang.
@@ -255,17 +255,24 @@
 - API: `GET mobile/dashboard?date&branchId` (lingkup PPL/cabang; per siklus berjalan: performa kumulatif, status recording & stok ayam hari ini, stok pakan + rata-rata 3 recording terakhir + estimasi sisa hari, flag `RecordingLate`/`FeedLow`/`HighDepletion`/`NoStockReport`; KPI gabungan). Ambang di `Mobile:Dashboard`. Akumulasi harian `performance` dipindah ke `CyclePerformanceBuilder` (dipakai bersama). Tidak ada migration.
 - Mobile: **Beranda** PPL (tugas hari ini + antrean lokal, kandang saya, stok pakan) & Manager (KPI cabang, siklus berisiko, stok ayam per rentang), offline dari cache; **Grafik Produksi** (Chart.js 4.5 lokal): BW, deplesi, FCR, pakan, mati, IP — harian/mingguan (minggu = umur 7n−6…7n), recording belum terkirim putus-putus (rumus diporting ke Core), bandingkan ≤ 3 siklus. Logo header Beranda tidak lagi gepeng.
 ### Fase M5 — Breed Standard ✅ (2026-10-11; detail: PLAN-MOBILE §21–§22)
-- Migration **`PhaseM5_BreedStandard`**: `master.breed_standards` + `master.breed_standard_rows` (per umur 0–70: BW g, FCR, deplesi %, pakan harian & kumulatif g/ekor), `production_cycles.breed_standard_id` dan `closing_standard` (jsonb, salinan standar saat Close). **Belum di-migrate.**
+- Migration **`PhaseM5_BreedStandard`**: `master.breed_standards` + `master.breed_standard_rows` (per umur 0–70: BW g, FCR, deplesi %, pakan harian & kumulatif g/ekor), `production_cycles.breed_standard_id` dan `closing_standard` (jsonb, salinan standar saat Close). Sudah di-migrate.
 - Standar efektif siklus = salinan saat tutup → standar siklus → standar **default**; umur di antara baris diinterpolasi linear. Ambang "di bawah standar" di `Production:Standard` (BW −5%, FCR +0,05, deplesi +1 poin); BW & FCR hanya dinilai pada hari penimbangan.
 - API: `GET breed-standards`, `GET breed-standards/{id}`, `PUT cycles/{id}/breed-standard` (`cycles:manage`), `POST cycles` menerima `breedStandardId`; `cycles/{id}/performance` menambah `standard` (kurva + ambang), `standardStatus`, `days[].standard/deviation`; dashboard menambah flag `BelowStandard`, `cycles[].standard`, KPI `cyclesBelowStandard`.
 - Web.App: **Master Data → Breed Standards** (form + tabel baris, impor/ekspor CSV, default), standar di form Plan, **Change standard** & garis/kolom standar di tab Performance. Demo data: standar `CP707-CONTOH` (angka ilustrasi).
 - Mobile: garis standar di Grafik (BW, deplesi, FCR, pakan; harian/mingguan; diperpanjang 7 hari ke depan), kartu standar + badge "Di bawah standar" (termasuk recording yang belum terkirim, dihitung di perangkat), kolom Std/Dev di tabel; Beranda PPL "vs standar", Manager KPI "Di bawah standar x/y".
 ### Fase M6 — Modul Approval Berjenjang ✅ (2026-10-12; detail: PLAN-MOBILE §23–§24)
-- Migration **`PhaseM6_ApprovalWorkflow`**: schema `approval` (alur, level, pengajuan + salinan level, keputusan, delegasi), `registration_status` farmer & coop (+ `pending_change` farmer), data lama `Approved`. **Belum di-migrate.**
+- Migration **`PhaseM6_ApprovalWorkflow`**: schema `approval` (alur, level, pengajuan + salinan level, keputusan, delegasi), `registration_status` farmer & coop (+ `pending_change` farmer), data lama `Approved`. Sudah di-migrate.
 - Approval berjenjang untuk **peternak baru, perubahan NIK/rekening, kandang baru, aktivasi kontrak**: alur default + alur cabang, 1–5 level bernama bebas, salah satu approver per level cukup, berurutan, tolak wajib alasan, pengaju bisa batal (→ Draft), ditolak → perbaiki → ajukan ulang dari level 1. Create peternak/kandang = simpan + ajukan; tanpa alur → *"Alur approval belum dikonfigurasi …"*. Kontrak: Submit menggantikan Activate (`contracts/{id}/activate` dihapus). Gudang `GK-` dibuat saat kandang disetujui. Delegasi (cuti, a.n.), Replace approver massal, penanda Stuck.
 - API: `approvals/*` (inbox, count, mine, detail, approve/reject/cancel, delegations), `farmers|coops|contracts/{id}/submit` & `/approvals`; dashboard mobile + `approvals`.
 - Web.App: grup **Approvals** (Inbox, Requests, Delegations), **Administration → Approval Flows** (+ Replace approver), setup alur di **Create Branch**, kartu Approval di Farmers/Coops/Contracts, badge header & dashboard. Perbaikan: halaman area dibuka langsung tidak lagi 404.
 - Mobile: Inbox Approval, Detail + Setujui/Tolak, Pengajuan Saya, Delegasi Approval, tab Approval + banner di Peternak/Kandang/Kontrak, badge bottom bar, kartu Beranda. Demo data: user `kacab`, alur default 2 level, contoh Pending & Rejected.
+
+### Perbaikan Temuan Audit 2026-10-04 ✅ (2026-10-13; detail: PLAN §17)
+- Migration **`CreditNote_Void`**: `status`/`void_date`/`void_reason` di `sales.sales_credit_notes` (data lama `Posted`). **Belum di-migrate.**
+- ⚠️ BPB, transfer ke siklus, retur, mutasi pakan, penerimaan customer, penerapan uang muka, transfer bank dan tutup siklus (bila ada penyesuaian HPP) kini **ditolak bila periode fiskal tidak ada/ditutup** (`FiscalPeriods.NotFoundForDate`/`Closed`) — buka tahun fiskal sebelum bertransaksi.
+- Nota kredit: halaman/endpoint detail + **Void** (kredit kembali ke invoice, jurnal dibalik). Transfer bank: halaman/endpoint detail. Jurnal kedua dokumen kini bertaut ke sumbernya.
+- API baru: `customers/{id}/credit`, `costing/settleable-cycles`, `finance/journals/by-source`, `dashboard?asOf=` (`dashboard:read`), `audit-logs` (`audit-logs:read`), `sales/credit-notes/{id}` (+ `/void`), `finance/bank-transfers/{id}`. Parameter wajib hilang/salah format kini 400, bukan 500.
+- Tutup tahun memakai mapping laba ditahan per cabang. Hak Export dicabut dari 6 menu yang tidak punya ekspor (+ test arsitektur). `Item.ConvertToBase` dibulatkan 4 desimal. `?modifiedSince=` dan `Quantity` ditutup dengan alasan.
 
 ## 5. Alur Akuntansi yang Sudah Berjalan
 
@@ -352,13 +359,13 @@ Semua event di katalog kini sudah dipakai.
 
 - Setiap fase: domain + unit test invariant → command/query + validator → EF config + migration → endpoint + permission → **verifikasi end-to-end** ke PostgreSQL lokal pada database sementara `intiplasma_verify` (dibuat & dihapus otomatis; database `intiplasma` milik user tidak disentuh).
 - User yang melakukan **commit & migrate** setelah tiap fase.
-- Status test saat ini: **700 test lulus** (194 domain, 114 application, 14 arsitektur, 140 MobileApp.UnitTests, 50 integration Web.Api, 188 integration Web.App).
+- Status test saat ini: **709 test lulus** (197 domain, 116 application, 15 arsitektur, 140 MobileApp.UnitTests, 53 integration Web.Api, 188 integration Web.App).
 - Verifikasi mobile (M0): emulator Android **API 34** (`intiplasma_api34`; image API 26 terlalu tua untuk WebView) + Web.Api `:5000` pada `intiplasma_verify`, diarahkan dengan `adb` (tap/teks/screencap). Integration test butuh mesin Podman berjalan (`podman machine start`).
 - Integration test (Testcontainers) **sudah bisa dijalankan** di mesin dev (container runtime tersedia) — `dotnet test IntiPlasma.slnx`.
 - Verifikasi end-to-end (Fase 5: 43 skenario, Fase 6: 70 skenario, Fase 7: 32 skenario, Fase 8: 35 skenario, Fase 9: 79 skenario) memakai script Node (fetch + psql) terhadap API di port 5099 dengan `ConnectionStrings__Database` diarahkan ke `intiplasma_verify`. Skenario maker-checker memakai user kedua (role `Checker`) yang dibuat lewat API.
 - ⚠️ Sejak W0 Web.Api tidak memproses outbox: verifikasi yang hanya menjalankan API perlu `BackgroundJobs__Enabled=true`.
 - Verifikasi WebApp (W0: 49 skenario, W1: 36 skenario, W2: 40 skenario, W3: 48 skenario, W4: 51 skenario, W5: 42 skenario, W6: 42 skenario, W7: 62 skenario, W8: 44 skenario, W9: 44 skenario, W10: 53 + 7 restart/rate-limit + 20 container + regresi W0–W9) memakai **Playwright** (dipasang di scratchpad, bukan di repo) terhadap Web.App :5098 + Web.Api :5099 pada `intiplasma_verify`; interaksi halaman lewat frame `content-frame`.
-- Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`, `Phase8_ReportingClosing`, `Phase9_Attachments`, `PhaseW0_UserStatus`, `PhaseW1_AccessControl`, `PhaseW10_Hardening`, `Coop_Profile`, `PhaseM1_FieldOfficerScope`, `PhaseM3_LiveBirdStock`, `PhaseM5_BreedStandard`, `PhaseM6_ApprovalWorkflow`.
+- Migration yang ada: `Initial`, `Phase1_MasterData_Partnership`, `Phase2_FinanceCore`, `Phase3_ProcurementInventory`, `Phase4_Production`, `Phase5_SalesReceivables`, `Phase6_PayablesCashBank`, `Phase7_CostingSettlement`, `Phase8_ReportingClosing`, `Phase9_Attachments`, `PhaseW0_UserStatus`, `PhaseW1_AccessControl`, `PhaseW10_Hardening`, `Coop_Profile`, `PhaseM1_FieldOfficerScope`, `PhaseM3_LiveBirdStock`, `PhaseM5_BreedStandard`, `PhaseM6_ApprovalWorkflow`, `CreditNote_Void`.
 
 ## 8. Catatan Terbuka / Hutang Teknis
 
@@ -379,16 +386,8 @@ Semua event di katalog kini sudah dipakai.
 - Bila Web.App mati, event outbox (jurnal otomatis, gudang kandang) tertunda sampai Web.App hidup lagi. (Key ring Data Protection sudah di PostgreSQL sejak W10.)
 - Audit log tanpa retensi/purge otomatis. Tombol primer `#0984E3` belum memenuhi kontras AA (keputusan W10).
 - Siklus lama yang ditutup sebelum Fase 7 tidak punya `ClosingCost`; invoice lama punya `costAmount` 0 (tidak ada penyesuaian HPP untuk siklus tersebut).
-- **Temuan audit 2026-10-04** (belum diperbaiki):
-  - **Tutup siklus** juga tidak mengecek periode fiskal; jurnal `CycleCostAdjustment` bisa jatuh ke dead letter. Ini menambah butir BPB/transfer/retur di bawah.
-  - Tutup tahun mengabaikan **override mapping cabang** untuk `YearEndClosing.NetIncome` (`YearEndClosing.cs` hanya memfilter `BranchId == null`).
-  - Endpoint sinkronisasi `?modifiedSince=` untuk mobile (PLAN §decision #4) belum dibuat.
-  - Belum ada endpoint API untuk: kredit customer, siklus siap-settle, jurnal per dokumen, dashboard, ganti password sendiri, audit log, detail/cancel nota kredit, dan detail transfer bank.
-  - Hak **Export** bisa diberikan untuk menu Users, Menu Access, Branch Access, API Roles, Branches & Feed Mutations, tetapi menu-menu itu tidak punya fitur ekspor.
-  - Transfer bank & nota kredit tidak punya halaman detail, sehingga jurnal otomatisnya tidak bertautan ke dokumen sumber (`JournalSources.Route`).
-  - Kode mati `GetUserByEmailQuery`.
-  - Value object `Quantity` (PLAN §2.4) tidak pernah dibuat.
-- BPB, transfer & retur bisa diposting walau tahun fiskal belum dibuka; jurnal otomatisnya menjadi dead letter (`FiscalPeriods.NotFoundForDate`) dan memblokir tutup periode → buka tahun fiskal dulu. Pertimbangkan validasi periode saat posting dokumen gudang (seperti VI/PV).
+- **Temuan audit 2026-10-04 — selesai 2026-10-13** (detail: PLAN §17): periode fiskal dicek sebelum dokumen disimpan (BPB, transfer ke siklus, retur, mutasi pakan, penerimaan & uang muka, transfer bank, tutup siklus); tutup tahun memakai mapping cabang; endpoint API yang kurang dibuat; nota kredit punya detail + void; detail transfer bank; hak Export yang tidak berguna dicabut; kode mati dihapus; `Quantity` & `?modifiedSince=` ditutup dengan alasan. Sisa kecil: jurnal `CustomerAdvanceApplied` belum bertaut ke halaman penerimaan (SourceId = id aplikasi uang muka).
+- Rekap PPN mengecualikan nota kredit yang di-void, sehingga rekap periode lama berubah bila nota di-void di periode berikutnya (pertimbangkan saat ekspor Coretax).
 
 ## 9. Langkah Berikutnya — Backlog setelah Fase 8
 
@@ -398,3 +397,4 @@ Seluruh fase rencana awal (0–8) selesai di sisi API. Kandidat berikutnya (urut
 - **Pajak**: ekspor XML Coretax (e-Faktur & e-Bupot) setelah format dikonfirmasi konsultan pajak; input tarif final PPN/PPh.
 - **Akuntansi lanjutan**: hutang non-PO (jasa) & nota debit vendor; transaksi antar cabang (akun antar-cabang); alokasi overhead ke siklus; sub-ledger piutang plasma per peternak; aset tetap & penyusutan.
 - **Operasional/infra**: Redis untuk idempotency & cache (multi-instance), integration test per modul (Testcontainers sudah jalan), observabilitas (Seq/OTel).
+- **Backlog teknis §8** — rencana & usulan keputusan B-1 s.d. B-12 di [PLAN-BACKLOG.md](PLAN-BACKLOG.md) (2026-10-13, **menunggu persetujuan**).

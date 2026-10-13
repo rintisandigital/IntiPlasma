@@ -205,6 +205,8 @@ public sealed partial class PayablesCashBankTests(WebAppFactory factory)
         })).StatusCode.ShouldBe(HttpStatusCode.Redirect);
         (await QueryAsync(db => db.BankTransfers.CountAsync(t => t.FromCashBankAccountId == bankId))).ShouldBe(1);
         (await admin.GetStringAsync(new Uri($"/Finance/BankTransfers?branch={branchId}", UriKind.Relative))).ShouldContain("TOPUP");
+        Guid transferId = await QueryAsync(db => db.BankTransfers.Where(t => t.FromCashBankAccountId == bankId).Select(t => t.Id).SingleAsync());
+        (await admin.GetStringAsync(new Uri($"/Finance/BankTransfers/Details/{transferId}", UriKind.Relative))).ShouldContain("TOPUP");
 
         // Cash/bank book (journals are written by the outbox job, not running here) and its export
         (await admin.GetStringAsync(new Uri($"/Finance/CashBankAccounts/Ledger/{bankId}", UriKind.Relative))).ShouldContain("Opening balance");

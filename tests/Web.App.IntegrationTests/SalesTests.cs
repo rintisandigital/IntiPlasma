@@ -3,6 +3,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using Domain.Finance.Receivables;
 using Domain.MasterData.Warehouses;
+using Domain.Sales.CreditNotes;
 using Domain.Sales.SalesInvoices;
 using Domain.Sales.SalesOrders;
 using Infrastructure.Database;
@@ -191,6 +192,17 @@ public sealed partial class SalesTests(WebAppFactory factory)
         await PostAsync(client, $"/Sales/Receipts/Void/{secondId}", new() { ["date"] = Today(), ["reason"] = "Bounced giro" });
         (await ReceiptStatusAsync(secondId)).ShouldBe(CustomerReceiptStatus.Voided);
         (await InvoiceAsync(invoiceId)).Outstanding.Amount.ShouldBe(400_000m);
+
+        // The credit note has its own page; voiding it puts its Rp 100.000 back on the invoice (once)
+        string creditNote = await client.GetStringAsync(new Uri($"/Sales/CreditNotes/Details/{creditNoteId}", UriKind.Relative));
+        creditNote.ShouldContain("Weight correction");
+        creditNote.ShouldContain("void-modal");
+        await PostAsync(client, $"/Sales/CreditNotes/Void/{creditNoteId}", new() { ["date"] = Today(), ["reason"] = "Wrong weight" });
+        await PostAsync(client, $"/Sales/CreditNotes/Void/{creditNoteId}", new() { ["date"] = Today(), ["reason"] = "Twice" });
+        (await QueryAsync(db => db.SalesCreditNotes.Where(c => c.Id == creditNoteId).Select(c => c.Status).SingleAsync()))
+            .ShouldBe(SalesCreditNoteStatus.Voided);
+        (await InvoiceAsync(invoiceId)).Outstanding.Amount.ShouldBe(500_000m);
+        (await client.GetStringAsync(new Uri($"/Sales/CreditNotes/Details/{creditNoteId}", UriKind.Relative))).ShouldContain("Wrong weight");
     }
 
     private async Task<CustomerReceiptStatus> ReceiptStatusAsync(Guid id) =>

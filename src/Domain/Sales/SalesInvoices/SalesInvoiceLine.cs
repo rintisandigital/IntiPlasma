@@ -82,6 +82,11 @@ public sealed class SalesInvoiceLine
         CreditedAmount += amount;
     }
 
+    internal void RemoveCredit(Money amount)
+    {
+        CreditedAmount -= amount;
+    }
+
     internal void SetCost(decimal costPerKg)
     {
         CostAmount = new Money(costPerKg * WeightKg);

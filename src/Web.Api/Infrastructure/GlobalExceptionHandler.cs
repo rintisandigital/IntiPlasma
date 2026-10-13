@@ -27,6 +27,15 @@ internal sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> log
                 "Database.UniqueViolation",
                 "The data conflicts with an existing record. Please refresh and retry."),
 
+            // A missing or malformed route/query parameter or body (e.g. a required ?asOf=): the client's mistake.
+            BadHttpRequestException badRequest => new ProblemDetails
+            {
+                Status = badRequest.StatusCode,
+                Type = "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+                Title = "Request.Invalid",
+                Detail = badRequest.Message
+            },
+
             _ => new ProblemDetails
             {
                 Status = StatusCodes.Status500InternalServerError,
@@ -39,7 +48,7 @@ internal sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> log
         {
             logger.LogError(exception, "Unhandled exception occurred");
         }
-        else
+        else if (problemDetails.Status == StatusCodes.Status409Conflict)
         {
             logger.LogWarning(exception, "Request conflicted with concurrent changes");
         }

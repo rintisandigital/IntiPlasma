@@ -4,6 +4,7 @@ using Application.Inventory.GoodsReceipts;
 using Application.Inventory.StockTransfers;
 using Application.UnitTests.Abstractions;
 using Domain.Common;
+using Domain.Finance.FiscalPeriods;
 using Domain.Inventory.Stock;
 using Domain.MasterData.Branches;
 using Domain.MasterData.Coops;
@@ -57,6 +58,24 @@ public sealed class InventoryHandlersTests : BaseHandlerTest
 
         (await context.StockLedgerEntries.CountAsync()).ShouldBe(3);
         (await context.PurchaseOrders.SingleAsync()).Status.ShouldBe(PurchaseOrderStatus.PartiallyReceived);
+    }
+
+    [Fact]
+    public async Task GoodsReceipt_Should_Fail_WithoutAFiscalPeriod_InsteadOfDeadLetteringItsJournal()
+    {
+        // Arrange: only fiscal year 2026 exists.
+        await using TestDbContext context = CreateDbContext();
+        Setup s = await SeedAsync(context);
+        var receive = new CreateGoodsReceiptCommandHandler(context, AllBranches(), Numbers(), CreateAttachments(context));
+
+        // Act
+        Result<CreateGoodsReceiptResponse> result = await receive.Handle(
+            new CreateGoodsReceiptCommand(s.Order.Id, s.Central.Id, new DateOnly(2027, 1, 4), "SJ-1", null, [new GoodsReceiptLineRequest(1, 20m)]),
+            CancellationToken.None);
+
+        // Assert
+        result.Error.Code.ShouldBe("FiscalPeriods.NotFoundForDate");
+        (await context.GoodsReceipts.CountAsync()).ShouldBe(0);
     }
 
     [Fact]
@@ -115,6 +134,9 @@ public sealed class InventoryHandlersTests : BaseHandlerTest
 
     private static async Task<Setup> SeedAsync(TestDbContext context)
     {
+        // Documents with an automatic journal need an open fiscal period.
+        context.FiscalPeriods.AddRange(FiscalPeriod.CreateYear(2026));
+
         var branch = Branch.Create("BDG", "Bandung", null, null);
         var kg = Uom.Create("KG", "Kilogram");
         var sak = Uom.Create("SAK", "Sak");

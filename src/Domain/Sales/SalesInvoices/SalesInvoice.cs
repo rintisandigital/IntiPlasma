@@ -225,6 +225,28 @@ public sealed class SalesInvoice : AggregateRoot
         return Result.Success();
     }
 
+    /// <summary>
+    /// Takes back a voided credit note: the credited lines and the outstanding grow again.
+    /// </summary>
+    public Result ReverseCreditNote(IReadOnlyList<(int LineNumber, Money Amount)> lines, Money total)
+    {
+        if (Status is not (SalesInvoiceStatus.Posted or SalesInvoiceStatus.PartiallyPaid or SalesInvoiceStatus.Paid) ||
+            total > CreditedAmount)
+        {
+            return Result.Failure(SalesInvoiceErrors.InvalidCreditReversal(Id));
+        }
+
+        foreach ((int lineNumber, Money amount) in lines)
+        {
+            _lines.Single(l => l.LineNumber == lineNumber).RemoveCredit(amount);
+        }
+
+        CreditedAmount -= total;
+        UpdateSettlementStatus();
+
+        return Result.Success();
+    }
+
     private void UpdateSettlementStatus()
     {
         if (Outstanding.IsZero)

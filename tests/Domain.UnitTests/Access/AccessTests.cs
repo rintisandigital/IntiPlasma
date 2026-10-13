@@ -156,6 +156,22 @@ public sealed class MenuAccessProfileTests
         copy.Items.Single(i => i.MenuId == Users.Id).Rights.ShouldBe(MenuRights.View | MenuRights.Create | MenuRights.Edit);
         copy.Items.Single(i => i.MenuId == Reports.Id).Rights.ShouldBe(MenuRights.View | MenuRights.Export);
     }
+
+    [Fact]
+    public void Duplicate_Should_DropRights_TheMenuNoLongerSupports()
+    {
+        var users = Menu.Create(new MenuDefinition(
+            "admin.users", "admin", "Users", null, "/Admin/Users", 10, MenuRights.Edit | MenuRights.Export, true));
+        MenuAccessProfile profile = MenuAccessProfile.Create(
+            "X", null, [new MenuAccessGrant(users.Id, MenuRights.View | MenuRights.Edit | MenuRights.Export)], [users]).Value;
+
+        // The catalog no longer offers Export on the menu.
+        users.Sync(new MenuDefinition("admin.users", "admin", "Users", null, "/Admin/Users", 10, MenuRights.Edit, true));
+
+        MenuAccessProfile copy = profile.Duplicate("Y", [users]).Value;
+
+        copy.Items.Single().Rights.ShouldBe(MenuRights.View | MenuRights.Edit);
+    }
 }
 
 public sealed class BranchAccessProfileTests

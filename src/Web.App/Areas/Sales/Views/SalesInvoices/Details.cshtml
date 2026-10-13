@@ -107,15 +107,16 @@
         <div class="card-header"><h5 class="card-title mb-0">Credit notes</h5></div>
         <div class="card-body p-0">
             <table class="table mb-0">
-                <thead class="thead-light"><tr><th>Number</th><th>Date</th><th>Reason</th><th class="text-end">Total</th><th></th></tr></thead>
+                <thead class="thead-light"><tr><th>Number</th><th>Date</th><th>Reason</th><th class="text-end">Total</th><th>Status</th><th></th></tr></thead>
                 <tbody>
                     @foreach (Application.Sales.SalesCreditNoteResponse note in Model.CreditNotes)
                     {
                         <tr>
-                            <td>@note.Number</td>
+                            <td><a asp-controller="CreditNotes" asp-action="Details" asp-route-id="@note.Id">@note.Number</a></td>
                             <td>@Fmt.Date(note.Date)</td>
                             <td>@note.Reason</td>
                             <td class="text-end">@Fmt.Money(note.Total)</td>
+                            <td><partial name="Partials/_StatusBadge" model="note.Status.ToString()" /></td>
                             <td class="text-end">
                                 <a asp-controller="CreditNotes" asp-action="Print" asp-route-id="@note.Id" asp-menu="@MenuCodes.SalesCreditNotes" asp-right="Export"
                                    target="_blank" class="btn btn-sm btn-light" title="PDF"><i class="ti ti-file-type-pdf"></i></a>

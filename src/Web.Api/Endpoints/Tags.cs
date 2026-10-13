@@ -45,6 +45,8 @@ public static class Tags
     public const string PlasmaSettlements = "Costing - Plasma Settlements";
     public const string TaxReports = "Finance - Tax Reports";
     public const string Monitoring = "System - Monitoring";
+    public const string Dashboard = "System - Dashboard";
+    public const string AuditLogs = "System - Audit Log";
     public const string Attachments = "Attachments";
     public const string Mobile = "Mobile";
     public const string WeightRanges = "Weight Ranges";

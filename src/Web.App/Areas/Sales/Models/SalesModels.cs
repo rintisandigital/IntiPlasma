@@ -283,6 +283,11 @@ public sealed class AllocationInput
     public decimal? Amount { get; set; }
 }
 
+public sealed record CreditNoteDetailsViewModel(SalesCreditNoteResponse Note, bool CanEdit, bool CanPrint)
+{
+    public bool CanBeVoided => Note.Status == Domain.Sales.CreditNotes.SalesCreditNoteStatus.Posted;
+}
+
 public sealed record ReceiptDetailsViewModel(
     CustomerReceiptResponse Receipt,
     IReadOnlyList<AttachmentResponse> Attachments,

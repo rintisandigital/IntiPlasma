@@ -19,7 +19,7 @@
                     @foreach (Application.Finance.CashBank.BankTransferResponse transfer in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@transfer.Number</td>
+                            <td class="fw-semibold"><a asp-action="Details" asp-route-id="@transfer.Id">@transfer.Number</a></td>
                             <td>@Fmt.Date(transfer.Date)</td>
                             <td>@transfer.BranchCode</td>
                             <td>@transfer.FromCode — @transfer.FromName</td>

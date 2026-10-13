@@ -1,0 +1,89 @@
+@model CreditNoteDetailsViewModel
+@{
+    Application.Sales.SalesCreditNoteResponse note = Model.Note;
+    ViewData["Title"] = $"Credit Note {note.Number}";
+    ViewData["Menu"] = MenuCodes.SalesCreditNotes;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Credit Note @note.Number <partial name="Partials/_StatusBadge" model="note.Status.ToString()" /></h4>
+            <h6>@note.CustomerName · @note.BranchCode</h6>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="Index" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+        @if (Model.CanPrint)
+        {
+            <a asp-action="Print" asp-route-id="@note.Id" target="_blank" class="btn btn-outline-danger"><i class="ti ti-file-type-pdf me-1"></i>Credit Note PDF</a>
+        }
+        @if (Model.CanEdit && Model.CanBeVoided)
+        {
+            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#void-modal"><i class="ti ti-ban me-1"></i>Void</button>
+        }
+    </div>
+</div>
+
+@if (note.VoidDate is { } voided)
+{
+    <div class="alert alert-danger">Voided on @Fmt.Date(voided): @note.VoidReason</div>
+}
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Date</div><div class="fw-semibold">@Fmt.Date(note.Date)</div></div>
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Invoice</div><div class="fw-semibold"><a asp-controller="SalesInvoices" asp-action="Details" asp-route-id="@note.SalesInvoiceId">@note.InvoiceNumber</a></div></div>
+                    <div class="col-md-4 mb-2"><div class="text-muted fs-13">Customer</div><div class="fw-semibold">@note.CustomerCode — @note.CustomerName</div></div>
+                    <div class="col-12"><div class="text-muted fs-13">Reason</div><div>@note.Reason</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-7 fw-normal">Reduction (excl. VAT)</dt><dd class="col-5 text-end">@Fmt.Money(note.Subtotal)</dd>
+                    <dt class="col-7 fw-normal">VAT correction</dt><dd class="col-5 text-end">@Fmt.Money(note.VatAmount)</dd>
+                    <dt class="col-7">Total credited</dt><dd class="col-5 text-end fw-bold">@Fmt.Money(note.Total)</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h5 class="card-title mb-0">Invoice lines credited</h5></div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead class="thead-light">
+                    <tr><th>#</th><th>DO</th><th>Item</th><th>Cycle</th><th class="text-end">Birds</th><th class="text-end">Kg</th><th class="text-end">Line amount</th><th class="text-end">Reduction</th><th class="text-end">VAT</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (Application.Sales.SalesCreditNoteLineResponse line in note.Lines)
+                    {
+                        <tr>
+                            <td>@line.InvoiceLineNumber</td>
+                            <td>@line.DeliveryOrderNumber</td>
+                            <td>@line.ItemCode — @line.ItemName</td>
+                            <td>@line.CycleNumber</td>
+                            <td class="text-end">@Fmt.Number(line.Birds)</td>
+                            <td class="text-end">@Fmt.Number(line.WeightKg, 3)</td>
+                            <td class="text-end">@Fmt.Money(line.InvoiceLineAmount)</td>
+                            <td class="text-end fw-semibold">@Fmt.Money(line.Amount)</td>
+                            <td class="text-end">@Fmt.Money(line.VatAmount)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<partial name="Partials/_ReasonModal" model='new ReasonModalModel("void-modal", $"Void credit note {note.Number}", Url.Action("Void", new { id = note.Id })!, "Void Credit Note", WithDate: true)' />
+
+@await Component.InvokeAsync("JournalPreview", new { sourceIds = new[] { note.Id } })

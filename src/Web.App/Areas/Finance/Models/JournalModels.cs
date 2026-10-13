@@ -128,10 +128,12 @@ public static class JournalSources
         "VendorInvoice" => ("Finance", "VendorInvoices", "Details"),
         "VendorPayment" or "PlasmaPayment" => ("Finance", "PaymentVouchers", "Details"),
         "SalesInvoice" => ("Sales", "SalesInvoices", "Details"),
+        "SalesCreditNote" => ("Sales", "CreditNotes", "Details"),
         "CustomerReceipt" => ("Sales", "Receipts", "Details"),
         "PlasmaSettlement" => ("Costing", "Settlements", "Details"),
         "CycleCostAdjustment" => ("Production", "Cycles", "Details"),
         "CashTransaction" => ("Finance", "CashTransactions", "Details"),
+        "BankTransfer" => ("Finance", "BankTransfers", "Details"),
         _ => null
     };
 }

@@ -29,6 +29,11 @@ public sealed record CreateSalesCreditNoteCommand(
 
 public sealed record CreateSalesCreditNoteResponse(Guid Id, string Number, decimal Total);
 
+/// <summary>
+/// Voids a credit note: the credit goes back to the invoice and the journal is reversed on <paramref name="Date"/>.
+/// </summary>
+public sealed record VoidSalesCreditNoteCommand(Guid SalesCreditNoteId, DateOnly Date, string Reason) : ICommand;
+
 internal sealed class CreateSalesCreditNoteCommandValidator : AbstractValidator<CreateSalesCreditNoteCommand>
 {
     public CreateSalesCreditNoteCommandValidator()
@@ -41,6 +46,15 @@ internal sealed class CreateSalesCreditNoteCommandValidator : AbstractValidator<
             line.RuleFor(l => l.InvoiceLineNumber).GreaterThan(0);
             line.RuleFor(l => l.Amount).GreaterThan(0);
         });
+    }
+}
+
+internal sealed class VoidSalesCreditNoteCommandValidator : AbstractValidator<VoidSalesCreditNoteCommand>
+{
+    public VoidSalesCreditNoteCommandValidator()
+    {
+        RuleFor(c => c.SalesCreditNoteId).NotEmpty();
+        RuleFor(c => c.Reason).NotEmpty().MaximumLength(500);
     }
 }
 
@@ -67,7 +81,7 @@ internal sealed class CreateSalesCreditNoteCommandHandler(
         }
 
         // The journal is posted from the outbox; reject a closed period now rather than dead-letter it later.
-        Result<Domain.Finance.FiscalPeriods.FiscalPeriod> period = await JournalSupport.FindPeriodAsync(context, command.Date, cancellationToken);
+        Result period = await JournalSupport.EnsurePeriodOpenAsync(context, command.Date, cancellationToken);
         if (period.IsFailure)
         {
             return Result.Failure<CreateSalesCreditNoteResponse>(period.Error);
@@ -103,6 +117,53 @@ internal sealed class CreateSalesCreditNoteCommandHandler(
     }
 }
 
+internal sealed class VoidSalesCreditNoteCommandHandler(
+    IApplicationDbContext context,
+    IBranchAccess branchAccess,
+    IDateTimeProvider dateTimeProvider) : ICommandHandler<VoidSalesCreditNoteCommand>
+{
+    public async Task<Result> Handle(VoidSalesCreditNoteCommand command, CancellationToken cancellationToken)
+    {
+        Result notFuture = DailyRecordingSupport.EnsureNotFuture(command.Date, dateTimeProvider);
+        if (notFuture.IsFailure)
+        {
+            return notFuture;
+        }
+
+        SalesCreditNote? creditNote = await context.SalesCreditNotes
+            .Include(n => n.Lines)
+            .SingleOrDefaultAsync(n => n.Id == command.SalesCreditNoteId, cancellationToken);
+
+        if (creditNote is null)
+        {
+            return Result.Failure(SalesCreditNoteErrors.NotFound(command.SalesCreditNoteId));
+        }
+
+        Result<SalesInvoice> invoice = await SalesSupport.LoadInvoiceAsync(context, branchAccess, creditNote.SalesInvoiceId, cancellationToken);
+        if (invoice.IsFailure)
+        {
+            return invoice;
+        }
+
+        // The reversal journal is posted from the outbox; reject a closed period now rather than dead-letter it later.
+        Result period = await JournalSupport.EnsurePeriodOpenAsync(context, command.Date, cancellationToken);
+        if (period.IsFailure)
+        {
+            return period;
+        }
+
+        Result voided = creditNote.Void(command.Date, command.Reason, invoice.Value);
+        if (voided.IsFailure)
+        {
+            return voided;
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+
+        return Result.Success();
+    }
+}
+
 /// <summary>
 /// Journals a credit note: Dr potongan &amp; retur penjualan (DPP) and Dr PPN keluaran / Cr piutang usaha.
 /// </summary>
@@ -130,5 +191,24 @@ internal sealed class SalesCreditNotePostedDomainEventHandler(IApplicationDbCont
                 new AccountingAmount("OutputVat", creditNote.VatAmount)
             ]),
             cancellationToken);
+    }
+}
+
+/// <summary>
+/// Reverses the journal of a voided credit note on the void date.
+/// </summary>
+internal sealed class SalesCreditNoteVoidedDomainEventHandler(IApplicationDbContext context, IAutoJournalService autoJournal)
+    : IDomainEventHandler<SalesCreditNoteVoidedDomainEvent>
+{
+    public async Task Handle(SalesCreditNoteVoidedDomainEvent domainEvent, CancellationToken cancellationToken)
+    {
+        SalesCreditNote creditNote = await context.SalesCreditNotes.AsNoTracking()
+            .SingleAsync(n => n.Id == domainEvent.SalesCreditNoteId, cancellationToken);
+
+        await AutoJournalPosting.EnsureAsync(
+            autoJournal.ReverseAsync(
+                AccountingEvents.SalesCreditNote, creditNote.Id, creditNote.VoidDate!.Value,
+                $"void {creditNote.Number}: {creditNote.VoidReason}", cancellationToken),
+            $"void of credit note {creditNote.Number}");
     }
 }

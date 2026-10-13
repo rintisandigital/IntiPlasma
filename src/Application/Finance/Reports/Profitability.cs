@@ -65,9 +65,12 @@ internal sealed class GetProfitabilityQueryHandler(IDbConnectionFactory dbConnec
             WHERE i.status IN ('Posted', 'PartiallyPaid', 'Paid') AND i.invoice_date BETWEEN @From AND @To
             GROUP BY l.cycle_id),
         credits AS (
-            SELECT cl.cycle_id, SUM(cl.amount) AS credits
+            -- A voided credit note counts back on its void date, as its reversed journal does.
+            SELECT cl.cycle_id,
+                   SUM(CASE WHEN n.date BETWEEN @From AND @To THEN cl.amount ELSE 0 END)
+                   - SUM(CASE WHEN n.status = 'Voided' AND n.void_date BETWEEN @From AND @To THEN cl.amount ELSE 0 END) AS credits
             FROM sales.sales_credit_note_lines cl JOIN sales.sales_credit_notes n ON n.id = cl.sales_credit_note_id
-            WHERE n.date BETWEEN @From AND @To
+            WHERE n.date BETWEEN @From AND @To OR (n.status = 'Voided' AND n.void_date BETWEEN @From AND @To)
             GROUP BY cl.cycle_id),
         adjustments AS (
             SELECT c.id AS cycle_id, (c.closing_cost ->> 'adjustment')::numeric AS adjustment

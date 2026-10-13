@@ -11,12 +11,13 @@ using Web.App.Infrastructure;
 using Web.App.Infrastructure.Authorization;
 using Web.App.Infrastructure.Export;
 using Web.App.Infrastructure.Formatting;
+using Web.App.Infrastructure.Workflow;
 
 namespace Web.App.Areas.Sales.Controllers;
 
 /// <summary>
 /// Nota kredit / retur penjualan on a posted invoice: per-line reductions (price or weight correction) with the VAT
-/// corrected accordingly; posted immediately.
+/// corrected accordingly; posted immediately. A void gives the credit back to the invoice and reverses the journal.
 /// </summary>
 [Area("Sales")]
 [MenuAccess(MenuCodes.SalesCreditNotes)]
@@ -24,9 +25,11 @@ public sealed class CreditNotesController(
     PageSupport support,
     DisplayFormatter formatter,
     IQueryHandler<GetSalesCreditNotesQuery, IReadOnlyList<SalesCreditNoteResponse>> creditNotesQuery,
+    IQueryHandler<GetSalesCreditNoteByIdQuery, SalesCreditNoteResponse> creditNoteQuery,
     IQueryHandler<GetSalesInvoiceByIdQuery, SalesInvoiceResponse> invoiceQuery) : AppController
 {
     private const string MenuCode = MenuCodes.SalesCreditNotes;
+    private const string DocumentType = "SalesCreditNote";
 
     private static readonly ExportColumn<SalesCreditNoteResponse>[] Columns =
     [
@@ -38,7 +41,8 @@ public sealed class CreditNotesController(
         new("Reason", c => c.Reason, Width: 3),
         new("Subtotal", c => c.Subtotal, ExportFormat.Money, 1.2f),
         new("VAT", c => c.VatAmount, ExportFormat.Money, 1),
-        new("Total", c => c.Total, ExportFormat.Money, 1.2f)
+        new("Total", c => c.Total, ExportFormat.Money, 1.2f),
+        new("Status", c => c.Status.ToString(), Width: 0.8f)
     ];
 
     [HttpGet]
@@ -63,6 +67,22 @@ public sealed class CreditNotesController(
 
         return await support.ExportAsync(format, "Credit Notes", "credit-notes", [branchFilter.Description], Columns,
             await ListAsync(branchFilter.BranchId, search, cancellationToken));
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Details(Guid id, CancellationToken cancellationToken)
+    {
+        Result<SalesCreditNoteResponse> result = await creditNoteQuery.Handle(new GetSalesCreditNoteByIdQuery(id), cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return result.Error.Type == ErrorType.Forbidden ? Forbid() : NotFound();
+        }
+
+        return View(new CreditNoteDetailsViewModel(
+            result.Value,
+            CanEdit: await support.CanAsync(MenuCode, MenuRights.Edit),
+            CanPrint: await support.CanAsync(MenuCode, MenuRights.Export)));
     }
 
     [HttpGet]
@@ -104,7 +124,7 @@ public sealed class CreditNotesController(
             if (result.IsSuccess)
             {
                 NotifySuccess($"Credit note {result.Value.Number} of {formatter.Money(result.Value.Total)} has been posted.");
-                return RedirectToAction("Details", "SalesInvoices", new { id = model.SalesInvoiceId });
+                return RedirectToAction(nameof(Details), new { id = result.Value.Id });
             }
 
             AddErrors(result.Error);
@@ -114,17 +134,52 @@ public sealed class CreditNotesController(
         return View("Form", model);
     }
 
+    [HttpPost]
+    [MenuAccess(MenuCode, MenuRights.Edit)]
+    [WorkflowAction("void")]
+    public async Task<IActionResult> Void(
+        Guid id,
+        DateOnly? date,
+        string? reason,
+        [FromServices] IWorkflowActionService workflow,
+        [FromServices] ICommandHandler<VoidSalesCreditNoteCommand> handler,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            NotifyError("Enter the reason for voiding.");
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        Result result = await workflow.ExecuteAsync(
+            new WorkflowActionRequest(DocumentType, id, "void"),
+            ct => handler.Handle(new VoidSalesCreditNoteCommand(id, date ?? formatter.Today(), reason), ct),
+            cancellationToken);
+
+        if (result.IsSuccess)
+        {
+            NotifySuccess("The credit note has been voided; the credit is back on the invoice and its journal reversed.");
+        }
+        else
+        {
+            NotifyError(result.Error.Description);
+        }
+
+        return RedirectToAction(nameof(Details), new { id });
+    }
+
     [HttpGet]
     [MenuAccess(MenuCode, MenuRights.Export)]
     public async Task<IActionResult> Print(Guid id, CancellationToken cancellationToken)
     {
-        SalesCreditNoteResponse? note = (await ListAsync(null, null, cancellationToken)).FirstOrDefault(c => c.Id == id);
+        Result<SalesCreditNoteResponse> result = await creditNoteQuery.Handle(new GetSalesCreditNoteByIdQuery(id), cancellationToken);
 
-        if (note is null)
+        if (result.IsFailure)
         {
-            return NotFound();
+            return result.Error.Type == ErrorType.Forbidden ? Forbid() : NotFound();
         }
 
+        SalesCreditNoteResponse note = result.Value;
         ExportHeader header = await support.Exports.HeaderAsync("Credit Note", $"credit-note-{note.Number}", [$"No. {note.Number}"]);
 
         return support.Exports.Document(header, container => SalesDocumentPdf.CreditNote(container, note, formatter));

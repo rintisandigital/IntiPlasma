@@ -7,6 +7,7 @@ using Application.Inventory.StockTransfers;
 using Application.Production;
 using Application.UnitTests.Abstractions;
 using Domain.Common;
+using Domain.Finance.FiscalPeriods;
 using Domain.Inventory.Stock;
 using Domain.MasterData.Branches;
 using Domain.MasterData.Coops;
@@ -196,6 +197,9 @@ public sealed class ProductionHandlersTests : BaseHandlerTest
     /// </summary>
     private static async Task<Setup> SeedAsync(TestDbContext context)
     {
+        // Documents with an automatic journal need an open fiscal period.
+        context.FiscalPeriods.AddRange(FiscalPeriod.CreateYear(2026));
+
         var branch = Branch.Create("BDG", "Bandung", null, null);
         var kg = Uom.Create("KG", "Kilogram");
         var sak = Uom.Create("SAK", "Sak");

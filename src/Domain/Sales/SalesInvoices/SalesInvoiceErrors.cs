@@ -25,6 +25,10 @@ public static class SalesInvoiceErrors
         "SalesInvoices.InvalidPaymentReversal",
         $"The sales invoice with the Id = '{salesInvoiceId}' has not received that much payment");
 
+    public static Error InvalidCreditReversal(Guid salesInvoiceId) => Error.Problem(
+        "SalesInvoices.InvalidCreditReversal",
+        $"The sales invoice with the Id = '{salesInvoiceId}' has not been credited that much");
+
     public static readonly Error NoDeliveries = Error.Problem(
         "SalesInvoices.NoDeliveries",
         "A sales invoice needs at least one delivery order");

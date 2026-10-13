@@ -199,6 +199,13 @@ internal sealed class CreateCustomerReceiptCommandHandler(
             return Result.Failure<CreateCustomerReceiptResponse>(validation.Error);
         }
 
+        // The journal is posted from the outbox; reject a closed period now rather than dead-letter it later.
+        Result period = await JournalSupport.EnsurePeriodOpenAsync(context, command.ReceiptDate, cancellationToken);
+        if (period.IsFailure)
+        {
+            return Result.Failure<CreateCustomerReceiptResponse>(period.Error);
+        }
+
         Result attachable = await attachments.EnsureAttachableAsync(cashBank.BranchId, command.Documents, cancellationToken);
         if (attachable.IsFailure)
         {
@@ -273,6 +280,13 @@ internal sealed class ApplyCustomerAdvanceCommandHandler(
         if (applied.IsFailure)
         {
             return applied;
+        }
+
+        // The journal is posted from the outbox; reject a closed period now rather than dead-letter it later.
+        Result period = await JournalSupport.EnsurePeriodOpenAsync(context, command.Date, cancellationToken);
+        if (period.IsFailure)
+        {
+            return period;
         }
 
         await context.SaveChangesAsync(cancellationToken);

@@ -1,4 +1,5 @@
 using System.Reflection;
+using Domain.Access;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Shouldly;
@@ -46,6 +47,35 @@ public sealed class WebAppAuthorizationTests : BaseTest
             .ToList();
 
         unknown.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void MenuCatalog_Rights_Should_MatchTheGuardedActions()
+    {
+        var used = Actions()
+            .SelectMany(a => a.Action.GetCustomAttributes<MenuAccessAttribute>()
+                .Concat(a.Controller.GetCustomAttributes<MenuAccessAttribute>()))
+            .Select(a => (a.Code, a.Right))
+            .ToHashSet();
+
+        // A right the Menu Access screen lets an admin grant must unlock something, and every guarded right must
+        // be grantable.
+        var unused = MenuCatalog.Definitions
+            .Where(d => d.Route is not null)
+            .SelectMany(d => Enum.GetValues<MenuRights>()
+                .Where(r => r != MenuRights.None && r != MenuRights.View && d.Supports.HasFlag(r))
+                .Where(r => !used.Contains((d.Code, r)))
+                .Select(r => $"{d.Code}:{r}"))
+            .ToList();
+
+        var ungrantable = used
+            .Where(u => u.Right != MenuRights.View &&
+                        MenuCatalog.Definitions.Any(d => d.Code == u.Code && !d.Supports.HasFlag(u.Right)))
+            .Select(u => $"{u.Code}:{u.Right}")
+            .ToList();
+
+        unused.ShouldBeEmpty();
+        ungrantable.ShouldBeEmpty();
     }
 
     [Fact]

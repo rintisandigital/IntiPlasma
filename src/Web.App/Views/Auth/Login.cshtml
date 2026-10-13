@@ -19,7 +19,7 @@
 }
 <div class="main-wrapper">
     <div class="account-content">
-        <div class="login-wrapper bg-img" style="background-image: url('/assets/img/login-bg.jpg');">
+        <div class="login-wrapper bg-img" style="background-image: url('@Url.Content("~/assets/img/login-bg.jpg")');">
             <div class="login-content authent-content">
                 <form asp-action="Login" asp-controller="Auth" method="post" id="login-form" novalidate>
                     <input type="hidden" asp-for="ReturnUrl" />

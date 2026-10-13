@@ -3675,6 +3675,10 @@ COPY infrastructure.audit_logs (id, occurred_at_utc, category, action, user_id, 
 01a12aec-262c-71d1-ab9d-0fdb55db5f96	2026-10-11 19:24:41.771254+07	SignIn	SignedIn	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	User	01a0f240-f921-75b0-972d-0f74522a6333	Signed in	\N	127.0.0.1	Web.App
 01a12af7-de83-7c50-b27a-94380d06c4e5	2026-10-11 19:37:29.858058+07	SignIn	SignedIn	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	User	01a0f240-f921-75b0-972d-0f74522a6333	Signed in	\N	127.0.0.1	Web.App
 01a12e74-84ea-73ab-b2de-6f601dec8e7b	2026-10-12 11:52:30.569539+07	SignIn	SignedIn	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	User	01a0f240-f921-75b0-972d-0f74522a6333	Signed in	\N	127.0.0.1	Web.App
+01a12ee4-baed-7423-aea5-8abb24c41dcf	2026-10-12 13:55:04.427809+07	SignIn	SignedIn	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	User	01a0f240-f921-75b0-972d-0f74522a6333	Signed in	\N	127.0.0.1	Web.App
+01a12ee5-280e-7a59-a6d9-410168b962dd	2026-10-12 13:55:32.35316+07	Export	PDF	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	sales.credit-notes	01a106ad-ec1a-7e4b-9c45-bc2b557665a5	PDF print of Credit Note	{"menu": "sales.credit-notes", "rows": 1, "title": "Credit Note", "branch": "Cabang Bandung", "filters": ["No. CN/BDG/2026/VIII/0001"]}	127.0.0.1	Web.App
+01a12ee5-7bd1-7038-af90-dae66b9810ec	2026-10-12 13:55:53.809162+07	Export	PDF	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	sales.invoices	01a106ad-f785-70ba-9a35-aaa06a2eaa01	PDF print of Sales Invoice	{"menu": "sales.invoices", "rows": 1, "title": "Sales Invoice", "branch": "Cabang Bandung", "filters": ["No. INV/BDG/2026/VIII/0005"]}	127.0.0.1	Web.App
+01a13414-0ecb-7437-b259-d7fd2af4acc3	2026-10-13 14:04:52.170446+07	SignIn	SignedIn	01a0f240-f921-75b0-972d-0f74522a6333	admin@intiplasma.local	User	01a0f240-f921-75b0-972d-0f74522a6333	Signed in	\N	127.0.0.1	Web.App
 \.
 
 

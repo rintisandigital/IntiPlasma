@@ -14,6 +14,7 @@ using Domain.Documents.Attachments;
 using Domain.Finance.JournalMappings;
 using Domain.MasterData.TaxCodes;
 using Domain.Partnership.Cycles;
+using Domain.Sales.CreditNotes;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using SharedKernel;
@@ -147,6 +148,7 @@ internal static class PlasmaSettlementSupport
             .ToListAsync(cancellationToken);
 
         List<decimal> credits = await context.SalesCreditNotes.AsNoTracking()
+            .Where(n => n.Status != SalesCreditNoteStatus.Voided)
             .SelectMany(n => n.Lines)
             .Where(l => l.CycleId == cycle.Id)
             .Select(l => l.Amount.Amount)

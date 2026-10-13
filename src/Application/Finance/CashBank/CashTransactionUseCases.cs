@@ -340,6 +340,13 @@ internal sealed class CreateBankTransferCommandHandler(
             return Result.Failure<CreateBankTransferResponse>(validation.Error);
         }
 
+        // The journal is posted from the outbox; reject a closed period now rather than dead-letter it later.
+        Result period = await JournalSupport.EnsurePeriodOpenAsync(context, command.Date, cancellationToken);
+        if (period.IsFailure)
+        {
+            return Result.Failure<CreateBankTransferResponse>(period.Error);
+        }
+
         string number = await numberGenerator.NextForBranchAsync(context, DocumentPrefix, from.BranchId, command.Date, cancellationToken);
 
         BankTransfer transfer = BankTransfer.Create(number, from, to, command.Date, amount, command.Reference, command.Notes).Value;

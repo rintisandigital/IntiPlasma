@@ -4,6 +4,7 @@ using Application.Abstractions.Messaging;
 using Application.BreedStandards;
 using Application.Costing;
 using Application.Documents;
+using Application.Finance.Journals;
 using Application.Inventory;
 using Application.Sales;
 using Domain.Documents.Attachments;
@@ -149,6 +150,19 @@ internal sealed class CloseCycleCommandHandler(
             averageAge);
 
         CycleCostSummary cost = await CycleCosting.SummarizeAsync(context, cycle.Value, cancellationToken);
+
+        // The HPP adjustment is posted from the outbox on the last harvest date; reject a closed or missing period
+        // now rather than dead-letter it later.
+        if (cost.Adjustment != 0m && cycle.Value.Harvests.Count > 0)
+        {
+            Result period = await JournalSupport.EnsurePeriodOpenAsync(
+                context, cycle.Value.Harvests.Max(h => h.Date), cancellationToken);
+
+            if (period.IsFailure)
+            {
+                return Result.Failure<CyclePerformance>(period.Error);
+            }
+        }
 
         BreedStandardSnapshot? standard = await BreedStandardReader.FindEffectiveAsync(
             context, cycle.Value.BreedStandardId, cancellationToken);
