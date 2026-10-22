@@ -45,7 +45,7 @@
                     @foreach (Application.Coops.CoopResponse coop in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@coop.Code</td>
+                            <td class="fw-semibold"><a asp-action="Edit" asp-route-id="@coop.Id">@coop.Code</a></td>
                             <td>@coop.Name</td>
                             <td>@coop.FarmerCode — @coop.FarmerName <span class="text-muted fs-13">(@coop.FarmerType)</span></td>
                             <td>@coop.BranchCode</td>

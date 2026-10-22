@@ -19,7 +19,7 @@
                     @foreach (Application.Vendors.VendorResponse vendor in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@vendor.Code</td>
+                            <td class="fw-semibold"><a asp-action="Edit" asp-route-id="@vendor.Id">@vendor.Code</a></td>
                             <td>@vendor.Name @if (vendor.TaxIdentity.IsPkp) { <span class="badge bg-light text-dark ms-1">PKP</span> }</td>
                             <td>@(vendor.TaxIdentity.Npwp ?? "—")</td>
                             <td>@(vendor.Phone ?? "—")</td>

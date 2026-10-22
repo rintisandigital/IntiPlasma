@@ -6543,6 +6543,10 @@ namespace Infrastructure.Database.Migrations
                         .HasColumnType("text")
                         .HasColumnName("password_hash");
 
+                    b.Property<Guid?>("PhotoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("photo_id");
+
                     b.Property<string>("SecurityStamp")
                         .IsRequired()
                         .HasMaxLength(32)

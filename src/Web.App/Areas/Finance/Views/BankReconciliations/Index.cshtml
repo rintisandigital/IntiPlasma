@@ -32,7 +32,7 @@
                     @foreach (Application.Finance.CashBank.BankReconciliationSummary reconciliation in Model.Rows)
                     {
                         <tr>
-                            <td class="fw-semibold">@reconciliation.CashBankCode</td>
+                            <td class="fw-semibold"><a asp-action="Details" asp-route-id="@reconciliation.Id">@reconciliation.CashBankCode</a></td>
                             <td>@Fmt.Date(reconciliation.StatementDate)</td>
                             <td class="text-end text-nowrap">@Fmt.Money(reconciliation.StatementBalance)</td>
                             <td><partial name="Partials/_StatusBadge" model="reconciliation.Status" /></td>

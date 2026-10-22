@@ -1,0 +1,104 @@
+@model Application.Users.Profile.MyProfileResponse
+@{
+    ViewData["Title"] = "Profile";
+    ViewData["Menu"] = "account.profile";
+    string initials = User.GetInitials();
+    string? photoUrl = Model.PhotoId is { } photoId ? Url.Action("File", "Attachments", new { id = photoId }) : null;
+}
+<div class="page-header">
+    <div class="add-item d-flex">
+        <div class="page-title">
+            <h4 class="fw-bold">Profile</h4>
+            <h6>Your account in Inti-Plasma</h6>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="ChangePassword" class="btn btn-outline-primary"><i class="ti ti-lock me-1"></i>Change Password</a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-xl-4 col-lg-5">
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    <partial name="Partials/_UserAvatar" model='new UserAvatarModel(Model.PhotoId, initials, "avatar-xl")' />
+                </div>
+                <h5 class="fw-bold mb-1">@Model.FirstName @Model.LastName</h5>
+                <div class="text-muted mb-3">@Model.Email</div>
+
+                <form asp-action="Photo" method="post" enctype="multipart/form-data" class="text-start">
+                    <label for="photo" class="form-label">@(Model.PhotoId is null ? "Upload photo" : "Change photo")</label>
+                    <input type="file" id="photo" name="photo" class="form-control" accept="image/jpeg,image/png,image/webp" required>
+                    <div class="form-text">JPEG, PNG or WEBP, at most 10 MB. A square photo looks best.</div>
+                    <button type="submit" class="btn btn-primary w-100 mt-2"><i class="ti ti-upload me-1"></i>Save photo</button>
+                </form>
+                @if (Model.PhotoId is not null)
+                {
+                    <form asp-action="RemovePhoto" method="post" class="mt-2" data-confirm="Remove your profile photo?">
+                        <button type="submit" class="btn btn-outline-danger w-100"><i class="ti ti-trash me-1"></i>Remove photo</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-8 col-lg-7">
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Account</h5></div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3"><div class="text-muted fs-13">First name</div><div class="fw-semibold">@Model.FirstName</div></div>
+                    <div class="col-md-6 mb-3"><div class="text-muted fs-13">Last name</div><div class="fw-semibold">@Model.LastName</div></div>
+                    <div class="col-md-6 mb-3"><div class="text-muted fs-13">Email</div><div class="fw-semibold">@Model.Email</div></div>
+                    <div class="col-md-6 mb-3"><div class="text-muted fs-13">Member since</div><div class="fw-semibold">@Fmt.Date(DateOnly.FromDateTime(Model.CreatedAtUtc))</div></div>
+                    <div class="col-md-6 mb-3"><div class="text-muted fs-13">Menu access</div><div class="fw-semibold">@(Model.MenuAccessProfileName ?? "—")</div></div>
+                    <div class="col-md-6 mb-3"><div class="text-muted fs-13">Branch access</div><div class="fw-semibold">@(Model.BranchAccessProfileName ?? "—")</div></div>
+                    <div class="col-md-6 mb-3"><div class="text-muted fs-13">Default branch</div><div class="fw-semibold">@(Model.DefaultBranchName ?? "—")</div></div>
+                    <div class="col-md-6 mb-3">
+                        <div class="text-muted fs-13">API roles</div>
+                        <div>
+                            @foreach (string role in Model.Roles)
+                            {
+                                <span class="badge bg-light text-dark me-1">@role</span>
+                            }
+                            @if (Model.Roles.Count == 0)
+                            {
+                                <span class="fw-semibold">—</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+                <div class="text-muted fs-13">Your name, access and roles are managed by the administrator.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Keep the header avatar (in the mainboard around this iframe) in step with the photo shown here.
+        (function () {
+            var host;
+            try { host = window.parent !== window ? window.parent.document : null; } catch (e) { host = null; }
+            if (!host) { return; }
+            var photoUrl = @Json.Serialize(photoUrl);
+            var initials = @Json.Serialize(initials);
+            host.querySelectorAll('[data-user-avatar]').forEach(function (slot) {
+                var size = slot.getAttribute('data-user-avatar');
+                var avatar;
+                if (photoUrl) {
+                    avatar = host.createElement('img');
+                    avatar.src = photoUrl;
+                    avatar.alt = '';
+                    avatar.className = 'avatar-initials avatar-photo';
+                } else {
+                    avatar = host.createElement('span');
+                    avatar.className = 'avatar-initials';
+                    avatar.textContent = initials;
+                }
+                if (size) { avatar.classList.add(size); }
+                slot.replaceChildren(avatar);
+            });
+        })();
+    </script>
+}

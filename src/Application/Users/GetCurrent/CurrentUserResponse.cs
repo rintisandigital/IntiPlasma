@@ -11,6 +11,11 @@ public sealed record CurrentUserResponse
     public string LastName { get; init; }
 
     /// <summary>
+    /// Profile photo (attachment id; <c>GET attachments/{id}/content</c>).
+    /// </summary>
+    public Guid? PhotoId { get; init; }
+
+    /// <summary>
     /// Branch selected after sign-in (null: the first accessible branch).
     /// </summary>
     public Guid? DefaultBranchId { get; init; }

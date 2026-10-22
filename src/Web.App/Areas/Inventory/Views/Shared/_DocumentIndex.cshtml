@@ -45,7 +45,7 @@
                     @foreach (Application.Inventory.InventoryDocumentResponse document in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@document.Number</td>
+                            <td class="fw-semibold"><a asp-action="Details" asp-route-id="@document.Id">@document.Number</a></td>
                             <td>@Fmt.Date(document.Date)</td>
                             <td>@document.BranchCode</td>
                             <td>@document.Reference</td>

@@ -13,6 +13,7 @@
     </div>
     <div class="d-flex flex-wrap gap-2">
         <a asp-action="Index" class="btn btn-light"><i class="ti ti-arrow-left me-1"></i>Back</a>
+        @await Component.InvokeAsync("JournalPreview", new { sourceIds = new[] { note.Id } })
         @if (Model.CanPrint)
         {
             <a asp-action="Print" asp-route-id="@note.Id" target="_blank" class="btn btn-outline-danger"><i class="ti ti-file-type-pdf me-1"></i>Credit Note PDF</a>
@@ -85,5 +86,3 @@
 </div>
 
 <partial name="Partials/_ReasonModal" model='new ReasonModalModel("void-modal", $"Void credit note {note.Number}", Url.Action("Void", new { id = note.Id })!, "Void Credit Note", WithDate: true)' />
-
-@await Component.InvokeAsync("JournalPreview", new { sourceIds = new[] { note.Id } })

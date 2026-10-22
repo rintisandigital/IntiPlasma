@@ -35,7 +35,7 @@
                     @foreach (Application.Cycles.CycleResponse cycle in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@cycle.Number</td>
+                            <td class="fw-semibold"><a asp-action="Details" asp-route-id="@cycle.Id">@cycle.Number</a></td>
                             <td>@cycle.CoopCode — @cycle.CoopName</td>
                             <td>@cycle.FarmerName <span class="text-muted fs-12">@cycle.FarmerType</span></td>
                             <td>@(cycle.ChickInDate is { } chickIn ? Fmt.Date(chickIn) : $"planned {Fmt.Date(cycle.PlannedChickInDate)}")</td>

@@ -19,7 +19,7 @@
                     @foreach (Application.Finance.CostCenters.CostCenterResponse costCenter in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@costCenter.Code</td>
+                            <td class="fw-semibold"><a asp-action="Edit" asp-route-id="@costCenter.Id">@costCenter.Code</a></td>
                             <td>@costCenter.Name</td>
                             <td><partial name="Partials/_StatusBadge" model='costCenter.IsActive ? "Active" : "Inactive"' /></td>
                             <td class="text-end"><a asp-action="Edit" asp-route-id="@costCenter.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>

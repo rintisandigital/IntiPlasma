@@ -1,0 +1,52 @@
+@model ProcurementOverviewViewModel
+@using System.Globalization
+@{
+    ViewData["Title"] = "Procurement Overview";
+    ViewData["Menu"] = MenuCodes.ProcurementOverview;
+    Application.Procurement.ProcurementOverviewResponse? o = Model.Overview;
+    string monthName = o is null ? "" : CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(o.AsOf.Month);
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel("Procurement Overview", $"{Model.BranchName ?? "All branches"}, as of {(o is null ? "" : Fmt.Date(o.AsOf))}")' />
+
+@if (o is null)
+{
+    <div class="alert alert-warning">The procurement figures could not be loaded.</div>
+    return;
+}
+
+<div class="row g-3 dashboard-kpis">
+    @{
+        string orders = Url.Action("Index", "PurchaseOrders", new { area = "Procurement" })!;
+        (string Label, string Value, string? Note, string Icon, bool Alert, string Menu, string Url)[] cards =
+        [
+            ("POs to approve", Fmt.Number(o.DraftOrders), Fmt.Money(o.DraftOrdersValue), "ti-file-pencil", false, MenuCodes.ProcurementPurchaseOrders,
+                Url.Action("Index", "PurchaseOrders", new { area = "Procurement", status = "Draft" })!),
+            ("POs awaiting goods", Fmt.Number(o.OpenOrders), $"{Fmt.Money(o.OpenOrdersValue)} not received yet", "ti-truck-delivery", false,
+                MenuCodes.ProcurementPurchaseOrders, orders),
+            ("Late deliveries", Fmt.Number(o.LateOrders), "open POs past the expected date", "ti-clock-exclamation", o.LateOrders > 0,
+                MenuCodes.ProcurementPurchaseOrders, orders),
+            ($"Ordered in {monthName}", Fmt.Money(o.OrdersThisMonthValue), $"{Fmt.Number(o.OrdersThisMonth)} POs, before VAT", "ti-shopping-cart", false,
+                MenuCodes.ProcurementPurchaseOrders, orders),
+            ("Invoices to post", Fmt.Number(o.DraftInvoices), Fmt.Money(o.DraftInvoicesValue), "ti-file-invoice", false, MenuCodes.FinanceVendorInvoices,
+                Url.Action("Index", "VendorInvoices", new { area = "Finance", status = "Draft" })!),
+            ("Unpaid invoices", Fmt.Money(o.Payables), $"{Fmt.Number(o.UnpaidInvoices)} invoices · {Fmt.Money(o.PayablesOverdue)} overdue", "ti-cash",
+                o.PayablesOverdue > 0, MenuCodes.FinancePayables, Url.Action("Index", "Payables", new { area = "Finance" })!)
+        ];
+    }
+    @foreach (var card in cards)
+    {
+        <div class="col-sm-6 col-xl-4">
+            <div class="card mb-0 h-100 dashboard-kpi @(card.Alert ? "border-danger" : "")">
+                <div class="card-body d-flex align-items-start gap-3">
+                    <span class="avatar avatar-md rounded @(card.Alert ? "bg-danger text-white" : "bg-primary-transparent text-primary")"><i class="ti @card.Icon fs-20"></i></span>
+                    <div class="flex-fill">
+                        <div class="text-muted fs-13">@card.Label</div>
+                        <div class="fw-bold fs-18">@card.Value</div>
+                        <div class="text-muted fs-12">@card.Note</div>
+                    </div>
+                    <a href="@card.Url" asp-menu="@card.Menu" class="stretched-link" aria-label="Open @card.Label"></a>
+                </div>
+            </div>
+        </div>
+    }
+</div>

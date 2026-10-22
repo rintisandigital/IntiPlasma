@@ -36,7 +36,7 @@
                     {
                         bool cashIn = transaction.Direction == "In";
                         <tr>
-                            <td class="fw-semibold">@(transaction.Number ?? "(draft)")</td>
+                            <td class="fw-semibold"><a asp-action="Details" asp-route-id="@transaction.Id">@(transaction.Number ?? "(draft)")</a></td>
                             <td>@Fmt.Date(transaction.Date)</td>
                             <td><span class="badge @(cashIn ? "bg-success" : "bg-primary")">@(cashIn ? "In" : "Out")</span></td>
                             <td>@transaction.CashBankCode <span class="text-muted fs-12">@transaction.BranchCode</span></td>

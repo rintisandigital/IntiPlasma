@@ -62,6 +62,11 @@ public sealed class User : AggregateRoot
     /// </summary>
     public DateTime? LockoutEndUtc { get; private set; }
 
+    /// <summary>
+    /// Profile photo: an attachment linked to the user (<c>AttachmentOwnerTypes.User</c>).
+    /// </summary>
+    public Guid? PhotoId { get; private set; }
+
     public IReadOnlyCollection<UserRole> Roles => [.. _roles];
 
     public static User Create(string email, string firstName, string lastName, string passwordHash)
@@ -95,6 +100,11 @@ public sealed class User : AggregateRoot
         FirstName = firstName.Trim();
         LastName = lastName.Trim();
     }
+
+    /// <summary>
+    /// Sets or removes the profile photo. The caller links the attachment (it needs the attachment service).
+    /// </summary>
+    public void SetPhoto(Guid? photoId) => PhotoId = photoId;
 
     /// <summary>
     /// Assigns the menu and branch access profiles. The caller checks that the profiles exist and that the

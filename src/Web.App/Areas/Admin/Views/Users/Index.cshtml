@@ -68,7 +68,7 @@
                     @foreach (Application.Users.Manage.UserListItem user in Model.Users.Items)
                     {
                         <tr>
-                            <td class="fw-medium">@user.FirstName @user.LastName</td>
+                            <td class="fw-medium"><a asp-action="Details" asp-route-id="@user.Id">@user.FirstName @user.LastName</a></td>
                             <td>@user.Email</td>
                             <td>@(user.MenuAccessProfileName ?? "—")</td>
                             <td>@(user.BranchAccessProfileName ?? "—")</td>

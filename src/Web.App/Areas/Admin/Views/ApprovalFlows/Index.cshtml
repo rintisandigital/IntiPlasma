@@ -60,7 +60,7 @@
                         <tr>
                             <td>@ApprovalLabels.DocumentType(flow.DocumentType)</td>
                             <td>@(flow.BranchCode ?? "Default (all branches)")</td>
-                            <td>@flow.Name</td>
+                            <td><a asp-action="Edit" asp-route-id="@flow.Id">@flow.Name</a></td>
                             <td>
                                 @foreach (ApprovalFlowLevelResponse level in flow.Levels)
                                 {

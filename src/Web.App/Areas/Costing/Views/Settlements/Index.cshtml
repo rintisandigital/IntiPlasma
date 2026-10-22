@@ -37,7 +37,7 @@
                     @foreach (Application.Costing.PlasmaSettlementResponse settlement in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold text-nowrap">@settlement.Number</td>
+                            <td class="fw-semibold text-nowrap"><a asp-action="Details" asp-route-id="@settlement.Id">@settlement.Number</a></td>
                             <td>@Fmt.Date(settlement.SettlementDate)</td>
                             <td class="text-nowrap">@settlement.CycleNumber<div class="text-muted fs-12">@settlement.CoopCode · @settlement.BranchCode</div></td>
                             <td>@settlement.FarmerName<div class="text-muted fs-12">@SettlementLines.Scheme(settlement.Scheme)</div></td>

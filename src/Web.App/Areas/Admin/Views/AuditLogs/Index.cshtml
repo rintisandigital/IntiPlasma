@@ -74,7 +74,7 @@
                     @foreach (Application.Auditing.AuditLogListItem entry in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="text-nowrap">@Fmt.DateTime(entry.OccurredAtUtc)</td>
+                            <td class="text-nowrap"><a asp-action="Details" asp-route-id="@entry.Id">@Fmt.DateTime(entry.OccurredAtUtc)</a></td>
                             <td><span class="badge @CategoryBadge(entry.Category)">@(entry.Category == "SignIn" ? "Sign-in" : entry.Category)</span></td>
                             <td>@(entry.UserEmail ?? "—")</td>
                             <td>@entry.Summary</td>

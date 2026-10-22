@@ -22,7 +22,7 @@
                     @foreach (Application.WeightRanges.WeightRangeResponse range in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@range.Code</td>
+                            <td class="fw-semibold"><a asp-action="Edit" asp-route-id="@range.Id">@range.Code</a></td>
                             <td>@range.Name</td>
                             <td class="text-end">@(range.MinWeightKg is { } min ? Fmt.Number(min, 3) : "—")</td>
                             <td class="text-end">@(range.MaxWeightKg is { } max ? Fmt.Number(max, 3) : "—")</td>

@@ -102,3 +102,7 @@ public sealed record PurchaseOrderDetailsViewModel(
 
     public bool IsReceivable => Order.Status is "Approved" or "PartiallyReceived";
 }
+
+/// <param name="Overview">Null when the figures could not be loaded.</param>
+/// <param name="BranchName">The branch the figures are for (null = all accessible branches).</param>
+public sealed record ProcurementOverviewViewModel(ProcurementOverviewResponse? Overview, string? BranchName);

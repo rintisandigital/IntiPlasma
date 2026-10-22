@@ -19,7 +19,7 @@
                     @foreach (Application.Finance.JournalTemplates.JournalTemplateResponse template in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@template.Name</td>
+                            <td class="fw-semibold"><a asp-action="Edit" asp-route-id="@template.Id">@template.Name</a></td>
                             <td>@(template.Description ?? "—")</td>
                             <td class="fs-13">
                                 @foreach (Application.Finance.JournalTemplates.JournalTemplateLineResponse line in template.Lines.OrderBy(l => l.LineNumber))

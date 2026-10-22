@@ -19,7 +19,7 @@
                     @foreach (Application.Finance.Payables.VendorInvoiceResponse invoice in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@(invoice.Number ?? "(draft)")</td>
+                            <td class="fw-semibold"><a asp-action="Details" asp-route-id="@invoice.Id">@(invoice.Number ?? "(draft)")</a></td>
                             <td>@invoice.VendorInvoiceNumber</td>
                             <td>@Fmt.Date(invoice.InvoiceDate)</td>
                             <td>@Fmt.Date(invoice.DueDate)</td>

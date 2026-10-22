@@ -19,7 +19,7 @@
                     @foreach (Application.Sales.SalesOrderResponse order in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@order.Number</td>
+                            <td class="fw-semibold"><a asp-action="Details" asp-route-id="@order.Id">@order.Number</a></td>
                             <td>@Fmt.Date(order.OrderDate)</td>
                             <td>@order.BranchCode</td>
                             <td>@order.CustomerName</td>

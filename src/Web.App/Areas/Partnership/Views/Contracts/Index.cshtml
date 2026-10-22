@@ -35,7 +35,7 @@
                     @foreach (Application.Contracts.ContractResponse contract in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@contract.Code</td>
+                            <td class="fw-semibold"><a asp-action="Details" asp-route-id="@contract.Id">@contract.Code</a></td>
                             <td>@contract.Name</td>
                             <td>@contract.BranchCode</td>
                             <td>@EnumOptions.Label(contract.Scheme)</td>

@@ -19,7 +19,7 @@
                     @foreach (Application.Finance.Receivables.CustomerReceiptResponse receipt in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@receipt.Number</td>
+                            <td class="fw-semibold"><a asp-action="Details" asp-route-id="@receipt.Id">@receipt.Number</a></td>
                             <td>@Fmt.Date(receipt.ReceiptDate)</td>
                             <td>@receipt.CustomerName</td>
                             <td>@(receipt.CashBankCode ?? receipt.CashAccountCode)</td>

@@ -19,7 +19,7 @@
                     @foreach (Application.Customers.CustomerResponse customer in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@customer.Code</td>
+                            <td class="fw-semibold"><a asp-action="Edit" asp-route-id="@customer.Id">@customer.Code</a></td>
                             <td>@customer.Name @if (customer.TaxIdentity.IsPkp) { <span class="badge bg-light text-dark ms-1">PKP</span> }</td>
                             <td>@(customer.TaxIdentity.Npwp ?? "—")</td>
                             <td>@(customer.Phone ?? "—")</td>

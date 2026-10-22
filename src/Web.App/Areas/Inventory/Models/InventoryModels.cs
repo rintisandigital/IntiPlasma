@@ -164,3 +164,7 @@ public sealed class StockCardViewModel
 
     public IReadOnlyList<SelectListItem> Warehouses { get; init; } = [];
 }
+
+/// <param name="Overview">Null when the figures could not be loaded.</param>
+/// <param name="BranchName">The branch the figures are for (null = all accessible branches).</param>
+public sealed record InventoryOverviewViewModel(Application.Inventory.InventoryOverviewResponse? Overview, string? BranchName);

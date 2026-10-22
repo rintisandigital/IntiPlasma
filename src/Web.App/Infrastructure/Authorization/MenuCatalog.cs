@@ -44,7 +44,9 @@ public static class MenuCodes
     public const string FinanceBankReconciliations = "finance.bank-reconciliations";
     public const string FinancePayables = "finance.payables";
     public const string FinanceJournals = "finance.journals";
+    public const string ProcurementOverview = "procurement.overview";
     public const string ProcurementPurchaseOrders = "procurement.purchase-orders";
+    public const string InventoryOverview = "inventory.overview";
     public const string InventoryGoodsReceipts = "inventory.goods-receipts";
     public const string InventoryStockTransfers = "inventory.stock-transfers";
     public const string InventoryStockReturns = "inventory.stock-returns";
@@ -54,6 +56,7 @@ public static class MenuCodes
     public const string ProductionRecordings = "production.recordings";
     public const string ProductionHarvests = "production.harvests";
     public const string ProductionLiveBirdStock = "production.live-bird-stock";
+    public const string SalesOverview = "sales.overview";
     public const string SalesOrders = "sales.orders";
     public const string SalesDeliveries = "sales.deliveries";
     public const string SalesInvoices = "sales.invoices";
@@ -124,9 +127,12 @@ public static class MenuCatalog
         Page("partnership", "partnership.field-officers", "Field Officer Assignment", "/Partnership/FieldOfficers", MenuRights.Edit, true);
 
         Group("procurement", "Procurement", "ti ti-shopping-cart", 40);
+        Page("procurement", MenuCodes.ProcurementOverview, "Overview", "/Procurement/Overview", MenuRights.None, true);
+        Page("procurement", MenuCodes.FinanceVendorInvoices, "Vendor Invoices", "/Finance/VendorInvoices", CreateEditExport, true);
         Page("procurement", "procurement.purchase-orders", "Purchase Orders", "/Procurement/PurchaseOrders", CreateEditExport, true);
 
         Group("inventory", "Inventory", "ti ti-building-warehouse", 50);
+        Page("inventory", MenuCodes.InventoryOverview, "Overview", "/Inventory/Overview", MenuRights.None, true);
         Page("inventory", "inventory.goods-receipts", "Goods Receipts", "/Inventory/GoodsReceipts", CreateExport, true);
         Page("inventory", "inventory.stock-transfers", "Stock Transfers", "/Inventory/StockTransfers", CreateExport, true);
         Page("inventory", "inventory.stock-returns", "Stock Returns", "/Inventory/StockReturns", CreateExport, true);
@@ -140,6 +146,7 @@ public static class MenuCatalog
         Page("production", "production.live-bird-stock", "Live Bird Stock", "/Production/LiveBirdStock", MenuRights.Export, true);
 
         Group("sales", "Sales", "ti ti-receipt", 70);
+        Page("sales", MenuCodes.SalesOverview, "Overview", "/Sales/Overview", MenuRights.None, true);
         Page("sales", "sales.orders", "Sales Orders", "/Sales/SalesOrders", CreateEditExport, true);
         Page("sales", "sales.deliveries", "Delivery Orders", "/Sales/DeliveryOrders", CreateEditExport, true);
         Page("sales", "sales.invoices", "Sales Invoices", "/Sales/SalesInvoices", CreateEditExport, true);
@@ -154,7 +161,6 @@ public static class MenuCatalog
         Page("finance", "finance.journal-templates", "Journal Templates", "/Finance/JournalTemplates", CreateEditExport, true);
         Page("finance", "finance.journal-mappings", "Auto Journal Mappings", "/Finance/JournalMappings", CreateEditExport, true);
         Page("finance", "finance.cash-bank-accounts", "Cash/Bank Accounts", "/Finance/CashBankAccounts", CreateEditExport, true);
-        Page("finance", MenuCodes.FinanceVendorInvoices, "Vendor Invoices", "/Finance/VendorInvoices", CreateEditExport, true);
         Page("finance", MenuCodes.FinancePaymentVouchers, "Payment Vouchers", "/Finance/PaymentVouchers", CreateEditExport, true);
         Page("finance", MenuCodes.FinanceCashTransactions, "Cash In/Out", "/Finance/CashTransactions", CreateEditExport, true);
         Page("finance", MenuCodes.FinanceBankTransfers, "Bank Transfers", "/Finance/BankTransfers", CreateExport, true);

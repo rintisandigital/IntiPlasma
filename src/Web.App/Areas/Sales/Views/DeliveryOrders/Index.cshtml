@@ -19,7 +19,7 @@
                     @foreach (Application.Sales.DeliveryOrderResponse delivery in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@delivery.Number</td>
+                            <td class="fw-semibold"><a asp-action="Details" asp-route-id="@delivery.Id">@delivery.Number</a></td>
                             <td>@Fmt.Date(delivery.DeliveryDate)</td>
                             <td>@delivery.SalesOrderNumber</td>
                             <td>@delivery.CustomerName</td>

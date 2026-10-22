@@ -63,6 +63,10 @@ public static class UserErrors
         "Users.LastAdministrator",
         "This is the last active user with Full Access; assign Full Access to another active user first");
 
+    public static readonly Error PhotoNotImage = Error.Problem(
+        "Users.PhotoNotImage",
+        "The profile photo must be a JPEG, PNG or WEBP image");
+
     public static readonly Error InvalidRefreshToken = Error.Problem(
         "Users.InvalidRefreshToken",
         "The provided refresh token is invalid or has expired");

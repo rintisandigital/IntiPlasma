@@ -11,8 +11,8 @@ namespace Web.App.ViewComponents;
 public sealed record JournalPreviewModel(IReadOnlyList<JournalResponse> Journals, string EmptyText);
 
 /// <summary>
-/// "Journal" card on a business document's detail page (PLAN-WEBAPP §21.2): the journals whose source is the document,
-/// with their lines and a link to the journal. Rendered only for users who may view journals.
+/// "Journal" button in a business document's page-header actions (PLAN-WEBAPP §21.2) that opens a modal with the
+/// journals whose source is the document, their lines and a link to each journal. Rendered only for users who may view journals.
 /// </summary>
 public sealed class JournalPreviewViewComponent(
     IMenuRights menuRights,

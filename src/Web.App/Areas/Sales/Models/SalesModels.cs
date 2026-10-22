@@ -329,3 +329,7 @@ public sealed class ReceivablesViewModel
 
     public ReceivableAgingResponse? Aging { get; init; }
 }
+
+/// <param name="Overview">Null when the figures could not be loaded.</param>
+/// <param name="BranchName">The branch the figures are for (null = all accessible branches).</param>
+public sealed record SalesOverviewViewModel(Application.Sales.SalesOverviewResponse? Overview, string? BranchName);

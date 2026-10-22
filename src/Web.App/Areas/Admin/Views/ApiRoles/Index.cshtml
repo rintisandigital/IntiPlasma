@@ -34,7 +34,7 @@
                     {
                         <tr>
                             <td class="fw-medium">
-                                @role.Name
+                                <a asp-action="Edit" asp-route-id="@role.Id">@role.Name</a>
                                 @if (role.IsSystem)
                                 {
                                     <span class="badge bg-info ms-1">System</span>

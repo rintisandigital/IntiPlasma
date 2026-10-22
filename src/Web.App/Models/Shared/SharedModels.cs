@@ -62,3 +62,9 @@ public sealed record FilterSelect(string Name, string AllLabel, IReadOnlyList<Se
 /// Model of <c>_ReasonModal</c>: asks the reason of a cancel/void action (and a date when <see cref="WithDate"/>).
 /// </summary>
 public sealed record ReasonModalModel(string Id, string Title, string Action, string SubmitText, bool WithDate = false);
+
+/// <summary>
+/// Model of <c>_UserAvatar</c>: the user's photo, or their initials when there is none.
+/// </summary>
+/// <param name="SizeClass">Extra size class, e.g. <c>avatar-lg</c> or <c>avatar-xl</c>.</param>
+public sealed record UserAvatarModel(Guid? PhotoId, string Initials, string? SizeClass = null);

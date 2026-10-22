@@ -22,7 +22,7 @@
                     @foreach (Application.BreedStandards.BreedStandardResponse standard in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@standard.Code</td>
+                            <td class="fw-semibold"><a asp-action="Edit" asp-route-id="@standard.Id">@standard.Code</a></td>
                             <td>
                                 @standard.Name
                                 @if (standard.IsDefault)

@@ -1,20 +1,22 @@
 @model UserMenuModel
 <li class="nav-item dropdown has-arrow main-drop profile-nav">
     <a href="#" role="button" class="nav-link userset" data-bs-toggle="dropdown" title="@Model.DisplayName">
-        <span class="user-info p-0">
-            <span class="avatar-initials">@Model.Initials</span>
+        <span class="user-info p-0" data-user-avatar>
+            <partial name="Partials/_UserAvatar" model="new UserAvatarModel(Model.PhotoId, Model.Initials)" />
         </span>
     </a>
     <div class="dropdown-menu menu-drop-user">
         <div class="profileset d-flex align-items-center">
-            <span class="avatar-initials avatar-lg me-2">@Model.Initials</span>
+            <span class="me-2" data-user-avatar="avatar-lg">
+                <partial name="Partials/_UserAvatar" model='new UserAvatarModel(Model.PhotoId, Model.Initials, "avatar-lg")' />
+            </span>
             <div>
                 <h6 class="fw-medium">@Model.DisplayName</h6>
                 <p>@Model.Email</p>
             </div>
         </div>
-        <a class="dropdown-item" href="@Url.Action("ChangePassword", "Account")" target="content-frame">
-            <i class="ti ti-lock me-2"></i>Change Password
+        <a class="dropdown-item" href="@Url.Action("Profile", "Account")" target="content-frame">
+            <i class="ti ti-user-circle me-2"></i>Profile
         </a>
         <a class="dropdown-item" href="/Approvals/MySubmissions" target="content-frame">
             <i class="ti ti-send me-2"></i>My Submissions
@@ -24,7 +26,7 @@
         </a>
         <hr class="my-2">
         <form method="post" asp-controller="Auth" asp-action="Logout" target="_top">
-            <button type="submit" class="dropdown-item logout btn btn-link">
+            <button type="submit" class="dropdown-item logout btn btn-link text-danger">
                 <i class="ti ti-logout me-2"></i>Sign Out
             </button>
         </form>

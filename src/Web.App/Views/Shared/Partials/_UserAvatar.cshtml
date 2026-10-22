@@ -1,0 +1,10 @@
+@* The user's photo, or their initials when there is none. Usage: <partial name="Partials/_UserAvatar" model="new UserAvatarModel(...)" /> *@
+@model UserAvatarModel
+@if (Model.PhotoId is { } photoId)
+{
+    <img src="@Url.Action("File", "Attachments", new { area = "", id = photoId })" alt="" class="avatar-initials avatar-photo @Model.SizeClass">
+}
+else
+{
+    <span class="avatar-initials @Model.SizeClass">@Model.Initials</span>
+}

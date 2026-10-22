@@ -1,0 +1,53 @@
+@model SalesOverviewViewModel
+@using System.Globalization
+@{
+    ViewData["Title"] = "Sales Overview";
+    ViewData["Menu"] = MenuCodes.SalesOverview;
+    Application.Sales.SalesOverviewResponse? o = Model.Overview;
+    string monthName = o is null ? "" : CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(o.AsOf.Month);
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel("Sales Overview", $"{Model.BranchName ?? "All branches"}, as of {(o is null ? "" : Fmt.Date(o.AsOf))}")' />
+
+@if (o is null)
+{
+    <div class="alert alert-warning">The sales figures could not be loaded.</div>
+    return;
+}
+
+<div class="row g-3 dashboard-kpis">
+    @{
+        string from = new DateOnly(o.AsOf.Year, o.AsOf.Month, 1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        string to = o.AsOf.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        (string Label, string Value, string? Note, string Icon, bool Alert, string Menu, string Url)[] cards =
+        [
+            ("SOs to approve", Fmt.Number(o.DraftOrders), "draft sales orders", "ti-file-pencil", false, MenuCodes.SalesOrders,
+                Url.Action("Index", "SalesOrders", new { area = "Sales", status = "Draft" })!),
+            ("SOs to deliver", Fmt.Number(o.OrdersToDeliver), $"{Fmt.Number(o.BirdsToDeliver)} birds not delivered yet", "ti-truck", false,
+                MenuCodes.SalesOrders, Url.Action("Index", "SalesOrders", new { area = "Sales" })!),
+            ("Delivered, not invoiced", Fmt.Number(o.DeliveriesToInvoice), Fmt.Money(o.DeliveriesToInvoiceAmount), "ti-truck-delivery", false,
+                MenuCodes.SalesDeliveries, Url.Action("Index", "DeliveryOrders", new { area = "Sales", status = "Delivered" })!),
+            ("Invoices to post", Fmt.Number(o.DraftInvoices), Fmt.Money(o.DraftInvoicesValue), "ti-file-invoice", false, MenuCodes.SalesInvoices,
+                Url.Action("Index", "SalesInvoices", new { area = "Sales", status = "Draft" })!),
+            ($"Sales {monthName}", Fmt.Money(o.SalesThisMonth), $"{Fmt.Number(o.InvoicesThisMonth)} invoices, before VAT", "ti-receipt", false,
+                MenuCodes.SalesInvoices, Url.Action("Index", "SalesInvoices", new { area = "Sales", from, to })!),
+            ("Receivables", Fmt.Money(o.Receivables), $"{Fmt.Number(o.OpenInvoices)} invoices · {Fmt.Money(o.ReceivablesOverdue)} overdue", "ti-cash",
+                o.ReceivablesOverdue > 0, MenuCodes.SalesReceivables, Url.Action("Index", "Receivables", new { area = "Sales" })!)
+        ];
+    }
+    @foreach (var card in cards)
+    {
+        <div class="col-sm-6 col-xl-4">
+            <div class="card mb-0 h-100 dashboard-kpi @(card.Alert ? "border-danger" : "")">
+                <div class="card-body d-flex align-items-start gap-3">
+                    <span class="avatar avatar-md rounded @(card.Alert ? "bg-danger text-white" : "bg-primary-transparent text-primary")"><i class="ti @card.Icon fs-20"></i></span>
+                    <div class="flex-fill">
+                        <div class="text-muted fs-13">@card.Label</div>
+                        <div class="fw-bold fs-18">@card.Value</div>
+                        <div class="text-muted fs-12">@card.Note</div>
+                    </div>
+                    <a href="@card.Url" asp-menu="@card.Menu" class="stretched-link" aria-label="Open @card.Label"></a>
+                </div>
+            </div>
+        </div>
+    }
+</div>

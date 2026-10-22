@@ -35,7 +35,7 @@
                     @foreach (Application.Warehouses.WarehouseResponse warehouse in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@warehouse.Code</td>
+                            <td class="fw-semibold"><a asp-action="Edit" asp-route-id="@warehouse.Id">@warehouse.Code</a></td>
                             <td>@warehouse.Name</td>
                             <td>@warehouse.BranchCode</td>
                             <td>@EnumOptions.Label(warehouse.Type)</td>

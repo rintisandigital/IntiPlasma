@@ -135,6 +135,31 @@
     font-size: 16px;
 }
 
+.avatar-initials.avatar-xl {
+    width: 112px;
+    height: 112px;
+    font-size: 36px;
+}
+
+/* Profile photo in place of the initials (same size and circle). The template's img { max-width: 100% } lets a
+   flex row (the user-menu card) squeeze the photo to zero width, so the avatar keeps its own size. */
+[data-user-avatar] {
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+img.avatar-initials.avatar-photo {
+    flex-shrink: 0;
+    max-width: none;
+    object-fit: cover;
+    background-color: var(--ip-primary-soft) !important;
+}
+
+.user-menu.nav > li.profile-nav .profileset img.avatar-lg {
+    width: 44px;
+    height: 44px;
+}
+
 /* ---- Pages inside the content iframe --------------------------------------------------------------- */
 
 body.frame-page {

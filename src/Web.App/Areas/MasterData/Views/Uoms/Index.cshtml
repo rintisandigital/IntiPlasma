@@ -19,7 +19,7 @@
                     @foreach (Application.Uoms.Get.UomResponse uom in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@uom.Code</td>
+                            <td class="fw-semibold"><a asp-action="Edit" asp-route-id="@uom.Id">@uom.Code</a></td>
                             <td>@uom.Name</td>
                             <td class="text-end"><a asp-action="Edit" asp-route-id="@uom.Id" class="btn btn-sm btn-light" title="Open"><i class="ti ti-eye"></i></a></td>
                         </tr>

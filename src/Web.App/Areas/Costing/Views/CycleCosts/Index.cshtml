@@ -32,7 +32,7 @@
                     {
                         <tr>
                             <td class="fw-semibold text-nowrap">
-                                @row.CycleNumber
+                                <a asp-action="Details" asp-route-id="@row.CycleId">@row.CycleNumber</a>
                                 <div class="text-muted fs-12 fw-normal">@row.BranchCode · @(row.ChickInDate is { } chickIn ? Fmt.Date(chickIn) : "not started")</div>
                             </td>
                             <td>

@@ -34,7 +34,7 @@
                     @foreach (Application.Finance.Journals.JournalResponse journal in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold text-nowrap">@(journal.Number ?? "(draft)")<div class="text-muted fs-12 fw-normal">@journal.BranchCode</div></td>
+                            <td class="fw-semibold text-nowrap"><a asp-action="Details" asp-route-id="@journal.Id">@(journal.Number ?? "(draft)")</a><div class="text-muted fs-12 fw-normal">@journal.BranchCode</div></td>
                             <td>@Fmt.Date(journal.Date)</td>
                             <td>@JournalSources.Label(journal.SourceType)</td>
                             <td>@journal.Description</td>

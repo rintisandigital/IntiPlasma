@@ -42,7 +42,7 @@
                         @foreach (Application.Production.DailyRecordingResponse recording in Model.Recordings)
                         {
                             <tr>
-                                <td class="fw-semibold">@Fmt.Date(recording.Date)</td>
+                                <td class="fw-semibold"><a asp-action="Details" asp-route-id="@recording.Id">@Fmt.Date(recording.Date)</a></td>
                                 <td class="text-end">@recording.AgeDays</td>
                                 <td class="text-end">@Fmt.Number(recording.Mortality)</td>
                                 <td class="text-end">@Fmt.Number(recording.Culling)</td>

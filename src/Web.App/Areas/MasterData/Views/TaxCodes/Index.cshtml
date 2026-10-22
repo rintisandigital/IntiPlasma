@@ -21,7 +21,7 @@
                     {
                         Application.TaxCodes.Get.TaxRateResponse? rate = taxCode.Rates.Where(r => r.EffectiveFrom <= today).MaxBy(r => r.EffectiveFrom);
                         <tr>
-                            <td class="fw-semibold">@taxCode.Code</td>
+                            <td class="fw-semibold"><a asp-action="Edit" asp-route-id="@taxCode.Id">@taxCode.Code</a></td>
                             <td>@taxCode.Name</td>
                             <td>@(taxCode.Type == "Vat" ? "PPN" : "PPh")</td>
                             <td>@EnumOptions.Label(taxCode.VatTreatment ?? taxCode.IncomeTaxArticle ?? "")</td>

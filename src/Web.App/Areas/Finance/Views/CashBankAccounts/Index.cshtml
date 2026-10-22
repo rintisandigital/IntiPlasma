@@ -35,7 +35,7 @@
                     @foreach (Application.Finance.CashBank.CashBankAccountResponse account in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@account.Code</td>
+                            <td class="fw-semibold"><a asp-action="Edit" asp-route-id="@account.Id">@account.Code</a></td>
                             <td>@account.Name</td>
                             <td>@account.Type</td>
                             <td>@account.BranchCode</td>

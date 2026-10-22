@@ -41,7 +41,7 @@
                     @foreach (Application.Farmers.FarmerResponse farmer in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@farmer.Code</td>
+                            <td class="fw-semibold"><a asp-action="Edit" asp-route-id="@farmer.Id">@farmer.Code</a></td>
                             <td>@farmer.Name</td>
                             <td>@farmer.Type</td>
                             <td>@farmer.BranchCode</td>

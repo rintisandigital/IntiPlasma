@@ -38,7 +38,7 @@
                     {
                         <tr>
                             <td class="fw-medium">
-                                @profile.Name
+                                <a asp-action="Details" asp-route-id="@profile.Id">@profile.Name</a>
                                 @if (profile.IsSystem)
                                 {
                                     <span class="badge bg-info ms-1">System</span>

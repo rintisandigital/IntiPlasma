@@ -27,7 +27,7 @@
                 <tr>
                     <td>@ApprovalLabels.DocumentType(request.DocumentType)</td>
                     <td>
-                        <div class="fw-semibold">@request.DocumentCode — @request.DocumentTitle</div>
+                        <div class="fw-semibold"><a asp-action="Details" asp-route-id="@request.Id">@request.DocumentCode — @request.DocumentTitle</a></div>
                         @if (request.Summary is not null)
                         {
                             <div class="text-muted fs-13">@request.Summary</div>

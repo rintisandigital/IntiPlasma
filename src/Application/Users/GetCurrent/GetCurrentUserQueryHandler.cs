@@ -24,7 +24,7 @@ internal sealed class GetCurrentUserQueryHandler(
         const string userSql =
             """
             SELECT u.id AS Id, u.email AS Email, u.first_name AS FirstName, u.last_name AS LastName,
-                   u.default_branch_id AS DefaultBranchId
+                   u.default_branch_id AS DefaultBranchId, u.photo_id AS PhotoId
             FROM identity.users u
             WHERE u.id = @UserId;
             """;

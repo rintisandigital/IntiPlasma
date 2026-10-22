@@ -1,0 +1,54 @@
+@model InventoryOverviewViewModel
+@using System.Globalization
+@{
+    ViewData["Title"] = "Inventory Overview";
+    ViewData["Menu"] = MenuCodes.InventoryOverview;
+    Application.Inventory.InventoryOverviewResponse? o = Model.Overview;
+    string monthName = o is null ? "" : CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(o.AsOf.Month);
+}
+<partial name="Partials/_PageHeader" model='new PageHeaderModel("Inventory Overview", $"{Model.BranchName ?? "All branches"}, as of {(o is null ? "" : Fmt.Date(o.AsOf))}")' />
+
+@if (o is null)
+{
+    <div class="alert alert-warning">The inventory figures could not be loaded.</div>
+    return;
+}
+
+<div class="row g-3 dashboard-kpis">
+    @{
+        string from = new DateOnly(o.AsOf.Year, o.AsOf.Month, 1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        string to = o.AsOf.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        string stock = Url.Action("Index", "Stock", new { area = "Inventory" })!;
+        (string Label, string Value, string? Note, string Icon, string Menu, string Url)[] cards =
+        [
+            ("Stock value", Fmt.Money(o.CentralStockValue + o.CoopStockValue), $"{Fmt.Number(o.ItemsInStock)} item balances in stock", "ti-packages",
+                MenuCodes.InventoryStock, stock),
+            ("In central warehouses", Fmt.Money(o.CentralStockValue), "moving average", "ti-building-warehouse", MenuCodes.InventoryStock, stock),
+            ("In coop warehouses", Fmt.Money(o.CoopStockValue), "sapronak at the farms", "ti-home", MenuCodes.InventoryStock, stock),
+            ("POs to receive", Fmt.Number(o.OrdersToReceive), $"{Fmt.Money(o.OrdersToReceiveValue)} not received yet", "ti-truck-delivery",
+                MenuCodes.ProcurementPurchaseOrders, Url.Action("Index", "PurchaseOrders", new { area = "Procurement" })!),
+            ($"Goods receipts {monthName}", Fmt.Money(o.GoodsReceiptsThisMonthValue), $"{Fmt.Number(o.GoodsReceiptsThisMonth)} documents", "ti-package-import",
+                MenuCodes.InventoryGoodsReceipts, Url.Action("Index", "GoodsReceipts", new { area = "Inventory", from, to })!),
+            ($"Stock transfers {monthName}", Fmt.Money(o.StockTransfersThisMonthValue), $"{Fmt.Number(o.StockTransfersThisMonth)} documents", "ti-transfer",
+                MenuCodes.InventoryStockTransfers, Url.Action("Index", "StockTransfers", new { area = "Inventory", from, to })!),
+            ($"Stock returns {monthName}", Fmt.Money(o.StockReturnsThisMonthValue), $"{Fmt.Number(o.StockReturnsThisMonth)} documents", "ti-arrow-back-up",
+                MenuCodes.InventoryStockReturns, Url.Action("Index", "StockReturns", new { area = "Inventory", from, to })!)
+        ];
+    }
+    @foreach (var card in cards)
+    {
+        <div class="col-sm-6 col-xl-3">
+            <div class="card mb-0 h-100 dashboard-kpi">
+                <div class="card-body d-flex align-items-start gap-3">
+                    <span class="avatar avatar-md bg-primary-transparent text-primary rounded"><i class="ti @card.Icon fs-20"></i></span>
+                    <div class="flex-fill">
+                        <div class="text-muted fs-13">@card.Label</div>
+                        <div class="fw-bold fs-18">@card.Value</div>
+                        <div class="text-muted fs-12">@card.Note</div>
+                    </div>
+                    <a href="@card.Url" asp-menu="@card.Menu" class="stretched-link" aria-label="Open @card.Label"></a>
+                </div>
+            </div>
+        </div>
+    }
+</div>

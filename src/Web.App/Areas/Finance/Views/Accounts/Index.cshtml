@@ -40,7 +40,7 @@
                     @foreach (Application.Finance.Accounts.AccountResponse account in Model.Accounts)
                     {
                         <tr class="@(account.IsPostable ? "" : "fw-semibold")">
-                            <td class="text-nowrap">@account.Code</td>
+                            <td class="text-nowrap"><a asp-action="Edit" asp-route-id="@account.Id">@account.Code</a></td>
                             <td style="padding-left: @((account.Level - 1) * 1.25 + 0.75)rem">
                                 @if (!account.IsPostable)
                                 {

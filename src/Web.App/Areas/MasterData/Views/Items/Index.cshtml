@@ -32,7 +32,7 @@
                     @foreach (Application.Items.ItemResponse item in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@item.Code</td>
+                            <td class="fw-semibold"><a asp-action="Edit" asp-route-id="@item.Id">@item.Code</a></td>
                             <td>@item.Name</td>
                             <td>@EnumOptions.Label(item.Category)</td>
                             <td>@item.BaseUomCode</td>

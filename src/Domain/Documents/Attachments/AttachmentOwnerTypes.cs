@@ -26,4 +26,9 @@ public static class AttachmentOwnerTypes
     public const string CustomerReceipt = "CustomerReceipt";
     public const string Journal = "Journal";
     public const string PlasmaSettlement = "PlasmaSettlement";
+
+    /// <summary>
+    /// Profile photo of a user (company-wide, no branch).
+    /// </summary>
+    public const string User = "User";
 }

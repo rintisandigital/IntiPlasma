@@ -35,7 +35,7 @@
                     @foreach (Application.Finance.Payables.PaymentVoucherResponse voucher in Model.Rows.Items)
                     {
                         <tr>
-                            <td class="fw-semibold">@voucher.Number</td>
+                            <td class="fw-semibold"><a asp-action="Details" asp-route-id="@voucher.Id">@voucher.Number</a></td>
                             <td>@Fmt.Date(voucher.PaymentDate)</td>
                             <td>
                                 @voucher.PayeeName
