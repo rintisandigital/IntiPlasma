@@ -1,0 +1,57 @@
+@implements IDisposable
+@inject SessionService Session
+@inject ProfilePhotoService ProfilePhoto
+
+@* The signed-in user's profile photo (cached on the device), or their initials when there is none. *@
+<span class="user-avatar" style="width: @(Size)px; height: @(Size)px; font-size: @(Size * 2 / 5)px;">
+    @if (_photo is not null)
+    {
+        <img src="@_photo" alt="Foto profil" />
+    }
+    else
+    {
+        @Initials
+    }
+</span>
+
+@code {
+    private string? _photo;
+    private Guid? _loadedFor;
+
+    [Parameter]
+    public int Size { get; set; } = 44;
+
+    private string Initials => Session.User is { } user
+        ? string.Concat(new[] { user.FirstName, user.LastName }
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Select(n => char.ToUpperInvariant(n.Trim()[0])))
+        : "?";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Session.Changed += OnChanged;
+        ProfilePhoto.Changed += OnChanged;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loadedFor = Session.User?.PhotoId;
+        _photo = await ProfilePhoto.GetDataUrlAsync();
+    }
+
+    private void OnChanged(object? sender, EventArgs e) => _ = InvokeAsync(async () =>
+    {
+        if (_loadedFor != Session.User?.PhotoId || sender is ProfilePhotoService)
+        {
+            await LoadAsync();
+            StateHasChanged();
+        }
+    });
+
+    public void Dispose()
+    {
+        Session.Changed -= OnChanged;
+        ProfilePhoto.Changed -= OnChanged;
+    }
+}

@@ -21,4 +21,19 @@ public sealed class UsersApi(ApiClient api)
         string newPassword,
         CancellationToken cancellationToken = default) =>
         api.PostAsync("users/me/change-password", new { currentPassword, newPassword }, cancellationToken);
+
+    /// <summary>
+    /// The current profile photo (404 when there is none).
+    /// </summary>
+    public Task<ApiResult<AttachmentContent>> GetPhotoAsync(CancellationToken cancellationToken = default) =>
+        api.GetBytesAsync("users/me/photo", cancellationToken);
+
+    /// <summary>
+    /// Uploads a JPEG and makes it the profile photo (the previous one is released by the server).
+    /// </summary>
+    public Task<ApiResult<UploadedPhoto>> UploadPhotoAsync(byte[] jpeg, CancellationToken cancellationToken = default) =>
+        api.PostFileAsync<UploadedPhoto>("users/me/photo", jpeg, "profile.jpg", "image/jpeg", null, cancellationToken);
+
+    public Task<ApiResult> DeletePhotoAsync(CancellationToken cancellationToken = default) =>
+        api.DeleteAsync("users/me/photo", cancellationToken);
 }

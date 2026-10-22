@@ -18,6 +18,11 @@ public sealed record CurrentUser
 
     public string LastName { get; init; } = string.Empty;
 
+    /// <summary>
+    /// Profile photo (attachment id), downloaded through <c>GET users/me/photo</c>.
+    /// </summary>
+    public Guid? PhotoId { get; init; }
+
     public Guid? DefaultBranchId { get; init; }
 
     public bool AllBranches { get; init; }
@@ -46,3 +51,8 @@ public sealed record CurrentUser
 }
 
 public sealed record CurrentUserBranch(Guid Id, string Code, string Name);
+
+/// <summary>
+/// Response of <c>POST users/me/photo</c>.
+/// </summary>
+public sealed record UploadedPhoto(Guid PhotoId);

@@ -6,9 +6,7 @@
     @if (Session.User is { } user)
     {
         <a href="/profil" class="d-flex align-items-center gap-12 mb-16">
-            <div class="chip" style="width: 44px; height: 44px; justify-content: center; font-size: 18px;">
-                <i class="icon icon-user-fill"></i>
-            </div>
+            <UserAvatar Size="44" />
             <div>
                 <div class="text-button-small text-OnSurface">@user.FullName</div>
                 <div class="text-caption-2 text-dark-4">@user.Email</div>

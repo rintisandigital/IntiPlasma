@@ -1,9 +1,35 @@
 @page "/profil"
 @inject SessionService Session
+@inject ProfilePhotoService ProfilePhoto
+@inject IPhotoPicker Photos
 
 <AppPage Title="Profil" BackTo="/lainnya">
     @if (Session.User is { } user)
     {
+        <div class="profile-photo">
+            <UserAvatar Size="112" />
+            <div class="d-flex gap-8">
+                <button type="button" class="tf-btn style-1 round-full" disabled="@_photoBusy" @onclick="() => ChangePhotoAsync(camera: true)">
+                    <i class="icon icon-camera me-1"></i>Kamera
+                </button>
+                <button type="button" class="tf-btn style-1 round-full" disabled="@_photoBusy" @onclick="() => ChangePhotoAsync(camera: false)">
+                    <i class="icon icon-gallery me-1"></i>Galeri
+                </button>
+            </div>
+            @if (user.PhotoId is not null)
+            {
+                <button type="button" class="link-btn text-danger" disabled="@_photoBusy" @onclick="() => _confirmRemove = true">Hapus foto</button>
+            }
+            @if (_photoProgress is not null)
+            {
+                <div class="text-caption-2 text-dark-4">@_photoProgress</div>
+            }
+            @if (_photoMessage is not null)
+            {
+                <div class="alert @(_photoSuccess ? "alert-success" : "alert-danger") w-100 mb-0" role="alert">@_photoMessage</div>
+            }
+        </div>
+
         <div class="info-list">
             <div class="row-item"><span class="label">Nama</span><span>@user.FullName</span></div>
             <div class="row-item"><span class="label">Email</span><span>@user.Email</span></div>
@@ -48,7 +74,18 @@
     }
 </AppPage>
 
+<ConfirmSheet Visible="_confirmRemove"
+              Title="Hapus foto profil?"
+              Message="Foto diganti dengan inisial nama Anda."
+              ConfirmText="Hapus"
+              OnClose="CloseRemoveAsync" />
+
 @code {
+    private bool _photoBusy;
+    private string? _photoProgress;
+    private bool _photoSuccess;
+    private string? _photoMessage;
+    private bool _confirmRemove;
     private PasswordModel _model = new();
     private bool _busy;
     private bool _success;
@@ -71,6 +108,56 @@
         {
             _model = new PasswordModel();
         }
+    }
+
+    private async Task ChangePhotoAsync(bool camera)
+    {
+        _photoBusy = true;
+        _photoMessage = null;
+        string path = Path.Combine(FileSystem.CacheDirectory, $"profile-{Guid.NewGuid():N}.jpg");
+
+        try
+        {
+            bool picked = camera ? await Photos.CaptureAsync(path) : await Photos.PickAsync(path);
+            if (!picked)
+            {
+                return;
+            }
+
+            // Shown only once a photo was chosen, not while the camera or the picker is open.
+            _photoProgress = "Menyimpan foto…";
+            StateHasChanged();
+
+            ApiResult result = await ProfilePhoto.UploadAsync(await File.ReadAllBytesAsync(path));
+            _photoSuccess = result.IsSuccess;
+            _photoMessage = result.IsSuccess ? "Foto profil berhasil diganti." : result.Error!.Message;
+        }
+        finally
+        {
+            File.Delete(path);
+            _photoBusy = false;
+            _photoProgress = null;
+        }
+    }
+
+    private async Task CloseRemoveAsync(bool confirmed)
+    {
+        _confirmRemove = false;
+        if (!confirmed)
+        {
+            return;
+        }
+
+        _photoBusy = true;
+        _photoProgress = "Menghapus foto…";
+        _photoMessage = null;
+
+        ApiResult result = await ProfilePhoto.RemoveAsync();
+
+        _photoBusy = false;
+        _photoProgress = null;
+        _photoSuccess = result.IsSuccess;
+        _photoMessage = result.IsSuccess ? "Foto profil dihapus." : result.Error!.Message;
     }
 
     private sealed class PasswordModel

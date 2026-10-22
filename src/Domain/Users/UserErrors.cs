@@ -63,6 +63,10 @@ public static class UserErrors
         "Users.LastAdministrator",
         "This is the last active user with Full Access; assign Full Access to another active user first");
 
+    public static readonly Error PhotoNotFound = Error.NotFound(
+        "Users.PhotoNotFound",
+        "No profile photo has been set");
+
     public static readonly Error PhotoNotImage = Error.Problem(
         "Users.PhotoNotImage",
         "The profile photo must be a JPEG, PNG or WEBP image");

@@ -21,6 +21,8 @@ public static partial class ErrorMessages
         ["Users.Inactive"] = "Akun Anda tidak aktif. Hubungi administrator.",
         ["Users.InvalidCurrentPassword"] = "Password saat ini salah.",
         ["Users.InvalidRefreshToken"] = "Sesi Anda sudah berakhir. Silakan masuk kembali.",
+        ["Users.PhotoNotImage"] = "Foto profil harus berupa gambar JPEG, PNG atau WEBP.",
+        ["Users.PhotoNotFound"] = "Belum ada foto profil.",
         // Also the answer for data outside the PPL scope (M-36), so it does not reveal that the data exists.
         ["Farmers.NotFound"] = "Peternak tidak ditemukan atau bukan tanggung jawab Anda.",
         ["Coops.NotFound"] = "Kandang tidak ditemukan atau bukan tanggung jawab Anda.",
